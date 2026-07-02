@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import ParticlesBackground from '../components/ParticlesBackground';
 import AuthPortal from '../components/AuthPortal';
 import UserLobby from '../components/UserLobby';
@@ -235,8 +236,10 @@ export default function Home() {
     }
   };
 
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || 'your_google_client_id_here';
+
   return (
-    <>
+    <GoogleOAuthProvider clientId={googleClientId}>
       <ParticlesBackground />
       <div className="ambient-glow glow-1"></div>
       <div className="ambient-glow glow-2"></div>
@@ -283,6 +286,6 @@ export default function Home() {
       <GoogleWarningModal isOpen={googleWarnOpen} onClose={() => setGoogleWarnOpen(false)} />
 
       <LoadingOverlay active={loadingActive} />
-    </>
+    </GoogleOAuthProvider>
   );
 }

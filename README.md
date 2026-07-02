@@ -22,7 +22,7 @@ A modern, highly responsive, dark-themed casino and sweepstakes landing page, pl
 
 ## 🔑 Environment Configuration & SMTP Settings
 
-To send real OTP emails, define the following variables inside your **`.env.local`** file:
+To send real OTP emails and enable Google Sign-In, define the following variables inside your **`.env.local`** file:
 
 ```env
 # Secure Admin Portal Credentials
@@ -32,12 +32,21 @@ NEXT_PUBLIC_ADMIN_PASSWORD=admin123
 # SMTP Server Configurations (GMAIL / SMTP Relay)
 SMTP_USER=sender@gmail.com
 SMTP_PASS=gmail_app_password
+
+# Google Sign-In OAuth Configuration
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id_here
 ```
 
-* **OTP Mail Flow**:
-  - The application sends a POST fetch request to `/api/send-otp`.
-  - If SMTP parameters are missing, the system runs in **Simulator Mode**, logging verification codes to the console and displaying an info alert box for local testing.
-  - If credentials are set, Gmail dispatches a templated verification email to the user.
+### 1. OTP Mail Flow
+* The application sends a POST fetch request to `/api/send-otp`.
+* If SMTP parameters are missing, the system runs in **Simulator Mode**, logging verification codes to the console and displaying an info alert box for local testing.
+* If credentials are set, Gmail dispatches a templated verification email to the user.
+
+### 2. Google OAuth Authentication Flow
+* When the user clicks the "Continue with Google" button:
+  - If they are inside Facebook/Messenger in-app browser, it shows a friendly browser limitations guide prompting them to open in Chrome or Safari.
+  - If they are in a normal browser (Chrome, Safari, etc.) and a Google Client ID is configured, it launches the Google Sign-In popup, retrieves their profile (Name, Email), registers new players automatically, and logs them in.
+  - If no Google Client ID is configured yet, it runs in **OAuth Simulator Mode**, showing a preview prompt and automatically logging them in with a test Google profile (`google-player@test.com`) for seamless test drives.
 
 ---
 

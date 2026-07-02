@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useGoogleLogin } from '@react-oauth/google';
 
 export default function AuthPortal({
   onLoginSuccess,
@@ -9,6 +10,92 @@ export default function AuthPortal({
   triggerLoading,
   showToast,
 }) {
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || 'your_google_client_id_here';
+
+  // Detect Facebook/Messenger In-App WebView
+  const isMessengerWebView = () => {
+    if (typeof window === 'undefined') return false;
+    const ua = navigator.userAgent || navigator.vendor || window.opera;
+    return (ua.indexOf("FBAN") > -1) || (ua.indexOf("FBAV") > -1) || (ua.indexOf("Messenger") > -1);
+  };
+
+  // Google OAuth Authentication login hook
+  const loginWithGoogle = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      triggerLoading(1500, async () => {
+        try {
+          const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
+          });
+          const profile = await res.json();
+          
+          if (!profile.email) {
+            showToast('Failed to fetch email profile from Google.', 'error');
+            return;
+          }
+
+          const userEmail = profile.email.toLowerCase();
+          const userName = profile.name || 'Google Player';
+          
+          // Verify against local database jackpot_users
+          const storedUsers = JSON.parse(localStorage.getItem('jackpot_users') || '[]');
+          let matched = storedUsers.find((u) => u.email.toLowerCase() === userEmail);
+          
+          if (!matched) {
+            // Automatically register brand-new Google users
+            matched = {
+              name: userName,
+              email: userEmail,
+              password: 'OAuth-Google-Login',
+              role: 'user'
+            };
+            storedUsers.push(matched);
+            localStorage.setItem('jackpot_users', JSON.stringify(storedUsers));
+            showToast(`Google account registered! Welcome, ${userName}.`, 'success');
+          } else {
+            showToast(`Welcome back, ${userName}!`, 'success');
+          }
+
+          onLoginSuccess(matched);
+        } catch (err) {
+          console.error('Google profile fetch failed:', err);
+          showToast('Google Authentication succeeded, but profile fetch failed.', 'error');
+        }
+      });
+    },
+    onError: (error) => {
+      console.error('Google Login Error:', error);
+      showToast('Google Sign-In failed or was cancelled.', 'error');
+    }
+  });
+
+  const handleGoogleClick = () => {
+    if (isMessengerWebView()) {
+      onGoogleWarning();
+    } else {
+      if (googleClientId === 'your_google_client_id_here' || !googleClientId) {
+        // Run Simulator Fallback
+        showToast('Google OAuth Simulator triggered (Client ID not configured in .env.local).', 'info');
+        triggerLoading(1200, () => {
+          const testUser = {
+            name: 'Google Demo Player',
+            email: 'google-player@test.com',
+            password: 'OAuth-Google-Login',
+            role: 'user'
+          };
+          const stored = JSON.parse(localStorage.getItem('jackpot_users') || '[]');
+          if (!stored.some(u => u.email === testUser.email)) {
+            stored.push(testUser);
+            localStorage.setItem('jackpot_users', JSON.stringify(stored));
+          }
+          onLoginSuccess(testUser);
+        });
+      } else {
+        loginWithGoogle();
+      }
+    }
+  };
+
   const [activeTab, setActiveTab] = useState('login'); // 'login' | 'register' | 'forgot' | 'otp'
   const [showPassword, setShowPassword] = useState(false);
 
@@ -368,7 +455,7 @@ export default function AuthPortal({
             <section className="auth-panel active" aria-labelledby="login-header">
               <h3 className="sr-only" id="login-header">Login Account</h3>
               
-              <button type="button" className="google-auth-btn" onClick={onGoogleWarning}>
+              <button type="button" className="google-auth-btn" onClick={handleGoogleClick}>
                 <svg className="google-svg" viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                   <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -456,7 +543,7 @@ export default function AuthPortal({
             <section className="auth-panel active" aria-labelledby="register-header">
               <h3 className="panel-heading" id="register-header">Quick signup</h3>
               
-              <button type="button" className="google-auth-btn" onClick={onGoogleWarning}>
+              <button type="button" className="google-auth-btn" onClick={handleGoogleClick}>
                 <svg className="google-svg" viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                   <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
