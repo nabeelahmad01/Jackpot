@@ -1,0 +1,18 @@
+{
+  "name": "Jackpot Entry",
+  "short_name": "JackpotEntry",
+  "description": "Welcome to Jackpot Entry. Access sweepstakes games, grab bonuses, and win big!",
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#05070f",
+  "theme_color": "#ffd700",
+  "icons": [
+    {
+      "src": "falcon_emblem.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
