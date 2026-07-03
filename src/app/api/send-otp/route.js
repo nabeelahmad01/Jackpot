@@ -32,7 +32,7 @@ export async function POST(req) {
       <html>
       <head>
         <meta charset="utf-8">
-        <title>Jackpot Entry Verification Code</title>
+        <title>Jackpot Royals Verification Code</title>
         <style>
           body {
             background-color: #030409;
@@ -116,7 +116,7 @@ export async function POST(req) {
         <div class="email-container">
           <div class="email-header">
             <h1 class="logo-text">
-              <span class="gold-1">JACKPOT</span><span class="gold-2">ENTRY</span>
+              <span class="gold-1">JACKPOT</span><span class="gold-2">ROYALS</span>
             </h1>
           </div>
           <div class="email-body">
@@ -131,7 +131,7 @@ export async function POST(req) {
             <p class="intro-text" style="font-size: 13px;">If you did not request this verification code, please ignore this email or contact support.</p>
             
             <div class="footer-text">
-              © 2026 JackpotEntry.com. All rights reserved.<br/>
+              © 2026 JackpotRoyals.com. All rights reserved.<br/>
               Play Smarter. Cashout Faster.
             </div>
           </div>
@@ -141,9 +141,9 @@ export async function POST(req) {
     `;
 
     const mailOptions = {
-      from: `"Jackpot Entry" <${smtpUser}>`,
+      from: `"Jackpot Royals" <${smtpUser}>`,
       to: email,
-      subject: `🗝️ ${otp} - Your Jackpot Entry Verification Code`,
+      subject: `🗝️ ${otp} - Your Jackpot Royals Verification Code`,
       html: htmlTemplate
     };
 

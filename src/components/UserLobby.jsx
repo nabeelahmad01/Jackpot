@@ -9,6 +9,7 @@ export default function UserLobby({
   gameAccounts = [],
   transactions = [],
   gateways = [],
+  currentUser,
   currentUserEmail,
   onLogout,
   showToast,
@@ -219,11 +220,11 @@ export default function UserLobby({
       <header className="dashboard-header">
         <div className="lobby-brand" onClick={() => { setActiveGame(null); setActiveInvoice(null); }} style={{ cursor: 'pointer' }}>
           <div className="lobby-logo-box">
-            <i className="fa-solid fa-spade spade-icon"></i>
+            <i className="fa-solid fa-crown spade-icon"></i>
           </div>
           <div className="lobby-brand-names">
             <h2 className="lobby-brand-title">
-              JACKPOT<span className="gold-accent">ENTRY</span>
+              JACKPOT<span className="gold-accent">ROYALS</span>
             </h2>
             <p className="lobby-brand-tagline">PLAY SMARTER. CASHOUT FASTER.</p>
           </div>

@@ -1,45 +1,144 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 // --- A) CUSTOMER SUPPORT MODAL ---
-export function SupportModal({ isOpen, onClose, onTicketSubmit }) {
+export function SupportModal({ isOpen, onClose, currentUser }) {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const chatEndRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen || !currentUser) return;
+
+    const fetchMessages = async () => {
+      try {
+        const res = await fetch(`/api/support?email=${encodeURIComponent(currentUser.email)}`);
+        const data = await res.json();
+        if (data.success) {
+          setMessages(data.messages);
+        }
+      } catch (err) {
+        console.error('Failed to load support chat:', err);
+      }
+    };
+
+    fetchMessages();
+    const interval = setInterval(fetchMessages, 3000); // Poll replies every 3 seconds
+
+    return () => clearInterval(interval);
+  }, [isOpen, currentUser]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!input.trim() || !currentUser) return;
+
+    const userEmail = currentUser.email;
+    const userName = currentUser.name;
+    const msgText = input;
+    setInput('');
+
+    try {
+      const response = await fetch('/api/support', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userEmail,
+          userName,
+          message: msgText,
+          senderType: 'player',
+          senderEmail: userEmail
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setMessages((prev) => [...prev, data.message]);
+      }
+    } catch (err) {
+      console.error('Send support msg error:', err);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
     <div className="modal-backdrop-custom" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3>
-            <i className="fa-solid fa-headset gold-text"></i> Customer Support
+      <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px', height: '550px', display: 'flex', flexDirection: 'column' }}>
+        <div className="modal-header" style={{ padding: '1rem 1.25rem' }}>
+          <h3 style={{ fontSize: '1.05rem', fontWeight: 'bold' }}>
+            <i className="fa-solid fa-headset gold-text"></i> Live Customer Support
           </h3>
           <button type="button" className="close-modal" onClick={onClose}>
             &times;
           </button>
         </div>
-        <div className="modal-body">
-          <p>Experiencing issues logging in or receiving your OTP code? Chat with our 24/7 support agent right now.</p>
-          <div className="support-action-box">
-            <a
-              href="https://m.me/jackpotentry"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="support-chat-link"
-              onClick={onClose}
-            >
-              <i className="fa-brands fa-facebook-messenger"></i> Open Live Messenger Support
-            </a>
-            <button
-              type="button"
-              className="support-email-link"
-              onClick={() => {
-                onTicketSubmit();
-                onClose();
-              }}
-            >
-              <i className="fa-solid fa-envelope"></i> Email Support Ticket
-            </button>
+        
+        <div className="modal-body" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '1rem', overflow: 'hidden', background: '#080a10' }}>
+          <p style={{ fontSize: '0.75rem', opacity: 0.7, marginBottom: '0.75rem', textAlign: 'center' }}>
+            Experiencing login, OTP, coin or withdrawal issues? Text our support agent.
+          </p>
+
+          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingRight: '0.25rem', marginBottom: '1rem' }}>
+            {messages.length === 0 ? (
+              <div style={{ margin: 'auto', textAlign: 'center', opacity: 0.5, fontSize: '0.8rem' }}>
+                <i className="fa-solid fa-comments" style={{ fontSize: '2rem', display: 'block', marginBottom: '0.5rem', color: 'var(--gold-primary)' }}></i>
+                No messages yet. Send a message to start!
+              </div>
+            ) : (
+              messages.map((msg) => {
+                const isMe = msg.senderType === 'player';
+                return (
+                  <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
+                    <div style={{
+                      background: isMe ? 'var(--gold-primary)' : 'rgba(255,255,255,0.08)',
+                      color: isMe ? '#000' : '#fff',
+                      padding: '0.6rem 0.85rem',
+                      borderRadius: '12px',
+                      borderBottomRightRadius: isMe ? '2px' : '12px',
+                      borderBottomLeftRadius: isMe ? '12px' : '2px',
+                      fontSize: '0.8rem',
+                      maxWidth: '80%',
+                      fontWeight: isMe ? '600' : 'normal',
+                      wordBreak: 'break-word'
+                    }}>
+                      {msg.message}
+                    </div>
+                    <span style={{ fontSize: '0.55rem', opacity: 0.5, marginTop: '0.2rem' }}>
+                      {isMe ? 'You' : (msg.userName || 'Support Agent')} • {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                );
+              })
+            )}
+            <div ref={chatEndRef} />
           </div>
+
+          <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.75rem' }}>
+            <input
+              type="text"
+              placeholder="Type message here..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              style={{
+                flex: 1,
+                background: '#0c0e17',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '8px',
+                padding: '0.65rem 1rem',
+                color: '#fff',
+                fontSize: '0.8rem',
+                outline: 'none'
+              }}
+              required
+            />
+            <button type="submit" className="submit-btn" style={{ margin: 0, padding: '0.65rem 1.25rem', width: 'auto', background: 'linear-gradient(135deg, #ffd700 0%, #cca000 100%)', color: '#000', fontWeight: 'bold' }}>
+              <i className="fa-solid fa-paper-plane"></i>
+            </button>
+          </form>
         </div>
       </div>
     </div>

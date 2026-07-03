@@ -1,8 +1,8 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Jackpot Entry - Win Big!",
-  description: "Welcome to Jackpot Entry. Access sweepstakes games, grab bonuses, and win big!",
+  title: "Jackpot Royals - Win Big!",
+  description: "Welcome to Jackpot Royals. Access sweepstakes games, grab bonuses, and win big!",
 };
 
 export default function RootLayout({ children }) {

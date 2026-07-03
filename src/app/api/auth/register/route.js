@@ -1,0 +1,88 @@
+import { NextResponse } from 'next/server';
+import { getDb } from '../../../../lib/mongodb';
+
+// GET checks if an email exists and returns registration details for otp flows
+export async function GET(req) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const email = searchParams.get('email');
+
+    if (!email) {
+      return NextResponse.json(
+        { success: false, message: 'Email query is required.' },
+        { status: 400 }
+      );
+    }
+
+    const db = await getDb();
+    const usersCollection = db.collection('users');
+    
+    const user = await usersCollection.findOne({ email: email.toLowerCase().trim() });
+    
+    if (!user) {
+      return NextResponse.json({ success: true, exists: false });
+    }
+
+    return NextResponse.json({
+      success: true,
+      exists: true,
+      name: user.name,
+      password: user.password
+    });
+  } catch (err) {
+    console.error('Email Check API Error:', err);
+    return NextResponse.json(
+      { success: false, message: 'Server error checking email: ' + err.message },
+      { status: 500 }
+    );
+  }
+}
+
+// POST registers a new user
+export async function POST(req) {
+  try {
+    const { email, password, name, role } = await req.json();
+
+    if (!email || !password || !name) {
+      return NextResponse.json(
+        { success: false, message: 'Missing required registration fields.' },
+        { status: 400 }
+      );
+    }
+
+    const db = await getDb();
+    const usersCollection = db.collection('users');
+
+    // Check if user already exists
+    const existingUser = await usersCollection.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
+      return NextResponse.json(
+        { success: false, message: 'An account with this email is already registered.' },
+        { status: 400 }
+      );
+    }
+
+    const newUser = {
+      name: name.trim(),
+      email: email.toLowerCase().trim(),
+      password, // Stored as-is to preserve local credentials migration compatibility
+      role: role || 'user',
+      coins: 100
+    };
+
+    const result = await usersCollection.insertOne(newUser);
+    newUser._id = result.insertedId;
+
+    return NextResponse.json({
+      success: true,
+      message: 'Account successfully registered!',
+      user: { name: newUser.name, email: newUser.email, role: newUser.role, coins: newUser.coins }
+    });
+  } catch (err) {
+    console.error('Registration API Error:', err);
+    return NextResponse.json(
+      { success: false, message: 'Server error during registration: ' + err.message },
+      { status: 500 }
+    );
+  }
+}

@@ -8,6 +8,7 @@ import { AdminGameModal, ApproveAccountModal, AdminGatewayModal, ViewProofModal 
 
 export default function AdminPage() {
   const [authenticated, setAuthenticated] = useState(false);
+  const [adminUser, setAdminUser] = useState(null);
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -19,6 +20,8 @@ export default function AdminPage() {
   const [gameAccounts, setGameAccounts] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [gateways, setGateways] = useState([]);
+  const [coinsNotifications, setCoinsNotifications] = useState([]);
+  const [systemSettings, setSystemSettings] = useState({ firstDepositBonus: 300, regularDepositBonus: 20 });
 
   // Modal Controls
   const [loadingActive, setLoadingActive] = useState(false);
@@ -36,31 +39,91 @@ export default function AdminPage() {
   const [proofModalOpen, setProofModalOpen] = useState(false);
   const [proofImageUrl, setProofImageUrl] = useState('');
 
-  // 1. Initialise and load database values
-  const loadDatabase = () => {
-    setGames(JSON.parse(localStorage.getItem('jackpot_games') || '[]'));
-    setUsers(JSON.parse(localStorage.getItem('jackpot_users') || '[]'));
-    setAccountRequests(JSON.parse(localStorage.getItem('jackpot_account_requests') || '[]'));
-    setGameAccounts(JSON.parse(localStorage.getItem('jackpot_game_accounts') || '[]'));
-    setTransactions(JSON.parse(localStorage.getItem('jackpot_transactions') || '[]'));
-    setGateways(JSON.parse(localStorage.getItem('jackpot_payment_gateways') || '[]'));
+  // 1. Initialise and load database values from server-side APIs
+  const loadDatabase = async () => {
+    try {
+      const gamesRes = await fetch('/api/games');
+      const gamesData = await gamesRes.json();
+      if (gamesData.success) setGames(gamesData.games);
+
+      const usersRes = await fetch('/api/users');
+      const usersData = await usersRes.json();
+      if (usersData.success) setUsers(usersData.users);
+
+      const requestsRes = await fetch('/api/account-requests');
+      const requestsData = await requestsRes.json();
+      if (requestsData.success) setAccountRequests(requestsData.accountRequests);
+
+      const credentialsRes = await fetch('/api/game-accounts');
+      const credentialsData = await credentialsRes.json();
+      if (credentialsData.success) setGameAccounts(credentialsData.gameAccounts);
+
+      const txRes = await fetch('/api/transactions');
+      const txData = await txRes.json();
+      if (txData.success) setTransactions(txData.transactions);
+
+      const gatewaysRes = await fetch('/api/gateways');
+      const gatewaysData = await gatewaysRes.json();
+      if (gatewaysData.success) setGateways(gatewaysData.gateways);
+
+      const notiRes = await fetch('/api/coins-notifications');
+      const notiData = await notiRes.json();
+      if (notiData.success) setCoinsNotifications(notiData.coinsNotifications);
+
+      const settingsRes = await fetch('/api/settings');
+      const settingsData = await settingsRes.json();
+      if (settingsData.success) setSystemSettings(settingsData.settings);
+    } catch (err) {
+      console.error('Failed to load admin database from APIs:', err);
+    }
   };
 
   useEffect(() => {
     // Check local session
     const adminSession = localStorage.getItem('jackpot_admin_session');
-    if (adminSession === 'active') {
+    if (adminSession && adminSession !== 'active') {
+      try {
+        const parsed = JSON.parse(adminSession);
+        if (parsed && parsed.role) {
+          setAuthenticated(true);
+          setAdminUser(parsed);
+        }
+      } catch (e) {
+        setAuthenticated(true);
+        setAdminUser({ name: 'System Admin', email: 'admin@jackpot.com', role: 'admin' });
+      }
+    } else if (adminSession === 'active') {
       setAuthenticated(true);
+      setAdminUser({ name: 'System Admin', email: 'admin@jackpot.com', role: 'admin' });
     }
 
     loadDatabase();
 
-    // 2. Multi-tab Real-Time Synchronization Listener (Zero Refresh!)
+    // Auto background poll database tables every 4 seconds for real-time updates
+    const databaseInterval = setInterval(loadDatabase, 4000);
+
+    // 2. Multi-tab Real-Time Synchronization Listener
     const handleStorageEvent = (e) => {
-      loadDatabase();
+      if (e.key === 'jackpot_admin_session') {
+        const sess = localStorage.getItem('jackpot_admin_session');
+        if (sess && sess !== 'null') {
+          setAuthenticated(true);
+          try {
+            setAdminUser(JSON.parse(sess));
+          } catch (err) {
+            setAdminUser({ name: 'System Admin', email: 'admin@jackpot.com', role: 'admin' });
+          }
+        } else {
+          setAuthenticated(false);
+          setAdminUser(null);
+        }
+      }
     };
     window.addEventListener('storage', handleStorageEvent);
-    return () => window.removeEventListener('storage', handleStorageEvent);
+    return () => {
+      clearInterval(databaseInterval);
+      window.removeEventListener('storage', handleStorageEvent);
+    };
   }, []);
 
   // Shared toast trigger
@@ -77,64 +140,219 @@ export default function AdminPage() {
     }, duration);
   };
 
-  // Admin login credentials check against env parameters
-  const handleAdminLogin = (e) => {
+  // Admin login credentials check against database users
+  const handleAdminLogin = async (e) => {
     e.preventDefault();
-    const envEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'admin@jackpot.com';
-    const envPass = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin123';
+    setLoginError('');
 
-    if (adminEmail.trim().toLowerCase() === envEmail.toLowerCase() && adminPassword === envPass) {
-      triggerLoading(1200, () => {
-        setAuthenticated(true);
-        localStorage.setItem('jackpot_admin_session', 'active');
-        showToast('Secure Admin Session Initiated.', 'success');
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: adminEmail, password: adminPassword })
       });
-    } else {
-      setLoginError('Invalid Administrator credentials.');
+      const data = await response.json();
+
+      if (data.success) {
+        const user = data.user;
+        const allowedRoles = ['admin', 'financial_admin', 'coins_admin', 'support_admin'];
+        if (allowedRoles.includes(user.role)) {
+          triggerLoading(1200, () => {
+            setAuthenticated(true);
+            setAdminUser(user);
+            localStorage.setItem('jackpot_admin_session', JSON.stringify(user));
+            showToast(`Welcome back, ${user.name}! Session Initiated.`, 'success');
+            loadDatabase();
+          });
+        } else {
+          setLoginError('Access Denied. You do not have administrator privileges.');
+        }
+      } else {
+        setLoginError(data.message || 'Invalid Administrator credentials.');
+      }
+    } catch (err) {
+      console.error('Admin login error:', err);
+      setLoginError('Connection error during login.');
     }
   };
 
   const handleAdminLogout = () => {
     triggerLoading(800, () => {
       setAuthenticated(false);
+      setAdminUser(null);
       localStorage.removeItem('jackpot_admin_session');
+      localStorage.removeItem('jackpot_session');
       setAdminEmail('');
       setAdminPassword('');
       showToast('Logged out of Admin Portal.', 'info');
     });
   };
 
-  // Games CRUDS
-  const handleSaveGame = (gameItem) => {
-    let updated;
-    if (gameItem.id) {
-      updated = games.map((g) => (g.id === gameItem.id ? gameItem : g));
-      showToast(`Game "${gameItem.title}" updated successfully!`, 'success');
-    } else {
-      const newGame = { ...gameItem, id: (Date.now() + Math.floor(Math.random() * 100)).toString() };
-      updated = [...games, newGame];
-      showToast(`Game "${gameItem.title}" created successfully!`, 'success');
+  const handleUpdateUserCoins = async (email, coins) => {
+    try {
+      const response = await fetch('/api/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, coins })
+      });
+      const data = await response.json();
+      if (data.success) {
+        showToast(`User coins updated to ${coins}!`, 'success');
+        loadDatabase();
+      } else {
+        showToast(data.message || 'Failed to update coins.', 'error');
+      }
+    } catch (err) {
+      console.error('Update coins API error:', err);
+      showToast('Connection error updating coins.', 'error');
     }
-    setGames(updated);
-    localStorage.setItem('jackpot_games', JSON.stringify(updated));
+  };
+
+  const handleCreateAdmin = async (adminData) => {
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: adminData.email,
+          password: adminData.password,
+          name: adminData.name,
+          role: adminData.role
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        showToast(`Admin staff account created for ${adminData.name}!`, 'success');
+        loadDatabase();
+      } else {
+        showToast(data.message || 'Failed to create admin staff.', 'error');
+      }
+    } catch (err) {
+      console.error('Create admin API error:', err);
+      showToast('Connection error creating admin staff.', 'error');
+    }
+  };
+
+  const handleUpdateSettings = async (firstDepositBonus, regularDepositBonus) => {
+    try {
+      const response = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ firstDepositBonus, regularDepositBonus })
+      });
+      const data = await response.json();
+      if (data.success) {
+        showToast('System settings updated successfully!', 'success');
+        loadDatabase();
+      } else {
+        showToast(data.message || 'Failed to update settings.', 'error');
+      }
+    } catch (err) {
+      console.error('Update settings API error:', err);
+      showToast('Connection error updating settings.', 'error');
+    }
+  };
+
+  const handleUpdateCoinsNotification = async (id, status, read) => {
+    try {
+      const response = await fetch('/api/coins-notifications', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status, read })
+      });
+      const data = await response.json();
+      if (data.success) {
+        if (status === 'COMPLETED') {
+          showToast('Coin allotment request marked as DONE!', 'success');
+        } else {
+          showToast('Notification read status updated.', 'success');
+        }
+        loadDatabase();
+      } else {
+        showToast(data.message || 'Failed to update notification.', 'error');
+      }
+    } catch (err) {
+      console.error('Update notification API error:', err);
+      showToast('Connection error updating notification.', 'error');
+    }
+  };
+
+  const handleUpdateGameCoinsPool = async (gameId, coins) => {
+    try {
+      const response = await fetch('/api/games', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: gameId, availableCoins: coins })
+      });
+      const data = await response.json();
+      if (data.success) {
+        showToast('Game coins pool updated successfully!', 'success');
+        loadDatabase();
+      } else {
+        showToast(data.message || 'Failed to update coins pool.', 'error');
+      }
+    } catch (err) {
+      console.error('Update coins pool API error:', err);
+      showToast('Connection error updating coins pool.', 'error');
+    }
+  };
+
+  // Games CRUDs
+  const handleSaveGame = async (gameItem) => {
+    try {
+      const method = gameItem.id ? 'PUT' : 'POST';
+      const response = await fetch('/api/games', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(gameItem)
+      });
+      const data = await response.json();
+      if (data.success) {
+        showToast(gameItem.id ? `Game updated successfully!` : `Game "${gameItem.title}" created successfully!`, 'success');
+        loadDatabase();
+      } else {
+        showToast(data.message || 'Failed to save game.', 'error');
+      }
+    } catch (err) {
+      console.error('Save game API error:', err);
+      showToast('Connection error saving game.', 'error');
+    }
     setGameModalOpen(false);
   };
 
-  const handleDeleteGame = (id) => {
+  const handleDeleteGame = async (id) => {
     if (window.confirm('Are you sure you want to delete this game?')) {
-      const updated = games.filter((g) => g.id !== id);
-      setGames(updated);
-      localStorage.setItem('jackpot_games', JSON.stringify(updated));
-      showToast('Game deleted successfully.', 'error');
+      try {
+        const response = await fetch(`/api/games?id=${id}`, { method: 'DELETE' });
+        const data = await response.json();
+        if (data.success) {
+          showToast('Game deleted successfully.', 'error');
+          loadDatabase();
+        } else {
+          showToast(data.message || 'Failed to delete game.', 'error');
+        }
+      } catch (err) {
+        console.error('Delete game API error:', err);
+        showToast('Connection error deleting game.', 'error');
+      }
     }
   };
 
-  const handleDeleteUser = (email) => {
+  const handleDeleteUser = async (email) => {
     if (window.confirm(`Delete user account "${email}"?`)) {
-      const updated = users.filter((u) => u.email.toLowerCase() !== email.toLowerCase());
-      setUsers(updated);
-      localStorage.setItem('jackpot_users', JSON.stringify(updated));
-      showToast('User account deleted.', 'error');
+      try {
+        const response = await fetch(`/api/users?email=${encodeURIComponent(email)}`, { method: 'DELETE' });
+        const data = await response.json();
+        if (data.success) {
+          showToast('User account deleted.', 'error');
+          loadDatabase();
+        } else {
+          showToast(data.message || 'Failed to delete user.', 'error');
+        }
+      } catch (err) {
+        console.error('Delete user API error:', err);
+        showToast('Connection error deleting user.', 'error');
+      }
     }
   };
 
@@ -144,56 +362,88 @@ export default function AdminPage() {
     setApproveModalOpen(true);
   };
 
-  const handleSaveApprovedAccount = (credData) => {
-    // 1. Save credentials
-    const newAccount = {
-      gameTitle: credData.gameTitle,
-      userEmail: credData.userEmail,
-      username: credData.username,
-      password: credData.password,
-      status: 'READY'
-    };
-    const updatedAccounts = [...gameAccounts, newAccount];
-    setGameAccounts(updatedAccounts);
-    localStorage.setItem('jackpot_game_accounts', JSON.stringify(updatedAccounts));
+  const handleSaveApprovedAccount = async (credData) => {
+    try {
+      // 1. Create credentials record
+      const credResponse = await fetch('/api/game-accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gameTitle: credData.gameTitle,
+          userEmail: credData.userEmail,
+          username: credData.username,
+          password: credData.password
+        })
+      });
+      const credResult = await credResponse.json();
 
-    // 2. Mark Request as ready
-    const updatedRequests = accountRequests.map((req) => 
-      req.id === credData.requestId ? { ...req, status: 'READY' } : req
-    );
-    setAccountRequests(updatedRequests);
-    localStorage.setItem('jackpot_account_requests', JSON.stringify(updatedRequests));
+      // 2. Set Request Status as READY
+      const reqResponse = await fetch('/api/account-requests', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: credData.requestId,
+          status: 'READY'
+        })
+      });
+      const reqResult = await reqResponse.json();
+
+      if (credResult.success && reqResult.success) {
+        showToast(`Account credentials sent to ${credData.userEmail}!`, 'success');
+        loadDatabase();
+      } else {
+        showToast('Failed to finalize request approval.', 'error');
+      }
+    } catch (err) {
+      console.error('Approve account request API error:', err);
+      showToast('Connection error approving request.', 'error');
+    }
 
     setApproveModalOpen(false);
-    showToast(`Account credentials sent to ${credData.userEmail}!`, 'success');
   };
 
   // Transaction Ledger Approvals
-  const handleApproveTransaction = (txId) => {
-    const updated = transactions.map((tx) => {
-      if (tx.id === txId) {
-        return { ...tx, status: 'SUCCESS' };
+  const handleApproveTransaction = async (txId) => {
+    try {
+      const response = await fetch('/api/transactions', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: txId, status: 'SUCCESS' })
+      });
+      const data = await response.json();
+      if (data.success) {
+        showToast(`Transaction approved successfully.`, 'success');
+        loadDatabase();
+      } else {
+        showToast(data.message || 'Failed to approve transaction.', 'error');
       }
-      return tx;
-    });
-    setTransactions(updated);
-    localStorage.setItem('jackpot_transactions', JSON.stringify(updated));
-    showToast(`Transaction approved successfully.`, 'success');
+    } catch (err) {
+      console.error('Approve transaction API error:', err);
+      showToast('Connection error approving transaction.', 'error');
+    }
   };
 
-  const handleFailTransaction = (txId) => {
+  const handleFailTransaction = async (txId) => {
     const feedbackMsg = window.prompt('Enter reason for rejection/failure:', 'Payment not received');
     if (feedbackMsg === null) return; // Cancelled
 
-    const updated = transactions.map((tx) => {
-      if (tx.id === txId) {
-        return { ...tx, status: 'FAILED', note: feedbackMsg || 'Declined by Admin' };
+    try {
+      const response = await fetch('/api/transactions', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: txId, status: 'FAILED', note: feedbackMsg || 'Declined by Admin' })
+      });
+      const data = await response.json();
+      if (data.success) {
+        showToast('Transaction set to FAILED status.', 'error');
+        loadDatabase();
+      } else {
+        showToast(data.message || 'Failed to decline transaction.', 'error');
       }
-      return tx;
-    });
-    setTransactions(updated);
-    localStorage.setItem('jackpot_transactions', JSON.stringify(updated));
-    showToast('Transaction set to FAILED status.', 'error');
+    } catch (err) {
+      console.error('Decline transaction API error:', err);
+      showToast('Connection error declining transaction.', 'error');
+    }
   };
 
   // View Screenshot proof trigger
@@ -213,29 +463,43 @@ export default function AdminPage() {
     setGatewayModalOpen(true);
   };
 
-  const handleSaveGateway = (gtData) => {
-    let updated;
-    if (gtData.id) {
-      // Edit
-      updated = gateways.map((g) => (g.id === gtData.id ? gtData : g));
-      showToast(`Gateway "${gtData.name}" updated successfully.`, 'success');
-    } else {
-      // Add
-      const newGt = { ...gtData, id: (Date.now() + Math.floor(Math.random() * 100)).toString() };
-      updated = [...gateways, newGt];
-      showToast(`Gateway "${gtData.name}" created successfully.`, 'success');
+  const handleSaveGateway = async (gtData) => {
+    try {
+      const method = gtData.id ? 'PUT' : 'POST';
+      const response = await fetch('/api/gateways', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(gtData)
+      });
+      const data = await response.json();
+      if (data.success) {
+        showToast(gtData.id ? `Gateway "${gtData.name}" updated successfully.` : `Gateway "${gtData.name}" created successfully.`, 'success');
+        loadDatabase();
+      } else {
+        showToast(data.message || 'Failed to save gateway.', 'error');
+      }
+    } catch (err) {
+      console.error('Save gateway API error:', err);
+      showToast('Connection error saving gateway.', 'error');
     }
-    setGateways(updated);
-    localStorage.setItem('jackpot_payment_gateways', JSON.stringify(updated));
     setGatewayModalOpen(false);
   };
 
-  const handleDeleteGateway = (id) => {
+  const handleDeleteGateway = async (id) => {
     if (window.confirm('Are you sure you want to delete this payment gateway?')) {
-      const updated = gateways.filter((g) => g.id !== id);
-      setGateways(updated);
-      localStorage.setItem('jackpot_payment_gateways', JSON.stringify(updated));
-      showToast('Payment gateway deleted.', 'error');
+      try {
+        const response = await fetch(`/api/gateways?id=${id}`, { method: 'DELETE' });
+        const data = await response.json();
+        if (data.success) {
+          showToast('Payment gateway deleted.', 'error');
+          loadDatabase();
+        } else {
+          showToast(data.message || 'Failed to delete gateway.', 'error');
+        }
+      } catch (err) {
+        console.error('Delete gateway API error:', err);
+        showToast('Connection error deleting gateway.', 'error');
+      }
     }
   };
 
@@ -317,6 +581,7 @@ export default function AdminPage() {
           accountRequests={accountRequests}
           transactions={transactions}
           gateways={gateways}
+          adminUser={adminUser}
           onLogout={handleAdminLogout}
           onAddGameClick={() => { setEditGameData(null); setGameModalOpen(true); }}
           onEditGameClick={(game) => { setEditGameData(game); setGameModalOpen(true); }}
@@ -329,6 +594,13 @@ export default function AdminPage() {
           onAddGatewayClick={handleAddGatewayClick}
           onEditGatewayClick={handleEditGatewayClick}
           onDeleteGateway={handleDeleteGateway}
+          onUpdateUserCoins={handleUpdateUserCoins}
+          onCreateAdmin={handleCreateAdmin}
+          coinsNotifications={coinsNotifications}
+          systemSettings={systemSettings}
+          onUpdateSettings={handleUpdateSettings}
+          onUpdateCoinsNotification={handleUpdateCoinsNotification}
+          onUpdateGameCoinsPool={handleUpdateGameCoinsPool}
         />
       )}
 

@@ -2,7 +2,7 @@ const CACHE_NAME = 'jackpot-cache-v1';
 const ASSETS = [
   '/',
   '/manifest.json',
-  '/falcon_emblem.png',
+  '/jackpot_royals_logo.png',
   '/game_juwa.png',
   '/game_gamevault.png',
   '/game_vegassweeps.png'

@@ -1,7 +1,7 @@
 {
-  "name": "Jackpot Entry",
-  "short_name": "JackpotEntry",
-  "description": "Welcome to Jackpot Entry. Access sweepstakes games, grab bonuses, and win big!",
+  "name": "Jackpot Royals",
+  "short_name": "JackpotRoyals",
+  "description": "Welcome to Jackpot Royals. Access sweepstakes games, grab bonuses, and win big!",
   "start_url": ".",
   "display": "standalone",
   "orientation": "portrait",
@@ -9,7 +9,7 @@
   "theme_color": "#ffd700",
   "icons": [
     {
-      "src": "falcon_emblem.png",
+      "src": "jackpot_royals_logo.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

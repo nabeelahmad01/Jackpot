@@ -1,0 +1,150 @@
+{
+  "users": [
+    {
+      "name": "System Admin",
+      "email": "admin@jackpot.com",
+      "password": "admin123",
+      "role": "admin"
+    },
+    {
+      "name": "Demo Player",
+      "email": "player@test.com",
+      "password": "password123",
+      "role": "user"
+    },
+    {
+      "name": "Nabil",
+      "email": "amjadrana6881@gmail.com",
+      "password": "0761071Na@",
+      "role": "financial_admin",
+      "coins": 100,
+      "_id": "ik8yra67016"
+    },
+    {
+      "name": "Arslan",
+      "email": "za7050353@gmail.com",
+      "password": "0761071Na@",
+      "role": "coins_admin",
+      "coins": 100,
+      "_id": "f4n6cr80770"
+    },
+    {
+      "name": "Rocky",
+      "email": "rocky634@gmail.com",
+      "password": "0761071Na@",
+      "role": "support_admin",
+      "coins": 100,
+      "_id": "h4ydqfy4143"
+    },
+    {
+      "name": "Adnan",
+      "email": "na619277@gmail.com",
+      "password": "12345678",
+      "role": "user",
+      "coins": 100,
+      "_id": "97u8skb3480"
+    }
+  ],
+  "games": [
+    {
+      "id": "1",
+      "title": "JUWA",
+      "badge": "hot",
+      "image": "game_juwa.png",
+      "link": "https://play.juwa.org/"
+    },
+    {
+      "id": "2",
+      "title": "GAMEVAULT",
+      "badge": "hot",
+      "image": "game_gamevault.png",
+      "link": "https://play.gamevault.com/"
+    },
+    {
+      "id": "3",
+      "title": "VEGAS SWEEPS",
+      "badge": "new",
+      "image": "game_vegassweeps.png",
+      "link": "https://play.vegassweeps.com/"
+    },
+    {
+      "id": "4",
+      "title": "ULTRAPANDA",
+      "badge": "none",
+      "image": "placeholder_1",
+      "link": "https://play.ultrapanda.com/"
+    },
+    {
+      "id": "5",
+      "title": "BLUE DRAGON",
+      "badge": "none",
+      "image": "placeholder_2",
+      "link": "https://play.bluedragon.com/"
+    },
+    {
+      "id": "6",
+      "title": "FIREKIRIN",
+      "badge": "none",
+      "image": "placeholder_3",
+      "link": "https://play.firekirin.com/"
+    }
+  ],
+  "gateways": [
+    {
+      "id": "1",
+      "name": "Chime",
+      "subtitle": "Fast bank transfer",
+      "tag": "$Autumn-King-34",
+      "phone": "3239902704",
+      "theme": "chime",
+      "qrImage": "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=ChimeTag-Autumn-King-34"
+    },
+    {
+      "id": "2",
+      "name": "Cash App",
+      "subtitle": "Pay using your Cash App",
+      "tag": "$Autumn-King-34",
+      "phone": "3239902704",
+      "theme": "cashapp",
+      "qrImage": "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=CashApp-Autumn-King-34"
+    },
+    {
+      "id": "3",
+      "name": "Crypto",
+      "subtitle": "Pay using USDT / crypto wallet",
+      "tag": "0x71C568971B9c7e73238971a153b8971a153b8971",
+      "phone": "USDT (TRC20)",
+      "theme": "crypto",
+      "qrImage": "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=USDT-0x71C568971B9c7e73238971a153b8971a153b8971"
+    }
+  ],
+  "accountRequests": [
+    {
+      "id": "178308675467168",
+      "gameTitle": "JUWA",
+      "userEmail": "na619277@gmail.com",
+      "status": "READY",
+      "date": "7/3/2026, 6:52:34 PM",
+      "_id": "wiix7504962"
+    }
+  ],
+  "gameAccounts": [
+    {
+      "gameTitle": "JUWA",
+      "userEmail": "na619277@gmail.com",
+      "username": "nabeel634",
+      "password": "258647",
+      "status": "READY",
+      "_id": "1yam7fk9941"
+    }
+  ],
+  "transactions": [],
+  "settings": [
+    {
+      "id": "global_settings",
+      "firstDepositBonus": 100,
+      "regularDepositBonus": 30,
+      "_id": "6kk5lw99344"
+    }
+  ]
+}

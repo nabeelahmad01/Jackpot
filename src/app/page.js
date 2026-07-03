@@ -9,8 +9,31 @@ import LoadingOverlay from '../components/LoadingOverlay';
 import { SupportModal, GoogleWarningModal } from '../components/Modals';
 
 export default function Home() {
-  const [view, setView] = useState('auth'); // 'auth' | 'lobby'
-  const [session, setSession] = useState(null);
+  const [session, setSession] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return JSON.parse(localStorage.getItem('jackpot_session') || 'null');
+      } catch (err) {
+        return null;
+      }
+    }
+    return null;
+  });
+
+  const [view, setView] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = JSON.parse(localStorage.getItem('jackpot_session') || 'null');
+        if (saved) {
+          if (saved.role === 'admin') return 'loading';
+          return 'lobby';
+        }
+      } catch (err) {
+        return 'auth';
+      }
+    }
+    return 'auth';
+  });
   
   // Database State Stores
   const [games, setGames] = useState([]);
@@ -28,97 +51,60 @@ export default function Home() {
   const [supportOpen, setSupportOpen] = useState(false);
   const [googleWarnOpen, setGoogleWarnOpen] = useState(false);
 
-  // Load database lists
-  const loadDatabase = () => {
-    setUsers(JSON.parse(localStorage.getItem('jackpot_users') || '[]'));
-    setGames(JSON.parse(localStorage.getItem('jackpot_games') || '[]'));
-    setAccountRequests(JSON.parse(localStorage.getItem('jackpot_account_requests') || '[]'));
-    setGameAccounts(JSON.parse(localStorage.getItem('jackpot_game_accounts') || '[]'));
-    setTransactions(JSON.parse(localStorage.getItem('jackpot_transactions') || '[]'));
-    setGateways(JSON.parse(localStorage.getItem('jackpot_payment_gateways') || '[]'));
+  // Load database lists from backend APIs
+  const loadDatabase = async (userSession = session) => {
+    try {
+      const gamesRes = await fetch('/api/games');
+      const gamesData = await gamesRes.json();
+      if (gamesData.success) setGames(gamesData.games);
+
+      const gatewaysRes = await fetch('/api/gateways');
+      const gatewaysData = await gatewaysRes.json();
+      if (gatewaysData.success) setGateways(gatewaysData.gateways);
+
+      if (userSession && userSession.email) {
+        const emailQuery = encodeURIComponent(userSession.email);
+        
+        const requestsRes = await fetch(`/api/account-requests?email=${emailQuery}`);
+        const requestsData = await requestsRes.json();
+        if (requestsData.success) setAccountRequests(requestsData.accountRequests);
+
+        const credentialsRes = await fetch(`/api/game-accounts?email=${emailQuery}`);
+        const credentialsData = await credentialsRes.json();
+        if (credentialsData.success) setGameAccounts(credentialsData.gameAccounts);
+
+        const txRes = await fetch(`/api/transactions?email=${emailQuery}`);
+        const txData = await txRes.json();
+        if (txData.success) setTransactions(txData.transactions);
+      }
+    } catch (err) {
+      console.error('Failed to load database from APIs:', err);
+    }
   };
 
-  // Initialize and synchronize LocalStorage Database
+  // Initialize session and trigger data fetch
   useEffect(() => {
-    const DEFAULT_GAMES = [
-      { id: '1', title: 'JUWA', badge: 'hot', image: 'game_juwa.png', link: 'https://play.juwa.org/' },
-      { id: '2', title: 'GAMEVAULT', badge: 'hot', image: 'game_gamevault.png', link: 'https://play.gamevault.com/' },
-      { id: '3', title: 'VEGAS SWEEPS', badge: 'hot', image: 'game_vegassweeps.png', link: 'https://play.vegassweeps.com/' },
-      { id: '4', title: 'ULTRAPANDA', badge: 'none', image: 'placeholder_1', link: 'https://play.ultrapanda.com/' },
-      { id: '5', title: 'BLUE DRAGON', badge: 'none', image: 'placeholder_2', link: 'https://play.bluedragon.com/' },
-      { id: '6', title: 'FIREKIRIN', badge: 'none', image: 'placeholder_3', link: 'https://play.firekirin.com/' },
-    ];
-
-    const DEFAULT_USERS = [
-      { email: 'admin@jackpot.com', password: 'admin123', name: 'System Admin', role: 'admin' },
-      { email: 'player@test.com', password: 'password123', name: 'Demo Player', role: 'user' },
-    ];
-
-    const DEFAULT_GATEWAYS = [
-      {
-        id: '1',
-        name: 'Chime',
-        subtitle: 'Fast bank transfer',
-        tag: '$Autumn-King-34',
-        phone: '3239902704',
-        theme: 'chime',
-        qrImage: 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=ChimeTag-Autumn-King-34'
-      },
-      {
-        id: '2',
-        name: 'Cash App',
-        subtitle: 'Pay using your Cash App',
-        tag: '$Autumn-King-34',
-        phone: '3239902704',
-        theme: 'cashapp',
-        qrImage: 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=CashApp-Autumn-King-34'
-      },
-      {
-        id: '3',
-        name: 'Crypto',
-        subtitle: 'Pay using USDT / crypto wallet',
-        tag: '0x71C568971B9c7e73238971a153b8971a153b8971',
-        phone: 'USDT (TRC20)',
-        theme: 'crypto',
-        qrImage: 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=USDT-0x71C568971B9c7e73238971a153b8971a153b8971'
-      }
-    ];
-
-    if (!localStorage.getItem('jackpot_users')) {
-      localStorage.setItem('jackpot_users', JSON.stringify(DEFAULT_USERS));
-    }
-    if (!localStorage.getItem('jackpot_games')) {
-      localStorage.setItem('jackpot_games', JSON.stringify(DEFAULT_GAMES));
-    }
-    if (!localStorage.getItem('jackpot_session')) {
-      localStorage.setItem('jackpot_session', 'null');
-    }
-    if (!localStorage.getItem('jackpot_account_requests')) {
-      localStorage.setItem('jackpot_account_requests', '[]');
-    }
-    if (!localStorage.getItem('jackpot_game_accounts')) {
-      localStorage.setItem('jackpot_game_accounts', '[]');
-    }
-    if (!localStorage.getItem('jackpot_transactions')) {
-      localStorage.setItem('jackpot_transactions', '[]');
-    }
-    if (!localStorage.getItem('jackpot_payment_gateways')) {
-      localStorage.setItem('jackpot_payment_gateways', JSON.stringify(DEFAULT_GATEWAYS));
-    }
-
-    loadDatabase();
-
-    const savedSession = JSON.parse(localStorage.getItem('jackpot_session'));
+    const savedSession = JSON.parse(localStorage.getItem('jackpot_session') || 'null');
     if (savedSession) {
       if (savedSession.role === 'admin') {
-        // Redirect to admin portal
         window.location.href = '/admin';
+        return;
       } else {
         setSession(savedSession);
         setView('lobby');
       }
     }
+    
+    loadDatabase(savedSession);
 
+    // Auto-poll user records from DB every 4 seconds for real-time updates
+    const interval = setInterval(() => {
+      const currentSess = JSON.parse(localStorage.getItem('jackpot_session') || 'null');
+      if (currentSess) {
+        loadDatabase(currentSess);
+      }
+    }, 4000);
+    
     // Register PWA Service Worker
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker
@@ -126,18 +112,24 @@ export default function Home() {
         .then(() => console.log('PWA Service Worker registered.'))
         .catch((err) => console.error('Service Worker registration failed:', err));
     }
+
+    return () => clearInterval(interval);
   }, []);
 
-  // Multi-tab Real-Time Synchronization Listener (Zero Refresh!)
+  // Multi-tab Session Synchronization Listener
   useEffect(() => {
     const handleStorageChange = (e) => {
-      loadDatabase();
-      
-      // Auto logout player if session cleared elsewhere
-      const currentSess = localStorage.getItem('jackpot_session');
-      if (currentSess === 'null' || !currentSess) {
-        setSession(null);
-        setView('auth');
+      if (e.key === 'jackpot_session') {
+        const currentSess = localStorage.getItem('jackpot_session');
+        if (currentSess === 'null' || !currentSess) {
+          setSession(null);
+          setView('auth');
+        } else {
+          const parsed = JSON.parse(currentSess);
+          setSession(parsed);
+          setView('lobby');
+          loadDatabase(parsed);
+        }
       }
     };
     window.addEventListener('storage', handleStorageChange);
@@ -178,17 +170,15 @@ export default function Home() {
     setSession(user);
     localStorage.setItem('jackpot_session', JSON.stringify(user));
     setView('lobby');
+    loadDatabase(user);
   };
 
   const handleRegisterSuccess = (newUser) => {
-    const updatedUsers = [...users, newUser];
-    setUsers(updatedUsers);
-    localStorage.setItem('jackpot_users', JSON.stringify(updatedUsers));
-
     setSession(newUser);
     localStorage.setItem('jackpot_session', JSON.stringify(newUser));
     setView('lobby');
-    showToast('Welcome to Jackpot Entry! Registration verified successfully.', 'success');
+    loadDatabase(newUser);
+    showToast('Welcome to Jackpot Royals! Registration verified successfully.', 'success');
   };
 
   const handleLogout = () => {
@@ -201,38 +191,48 @@ export default function Home() {
   };
 
   // Player Account Creation Requests
-  const handleRequestAccount = (gameTitle) => {
-    const newRequest = {
-      id: (Date.now() + Math.floor(Math.random() * 100)).toString(),
-      gameTitle,
-      userEmail: session.email,
-      status: 'PENDING',
-      date: new Date().toLocaleString()
-    };
-    const updatedRequests = [...accountRequests, newRequest];
-    setAccountRequests(updatedRequests);
-    localStorage.setItem('jackpot_account_requests', JSON.stringify(updatedRequests));
-    showToast(`Account creation request submitted for ${gameTitle}!`, 'success');
+  const handleRequestAccount = async (gameTitle) => {
+    try {
+      const response = await fetch('/api/account-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameTitle, userEmail: session.email })
+      });
+      const data = await response.json();
+      if (data.success) {
+        showToast(`Account creation request submitted for ${gameTitle}!`, 'success');
+        loadDatabase(session);
+      } else {
+        showToast(data.message || 'Failed to submit account request.', 'error');
+      }
+    } catch (err) {
+      console.error('Request account error:', err);
+      showToast('Connection error submitting request.', 'error');
+    }
   };
 
-  // Player Transactions Requests (Sends receipt image uploader)
-  const handleSubmitTransaction = (newTx) => {
-    const txObject = {
-      id: (Date.now() + Math.floor(Math.random() * 100)).toString(),
-      userEmail: session.email,
-      date: new Date().toLocaleString(),
-      status: 'PENDING',
-      note: '',
-      ...newTx
-    };
-    const updatedTx = [txObject, ...transactions];
-    setTransactions(updatedTx);
-    localStorage.setItem('jackpot_transactions', JSON.stringify(updatedTx));
-    
-    if (newTx.type === 'DEPOSIT') {
-      showToast(`Deposit request of $${parseFloat(newTx.amount).toFixed(2)} submitted with payment proof.`, 'success');
-    } else {
-      showToast(`Withdrawal request of $${parseFloat(newTx.amount).toFixed(2)} submitted.`, 'success');
+  // Player Transactions Requests
+  const handleSubmitTransaction = async (newTx) => {
+    try {
+      const response = await fetch('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...newTx, userEmail: session.email })
+      });
+      const data = await response.json();
+      if (data.success) {
+        if (newTx.type === 'DEPOSIT') {
+          showToast(`Deposit request of $${parseFloat(newTx.amount).toFixed(2)} submitted with payment proof.`, 'success');
+        } else {
+          showToast(`Withdrawal request of $${parseFloat(newTx.amount).toFixed(2)} submitted.`, 'success');
+        }
+        loadDatabase(session);
+      } else {
+        showToast(data.message || 'Transaction submission failed.', 'error');
+      }
+    } catch (err) {
+      console.error('Submit transaction error:', err);
+      showToast('Connection error submitting transaction.', 'error');
     }
   };
 
@@ -252,13 +252,19 @@ export default function Home() {
       )}
 
       {/* Screen Views Wrapper */}
-      {view === 'auth' ? (
+      {view === 'loading' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: '1rem', color: '#fff' }}>
+          <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '2.5rem', color: 'var(--gold-primary)' }}></i>
+          <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Redirecting to secure workspace...</span>
+        </div>
+      ) : view === 'auth' ? (
         <AuthPortal
           onLoginSuccess={handleLoginSuccess}
           onRegisterSuccess={handleRegisterSuccess}
           onGoogleWarning={() => setGoogleWarnOpen(true)}
           triggerLoading={triggerLoading}
           showToast={showToast}
+          onOpenSupport={() => setSupportOpen(true)}
         />
       ) : (
         <UserLobby
@@ -267,6 +273,7 @@ export default function Home() {
           gameAccounts={gameAccounts}
           transactions={transactions}
           gateways={gateways}
+          currentUser={session}
           currentUserEmail={session?.email}
           onLogout={handleLogout}
           showToast={showToast}
@@ -280,7 +287,7 @@ export default function Home() {
       <SupportModal
         isOpen={supportOpen}
         onClose={() => setSupportOpen(false)}
-        onTicketSubmit={() => showToast('Support Ticket Created! We will email you within 15 minutes.', 'success')}
+        currentUser={session}
       />
 
       <GoogleWarningModal isOpen={googleWarnOpen} onClose={() => setGoogleWarnOpen(false)} />
