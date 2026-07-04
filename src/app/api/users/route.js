@@ -1,11 +1,24 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
 
-// GET all users (Admin listing)
-export async function GET() {
+// GET users (Admin listing, or referrals query)
+export async function GET(req) {
   try {
+    const { searchParams } = new URL(req.url);
+    const referredBy = searchParams.get('referredBy');
+
     const db = await getDb();
     const usersCollection = db.collection('users');
+
+    if (referredBy) {
+      // referredBy parameter is the referrer's email — find users referred by that email
+      const referrals = await usersCollection.find(
+        { referredBy: referredBy.toLowerCase().trim() },
+        { projection: { name: 1, email: 1 } }
+      ).toArray();
+      return NextResponse.json({ success: true, referrals });
+    }
+
     // Fetch users (excluding password fields for security)
     const users = await usersCollection.find({}, { projection: { password: 0 } }).toArray();
     return NextResponse.json({ success: true, users });

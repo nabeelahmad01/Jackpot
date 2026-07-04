@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { PaymentMethodModal } from './Modals';
+import ReferralCenter from './ReferralCenter';
 
 export default function UserLobby({
   games,
@@ -25,6 +26,13 @@ export default function UserLobby({
   const [depositAmount, setDepositAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawTag, setWithdrawTag] = useState('');
+  const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
+  const [withdrawMethod, setWithdrawMethod] = useState('Chime');
+  const [nameOnTag, setNameOnTag] = useState('');
+  const [phoneOnTag, setPhoneOnTag] = useState('');
+  const [lobbySubView, setLobbySubView] = useState('main'); // 'main' | 'referrals'
+  const [referralsList, setReferralsList] = useState([]);
+  const [claimBonus, setClaimBonus] = useState(true);
 
   // Payment selection modal
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -69,6 +77,20 @@ export default function UserLobby({
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [activeInvoice]);
+
+  // 2. Fetch referrals list effect
+  useEffect(() => {
+    if (currentUserEmail) {
+      fetch(`/api/users?referredBy=${encodeURIComponent(currentUserEmail)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            setReferralsList(data.referrals || []);
+          }
+        })
+        .catch(err => console.error('Error fetching referrals list:', err));
+    }
+  }, [currentUserEmail, lobbySubView]);
 
   const handleCopyText = (text) => {
     navigator.clipboard.writeText(text);
@@ -158,7 +180,7 @@ export default function UserLobby({
     setScreenshotBase64('');
   };
 
-  const handleWithdrawClick = (e) => {
+  const handleWithdrawInitiate = (e) => {
     e.preventDefault();
     const amountVal = parseFloat(withdrawAmount);
     if (isNaN(amountVal) || amountVal <= 0) {
@@ -169,8 +191,18 @@ export default function UserLobby({
       showToast('Minimum withdrawal limit is $5.00.', 'error');
       return;
     }
+    setWithdrawModalOpen(true);
+  };
+
+  const handleWithdrawConfirm = (e) => {
+    e.preventDefault();
+    const amountVal = parseFloat(withdrawAmount);
     if (withdrawTag.trim() === '') {
-      showToast('Please provide your payout tag address.', 'error');
+      showToast('Please provide your payout tag.', 'error');
+      return;
+    }
+    if (nameOnTag.trim() === '') {
+      showToast('Please provide the name on your tag.', 'error');
       return;
     }
 
@@ -178,13 +210,19 @@ export default function UserLobby({
       gameTitle: activeGame.title,
       type: 'WITHDRAW',
       amount: amountVal,
-      gateway: 'Payout Tag',
+      gateway: withdrawMethod,
       code: withdrawTag.trim(),
-      screenshot: '' // Payout requests don't need screenshot receipts
+      nameOnTag: nameOnTag.trim(),
+      phoneOnTag: phoneOnTag.trim(),
+      screenshot: ''
     });
 
     setWithdrawAmount('');
     setWithdrawTag('');
+    setNameOnTag('');
+    setPhoneOnTag('');
+    setWithdrawModalOpen(false);
+    showToast('Withdrawal request submitted successfully!', 'success');
   };
 
   const formatTimer = (seconds) => {
@@ -194,12 +232,33 @@ export default function UserLobby({
   };
 
   const handleReferEarn = () => {
-    showToast('Referral link copied to clipboard: https://jackpotentry.com/ref?user=demo', 'success');
+    setLobbySubView('referrals');
   };
 
   const handleDownloadApp = () => {
     showToast('Downloading Jackpot Entry mobile app APK...', 'success');
     window.open('/jackpotentry.apk', '_blank');
+  };
+
+  const handleRequestAccountWithBonus = () => {
+    onRequestAccount(activeGame.title);
+    const isFirstAccount = gameAccounts.length === 0 && !accountRequests.some(r => r.userEmail === currentUserEmail);
+    const hasClaimedBonus = (transactions || []).some(t => t.type === 'BONUS' && t.userEmail === currentUserEmail && t.code === 'SIGNUP-FREE3');
+    const eligibleForSignupBonus = isFirstAccount && !hasClaimedBonus;
+
+    if (eligibleForSignupBonus && claimBonus) {
+      onSubmitTransaction({
+        gameTitle: activeGame.title,
+        type: 'BONUS',
+        amount: 3.00,
+        gateway: 'Signup Bonus',
+        code: 'SIGNUP-FREE3',
+        nameOnTag: currentUser?.name || 'Player',
+        phoneOnTag: '',
+        screenshot: ''
+      });
+      showToast('$3.00 Free Signup Bonus request submitted! Awaiting admin confirmation.', 'success');
+    }
   };
 
   const currentRequest = activeGame 
@@ -214,11 +273,15 @@ export default function UserLobby({
     ? transactions.filter((t) => t.gameTitle === activeGame.title && t.userEmail === currentUserEmail)
     : [];
 
+  const isFirstAccount = gameAccounts.length === 0 && !accountRequests.some(r => r.userEmail === currentUserEmail);
+  const hasClaimedBonus = (transactions || []).some(t => t.type === 'BONUS' && t.userEmail === currentUserEmail && t.code === 'SIGNUP-FREE3');
+  const eligibleForSignupBonus = isFirstAccount && !hasClaimedBonus;
+
   return (
     <div id="view-user-dashboard">
       {/* Dynamic Header */}
       <header className="dashboard-header">
-        <div className="lobby-brand" onClick={() => { setActiveGame(null); setActiveInvoice(null); }} style={{ cursor: 'pointer' }}>
+        <div className="lobby-brand" onClick={() => { setActiveGame(null); setActiveInvoice(null); setLobbySubView('main'); }} style={{ cursor: 'pointer' }}>
           <div className="lobby-logo-box">
             <i className="fa-solid fa-crown spade-icon"></i>
           </div>
@@ -231,14 +294,16 @@ export default function UserLobby({
         </div>
 
         <div className="lobby-nav-actions">
-          {activeGame && (
-            <button className="lobby-nav-btn" onClick={() => { setActiveGame(null); setActiveInvoice(null); }} style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
+          {(activeGame || lobbySubView === 'referrals') && (
+            <button className="lobby-nav-btn" onClick={() => { setActiveGame(null); setActiveInvoice(null); setLobbySubView('main'); }} style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
               <i className="fa-solid fa-chevron-left"></i> <span>Back to Lobby</span>
             </button>
           )}
-          <button className="lobby-nav-btn refer-btn" onClick={handleReferEarn}>
-            <i className="fa-solid fa-gift"></i> <span>Refer</span>
-          </button>
+          {lobbySubView !== 'referrals' && (
+            <button className="lobby-nav-btn refer-btn" onClick={handleReferEarn}>
+              <i className="fa-solid fa-gift"></i> <span>Refer</span>
+            </button>
+          )}
           <button className="lobby-nav-btn logout-btn" onClick={onLogout}>
             <i className="fa-solid fa-right-from-bracket"></i> <span>Logout</span>
           </button>
@@ -248,7 +313,18 @@ export default function UserLobby({
       {/* ==============================================================
            VIEW A: MAIN PLAYER LOBBY
            ============================================================== */}
-      {!activeGame ? (
+      {lobbySubView === 'referrals' ? (
+        <div className="lobby-content-container">
+          <ReferralCenter
+            currentUserEmail={currentUserEmail}
+            referralCode={currentUser?.referralCode || ''}
+            referralsList={referralsList}
+            onClose={() => setLobbySubView('main')}
+            onOpenSupport={onOpenSupport}
+            showToast={showToast}
+          />
+        </div>
+      ) : !activeGame ? (
         <div className="lobby-content-container">
           <section className="lobby-hero">
             <div className="hero-promo-block">
@@ -590,7 +666,45 @@ export default function UserLobby({
                     <div className="game-alert-strip" style={{ padding: '1rem', border: '1px solid rgba(230,142,0,0.2)', background: 'rgba(230,142,0,0.05)', borderRadius: '12px', color: '#ffe16c', fontSize: '0.8rem', marginBottom: '1.5rem' }}>
                       You don't have a <strong>{activeGame.title}</strong> account yet. Request one below.
                     </div>
-                    <button onClick={() => onRequestAccount(activeGame.title)} className="submit-btn" style={{ background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)', maxWidth: '350px', margin: '0 auto' }}>
+
+                    {eligibleForSignupBonus && (
+                      <div style={{
+                        margin: '0 auto 1.5rem auto',
+                        maxWidth: '450px',
+                        padding: '1rem 1.25rem',
+                        background: 'rgba(168,85,247,0.06)',
+                        border: '1px dashed rgba(168,85,247,0.3)',
+                        borderRadius: '12px',
+                        textAlign: 'left',
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '0.75rem'
+                      }}>
+                        <input
+                          type="checkbox"
+                          id="claim-signup-bonus"
+                          checked={claimBonus}
+                          onChange={(e) => setClaimBonus(e.target.checked)}
+                          style={{
+                            width: '20px',
+                            height: '20px',
+                            accentColor: '#a855f7',
+                            cursor: 'pointer',
+                            marginTop: '0.15rem'
+                          }}
+                        />
+                        <label htmlFor="claim-signup-bonus" style={{ cursor: 'pointer' }}>
+                          <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', color: '#fff', marginBottom: '0.15rem' }}>
+                            🎁 Claim $3.00 Free Redeemable Signup Bonus!
+                          </span>
+                          <span style={{ display: 'block', fontSize: '0.675rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                            Get $3 free playable coins on this first game portal. Bonus request will be processed in your transactions list.
+                          </span>
+                        </label>
+                      </div>
+                    )}
+
+                    <button onClick={handleRequestAccountWithBonus} className="submit-btn" style={{ background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)', maxWidth: '350px', margin: '0 auto' }}>
                       <span style={{ letterSpacing: '0.1em', fontWeight: 'bold' }}>REQUEST / CREATE ACCOUNT</span>
                       <div className="btn-glow"></div>
                     </button>
@@ -706,24 +820,14 @@ export default function UserLobby({
                           </div>
                         </div>
 
-                        <form onSubmit={handleWithdrawClick}>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '1rem' }}>
+                        <form onSubmit={handleWithdrawInitiate}>
+                          <div className="input-group" style={{ marginBottom: '1rem' }}>
                             <div className="input-wrapper" style={{ background: '#0b0c16' }}>
                               <input
                                 type="number"
-                                placeholder="Amount"
+                                placeholder="10"
                                 value={withdrawAmount}
                                 onChange={(e) => setWithdrawAmount(e.target.value)}
-                                style={{ padding: '0.75rem 1rem' }}
-                                required
-                              />
-                            </div>
-                            <div className="input-wrapper" style={{ background: '#0b0c16' }}>
-                              <input
-                                type="text"
-                                placeholder="Payout tag"
-                                value={withdrawTag}
-                                onChange={(e) => setWithdrawTag(e.target.value)}
                                 style={{ padding: '0.75rem 1rem' }}
                                 required
                               />
@@ -774,7 +878,7 @@ export default function UserLobby({
                               <tr key={tx.id}>
                                 <td>{idx + 1}</td>
                                 <td>
-                                  <span className={`admin-badge-preview ${tx.type === 'DEPOSIT' ? 'b-hot' : 'b-new'}`} style={{ textTransform: 'uppercase', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
+                                  <span className={`admin-badge-preview ${tx.type === 'DEPOSIT' ? 'b-hot' : tx.type === 'BONUS' ? 'b-vip' : 'b-new'}`} style={{ textTransform: 'uppercase', padding: '0.2rem 0.5rem', borderRadius: '4px', background: tx.type === 'BONUS' ? '#a855f7' : undefined, color: tx.type === 'BONUS' ? '#fff' : undefined }}>
                                     {tx.type}
                                   </span>
                                 </td>
@@ -819,6 +923,159 @@ export default function UserLobby({
         gateways={gateways}
         onSelectMethod={handleSelectGateway}
       />
+
+      {/* Payout Withdrawal Modal Overlay */}
+      {withdrawModalOpen && (
+        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: '2rem 0', backdropFilter: 'blur(8px)', animation: 'fade-in 0.25s ease-out' }}>
+          <div className="auth-card" style={{ maxWidth: '460px', width: '92%', padding: '2rem 1.75rem', position: 'relative', animation: 'scale-up 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)' }}>
+            <div className="glow-border-layer"></div>
+            
+            <button
+              onClick={() => setWithdrawModalOpen(false)}
+              className="close-modal"
+              style={{ position: 'absolute', top: '1rem', right: '1.25rem', background: 'none', border: 'none', color: '#fff', fontSize: '1.25rem', cursor: 'pointer', zIndex: 10 }}
+            >
+              &times;
+            </button>
+
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: '0.25rem' }}>
+                Withdraw Amount
+              </span>
+              <h2 style={{ fontSize: '2.5rem', fontWeight: '900', color: '#ff4d6d', fontFamily: 'var(--font-heading)', margin: 0 }}>
+                ${parseFloat(withdrawAmount).toFixed(2)}
+              </h2>
+            </div>
+
+            <form onSubmit={handleWithdrawConfirm} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }} noValidate>
+              
+              <div className="input-group">
+                <label style={{ marginBottom: '0.5rem', display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Choose Payment Method</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                  {/* Chime Option */}
+                  <label
+                    onClick={() => setWithdrawMethod('Chime')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '0.85rem 1rem',
+                      background: withdrawMethod === 'Chime' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.01)',
+                      border: withdrawMethod === 'Chime' ? '1.5px solid var(--gold-primary)' : '1.5px solid rgba(255,255,255,0.05)',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <div>
+                      <strong style={{ display: 'block', fontSize: '0.85rem', color: '#fff' }}>Chime</strong>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Withdraw to your Chime tag</span>
+                    </div>
+                    <input
+                      type="radio"
+                      name="withdrawMethod"
+                      checked={withdrawMethod === 'Chime'}
+                      onChange={() => setWithdrawMethod('Chime')}
+                      style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--gold-primary)' }}
+                    />
+                  </label>
+
+                  {/* Cash App Option */}
+                  <label
+                    onClick={() => setWithdrawMethod('Cash App')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '0.85rem 1rem',
+                      background: withdrawMethod === 'Cash App' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.01)',
+                      border: withdrawMethod === 'Cash App' ? '1.5px solid var(--gold-primary)' : '1.5px solid rgba(255,255,255,0.05)',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <div>
+                      <strong style={{ display: 'block', fontSize: '0.85rem', color: '#fff' }}>Cash App</strong>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Withdraw to your Cash App tag</span>
+                    </div>
+                    <input
+                      type="radio"
+                      name="withdrawMethod"
+                      checked={withdrawMethod === 'Cash App'}
+                      onChange={() => setWithdrawMethod('Cash App')}
+                      style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--gold-primary)' }}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label htmlFor="tag-name">Name on Tag</label>
+                <div className="input-wrapper" style={{ background: '#0b0c16' }}>
+                  <i className="fa-solid fa-user input-icon"></i>
+                  <input
+                    type="text"
+                    id="tag-name"
+                    placeholder="e.g. John Doe"
+                    value={nameOnTag}
+                    onChange={(e) => setNameOnTag(e.target.value)}
+                    style={{ paddingLeft: '2.5rem' }}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label htmlFor="tag-code">Tag</label>
+                <div className="input-wrapper" style={{ background: '#0b0c16' }}>
+                  <i className="fa-solid fa-at input-icon"></i>
+                  <input
+                    type="text"
+                    id="tag-code"
+                    placeholder="e.g. $john777 or @john"
+                    value={withdrawTag}
+                    onChange={(e) => setWithdrawTag(e.target.value)}
+                    style={{ paddingLeft: '2.5rem' }}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label htmlFor="tag-phone">Linked number on Tag</label>
+                <div className="input-wrapper" style={{ background: '#0b0c16' }}>
+                  <i className="fa-solid fa-phone input-icon"></i>
+                  <input
+                    type="tel"
+                    id="tag-phone"
+                    placeholder="e.g. +1 555 123 4567"
+                    value={phoneOnTag}
+                    onChange={(e) => setPhoneOnTag(e.target.value)}
+                    style={{ paddingLeft: '2.5rem' }}
+                    required
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="submit-btn"
+                style={{
+                  background: 'linear-gradient(135deg, #ff4d6d 0%, #c9184a 100%)',
+                  color: '#fff',
+                  fontWeight: 'bold',
+                  letterSpacing: '0.1em',
+                  marginTop: '0.75rem',
+                  padding: '0.85rem'
+                }}
+              >
+                CONFIRM WITHDRAW
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Floating support */}
       <div className="support-chat-widget" onClick={onOpenSupport}>

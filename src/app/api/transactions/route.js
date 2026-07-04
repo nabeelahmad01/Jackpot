@@ -83,8 +83,8 @@ export async function PUT(req) {
 
     await transactionsCollection.updateOne({ id }, { $set: updateFields });
 
-    // Trigger Coins notification if this transaction is approved as SUCCESS and it is a DEPOSIT
-    if (status === 'SUCCESS' && originalTx.type === 'DEPOSIT' && originalTx.status !== 'SUCCESS') {
+    // Trigger Coins notification if this transaction is approved as SUCCESS and it is a DEPOSIT or a BONUS
+    if (status === 'SUCCESS' && (originalTx.type === 'DEPOSIT' || originalTx.type === 'BONUS') && originalTx.status !== 'SUCCESS') {
       try {
         const userEmail = originalTx.userEmail.toLowerCase();
         
@@ -105,11 +105,12 @@ export async function PUT(req) {
           settings = { firstDepositBonus: 300, regularDepositBonus: 20 };
         }
 
-        const bonusPercentage = isFirstDeposit ? settings.firstDepositBonus : settings.regularDepositBonus;
+        const isBonus = originalTx.type === 'BONUS';
+        const bonusPercentage = isBonus ? 0 : (isFirstDeposit ? settings.firstDepositBonus : settings.regularDepositBonus);
         
         // Calculate total coins to allot
         const amount = parseFloat(originalTx.amount);
-        const totalCoins = amount * (1 + bonusPercentage / 100);
+        const totalCoins = isBonus ? amount : (amount * (1 + bonusPercentage / 100));
 
         // 3. Insert notification for the Coins Manager
         const notificationsCollection = db.collection('coinsNotifications');

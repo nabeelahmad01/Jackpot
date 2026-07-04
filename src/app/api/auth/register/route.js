@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/mongodb';
+import crypto from 'crypto';
+
+// Generate a short unique alphanumeric referral code
+function generateReferralCode() {
+  return crypto.randomBytes(4).toString('hex').toUpperCase(); // e.g. "A3F8B12C"
+}
 
 // GET checks if an email exists and returns registration details for otp flows
 export async function GET(req) {
@@ -41,7 +47,7 @@ export async function GET(req) {
 // POST registers a new user
 export async function POST(req) {
   try {
-    const { email, password, name, role } = await req.json();
+    const { email, password, name, role, referredBy } = await req.json();
 
     if (!email || !password || !name) {
       return NextResponse.json(
@@ -62,12 +68,30 @@ export async function POST(req) {
       );
     }
 
+    // Generate a unique referral code for this new user
+    let referralCode = generateReferralCode();
+    // Ensure uniqueness
+    while (await usersCollection.findOne({ referralCode })) {
+      referralCode = generateReferralCode();
+    }
+
+    // Resolve the referrer: look up by referralCode, store their email
+    let resolvedReferrer = '';
+    if (referredBy) {
+      const referrer = await usersCollection.findOne({ referralCode: referredBy.trim() });
+      if (referrer) {
+        resolvedReferrer = referrer.email;
+      }
+    }
+
     const newUser = {
       name: name.trim(),
       email: email.toLowerCase().trim(),
       password, // Stored as-is to preserve local credentials migration compatibility
       role: role || 'user',
-      coins: 100
+      coins: 100,
+      referralCode,
+      referredBy: resolvedReferrer
     };
 
     const result = await usersCollection.insertOne(newUser);
@@ -76,7 +100,7 @@ export async function POST(req) {
     return NextResponse.json({
       success: true,
       message: 'Account successfully registered!',
-      user: { name: newUser.name, email: newUser.email, role: newUser.role, coins: newUser.coins }
+      user: { name: newUser.name, email: newUser.email, role: newUser.role, coins: newUser.coins, referralCode: newUser.referralCode }
     });
   } catch (err) {
     console.error('Registration API Error:', err);

@@ -813,26 +813,46 @@ export default function AdminDashboard({
                   <tr>
                     <th>Full Name</th>
                     <th>Email Address</th>
+                    <th>Referral Code</th>
+                    <th>Referrals</th>
                     <th>Status Privilege</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredUsers.length === 0 ? (
-                    <tr><td colSpan="4" className="text-center text-muted">No matching players.</td></tr>
+                    <tr><td colSpan="6" className="text-center text-muted">No matching players.</td></tr>
                   ) : (
-                    filteredUsers.map((user) => (
-                      <tr key={user.email}>
-                        <td>{user.name}</td>
-                        <td>{user.email}</td>
-                        <td>
-                          <span className="admin-badge-preview b-new">PLAYER</span>
-                        </td>
-                        <td>
-                          <button className="action-row-btn btn-delete" onClick={() => onDeleteUser(user.email)} title="Delete User"><i className="fa-solid fa-user-minus"></i></button>
-                        </td>
-                      </tr>
-                    ))
+                    filteredUsers.map((user) => {
+                      // Count how many users have this user's email as their referredBy
+                      const referralCount = users.filter(u => u.referredBy && u.referredBy.toLowerCase() === user.email.toLowerCase()).length;
+                      return (
+                        <tr key={user.email}>
+                          <td>{user.name}</td>
+                          <td>{user.email}</td>
+                          <td>
+                            <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#a855f7', fontWeight: 700 }}>
+                              {user.referralCode || '—'}
+                            </span>
+                          </td>
+                          <td>
+                            {referralCount > 0 ? (
+                              <span className="admin-badge-preview b-hot" style={{ cursor: 'default' }}>
+                                {referralCount} {referralCount === 1 ? 'referral' : 'referrals'}
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>0</span>
+                            )}
+                          </td>
+                          <td>
+                            <span className="admin-badge-preview b-new">PLAYER</span>
+                          </td>
+                          <td>
+                            <button className="action-row-btn btn-delete" onClick={() => onDeleteUser(user.email)} title="Delete User"><i className="fa-solid fa-user-minus"></i></button>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -977,6 +997,12 @@ export default function AdminDashboard({
                           <span style={{ fontSize: '0.725rem', opacity: 0.9 }}>
                             {tx.gateway} ({tx.code})
                           </span>
+                          {tx.nameOnTag && (
+                            <div style={{ marginTop: '0.25rem', padding: '0.25rem 0.5rem', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', fontSize: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.1rem', border: '1px solid rgba(255,255,255,0.03)' }}>
+                              <span style={{ color: '#ffd700' }}>Name: {tx.nameOnTag}</span>
+                              {tx.phoneOnTag && <span style={{ color: 'var(--text-muted)' }}>Phone: {tx.phoneOnTag}</span>}
+                            </div>
+                          )}
                           {tx.note && <p style={{ fontSize: '0.65rem', color: '#ff8787', margin: '0.2rem 0 0 0' }}>{tx.note}</p>}
                         </td>
                         <td style={{ fontSize: '0.7rem' }}>{tx.date}</td>

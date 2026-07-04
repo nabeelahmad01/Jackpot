@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/mongodb';
+import crypto from 'crypto';
+
+function generateReferralCode() {
+  return crypto.randomBytes(4).toString('hex').toUpperCase();
+}
 
 export async function POST(req) {
   try {
-    const { email, name } = await req.json();
+    const { email, name, referredBy } = await req.json();
 
     if (!email || !name) {
       return NextResponse.json(
@@ -20,13 +25,30 @@ export async function POST(req) {
     let isNewUser = false;
 
     if (!matchedUser) {
+      // Generate a unique referral code
+      let referralCode = generateReferralCode();
+      while (await usersCollection.findOne({ referralCode })) {
+        referralCode = generateReferralCode();
+      }
+
+      // Resolve the referrer by referralCode
+      let resolvedReferrer = '';
+      if (referredBy) {
+        const referrer = await usersCollection.findOne({ referralCode: referredBy.trim() });
+        if (referrer) {
+          resolvedReferrer = referrer.email;
+        }
+      }
+
       // Automatically register brand-new Google users
       matchedUser = {
         name: name.trim(),
         email: cleanEmail,
         password: 'OAuth-Google-Login',
         role: 'user',
-        coins: 100
+        coins: 100,
+        referralCode,
+        referredBy: resolvedReferrer
       };
       const result = await usersCollection.insertOne(matchedUser);
       matchedUser._id = result.insertedId;
@@ -37,7 +59,7 @@ export async function POST(req) {
       success: true,
       message: isNewUser ? 'Google account registered successfully!' : 'Welcome back!',
       isNewUser,
-      user: { name: matchedUser.name, email: matchedUser.email, role: matchedUser.role, coins: matchedUser.coins || 100 }
+      user: { name: matchedUser.name, email: matchedUser.email, role: matchedUser.role, coins: matchedUser.coins || 100, referralCode: matchedUser.referralCode || '' }
     });
   } catch (err) {
     console.error('Google OAuth API Error:', err);

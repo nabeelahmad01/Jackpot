@@ -9,31 +9,9 @@ import LoadingOverlay from '../components/LoadingOverlay';
 import { SupportModal, GoogleWarningModal } from '../components/Modals';
 
 export default function Home() {
-  const [session, setSession] = useState(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        return JSON.parse(localStorage.getItem('jackpot_session') || 'null');
-      } catch (err) {
-        return null;
-      }
-    }
-    return null;
-  });
-
-  const [view, setView] = useState(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = JSON.parse(localStorage.getItem('jackpot_session') || 'null');
-        if (saved) {
-          if (saved.role === 'admin') return 'loading';
-          return 'lobby';
-        }
-      } catch (err) {
-        return 'auth';
-      }
-    }
-    return 'auth';
-  });
+  const [mounted, setMounted] = useState(false);
+  const [session, setSession] = useState(null);
+  const [view, setView] = useState('loading');
   
   // Database State Stores
   const [games, setGames] = useState([]);
@@ -84,6 +62,15 @@ export default function Home() {
 
   // Initialize session and trigger data fetch
   useEffect(() => {
+    setMounted(true);
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get('ref');
+      if (ref) {
+        localStorage.setItem('jackpot_ref_code', ref);
+      }
+    }
+
     const savedSession = JSON.parse(localStorage.getItem('jackpot_session') || 'null');
     if (savedSession) {
       if (savedSession.role === 'admin') {
@@ -93,6 +80,8 @@ export default function Home() {
         setSession(savedSession);
         setView('lobby');
       }
+    } else {
+      setView('auth');
     }
     
     loadDatabase(savedSession);
@@ -237,6 +226,15 @@ export default function Home() {
   };
 
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || 'your_google_client_id_here';
+
+  if (!mounted) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: '1rem', color: '#fff' }}>
+        <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '2.5rem', color: 'var(--gold-primary)' }}></i>
+        <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Initializing Jackpot Royals...</span>
+      </div>
+    );
+  }
 
   return (
     <GoogleOAuthProvider clientId={googleClientId}>

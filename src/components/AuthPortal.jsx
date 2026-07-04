@@ -42,7 +42,7 @@ export default function AuthPortal({
             const googleRes = await fetch('/api/auth/google', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email: userEmail, name: userName })
+              body: JSON.stringify({ email: userEmail, name: userName, referredBy: localStorage.getItem('jackpot_ref_code') || '' })
             });
             const googleData = await googleRes.json();
             
@@ -88,7 +88,7 @@ export default function AuthPortal({
             const googleRes = await fetch('/api/auth/google', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email: testUser.email, name: testUser.name })
+              body: JSON.stringify({ email: testUser.email, name: testUser.name, referredBy: localStorage.getItem('jackpot_ref_code') || '' })
             });
             const googleData = await googleRes.json();
             if (googleData.success) {
@@ -279,6 +279,7 @@ export default function AuthPortal({
         email: regEmail.trim(),
         password: regPassword,
         role: 'user',
+        referredBy: localStorage.getItem('jackpot_ref_code') || '',
       };
 
       triggerLoading(1200, () => {
