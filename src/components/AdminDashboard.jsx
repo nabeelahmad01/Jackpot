@@ -1140,8 +1140,8 @@ export default function AdminDashboard({
                         </td>
                         <td style={{ fontSize: '0.7rem' }}>{tx.date}</td>
                         <td>
-                          <span className={`admin-badge-preview b-${tx.status.toLowerCase() === 'success' ? 'ready' : tx.status.toLowerCase()}`}>
-                            {tx.status}
+                          <span className={`admin-badge-preview b-${tx.status === 'PENDING_COINS' ? 'new' : (tx.status.toLowerCase() === 'success' ? 'ready' : tx.status.toLowerCase())}`}>
+                            {tx.status === 'PENDING_COINS' ? 'VERIFYING COINS' : tx.status}
                           </span>
                         </td>
                         <td>
@@ -1179,6 +1179,8 @@ export default function AdminDashboard({
                                 {processingIds[tx.id] ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-xmark"></i>}
                               </button>
                             </div>
+                          ) : tx.status === 'PENDING_COINS' ? (
+                            <span style={{ fontSize: '0.7rem', color: '#ffb703', fontWeight: 'bold' }}>Waiting on Coins Manager</span>
                           ) : (
                             <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>Processed</span>
                           )}

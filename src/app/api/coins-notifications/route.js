@@ -40,6 +40,18 @@ export async function PUT(req) {
     }
 
     await notificationsCollection.updateOne({ id }, { $set: updateFields });
+
+    if (status === 'COMPLETED') {
+      const originalNoti = await notificationsCollection.findOne({ id });
+      if (originalNoti && originalNoti.transactionId) {
+        const transactionsCollection = db.collection('transactions');
+        await transactionsCollection.updateOne(
+          { id: originalNoti.transactionId },
+          { $set: { status: 'PENDING' } }
+        );
+      }
+    }
+
     return NextResponse.json({ success: true, message: 'Notification updated successfully!' });
   } catch (err) {
     console.error('Update Coins Notification Error:', err);

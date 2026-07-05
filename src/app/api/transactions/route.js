@@ -46,12 +46,29 @@ export async function POST(req) {
       id: (Date.now() + Math.floor(Math.random() * 100)).toString(),
       userEmail: newTx.userEmail.toLowerCase().trim(),
       date: new Date().toLocaleString(),
-      status: 'PENDING',
+      status: newTx.type === 'WITHDRAW' ? 'PENDING_COINS' : 'PENDING',
       note: '',
       ...newTx
     };
 
     await transactionsCollection.insertOne(txObject);
+
+    if (txObject.type === 'WITHDRAW') {
+      const notificationsCollection = db.collection('coinsNotifications');
+      await notificationsCollection.insertOne({
+        id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
+        userEmail: txObject.userEmail,
+        gameTitle: txObject.gameTitle || 'Lobby',
+        depositAmount: parseFloat(txObject.amount),
+        bonusApplied: -1, // Indicates deduction/withdrawal action
+        totalCoins: -parseFloat(txObject.amount), // Negative value indicates deduction
+        status: 'PENDING',
+        read: false,
+        timestamp: new Date().toISOString(),
+        transactionId: txObject.id
+      });
+    }
+
     return NextResponse.json({ success: true, transaction: txObject, message: 'Transaction request submitted successfully!' });
   } catch (err) {
     console.error('Create Transaction API Error:', err);
@@ -154,30 +171,6 @@ export async function PUT(req) {
         }
       } catch (notiErr) {
         console.error('Failed to generate coin allotment notification:', notiErr);
-      }
-    }
-
-    // Trigger Coins notification if this transaction is approved as SUCCESS and it is a WITHDRAW (Deduction task)
-    if (status === 'SUCCESS' && originalTx.type === 'WITHDRAW' && originalTx.status !== 'SUCCESS') {
-      try {
-        const userEmail = originalTx.userEmail.toLowerCase();
-        const amount = parseFloat(originalTx.amount);
-        
-        // Insert a deduction notification for the Coins Manager (negative coins)
-        const notificationsCollection = db.collection('coinsNotifications');
-        await notificationsCollection.insertOne({
-          id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
-          userEmail,
-          gameTitle: originalTx.gameTitle || 'Lobby',
-          depositAmount: amount, // Represents the cashout withdrawal amount
-          bonusApplied: -1, // Indicates deduction/withdrawal action
-          totalCoins: -amount, // Negative value indicates deduction to the Coins Manager!
-          status: 'PENDING',
-          read: false,
-          timestamp: new Date().toISOString()
-        });
-      } catch (notiErr) {
-        console.error('Failed to generate coin deduction notification:', notiErr);
       }
     }
 

@@ -965,8 +965,8 @@ export default function UserLobby({
                                   {tx.status === 'SUCCESS' ? `$${parseFloat(tx.amount).toFixed(2)}` : '—'}
                                 </td>
                                 <td>
-                                  <span className={`admin-badge-preview b-${tx.status.toLowerCase() === 'success' ? 'ready' : tx.status.toLowerCase()}`}>
-                                    {tx.status}
+                                  <span className={`admin-badge-preview b-${tx.status === 'PENDING_COINS' ? 'new' : (tx.status.toLowerCase() === 'success' ? 'ready' : tx.status.toLowerCase())}`}>
+                                    {tx.status === 'PENDING_COINS' ? 'VERIFYING COINS' : tx.status}
                                   </span>
                                 </td>
                                 <td>
