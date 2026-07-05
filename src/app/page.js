@@ -251,10 +251,7 @@ export default function Home() {
 
       {/* Screen Views Wrapper */}
       {view === 'loading' ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: '1rem', color: '#fff' }}>
-          <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '2.5rem', color: 'var(--gold-primary)' }}></i>
-          <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Redirecting to secure workspace...</span>
-        </div>
+        <LoadingOverlay active={true} />
       ) : view === 'auth' ? (
         <AuthPortal
           onLoginSuccess={handleLoginSuccess}

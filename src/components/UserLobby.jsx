@@ -282,8 +282,19 @@ export default function UserLobby({
       {/* Dynamic Header */}
       <header className="dashboard-header">
         <div className="lobby-brand" onClick={() => { setActiveGame(null); setActiveInvoice(null); setLobbySubView('main'); }} style={{ cursor: 'pointer' }}>
-          <div className="lobby-logo-box">
-            <i className="fa-solid fa-crown spade-icon"></i>
+          <div className="lobby-logo-box" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000', border: '1px solid rgba(255,215,0,0.4)', borderRadius: '50%', boxShadow: '0 0 15px rgba(255,215,0,0.25)' }}>
+            <img
+              src="/jackpot_lion_mascot.png"
+              alt="Jackpot Lion Mascot"
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                borderRadius: '50%',
+                animation: 'pulse-lion 2s infinite ease-in-out',
+                transform: 'scale(1.05)'
+              }}
+            />
           </div>
           <div className="lobby-brand-names">
             <h2 className="lobby-brand-title">
@@ -340,7 +351,33 @@ export default function UserLobby({
 
             <div className="hero-badge-block">
               <div className="freeplay-card">
-                <div className="card-crown"><i className="fa-solid fa-crown"></i></div>
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.5rem' }}>
+                  <div style={{
+                    width: '60px',
+                    height: '60px',
+                    borderRadius: '50%',
+                    border: '2px solid var(--gold-primary)',
+                    background: '#000',
+                    boxShadow: '0 0 15px rgba(255,215,0,0.35)',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <img
+                      src="/jackpot_lion_mascot.png"
+                      alt="Jackpot Royals Lion Mascot"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        borderRadius: '50%',
+                        animation: 'pulse-lion 2s infinite ease-in-out',
+                        transform: 'scale(1.05)'
+                      }}
+                    />
+                  </div>
+                </div>
                 <h3 className="freeplay-value">$3</h3>
                 <h4 className="freeplay-label">FREEPLAY</h4>
                 <p className="freeplay-condition">ON SIGNUP!</p>
@@ -493,8 +530,19 @@ export default function UserLobby({
           
           <div className="game-access-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', marginBottom: '1.5rem' }}>
             <div className="game-header-brand" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div className="game-header-avatar" style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: '900', color: '#fff', boxShadow: '0 0 15px rgba(245,158,11,0.25)' }}>
-                {activeGame.title.slice(0, 1).toUpperCase()}
+              <div className="lobby-logo-box" style={{ width: '50px', height: '50px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000', border: '1px solid rgba(255,215,0,0.4)', borderRadius: '50%', boxShadow: '0 0 15px rgba(255,215,0,0.25)' }}>
+                <img
+                  src="/jackpot_lion_mascot.png"
+                  alt="Jackpot Lion Mascot"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    borderRadius: '50%',
+                    animation: 'pulse-lion 2s infinite ease-in-out',
+                    transform: 'scale(1.05)'
+                  }}
+                />
               </div>
               <div className="game-header-titles">
                 <h3 style={{ fontSize: '1.25rem', fontFamily: 'var(--font-heading)', color: '#fff', fontWeight: '900', letterSpacing: '0.05em' }}>

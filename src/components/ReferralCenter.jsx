@@ -29,7 +29,7 @@ export default function ReferralCenter({
     // Top bar
     topBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1.25rem', background: 'rgba(14,18,36,0.9)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '14px', flexWrap: 'wrap', gap: '0.75rem' },
     topLeft: { display: 'flex', alignItems: 'center', gap: '0.85rem' },
-    topIcon: { width: '42px', height: '42px', borderRadius: '10px', background: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', color: '#fff', flexShrink: 0 },
+    topIcon: { width: '42px', height: '42px', borderRadius: '50%', border: '1.5px solid var(--gold-primary)', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 },
     topTitle: { fontSize: '1rem', fontWeight: 900, color: '#fff', letterSpacing: '0.04em', margin: 0 },
     topSub: { fontSize: '0.675rem', color: 'var(--text-muted)', marginTop: '0.1rem' },
     topBtns: { display: 'flex', gap: '0.5rem' },
@@ -94,7 +94,9 @@ export default function ReferralCenter({
       {/* ─── TOP BAR ─── */}
       <div style={s.topBar}>
         <div style={s.topLeft}>
-          <div style={s.topIcon}><i className="fa-solid fa-gift"></i></div>
+          <div style={s.topIcon}>
+            <img src="/jackpot_lion_mascot.png" alt="Gold Lion Mascot" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </div>
           <div>
             <h2 style={s.topTitle}>JACKPOT<span style={{ color: 'var(--gold-primary)' }}>ROYALS</span> REFERRALS</h2>
           </div>
@@ -107,6 +109,31 @@ export default function ReferralCenter({
 
       {/* ─── HERO SECTION ─── */}
       <div style={s.hero}>
+        <style dangerouslySetInnerHTML={{__html: `
+          @media (max-width: 600px) {
+            .desktop-only-lion { display: none !important; }
+          }
+        `}} />
+        <div style={{
+          position: 'absolute',
+          top: '20px',
+          right: '30px',
+          width: '100px',
+          height: '100px',
+          borderRadius: '50%',
+          border: '2px solid var(--gold-primary)',
+          background: '#000',
+          boxShadow: '0 0 20px rgba(255,215,0,0.3)',
+          overflow: 'hidden',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          animation: 'float-animation 4s infinite ease-in-out',
+          zIndex: 2,
+          opacity: 0.85
+        }} className="desktop-only-lion">
+          <img src="/jackpot_lion_mascot.png" alt="Gold Lion Mascot" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        </div>
         <div style={s.heroBg}></div>
         <div style={s.heroBg2}></div>
 

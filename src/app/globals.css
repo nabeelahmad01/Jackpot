@@ -2631,3 +2631,25 @@ dialog::backdrop {
     display: none !important;
   }
 }
+
+/* --- Lion Mascot & Cyberpunk Animations --- */
+@keyframes float-animation {
+  0%, 100% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-15px) scale(1.02); }
+}
+@keyframes spin-clockwise {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes spin-counter-clockwise {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+@keyframes pulse-lion {
+  0%, 100% { filter: drop-shadow(0 0 20px rgba(255,215,0,0.4)) drop-shadow(0 0 40px rgba(168,85,247,0.3)); transform: scale(1); }
+  50% { filter: drop-shadow(0 0 35px rgba(255,215,0,0.65)) drop-shadow(0 0 60px rgba(168,85,247,0.45)); transform: scale(1.03); }
+}
+@keyframes glow-text {
+  0%, 100% { text-shadow: 0 0 10px rgba(255,215,0,0.3), 0 0 20px rgba(168,85,247,0.2); }
+  50% { text-shadow: 0 0 25px rgba(255,215,0,0.6), 0 0 40px rgba(168,85,247,0.4); }
+}
