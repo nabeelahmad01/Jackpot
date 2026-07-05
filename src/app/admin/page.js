@@ -42,36 +42,53 @@ export default function AdminPage() {
   // 1. Initialise and load database values from server-side APIs
   const loadDatabase = async () => {
     try {
-      const gamesRes = await fetch('/api/games');
-      const gamesData = await gamesRes.json();
+      const [
+        gamesRes,
+        usersRes,
+        requestsRes,
+        credentialsRes,
+        txRes,
+        gatewaysRes,
+        notiRes,
+        settingsRes
+      ] = await Promise.all([
+        fetch('/api/games'),
+        fetch('/api/users'),
+        fetch('/api/account-requests'),
+        fetch('/api/game-accounts'),
+        fetch('/api/transactions'),
+        fetch('/api/gateways'),
+        fetch('/api/coins-notifications'),
+        fetch('/api/settings')
+      ]);
+
+      const [
+        gamesData,
+        usersData,
+        requestsData,
+        credentialsData,
+        txData,
+        gatewaysData,
+        notiData,
+        settingsData
+      ] = await Promise.all([
+        gamesRes.json(),
+        usersRes.json(),
+        requestsRes.json(),
+        credentialsRes.json(),
+        txRes.json(),
+        gatewaysRes.json(),
+        notiRes.json(),
+        settingsRes.json()
+      ]);
+
       if (gamesData.success) setGames(gamesData.games);
-
-      const usersRes = await fetch('/api/users');
-      const usersData = await usersRes.json();
       if (usersData.success) setUsers(usersData.users);
-
-      const requestsRes = await fetch('/api/account-requests');
-      const requestsData = await requestsRes.json();
       if (requestsData.success) setAccountRequests(requestsData.accountRequests);
-
-      const credentialsRes = await fetch('/api/game-accounts');
-      const credentialsData = await credentialsRes.json();
       if (credentialsData.success) setGameAccounts(credentialsData.gameAccounts);
-
-      const txRes = await fetch('/api/transactions');
-      const txData = await txRes.json();
       if (txData.success) setTransactions(txData.transactions);
-
-      const gatewaysRes = await fetch('/api/gateways');
-      const gatewaysData = await gatewaysRes.json();
       if (gatewaysData.success) setGateways(gatewaysData.gateways);
-
-      const notiRes = await fetch('/api/coins-notifications');
-      const notiData = await notiRes.json();
       if (notiData.success) setCoinsNotifications(notiData.coinsNotifications);
-
-      const settingsRes = await fetch('/api/settings');
-      const settingsData = await settingsRes.json();
       if (settingsData.success) setSystemSettings(settingsData.settings);
     } catch (err) {
       console.error('Failed to load admin database from APIs:', err);

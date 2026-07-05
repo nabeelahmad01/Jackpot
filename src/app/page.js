@@ -50,16 +50,20 @@ export default function Home() {
       if (userSession && userSession.email) {
         const emailQuery = encodeURIComponent(userSession.email);
         
-        const requestsRes = await fetch(`/api/account-requests?email=${emailQuery}`);
-        const requestsData = await requestsRes.json();
+        const [requestsRes, credentialsRes, txRes] = await Promise.all([
+          fetch(`/api/account-requests?email=${emailQuery}`),
+          fetch(`/api/game-accounts?email=${emailQuery}`),
+          fetch(`/api/transactions?email=${emailQuery}`)
+        ]);
+
+        const [requestsData, credentialsData, txData] = await Promise.all([
+          requestsRes.json(),
+          credentialsRes.json(),
+          txRes.json()
+        ]);
+
         if (requestsData.success) setAccountRequests(requestsData.accountRequests);
-
-        const credentialsRes = await fetch(`/api/game-accounts?email=${emailQuery}`);
-        const credentialsData = await credentialsRes.json();
         if (credentialsData.success) setGameAccounts(credentialsData.gameAccounts);
-
-        const txRes = await fetch(`/api/transactions?email=${emailQuery}`);
-        const txData = await txRes.json();
         if (txData.success) setTransactions(txData.transactions);
       }
     } catch (err) {
