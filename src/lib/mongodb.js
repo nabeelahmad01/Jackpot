@@ -268,15 +268,22 @@ class LocalJSONDatabase {
 
 const localDb = new LocalJSONDatabase();
 
+let cachedDb = null;
+
 // -------------------------------------------------------------
 // Core Database Dispatcher (MongoDB or Fallback)
 // -------------------------------------------------------------
 export async function getDb() {
+  if (cachedDb) {
+    return cachedDb;
+  }
+
   if (MONGODB_URI && clientPromise) {
     try {
       const mongoClient = await clientPromise;
       const db = mongoClient.db(); // Uses db name from URI connection string
       await seedRealMongo(db);
+      cachedDb = db;
       return db;
     } catch (dbErr) {
       if (!global._warnedAboutMongoFailure) {

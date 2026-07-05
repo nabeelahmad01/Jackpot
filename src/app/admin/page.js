@@ -21,7 +21,7 @@ export default function AdminPage() {
   const [transactions, setTransactions] = useState([]);
   const [gateways, setGateways] = useState([]);
   const [coinsNotifications, setCoinsNotifications] = useState([]);
-  const [systemSettings, setSystemSettings] = useState({ firstDepositBonus: 300, regularDepositBonus: 20 });
+  const [systemSettings, setSystemSettings] = useState({ firstDepositBonus: 300, regularDepositBonus: 20, referralBonus: 10 });
 
   // Modal Controls
   const [loadingActive, setLoadingActive] = useState(false);
@@ -233,12 +233,12 @@ export default function AdminPage() {
     }
   };
 
-  const handleUpdateSettings = async (firstDepositBonus, regularDepositBonus) => {
+  const handleUpdateSettings = async (firstDepositBonus, regularDepositBonus, referralBonus) => {
     try {
       const response = await fetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstDepositBonus, regularDepositBonus })
+        body: JSON.stringify({ firstDepositBonus, regularDepositBonus, referralBonus })
       });
       const data = await response.json();
       if (data.success) {

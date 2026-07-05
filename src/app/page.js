@@ -29,8 +29,8 @@ export default function Home() {
   const [supportOpen, setSupportOpen] = useState(false);
   const [googleWarnOpen, setGoogleWarnOpen] = useState(false);
 
-  // Load database lists from backend APIs
-  const loadDatabase = async (userSession = session) => {
+  // Load static things once on mount
+  const loadStaticData = async () => {
     try {
       const gamesRes = await fetch('/api/games');
       const gamesData = await gamesRes.json();
@@ -39,7 +39,14 @@ export default function Home() {
       const gatewaysRes = await fetch('/api/gateways');
       const gatewaysData = await gatewaysRes.json();
       if (gatewaysData.success) setGateways(gatewaysData.gateways);
+    } catch (err) {
+      console.error('Failed to load static games/gateways:', err);
+    }
+  };
 
+  // Load database lists from backend APIs
+  const loadDatabase = async (userSession = session) => {
+    try {
       if (userSession && userSession.email) {
         const emailQuery = encodeURIComponent(userSession.email);
         
@@ -56,7 +63,7 @@ export default function Home() {
         if (txData.success) setTransactions(txData.transactions);
       }
     } catch (err) {
-      console.error('Failed to load database from APIs:', err);
+      console.error('Failed to load transactional records:', err);
     }
   };
 
@@ -84,6 +91,7 @@ export default function Home() {
       setView('auth');
     }
     
+    loadStaticData();
     loadDatabase(savedSession);
 
     // Auto-poll user records from DB every 4 seconds for real-time updates

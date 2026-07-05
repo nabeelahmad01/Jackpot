@@ -125,8 +125,59 @@ export async function PUT(req) {
           read: false,
           timestamp: new Date().toISOString()
         });
+
+        // 4. Referral System Bonus: Check if this depositor was referred by someone
+        const usersCollection = db.collection('users');
+        const depositor = await usersCollection.findOne({ email: userEmail });
+        if (depositor && depositor.referredBy && originalTx.type === 'DEPOSIT') {
+          const referrerEmail = depositor.referredBy.toLowerCase().trim();
+          
+          // Get referral reward percentage (default: 10%)
+          const refBonusPercent = (settings && settings.referralBonus !== undefined) ? Number(settings.referralBonus) : 10;
+          
+          if (refBonusPercent > 0) {
+            const rewardCoins = amount * (refBonusPercent / 100);
+            
+            // Insert referral reward notification for the Coins Manager (to allot to the Referrer)
+            await notificationsCollection.insertOne({
+              id: Date.now().toString() + Math.floor(Math.random() * 100 + 1).toString(),
+              userEmail: referrerEmail,
+              gameTitle: 'Referral Reward', // Clearly labels this as a referral reward allotment
+              depositAmount: amount, // The referred friend's deposit amount
+              bonusApplied: refBonusPercent, // The config %
+              totalCoins: Math.round(rewardCoins * 100) / 100, // Reward amount
+              status: 'PENDING',
+              read: false,
+              timestamp: new Date().toISOString()
+            });
+          }
+        }
       } catch (notiErr) {
         console.error('Failed to generate coin allotment notification:', notiErr);
+      }
+    }
+
+    // Trigger Coins notification if this transaction is approved as SUCCESS and it is a WITHDRAW (Deduction task)
+    if (status === 'SUCCESS' && originalTx.type === 'WITHDRAW' && originalTx.status !== 'SUCCESS') {
+      try {
+        const userEmail = originalTx.userEmail.toLowerCase();
+        const amount = parseFloat(originalTx.amount);
+        
+        // Insert a deduction notification for the Coins Manager (negative coins)
+        const notificationsCollection = db.collection('coinsNotifications');
+        await notificationsCollection.insertOne({
+          id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
+          userEmail,
+          gameTitle: originalTx.gameTitle || 'Lobby',
+          depositAmount: amount, // Represents the cashout withdrawal amount
+          bonusApplied: -1, // Indicates deduction/withdrawal action
+          totalCoins: -amount, // Negative value indicates deduction to the Coins Manager!
+          status: 'PENDING',
+          read: false,
+          timestamp: new Date().toISOString()
+        });
+      } catch (notiErr) {
+        console.error('Failed to generate coin deduction notification:', notiErr);
       }
     }
 

@@ -11,8 +11,11 @@ export async function GET() {
     
     // Seed defaults if missing
     if (!settings) {
-      settings = { id: 'global_settings', firstDepositBonus: 300, regularDepositBonus: 20 };
+      settings = { id: 'global_settings', firstDepositBonus: 300, regularDepositBonus: 20, referralBonus: 10 };
       await settingsCollection.insertOne(settings);
+    } else if (settings.referralBonus === undefined) {
+      await settingsCollection.updateOne({ id: 'global_settings' }, { $set: { referralBonus: 10 } });
+      settings.referralBonus = 10;
     }
     
     return NextResponse.json({ success: true, settings });
@@ -25,7 +28,7 @@ export async function GET() {
 // PUT / POST update settings (Super Admin only)
 export async function PUT(req) {
   try {
-    const { firstDepositBonus, regularDepositBonus } = await req.json();
+    const { firstDepositBonus, regularDepositBonus, referralBonus } = await req.json();
 
     const db = await getDb();
     const settingsCollection = db.collection('settings');
@@ -37,6 +40,9 @@ export async function PUT(req) {
     if (regularDepositBonus !== undefined) {
       updateFields.regularDepositBonus = Number(regularDepositBonus);
     }
+    if (referralBonus !== undefined) {
+      updateFields.referralBonus = Number(referralBonus);
+    }
 
     await settingsCollection.updateOne(
       { id: 'global_settings' },
@@ -44,7 +50,7 @@ export async function PUT(req) {
       { upsert: true }
     );
 
-    return NextResponse.json({ success: true, message: 'Bonus percentages updated successfully!' });
+    return NextResponse.json({ success: true, message: 'Bonus settings updated successfully!' });
   } catch (err) {
     console.error('Update Settings API Error:', err);
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });

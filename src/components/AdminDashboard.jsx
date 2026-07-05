@@ -66,14 +66,15 @@ export default function AdminDashboard({
   const [newAdminPassword, setNewAdminPassword] = useState('');
   const [newAdminRole, setNewAdminRole] = useState('financial_admin');
 
-  // 4. Settings Form State
   const [firstBonusInput, setFirstBonusInput] = useState(systemSettings.firstDepositBonus);
   const [regularBonusInput, setRegularBonusInput] = useState(systemSettings.regularDepositBonus);
+  const [referralBonusInput, setReferralBonusInput] = useState(systemSettings.referralBonus || 10);
 
   // Sync settings inputs when prop loads
   useEffect(() => {
     setFirstBonusInput(systemSettings.firstDepositBonus);
     setRegularBonusInput(systemSettings.regularDepositBonus);
+    setReferralBonusInput(systemSettings.referralBonus || 10);
   }, [systemSettings]);
 
   // 5. Live Chat Support Console States
@@ -216,7 +217,7 @@ export default function AdminDashboard({
   // Settings Save Submit
   const handleSettingsSubmit = (e) => {
     e.preventDefault();
-    onUpdateSettings(firstBonusInput, regularBonusInput);
+    onUpdateSettings(firstBonusInput, regularBonusInput, referralBonusInput);
   };
 
   // Game remaining pool coin balance editor trigger
@@ -256,6 +257,8 @@ export default function AdminDashboard({
   const filteredUsers = normalUsers.filter((u) => u.name.toLowerCase().includes(userSearch.toLowerCase()) || u.email.toLowerCase().includes(userSearch.toLowerCase()));
   const filteredRequests = accountRequests.filter((r) => r.userEmail.toLowerCase().includes(requestSearch.toLowerCase()) || r.gameTitle.toLowerCase().includes(requestSearch.toLowerCase()));
   const filteredLedger = transactions.filter((t) => t.userEmail.toLowerCase().includes(ledgerSearch.toLowerCase()) || t.gateway.toLowerCase().includes(ledgerSearch.toLowerCase()) || t.type.toLowerCase().includes(ledgerSearch.toLowerCase()));
+  const depositsLedger = filteredLedger.filter((t) => t.type === 'DEPOSIT');
+  const withdrawalsLedger = filteredLedger.filter((t) => t.type === 'WITHDRAW' || t.type === 'BONUS');
   const filteredGateways = gateways.filter((g) => g.name.toLowerCase().includes(gatewaySearch.toLowerCase()) || g.tag.toLowerCase().includes(gatewaySearch.toLowerCase()));
   const filteredStaff = staffUsers.filter((s) => s.name.toLowerCase().includes(staffSearch.toLowerCase()) || s.email.toLowerCase().includes(staffSearch.toLowerCase()) || s.role.toLowerCase().includes(staffSearch.toLowerCase()));
   const filteredConversations = conversations.filter((c) => c.email.toLowerCase().includes(chatSearch.toLowerCase()) || (c.name && c.name.toLowerCase().includes(chatSearch.toLowerCase())));
@@ -304,17 +307,36 @@ export default function AdminDashboard({
     <div id="view-admin-dashboard" className="admin-dashboard-layout">
       {/* Mobile Top Header Bar */}
       <div className="admin-mobile-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.25rem', cursor: 'pointer', marginRight: '0.25rem' }}
+            style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.35rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            title="Toggle Menu"
           >
             <i className={`fa-solid ${sidebarOpen ? 'fa-xmark' : 'fa-bars'}`}></i>
           </button>
-          <span style={{ fontSize: '1rem', fontWeight: 'bold', color: '#fff', fontFamily: 'var(--font-heading)' }}>JACKPOT ROYALS</span>
+          
+          <div style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '50%',
+            border: '1px solid rgba(255,215,0,0.4)',
+            background: '#000',
+            boxShadow: '0 0 10px rgba(255,215,0,0.3)',
+            overflow: 'hidden',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <img src="/jackpot_lion_mascot.png?v=2" alt="Mascot Logo" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%', clipPath: 'circle(50%)' }} />
+          </div>
+
+          <span style={{ fontSize: '0.9rem', fontWeight: '900', color: '#fff', fontFamily: 'var(--font-heading)', letterSpacing: '0.05em' }}>
+            JACKPOT<span style={{ color: 'var(--gold-primary)' }}>ROYALS</span>
+          </span>
         </div>
-        <button className="lobby-nav-btn logout-btn" onClick={onLogout} style={{ padding: '0.35rem 0.75rem', fontSize: '0.7rem', margin: 0, width: 'auto' }}>
-          <i className="fa-solid fa-right-from-bracket"></i>
+        <button className="lobby-nav-btn logout-btn" onClick={onLogout} style={{ padding: '0.4rem 0.8rem', fontSize: '0.7rem', margin: 0, width: 'auto', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+          <i className="fa-solid fa-right-from-bracket"></i> <span>LOGOUT</span>
         </button>
       </div>
 
@@ -682,7 +704,7 @@ export default function AdminDashboard({
                           <td><span className={`admin-badge-preview b-${game.badge}`}>{game.badge}</span></td>
                           <td>
                             <strong style={{ fontSize: '0.95rem', color: (game.availableCoins || 0) < 5000 ? '#ef4444' : '#ffd700' }}>
-                              🪙 {game.availableCoins || 0} Coins
+                              <i className="fa-solid fa-coins" style={{ color: '#ffd700', marginRight: '4px' }}></i> {game.availableCoins || 0} Coins
                             </strong>
                           </td>
                           <td>
@@ -958,7 +980,13 @@ export default function AdminDashboard({
               </div>
             </div>
 
-            <div className="table-responsive">
+            <div className="section-card-header" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '1.5rem', marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
+              <h4 style={{ fontSize: '1rem', color: 'var(--gold-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <i className="fa-solid fa-circle-arrow-down"></i> DEPOSIT REQUESTS & LOGS ({depositsLedger.length})
+              </h4>
+            </div>
+
+            <div className="table-responsive" style={{ marginBottom: '2.5rem' }}>
               <table className="admin-table">
                 <thead>
                   <tr>
@@ -975,20 +1003,20 @@ export default function AdminDashboard({
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredLedger.length === 0 ? (
+                  {depositsLedger.length === 0 ? (
                     <tr>
                       <td colSpan="10" className="text-center text-muted" style={{ padding: '2rem' }}>
-                        No ledger transactions matching criteria found.
+                        No pending or past deposit transactions found.
                       </td>
                     </tr>
                   ) : (
-                    filteredLedger.map((tx, idx) => (
+                    depositsLedger.map((tx, idx) => (
                       <tr key={tx.id}>
                         <td>{idx + 1}</td>
                         <td>{tx.userEmail}</td>
                         <td><strong>{tx.gameTitle}</strong></td>
                         <td>
-                          <span className={`admin-badge-preview ${tx.type === 'DEPOSIT' ? 'b-hot' : 'b-new'}`}>
+                          <span className="admin-badge-preview b-hot">
                             {tx.type}
                           </span>
                         </td>
@@ -1019,6 +1047,111 @@ export default function AdminDashboard({
                               style={{ background: '#3498db', margin: 0, padding: '0.35rem 0.65rem', width: 'auto', display: 'inline-flex', gap: '0.3rem', alignItems: 'center' }}
                             >
                               <i className="fa-solid fa-receipt"></i> <span style={{ fontSize: '0.65rem' }}>View Proof</span>
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>No Screenshot</span>
+                          )}
+                        </td>
+                        <td>
+                          {tx.status === 'PENDING' ? (
+                            <div className="table-actions" style={{ justifyContent: 'flex-start', gap: '0.5rem' }}>
+                              <button
+                                disabled={processingIds[tx.id]}
+                                onClick={wrapAction(tx.id, () => onApproveTransaction(tx.id))}
+                                className="action-row-btn btn-edit"
+                                style={{ background: '#22c55e', color: '#fff', opacity: processingIds[tx.id] ? 0.5 : 1 }}
+                                title="Approve Payment"
+                              >
+                                {processingIds[tx.id] ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-check"></i>}
+                              </button>
+                              <button
+                                disabled={processingIds[tx.id]}
+                                onClick={wrapAction(tx.id, () => onFailTransaction(tx.id))}
+                                className="action-row-btn btn-delete"
+                                style={{ background: '#ef4444', color: '#fff', opacity: processingIds[tx.id] ? 0.5 : 1 }}
+                                title="Fail/Reject Payment"
+                              >
+                                {processingIds[tx.id] ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-xmark"></i>}
+                              </button>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>Processed</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="section-card-header" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '1.5rem', marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
+              <h4 style={{ fontSize: '1rem', color: '#ff4d6d', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <i className="fa-solid fa-circle-arrow-up"></i> WITHDRAWAL REQUESTS & LOGS ({withdrawalsLedger.length})
+              </h4>
+            </div>
+
+            <div className="table-responsive">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>User Email</th>
+                    <th>Game Title</th>
+                    <th>Tx Type</th>
+                    <th>Amount</th>
+                    <th>Gateway Details</th>
+                    <th>Timestamp</th>
+                    <th>Status</th>
+                    <th>Game Screenshot</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {withdrawalsLedger.length === 0 ? (
+                    <tr>
+                      <td colSpan="10" className="text-center text-muted" style={{ padding: '2rem' }}>
+                        No pending or past withdrawal transactions found.
+                      </td>
+                    </tr>
+                  ) : (
+                    withdrawalsLedger.map((tx, idx) => (
+                      <tr key={tx.id}>
+                        <td>{idx + 1}</td>
+                        <td>{tx.userEmail}</td>
+                        <td><strong>{tx.gameTitle}</strong></td>
+                        <td>
+                          <span className="admin-badge-preview b-new">
+                            {tx.type}
+                          </span>
+                        </td>
+                        <td><strong>${parseFloat(tx.amount).toFixed(2)}</strong></td>
+                        <td>
+                          <span style={{ fontSize: '0.725rem', opacity: 0.9 }}>
+                            {tx.gateway} ({tx.code})
+                          </span>
+                          {tx.nameOnTag && (
+                            <div style={{ marginTop: '0.25rem', padding: '0.25rem 0.5rem', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', fontSize: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.1rem', border: '1px solid rgba(255,255,255,0.03)' }}>
+                              <span style={{ color: '#ffd700' }}>Name: {tx.nameOnTag}</span>
+                              {tx.phoneOnTag && <span style={{ color: 'var(--text-muted)' }}>Phone: {tx.phoneOnTag}</span>}
+                            </div>
+                          )}
+                          {tx.note && <p style={{ fontSize: '0.65rem', color: '#ff8787', margin: '0.2rem 0 0 0' }}>{tx.note}</p>}
+                        </td>
+                        <td style={{ fontSize: '0.7rem' }}>{tx.date}</td>
+                        <td>
+                          <span className={`admin-badge-preview b-${tx.status.toLowerCase() === 'success' ? 'ready' : tx.status.toLowerCase()}`}>
+                            {tx.status}
+                          </span>
+                        </td>
+                        <td>
+                          {tx.screenshot ? (
+                            <button
+                              onClick={() => onInspectProof(tx.screenshot)}
+                              className="submit-btn"
+                              style={{ background: '#eab308', color: '#000', margin: 0, padding: '0.35rem 0.65rem', width: 'auto', display: 'inline-flex', gap: '0.3rem', alignItems: 'center' }}
+                            >
+                              <i className="fa-solid fa-gamepad"></i> <span style={{ fontSize: '0.65rem', fontWeight: 'bold' }}>View Game Balance</span>
                             </button>
                           ) : (
                             <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>No Screenshot</span>
@@ -1185,11 +1318,27 @@ export default function AdminDashboard({
                       <tr key={noti.id} style={{ opacity: noti.status === 'COMPLETED' ? 0.6 : 1 }}>
                         <td>{idx + 1}</td>
                         <td><strong>{noti.userEmail}</strong></td>
-                        <td><span className="admin-badge-preview b-hot">{noti.gameTitle}</span></td>
-                        <td>${parseFloat(noti.depositAmount).toFixed(2)}</td>
-                        <td>{noti.bonusApplied}% Bonus</td>
+                        <td><span className={`admin-badge-preview ${noti.totalCoins < 0 ? 'b-new' : 'b-hot'}`}>{noti.gameTitle}</span></td>
                         <td>
-                          <strong style={{ color: '#00ff66', fontSize: '0.9rem' }}>🪙 {noti.totalCoins}</strong>
+                          {noti.bonusApplied === -1 ? (
+                            <span style={{ color: '#ff4d6d' }}>${parseFloat(noti.depositAmount).toFixed(2)} (Cashout)</span>
+                          ) : (
+                            `$${parseFloat(noti.depositAmount).toFixed(2)}`
+                          )}
+                        </td>
+                        <td>
+                          {noti.bonusApplied === -1 ? (
+                            <span style={{ color: '#ff4d6d', fontWeight: 'bold' }}>DEDUCTION</span>
+                          ) : (
+                            `${noti.bonusApplied}% Bonus`
+                          )}
+                        </td>
+                        <td>
+                          {noti.totalCoins < 0 ? (
+                            <strong style={{ color: '#ff4d6d', fontSize: '0.9rem' }}><i className="fa-solid fa-coins" style={{ marginRight: '4px' }}></i> {noti.totalCoins} (Deduct)</strong>
+                          ) : (
+                            <strong style={{ color: '#00ff66', fontSize: '0.9rem' }}><i className="fa-solid fa-coins" style={{ color: '#00ff66', marginRight: '4px' }}></i> {noti.totalCoins}</strong>
+                          )}
                         </td>
                         <td style={{ fontSize: '0.7rem' }}>{new Date(noti.timestamp).toLocaleString()}</td>
                         <td>
@@ -1557,6 +1706,23 @@ export default function AdminDashboard({
                   <span style={{ paddingRight: '1rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>%</span>
                 </div>
                 <span className="game-tap-tip">Calculates multiplier of deposit when a player makes repeat deposits (e.g. 20% adds 1.2x coins).</span>
+              </div>
+
+              <div className="input-group" style={{ marginTop: '1.5rem' }}>
+                <label htmlFor="settings-referral-bonus">Referral Deposit Reward Bonus (%)</label>
+                <div className="input-wrapper">
+                  <i className="fa-solid fa-users-viewfinder input-icon" style={{ color: '#a855f7' }}></i>
+                  <input
+                    type="number"
+                    id="settings-referral-bonus"
+                    placeholder="e.g. 10"
+                    value={referralBonusInput}
+                    onChange={(e) => setReferralBonusInput(e.target.value)}
+                    required
+                  />
+                  <span style={{ paddingRight: '1rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>%</span>
+                </div>
+                <span className="game-tap-tip">Calculates reward coins allotted to the referrer when their referred friend makes a deposit (e.g. 10% sends 10% of deposit value to referrer).</span>
               </div>
 
               <button type="submit" className="submit-btn" style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold', marginTop: '2rem' }}>

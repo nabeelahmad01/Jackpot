@@ -40,6 +40,7 @@ export default function UserLobby({
 
   // Screenshot Upload state
   const [screenshotBase64, setScreenshotBase64] = useState('');
+  const [withdrawScreenshot, setWithdrawScreenshot] = useState('');
 
   // Countdown timer ref for live invoice
   const timerRef = useRef(null);
@@ -113,6 +114,25 @@ export default function UserLobby({
     reader.onloadend = () => {
       setScreenshotBase64(reader.result);
       showToast('Payment screenshot receipt loaded. Ready to confirm!', 'success');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleWithdrawScreenshotChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('Game screenshot must be less than 2MB.', 'error');
+      e.target.value = '';
+      setWithdrawScreenshot('');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setWithdrawScreenshot(reader.result);
+      showToast('Game screenshot loaded successfully!', 'success');
     };
     reader.readAsDataURL(file);
   };
@@ -205,6 +225,10 @@ export default function UserLobby({
       showToast('Please provide the name on your tag.', 'error');
       return;
     }
+    if (!withdrawScreenshot) {
+      showToast('Please upload a screenshot of your game balance.', 'error');
+      return;
+    }
 
     onSubmitTransaction({
       gameTitle: activeGame.title,
@@ -214,13 +238,14 @@ export default function UserLobby({
       code: withdrawTag.trim(),
       nameOnTag: nameOnTag.trim(),
       phoneOnTag: phoneOnTag.trim(),
-      screenshot: ''
+      screenshot: withdrawScreenshot
     });
 
     setWithdrawAmount('');
     setWithdrawTag('');
     setNameOnTag('');
     setPhoneOnTag('');
+    setWithdrawScreenshot('');
     setWithdrawModalOpen(false);
     showToast('Withdrawal request submitted successfully!', 'success');
   };
@@ -403,7 +428,7 @@ export default function UserLobby({
           </section>
 
           <div className="deposit-button-wrapper">
-            <button type="button" className="deposit-now-btn" onClick={() => showToast('Choose a game below to start playing!', 'info')}>
+            <button type="button" className="deposit-now-btn" onClick={() => document.getElementById('lobby-games-section')?.scrollIntoView({ behavior: 'smooth' })}>
               <div className="deposit-btn-content">
                 <i className="fa-solid fa-circle-chevron-down deposit-bag-icon" style={{ animation: 'bounce 2s infinite' }}></i>
                 <span className="deposit-text">SELECT GAME BELOW</span>
@@ -457,17 +482,17 @@ export default function UserLobby({
               <div className="referral-left">
                 <i className="fa-solid fa-handshake referral-icon"></i>
                 <div>
-                  <h3>SHARE JACKPOTENTRY WITH FRIENDS</h3>
+                  <h3>SHARE JACKPOT ROYALS WITH FRIENDS</h3>
                   <p>Enjoying our platform? Invite your friends and help grow our community. Great experiences are worth sharing.</p>
                 </div>
               </div>
-              <button type="button" className="share-btn" onClick={() => showToast('Referral copied to clipboard!', 'success')}>
+              <button type="button" className="share-btn" onClick={() => setLobbySubView('referrals')}>
                 <span>SHARE NOW &rarr;</span>
               </button>
             </div>
           </article>
 
-          <section className="games-lobby-section">
+          <section id="lobby-games-section" className="games-lobby-section">
             <div className="lobby-section-header">
               <h3><i className="fa-solid fa-gamepad gold-text"></i> OUR GAMES</h3>
               <span className="game-tap-tip">Tap a game to play <i className="fa-solid fa-hand-pointer"></i></span>
@@ -1106,6 +1131,29 @@ export default function UserLobby({
                     style={{ paddingLeft: '2.5rem' }}
                     required
                   />
+                </div>
+              </div>
+
+              <div className="input-group" style={{ marginTop: '0.5rem' }}>
+                <label htmlFor="withdraw-screenshot-receipt" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.35rem' }}>
+                  Upload Game Screenshot (Required)
+                </label>
+                <p style={{ fontSize: '0.6rem', color: 'var(--text-muted)', margin: '0.1rem 0 0.5rem' }}>
+                  Please upload a full screen screenshot of your game balance showing your wins.
+                </p>
+                <div className="input-wrapper" style={{ background: '#0b0c16', position: 'relative' }}>
+                  <i className="fa-solid fa-image input-icon" style={{ color: 'var(--gold-primary)' }}></i>
+                  <input
+                    type="file"
+                    id="withdraw-screenshot-receipt"
+                    accept="image/*"
+                    onChange={handleWithdrawScreenshotChange}
+                    style={{ opacity: 0, position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', cursor: 'pointer', zIndex: 5 }}
+                    required
+                  />
+                  <span style={{ fontSize: '0.75rem', paddingLeft: '2.5rem', color: withdrawScreenshot ? '#4ade80' : 'rgba(255,255,255,0.4)', lineHeight: '40px', pointerEvents: 'none' }}>
+                    {withdrawScreenshot ? 'Game screenshot selected ✓' : 'Choose screenshot image...'}
+                  </span>
                 </div>
               </div>
 
