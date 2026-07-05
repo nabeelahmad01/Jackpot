@@ -95,7 +95,7 @@ export default function ReferralCenter({
       <div style={s.topBar}>
         <div style={s.topLeft}>
           <div style={s.topIcon}>
-            <img src="/jackpot_lion_mascot.png" alt="Gold Lion Mascot" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <img src="/jackpot_lion_mascot.png?v=2" alt="Gold Lion Mascot" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%', clipPath: 'circle(50%)' }} />
           </div>
           <div>
             <h2 style={s.topTitle}>JACKPOT<span style={{ color: 'var(--gold-primary)' }}>ROYALS</span> REFERRALS</h2>
@@ -132,7 +132,7 @@ export default function ReferralCenter({
           zIndex: 2,
           opacity: 0.85
         }} className="desktop-only-lion">
-          <img src="/jackpot_lion_mascot.png" alt="Gold Lion Mascot" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <img src="/jackpot_lion_mascot.png?v=2" alt="Gold Lion Mascot" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%', clipPath: 'circle(50%)' }} />
         </div>
         <div style={s.heroBg}></div>
         <div style={s.heroBg2}></div>

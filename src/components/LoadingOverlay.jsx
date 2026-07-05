@@ -19,7 +19,7 @@ export default function LoadingOverlay({ active }) {
       animation: 'fade-in 0.2s ease-out'
     }}>
       <div className="loader-content" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        
+
         {/* Luxury Gold Medal Card with floating animation */}
         <div className="luxury-vip-medal" style={{
           position: 'relative',
@@ -54,6 +54,7 @@ export default function LoadingOverlay({ active }) {
               height: '100%',
               objectFit: 'cover',
               borderRadius: '50%',
+              clipPath: 'circle(50%)',
               zIndex: 2,
               filter: 'drop-shadow(0 0 15px rgba(255,215,0,0.4))'
             }}

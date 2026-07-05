@@ -284,13 +284,14 @@ export default function UserLobby({
         <div className="lobby-brand" onClick={() => { setActiveGame(null); setActiveInvoice(null); setLobbySubView('main'); }} style={{ cursor: 'pointer' }}>
           <div className="lobby-logo-box" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000', border: '1px solid rgba(255,215,0,0.4)', borderRadius: '50%', boxShadow: '0 0 15px rgba(255,215,0,0.25)' }}>
             <img
-              src="/jackpot_lion_mascot.png"
+              src="/jackpot_lion_mascot.png?v=2"
               alt="Jackpot Lion Mascot"
               style={{
                 width: '100%',
                 height: '100%',
                 objectFit: 'cover',
                 borderRadius: '50%',
+                clipPath: 'circle(50%)',
                 animation: 'pulse-lion 2s infinite ease-in-out',
                 transform: 'scale(1.05)'
               }}
@@ -365,13 +366,14 @@ export default function UserLobby({
                     justifyContent: 'center'
                   }}>
                     <img
-                      src="/jackpot_lion_mascot.png"
+                      src="/jackpot_lion_mascot.png?v=2"
                       alt="Jackpot Royals Lion Mascot"
                       style={{
                         width: '100%',
                         height: '100%',
                         objectFit: 'cover',
                         borderRadius: '50%',
+                        clipPath: 'circle(50%)',
                         animation: 'pulse-lion 2s infinite ease-in-out',
                         transform: 'scale(1.05)'
                       }}
@@ -532,13 +534,14 @@ export default function UserLobby({
             <div className="game-header-brand" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <div className="lobby-logo-box" style={{ width: '50px', height: '50px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000', border: '1px solid rgba(255,215,0,0.4)', borderRadius: '50%', boxShadow: '0 0 15px rgba(255,215,0,0.25)' }}>
                 <img
-                  src="/jackpot_lion_mascot.png"
+                  src="/jackpot_lion_mascot.png?v=2"
                   alt="Jackpot Lion Mascot"
                   style={{
                     width: '100%',
                     height: '100%',
                     objectFit: 'cover',
                     borderRadius: '50%',
+                    clipPath: 'circle(50%)',
                     animation: 'pulse-lion 2s infinite ease-in-out',
                     transform: 'scale(1.05)'
                   }}
