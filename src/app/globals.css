@@ -2160,6 +2160,8 @@ select option {
 .admin-badge-preview.b-hot { background: rgba(255,46,99,0.15); border: 1px solid var(--red-primary); color: var(--red-primary); }
 .admin-badge-preview.b-new { background: rgba(255,215,0,0.15); border: 1px solid var(--gold-primary); color: var(--gold-primary); }
 .admin-badge-preview.b-none { background: rgba(255,255,255,0.05); color: var(--text-muted); }
+.admin-badge-preview.b-vip { background: rgba(168,85,247,0.15); border: 1px solid #a855f7; color: #a855f7; }
+.admin-badge-preview.b-ready { background: rgba(34,197,94,0.15); border: 1px solid #22c55e; color: #22c55e; }
 
 .border-gold {
   border: 1px solid rgba(255, 215, 0, 0.35);

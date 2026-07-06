@@ -10,6 +10,8 @@ export default function UserLobby({
   gameAccounts = [],
   transactions = [],
   gateways = [],
+  coinsNotifications = [],
+  onUpdateCoinsNotification,
   currentUser,
   currentUserEmail,
   onLogout,
@@ -155,11 +157,9 @@ export default function UserLobby({
   const handleSelectGateway = (gatewayObj) => {
     setPaymentModalOpen(false);
     
-    // Generate Random Confirmation Code
-    const prefixes = ['book', 'play', 'jack', 'win', 'cash', 'coin'];
-    const randPre = prefixes[Math.floor(Math.random() * prefixes.length)];
-    const randNum = Math.floor(1000 + Math.random() * 9000);
-    const code = `${randPre}${randNum}`;
+    // Generate Random Transaction Reference Code (e.g. JKP-837291)
+    const randNum = Math.floor(100000 + Math.random() * 900000);
+    const code = `JKP-${randNum}`;
 
     setScreenshotBase64('');
 
@@ -265,6 +265,47 @@ export default function UserLobby({
     window.open('/jackpotentry.apk', '_blank');
   };
 
+  const handleFreeplayClaim = () => {
+    // 1. Check if user already claimed signup freeplay bonus
+    const hasClaimedFreeplay = (transactions || []).some(
+      (t) => t.type === 'BONUS' && t.code === 'SIGNUP-FREE3'
+    );
+    if (hasClaimedFreeplay) {
+      showToast("You have already claimed your $3.00 signup Freeplay bonus!", "error");
+      return;
+    }
+
+    // 2. Check if a game is active
+    if (!activeGame) {
+      // If no active game, scroll to games section so they select a game first
+      showToast("Please select a game first to request account and claim your Freeplay!", "info");
+      document.getElementById('lobby-games-section')?.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+
+    // 3. Check if they have a game account for this active game
+    const currentAccount = gameAccounts.find(
+      (acc) => acc.gameTitle.toLowerCase() === activeGame.title.toLowerCase()
+    );
+    if (!currentAccount) {
+      showToast(`Please request/create a game account for ${activeGame.title} first to claim Freeplay!`, "error");
+      return;
+    }
+
+    // 4. Submit the Freeplay request directly!
+    onSubmitTransaction({
+      gameTitle: activeGame.title,
+      type: 'BONUS',
+      amount: 3.00,
+      gateway: 'Signup Bonus',
+      code: 'SIGNUP-FREE3',
+      nameOnTag: currentUser?.name || 'Player',
+      phoneOnTag: '',
+      screenshot: ''
+    });
+    showToast(`Freeplay request of $3.00 submitted for ${activeGame.title}! Awaiting manager allotment.`, "success");
+  };
+
   const handleRequestAccountWithBonus = () => {
     onRequestAccount(activeGame.title);
     const isFirstAccount = gameAccounts.length === 0 && !accountRequests.some(r => r.userEmail === currentUserEmail);
@@ -363,6 +404,86 @@ export default function UserLobby({
         </div>
       ) : !activeGame ? (
         <div className="lobby-content-container">
+          {/* Active Hold/Claim Notifications */}
+          {coinsNotifications && coinsNotifications.filter(n => n.status === 'HOLD' || n.status === 'CLAIM_REQUESTED').length > 0 && (
+            <div className="hold-notifications-wrapper" style={{ marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {coinsNotifications.filter(n => n.status === 'HOLD' || n.status === 'CLAIM_REQUESTED').map(noti => (
+                <div key={noti.id} className="admin-section-card" style={{
+                  padding: '1.25rem',
+                  border: '1.5px solid rgba(245, 158, 11, 0.4)',
+                  background: 'linear-gradient(135deg, rgba(8, 10, 17, 0.95) 0%, rgba(20, 15, 5, 0.95) 100%)',
+                  borderRadius: '16px',
+                  boxShadow: '0 8px 30px rgba(0, 0, 0, 0.4)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '1rem',
+                  animation: 'fade-in 0.3s ease-out'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{
+                      width: '45px',
+                      height: '45px',
+                      borderRadius: '50%',
+                      background: 'rgba(245,158,11,0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: '1px solid rgba(245,158,11,0.3)'
+                    }}>
+                      <i className="fa-solid fa-coins" style={{ fontSize: '1.25rem', color: '#f59e0b' }}></i>
+                    </div>
+                    <div>
+                      <h4 style={{ fontSize: '0.9rem', color: '#fff', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
+                        Allotment Status: <span style={{ color: noti.status === 'HOLD' ? '#f59e0b' : '#38bdf8' }}>{noti.status === 'HOLD' ? 'ON HOLD' : 'CLAIM REQUESTED'}</span>
+                      </h4>
+                      <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)', margin: '0.25rem 0' }}>
+                        Coins to credit: <strong style={{ color: 'var(--gold-primary)' }}>{noti.totalCoins} Coins</strong> for <strong>{noti.gameTitle}</strong>
+                      </p>
+                      {noti.holdNote && (
+                        <div style={{ padding: '0.5rem 0.75rem', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', borderLeft: '3px solid #f59e0b', fontSize: '0.7rem', color: '#e2e8f0', marginTop: '0.5rem', fontStyle: 'italic', maxWidth: '500px' }}>
+                          Manager Note: "{noti.holdNote}"
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    {noti.status === 'HOLD' ? (
+                      <button
+                        onClick={async () => {
+                          if (onUpdateCoinsNotification) {
+                            await onUpdateCoinsNotification(noti.id, 'CLAIM_REQUESTED');
+                            showToast("Coins claim request sent to manager!", "success");
+                          }
+                        }}
+                        className="submit-btn"
+                        style={{
+                          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                          color: '#000',
+                          fontWeight: 'bold',
+                          padding: '0.6rem 1.25rem',
+                          borderRadius: '10px',
+                          fontSize: '0.75rem',
+                          width: 'auto',
+                          margin: 0,
+                          boxShadow: '0 4px 15px rgba(245,158,11,0.2)'
+                        }}
+                      >
+                        Claim Coins Now (Played Existing)
+                      </button>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#38bdf8', fontSize: '0.75rem', fontWeight: 'bold', background: 'rgba(56,189,248,0.1)', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid rgba(56,189,248,0.2)' }}>
+                        <i className="fa-solid fa-spinner fa-spin"></i> Awaiting Verification...
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           <section className="lobby-hero">
             <div className="hero-promo-block">
               <h2 className="hero-promo-headline">
@@ -423,6 +544,25 @@ export default function UserLobby({
                     <div className="bullet-desc"><strong>CASH OUT</strong><span>Fast withdrawals</span></div>
                   </div>
                 </div>
+                <button
+                  onClick={handleFreeplayClaim}
+                  className="submit-btn"
+                  style={{
+                    marginTop: '1.25rem',
+                    background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)',
+                    color: '#fff',
+                    fontWeight: 'bold',
+                    padding: '0.65rem 1rem',
+                    fontSize: '0.75rem',
+                    borderRadius: '10px',
+                    width: '100%',
+                    border: 'none',
+                    boxShadow: '0 4px 15px rgba(168,85,247,0.3)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <i className="fa-solid fa-gift" style={{ marginRight: '6px' }}></i> CLAIM FREEPLAY NOW
+                </button>
               </div>
             </div>
           </section>
@@ -583,7 +723,7 @@ export default function UserLobby({
             </div>
 
             <div className="game-header-buttons" style={{ display: 'flex', gap: '0.5rem' }}>
-              <button onClick={() => showToast('Freeplay claimed!', 'success')} className="lobby-nav-btn app-btn" style={{ background: '#a855f7', color: '#fff', padding: '0.5rem 0.85rem' }}>
+              <button onClick={handleFreeplayClaim} className="lobby-nav-btn app-btn" style={{ background: '#a855f7', color: '#fff', padding: '0.5rem 0.85rem' }}>
                 <i className="fa-solid fa-gift"></i> <span style={{ fontSize: '0.75rem' }}>FREEPLAY</span>
               </button>
               <button onClick={handleReferEarn} className="lobby-nav-btn app-btn" style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '0.5rem 0.85rem' }}>
@@ -657,12 +797,15 @@ export default function UserLobby({
                       </button>
                     </div>
 
-                    <div className="tag-field-row" style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '12px', padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <span style={{ fontSize: '0.55rem', color: '#f87171', textTransform: 'uppercase', display: 'block', marginBottom: '0.15rem' }}>PAYMENT NOTE CODE</span>
-                        <code style={{ fontSize: '0.85rem', color: '#f87171', fontWeight: 'bold' }}>{activeInvoice.noteCode}</code>
+                    <div className="tag-field-row" style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '12px', padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ paddingRight: '0.5rem' }}>
+                        <span style={{ fontSize: '0.55rem', color: '#f59e0b', textTransform: 'uppercase', display: 'block', marginBottom: '0.15rem', fontWeight: 'bold' }}>IMPORTANT: TRANSACTION REFERENCE CODE</span>
+                        <code style={{ fontSize: '1.05rem', color: '#f59e0b', fontWeight: '900', letterSpacing: '1px' }}>{activeInvoice.noteCode}</code>
+                        <span style={{ fontSize: '0.6rem', color: 'rgba(255, 255, 255, 0.65)', display: 'block', marginTop: '0.25rem', lineHeight: '1.3' }}>
+                          *You MUST write this code in the Payment Note / Message / Reference field in your payment app while transferring the money.
+                        </span>
                       </div>
-                      <button onClick={() => handleCopyText(activeInvoice.noteCode)} className="action-row-btn btn-delete" style={{ background: 'none', border: 'none', color: '#f87171', fontSize: '1.2rem', cursor: 'pointer', padding: '0.25rem' }} title="Copy Code">
+                      <button onClick={() => handleCopyText(activeInvoice.noteCode)} className="action-row-btn" style={{ background: 'none', border: 'none', color: '#f59e0b', fontSize: '1.2rem', cursor: 'pointer', padding: '0.25rem' }} title="Copy Code">
                         <i className="fa-solid fa-copy"></i>
                       </button>
                     </div>

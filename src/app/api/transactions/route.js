@@ -46,7 +46,7 @@ export async function POST(req) {
       id: (Date.now() + Math.floor(Math.random() * 100)).toString(),
       userEmail: newTx.userEmail.toLowerCase().trim(),
       date: new Date().toLocaleString(),
-      status: newTx.type === 'WITHDRAW' ? 'PENDING_COINS' : 'PENDING',
+      status: newTx.type === 'WITHDRAW' ? 'PENDING_COINS' : newTx.type === 'BONUS' ? 'SUCCESS' : 'PENDING',
       note: '',
       ...newTx
     };
@@ -62,6 +62,20 @@ export async function POST(req) {
         depositAmount: parseFloat(txObject.amount),
         bonusApplied: -1, // Indicates deduction/withdrawal action
         totalCoins: -parseFloat(txObject.amount), // Negative value indicates deduction
+        status: 'PENDING',
+        read: false,
+        timestamp: new Date().toISOString(),
+        transactionId: txObject.id
+      });
+    } else if (txObject.type === 'BONUS' && txObject.code === 'SIGNUP-FREE3') {
+      const notificationsCollection = db.collection('coinsNotifications');
+      await notificationsCollection.insertOne({
+        id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
+        userEmail: txObject.userEmail,
+        gameTitle: txObject.gameTitle || 'Lobby',
+        depositAmount: 0,
+        bonusApplied: 100, // 100% bonus indicator for signup freeplay
+        totalCoins: parseFloat(txObject.amount),
         status: 'PENDING',
         read: false,
         timestamp: new Date().toISOString(),
@@ -146,7 +160,7 @@ export async function PUT(req) {
         // 4. Referral System Bonus: Check if this depositor was referred by someone
         const usersCollection = db.collection('users');
         const depositor = await usersCollection.findOne({ email: userEmail });
-        if (depositor && depositor.referredBy && originalTx.type === 'DEPOSIT') {
+        if (depositor && depositor.referredBy && originalTx.type === 'DEPOSIT' && isFirstDeposit) {
           const referrerEmail = depositor.referredBy.toLowerCase().trim();
           
           // Get referral reward percentage (default: 10%)

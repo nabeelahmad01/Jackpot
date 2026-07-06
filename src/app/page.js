@@ -20,6 +20,7 @@ export default function Home() {
   const [gameAccounts, setGameAccounts] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [gateways, setGateways] = useState([]);
+  const [coinsNotifications, setCoinsNotifications] = useState([]);
 
   // Overlay states
   const [loadingActive, setLoadingActive] = useState(false);
@@ -50,21 +51,24 @@ export default function Home() {
       if (userSession && userSession.email) {
         const emailQuery = encodeURIComponent(userSession.email);
         
-        const [requestsRes, credentialsRes, txRes] = await Promise.all([
+        const [requestsRes, credentialsRes, txRes, notiRes] = await Promise.all([
           fetch(`/api/account-requests?email=${emailQuery}`),
           fetch(`/api/game-accounts?email=${emailQuery}`),
-          fetch(`/api/transactions?email=${emailQuery}`)
+          fetch(`/api/transactions?email=${emailQuery}`),
+          fetch(`/api/coins-notifications?email=${emailQuery}`)
         ]);
 
-        const [requestsData, credentialsData, txData] = await Promise.all([
+        const [requestsData, credentialsData, txData, notiData] = await Promise.all([
           requestsRes.json(),
           credentialsRes.json(),
-          txRes.json()
+          txRes.json(),
+          notiRes.json()
         ]);
 
         if (requestsData.success) setAccountRequests(requestsData.accountRequests);
         if (credentialsData.success) setGameAccounts(credentialsData.gameAccounts);
         if (txData.success) setTransactions(txData.transactions);
+        if (notiData.success) setCoinsNotifications(notiData.coinsNotifications);
       }
     } catch (err) {
       console.error('Failed to load transactional records:', err);
@@ -237,6 +241,22 @@ export default function Home() {
     }
   };
 
+  const handleUpdateCoinsNotification = async (id, status, read, holdNote) => {
+    try {
+      const response = await fetch('/api/coins-notifications', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status, read, holdNote })
+      });
+      const data = await response.json();
+      if (data.success) {
+        loadDatabase(session);
+      }
+    } catch (err) {
+      console.error('Update coins notification error:', err);
+    }
+  };
+
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || 'your_google_client_id_here';
 
   if (!mounted) {
@@ -280,6 +300,8 @@ export default function Home() {
           gameAccounts={gameAccounts}
           transactions={transactions}
           gateways={gateways}
+          coinsNotifications={coinsNotifications}
+          onUpdateCoinsNotification={handleUpdateCoinsNotification}
           currentUser={session}
           currentUserEmail={session?.email}
           onLogout={handleLogout}

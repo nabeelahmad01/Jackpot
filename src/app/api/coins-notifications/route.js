@@ -1,13 +1,21 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
 
-// GET all coins notifications (ordered by newest first)
-export async function GET() {
+// GET all coins notifications (supports filtering by email for users, or returning all for admins)
+export async function GET(req) {
   try {
+    const { searchParams } = new URL(req.url);
+    const email = searchParams.get('email');
+
     const db = await getDb();
     const notificationsCollection = db.collection('coinsNotifications');
     
-    const notifications = await notificationsCollection.find().toArray();
+    let query = {};
+    if (email) {
+      query.userEmail = email.toLowerCase().trim();
+    }
+
+    const notifications = await notificationsCollection.find(query).toArray();
     
     // Sort by timestamp descending
     notifications.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -19,10 +27,10 @@ export async function GET() {
   }
 }
 
-// PUT update status or read indicator
+// PUT update status, read indicator, or hold note
 export async function PUT(req) {
   try {
-    const { id, status, read } = await req.json();
+    const { id, status, read, holdNote } = await req.json();
 
     if (!id) {
       return NextResponse.json({ success: false, message: 'Notification ID is required.' }, { status: 400 });
@@ -37,6 +45,9 @@ export async function PUT(req) {
     }
     if (read !== undefined) {
       updateFields.read = Boolean(read);
+    }
+    if (holdNote !== undefined) {
+      updateFields.holdNote = holdNote;
     }
 
     await notificationsCollection.updateOne({ id }, { $set: updateFields });

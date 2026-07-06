@@ -172,7 +172,7 @@ export default function AdminPage() {
 
       if (data.success) {
         const user = data.user;
-        const allowedRoles = ['admin', 'financial_admin', 'coins_admin', 'support_admin'];
+        const allowedRoles = ['admin', 'financial_admin', 'coins_admin', 'support_admin', 'operation_admin'];
         if (allowedRoles.includes(user.role)) {
           triggerLoading(1200, () => {
             setAuthenticated(true);

@@ -59,6 +59,8 @@ export default function AdminDashboard({
   const [staffSearch, setStaffSearch] = useState('');
   const [chatSearch, setChatSearch] = useState('');
   const [coinsNotiSearch, setCoinsNotiSearch] = useState('');
+  const [activeHoldId, setActiveHoldId] = useState(null);
+  const [holdNoteText, setHoldNoteText] = useState('');
 
   // 3. Admin Creation Form State
   const [newAdminName, setNewAdminName] = useState('');
@@ -242,6 +244,7 @@ export default function AdminDashboard({
     if (!adminUser) return false;
     const role = adminUser.role;
     if (role === 'admin') return true; // Super Admin has access to all
+    if (role === 'operation_admin') return ['dashboard', 'games', 'users', 'requests', 'ledger', 'gateways', 'coins', 'support', 'staff', 'settings'].includes(tabName); // Operational Manager
     if (role === 'financial_admin') return ['dashboard', 'ledger'].includes(tabName);
     if (role === 'support_admin') return ['dashboard', 'support'].includes(tabName);
     if (role === 'coins_admin') return ['dashboard', 'games', 'users', 'requests', 'gateways', 'coins'].includes(tabName);
@@ -249,7 +252,7 @@ export default function AdminDashboard({
   };
 
   // Users sorting/filtering
-  const staffUsers = users.filter((u) => ['admin', 'financial_admin', 'coins_admin', 'support_admin'].includes(u.role));
+  const staffUsers = users.filter((u) => ['admin', 'financial_admin', 'coins_admin', 'support_admin', 'operation_admin'].includes(u.role));
   const normalUsers = users.filter((u) => u.role === 'user');
 
   // Search filtering logic
@@ -1320,7 +1323,14 @@ export default function AdminDashboard({
                       <tr key={noti.id} style={{ opacity: noti.status === 'COMPLETED' ? 0.6 : 1 }}>
                         <td>{idx + 1}</td>
                         <td><strong>{noti.userEmail}</strong></td>
-                        <td><span className={`admin-badge-preview ${noti.totalCoins < 0 ? 'b-new' : 'b-hot'}`}>{noti.gameTitle}</span></td>
+                        <td>
+                          <span className={`admin-badge-preview ${noti.totalCoins < 0 ? 'b-new' : 'b-hot'}`}>{noti.gameTitle}</span>
+                          {noti.holdNote && (
+                            <div style={{ fontSize: '0.65rem', color: '#f59e0b', marginTop: '0.25rem', maxWidth: '200px', whiteSpace: 'normal', fontStyle: 'italic' }}>
+                              Note: "{noti.holdNote}"
+                            </div>
+                          )}
+                        </td>
                         <td>
                           {noti.bonusApplied === -1 ? (
                             <span style={{ color: '#ff4d6d' }}>${parseFloat(noti.depositAmount).toFixed(2)} (Cashout)</span>
@@ -1363,23 +1373,70 @@ export default function AdminDashboard({
                           </button>
                         </td>
                         <td>
-                          <span className={`admin-badge-preview b-${noti.status === 'PENDING' ? 'none' : 'ready'}`}>
-                            {noti.status}
+                          <span className={`admin-badge-preview b-${noti.status === 'PENDING' ? 'none' : noti.status === 'HOLD' ? 'new' : noti.status === 'CLAIM_REQUESTED' ? 'hot' : 'ready'}`} style={{ animation: noti.status === 'CLAIM_REQUESTED' ? 'pulse-lion 1.5s infinite' : 'none' }}>
+                            {noti.status === 'HOLD' ? 'ON HOLD' : noti.status === 'CLAIM_REQUESTED' ? 'CLAIM REQUESTED' : noti.status}
                           </span>
                         </td>
                         <td>
-                          {noti.status === 'PENDING' ? (
-                            <button
-                              disabled={processingIds[noti.id]}
-                              onClick={wrapAction(noti.id, () => onUpdateCoinsNotification(noti.id, 'COMPLETED', true))}
-                              className="submit-btn"
-                              style={{ background: 'linear-gradient(135deg, #00ff66 0%, #00a844 100%)', color: '#000', margin: 0, padding: '0.35rem 0.75rem', width: 'auto', display: 'inline-flex', gap: '0.3rem', alignItems: 'center', fontWeight: 'bold', opacity: processingIds[noti.id] ? 0.6 : 1 }}
-                            >
-                              {processingIds[noti.id] ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-circle-check"></i>}
-                              <span style={{ fontSize: '0.7rem' }}>
-                                {processingIds[noti.id] ? 'Updating...' : 'DONE'}
-                              </span>
-                            </button>
+                          {noti.status === 'PENDING' || noti.status === 'CLAIM_REQUESTED' || noti.status === 'HOLD' ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', minWidth: '150px' }}>
+                              <div style={{ display: 'flex', gap: '0.35rem' }}>
+                                <button
+                                  disabled={processingIds[noti.id]}
+                                  onClick={wrapAction(noti.id, () => onUpdateCoinsNotification(noti.id, 'COMPLETED', true))}
+                                  className="submit-btn"
+                                  style={{ background: 'linear-gradient(135deg, #00ff66 0%, #00a844 100%)', color: '#000', margin: 0, padding: '0.35rem 0.5rem', width: 'auto', display: 'inline-flex', gap: '0.2rem', alignItems: 'center', fontWeight: 'bold', opacity: processingIds[noti.id] ? 0.6 : 1 }}
+                                >
+                                  {processingIds[noti.id] ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-circle-check"></i>}
+                                  <span style={{ fontSize: '0.65rem' }}>DONE</span>
+                                </button>
+                                
+                                {noti.totalCoins > 0 && (noti.status === 'PENDING' || noti.status === 'CLAIM_REQUESTED') && (
+                                  <button
+                                    onClick={() => {
+                                      setActiveHoldId(noti.id);
+                                      setHoldNoteText(""); // Empty by default for manual entry
+                                    }}
+                                    className="submit-btn"
+                                    style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: '#000', margin: 0, padding: '0.35rem 0.5rem', width: 'auto', display: 'inline-flex', gap: '0.2rem', alignItems: 'center', fontWeight: 'bold' }}
+                                  >
+                                    <i className="fa-solid fa-pause"></i>
+                                    <span style={{ fontSize: '0.65rem' }}>HOLD</span>
+                                  </button>
+                                )}
+                              </div>
+
+                              {activeHoldId === noti.id && (
+                                <div style={{ marginTop: '0.5rem', padding: '0.5rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(245,158,11,0.2)', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                  <textarea
+                                    value={holdNoteText}
+                                    onChange={(e) => setHoldNoteText(e.target.value)}
+                                    style={{ width: '100%', minHeight: '60px', background: '#070913', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.7rem', padding: '0.35rem', borderRadius: '4px', resize: 'vertical' }}
+                                    placeholder="Type instructions manually in English (e.g. Please play with existing coins first before claiming)..."
+                                  />
+                                  <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'flex-end' }}>
+                                    <button
+                                      onClick={() => setActiveHoldId(null)}
+                                      className="action-row-btn"
+                                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.65rem', background: 'rgba(255,255,255,0.05)', color: '#fff', width: 'auto' }}
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      disabled={processingIds[noti.id]}
+                                      onClick={wrapAction(noti.id, async () => {
+                                        await onUpdateCoinsNotification(noti.id, 'HOLD', undefined, holdNoteText);
+                                        setActiveHoldId(null);
+                                      })}
+                                      className="submit-btn"
+                                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.65rem', background: '#f59e0b', color: '#000', width: 'auto', margin: 0 }}
+                                    >
+                                      Send Note
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           ) : (
                             <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>Fulfilled</span>
                           )}
@@ -1591,6 +1648,7 @@ export default function AdminDashboard({
                       <option value="financial_admin">Financial Admin (Transactions Ledger)</option>
                       <option value="coins_admin">Coins & Games Admin (Gateways/Catalog)</option>
                       <option value="support_admin">Support Admin (Human Live Support)</option>
+                      <option value="operation_admin">Operational Manager (Almost Full Access)</option>
                       <option value="admin">Super Admin (Unrestricted Full Access)</option>
                     </select>
                   </div>
@@ -1636,7 +1694,7 @@ export default function AdminDashboard({
                           <td>{staff.name}</td>
                           <td>{staff.email}</td>
                           <td>
-                            <span className={`admin-badge-preview b-${staff.role === 'admin' ? 'ready' : staff.role === 'financial_admin' ? 'none' : staff.role === 'coins_admin' ? 'hot' : 'new'}`} style={{ textTransform: 'uppercase' }}>
+                            <span className={`admin-badge-preview b-${staff.role === 'admin' ? 'ready' : staff.role === 'operation_admin' ? 'vip' : staff.role === 'financial_admin' ? 'none' : staff.role === 'coins_admin' ? 'hot' : 'new'}`} style={{ textTransform: 'uppercase' }}>
                               {staff.role.replace('_', ' ')}
                             </span>
                           </td>
