@@ -2168,6 +2168,85 @@ select option {
   box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 20px rgba(255, 215, 0, 0.15);
 }
 
+/* Game Access Header Layout */
+.game-access-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  margin-bottom: 1.5rem;
+  gap: 1rem;
+}
+
+.game-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.game-header-titles h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-family: var(--font-heading);
+  color: #fff;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+}
+
+.game-header-titles span {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  display: block;
+  margin-top: 0.15rem;
+}
+
+.game-header-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+@media (max-width: 768px) {
+  .game-access-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 1.25rem;
+    padding: 1.25rem;
+  }
+
+  .game-header-brand {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .game-header-titles h3 {
+    font-size: 1.15rem;
+  }
+
+  .game-header-titles span {
+    font-size: 0.55rem;
+  }
+
+  .game-header-buttons {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .game-header-buttons .lobby-nav-btn {
+    flex: 1;
+    min-width: 100px;
+    justify-content: center;
+    padding: 0.6rem 0.75rem;
+  }
+}
+
 /* =========================================================================
    MODALS AND LOADER OVERLAYS
    ========================================================================= */

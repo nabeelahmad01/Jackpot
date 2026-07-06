@@ -699,8 +699,8 @@ export default function UserLobby({
              ============================================================== */
         <div className="lobby-content-container game-access-portal-view">
           
-          <div className="game-access-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', marginBottom: '1.5rem' }}>
-            <div className="game-header-brand" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div className="game-access-header">
+            <div className="game-header-brand">
               <div className="lobby-logo-box" style={{ width: '50px', height: '50px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000', border: '1px solid rgba(255,215,0,0.4)', borderRadius: '50%', boxShadow: '0 0 15px rgba(255,215,0,0.25)' }}>
                 <img
                   src="/jackpot_lion_mascot.png?v=2"
@@ -717,16 +717,16 @@ export default function UserLobby({
                 />
               </div>
               <div className="game-header-titles">
-                <h3 style={{ fontSize: '1.25rem', fontFamily: 'var(--font-heading)', color: '#fff', fontWeight: '900', letterSpacing: '0.05em' }}>
+                <h3>
                   {activeGame.title} PANEL
                 </h3>
-                <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.15em' }}>
+                <span>
                   Deposits • Withdrawals • Game Access
                 </span>
               </div>
             </div>
 
-            <div className="game-header-buttons" style={{ display: 'flex', gap: '0.5rem' }}>
+            <div className="game-header-buttons">
               <button onClick={handleFreeplayClaim} className="lobby-nav-btn app-btn" style={{ background: '#a855f7', color: '#fff', padding: '0.5rem 0.85rem' }}>
                 <i className="fa-solid fa-gift"></i> <span style={{ fontSize: '0.75rem' }}>FREEPLAY</span>
               </button>
