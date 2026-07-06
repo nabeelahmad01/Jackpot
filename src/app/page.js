@@ -21,6 +21,7 @@ export default function Home() {
   const [transactions, setTransactions] = useState([]);
   const [gateways, setGateways] = useState([]);
   const [coinsNotifications, setCoinsNotifications] = useState([]);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
 
   // Overlay states
   const [loadingActive, setLoadingActive] = useState(false);
@@ -78,6 +79,13 @@ export default function Home() {
   // Initialize session and trigger data fetch
   useEffect(() => {
     setMounted(true);
+
+    const handleInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleInstallPrompt);
+
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const ref = params.get('ref');
@@ -118,7 +126,10 @@ export default function Home() {
         .catch((err) => console.error('Service Worker registration failed:', err));
     }
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('beforeinstallprompt', handleInstallPrompt);
+    };
   }, []);
 
   // Multi-tab Session Synchronization Listener
@@ -257,6 +268,20 @@ export default function Home() {
     }
   };
 
+  const handleInstallApp = () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then((choiceResult) => {
+        if (choiceResult.outcome === 'accepted') {
+          showToast('Thank you for installing Jackpot Royals app!', 'success');
+          setDeferredPrompt(null);
+        }
+      });
+    } else {
+      showToast('To Install App: Click browser settings menu (or Share button on Safari) and select "Add to Home Screen" or "Install App".', 'info');
+    }
+  };
+
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || 'your_google_client_id_here';
 
   if (!mounted) {
@@ -302,6 +327,7 @@ export default function Home() {
           gateways={gateways}
           coinsNotifications={coinsNotifications}
           onUpdateCoinsNotification={handleUpdateCoinsNotification}
+          onInstallApp={handleInstallApp}
           currentUser={session}
           currentUserEmail={session?.email}
           onLogout={handleLogout}

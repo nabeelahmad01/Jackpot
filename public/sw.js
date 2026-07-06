@@ -1,44 +1,16 @@
-const CACHE_NAME = 'jackpot-cache-v1';
-const ASSETS = [
-  '/',
-  '/manifest.json',
-  '/jackpot_royals_logo.png',
-  '/game_juwa.png',
-  '/game_gamevault.png',
-  '/game_vegassweeps.png'
-];
-
 self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
-    }).then(() => self.skipWaiting())
-  );
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) {
-            return caches.delete(key);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
-  );
+  e.waitUntil(self.clients.claim());
 });
 
 self.addEventListener('fetch', (e) => {
+  // Lightweight network-first fetch proxy
   e.respondWith(
-    caches.match(e.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(e.request).catch(() => {
-        // Fallback or offline support
-      });
+    fetch(e.request).catch(() => {
+      return caches.match(e.request);
     })
   );
 });

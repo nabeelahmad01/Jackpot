@@ -1,18 +1,22 @@
 {
   "name": "Jackpot Royals",
-  "short_name": "JackpotRoyals",
-  "description": "Welcome to Jackpot Royals. Access sweepstakes games, grab bonuses, and win big!",
-  "start_url": ".",
+  "short_name": "Jackpot",
+  "description": "Premium Casino Gaming Entry Portal",
+  "start_url": "/",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#05070f",
+  "background_color": "#080a11",
   "theme_color": "#ffd700",
+  "orientation": "portrait",
   "icons": [
     {
-      "src": "jackpot_royals_logo.png",
+      "src": "/jackpot_lion_mascot.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/jackpot_lion_mascot.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     }
   ]
 }

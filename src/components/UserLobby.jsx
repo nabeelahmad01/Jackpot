@@ -12,6 +12,7 @@ export default function UserLobby({
   gateways = [],
   coinsNotifications = [],
   onUpdateCoinsNotification,
+  onInstallApp,
   currentUser,
   currentUserEmail,
   onLogout,
@@ -261,8 +262,11 @@ export default function UserLobby({
   };
 
   const handleDownloadApp = () => {
-    showToast('Downloading Jackpot Entry mobile app APK...', 'success');
-    window.open('/jackpotentry.apk', '_blank');
+    if (onInstallApp) {
+      onInstallApp();
+    } else {
+      showToast('To Install App: Click browser settings menu and select "Add to Home Screen".', 'info');
+    }
   };
 
   const handleFreeplayClaim = () => {
