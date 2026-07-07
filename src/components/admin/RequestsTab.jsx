@@ -19,7 +19,7 @@ export default function RequestsTab({ onApproveRequest, completedActionIds = {},
 
   // SWR automatically refreshes every 4s for requests tab (real-time lobby queue)
   const { data, error, mutate } = useSWR(
-    `/api/account-requests?page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}`,
+    `/api/account-requests?status=PENDING&page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}`,
     fetcher,
     { refreshInterval: 4000 }
   );

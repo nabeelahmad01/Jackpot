@@ -59,13 +59,47 @@ export async function POST(req) {
       attachment: attachment || '',
       senderType, // 'player' | 'admin'
       senderEmail: senderEmail.toLowerCase().trim(),
+      read: senderType === 'admin', // default to read if admin, unread if player
       timestamp: new Date().toISOString()
     };
 
     await supportCollection.insertOne(newMsg);
+
+    // Invalidate stats cache
+    const { cache } = await import('../../../lib/cache');
+    cache.del('admin_stats');
+
     return NextResponse.json({ success: true, message: newMsg });
   } catch (err) {
     console.error('Create Support Message Error:', err);
+    return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
+  }
+}
+
+// PUT mark support messages as read
+export async function PUT(req) {
+  try {
+    const { email } = await req.json();
+    if (!email) {
+      return NextResponse.json({ success: false, message: 'User email is required.' }, { status: 400 });
+    }
+
+    const db = await getDb();
+    const supportCollection = db.collection('supportMessages');
+
+    // Update all player messages for this email to read: true
+    await supportCollection.updateMany(
+      { userEmail: email.toLowerCase().trim(), senderType: 'player', read: false },
+      { $set: { read: true } }
+    );
+
+    // Invalidate stats cache
+    const { cache } = await import('../../../lib/cache');
+    cache.del('admin_stats');
+
+    return NextResponse.json({ success: true, message: 'Messages marked as read.' });
+  } catch (err) {
+    console.error('Update Support Messages Error:', err);
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
   }
 }

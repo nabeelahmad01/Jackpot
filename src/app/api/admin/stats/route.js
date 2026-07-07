@@ -16,29 +16,15 @@ export async function GET(req) {
       pendingRequestsCount,
       pendingTransactionsCount,
       pendingCoinsCount,
-      chatStats
+      unreadChatUsers
     ] = await Promise.all([
       db.collection('accountRequests').countDocuments({ status: 'PENDING' }),
       db.collection('transactions').countDocuments({ status: 'PENDING' }),
       db.collection('coinsNotifications').countDocuments({ status: 'PENDING' }),
-      db.collection('supportMessages').aggregate([
-        { $sort: { timestamp: -1 } },
-        {
-          $group: {
-            _id: "$userEmail",
-            latestSender: { $first: "$senderType" }
-          }
-        },
-        {
-          $match: { latestSender: "player" }
-        },
-        {
-          $count: "pendingChatsCount"
-        }
-      ]).toArray()
+      db.collection('supportMessages').distinct('userEmail', { senderType: 'player', read: false })
     ]);
 
-    const pendingChatsCount = chatStats[0]?.pendingChatsCount || 0;
+    const pendingChatsCount = unreadChatUsers.length;
 
     // Fetch successful transactions with projection to compute financial summaries
     const successfulTx = await db.collection('transactions')

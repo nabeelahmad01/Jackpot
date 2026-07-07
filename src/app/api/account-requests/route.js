@@ -7,6 +7,7 @@ export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const email = searchParams.get('email');
+    const status = searchParams.get('status');
     const search = searchParams.get('search') || '';
     const page = parseInt(searchParams.get('page') || '1', 10);
     const limit = parseInt(searchParams.get('limit') || '25', 10);
@@ -18,6 +19,9 @@ export async function GET(req) {
     if (email) {
       query.userEmail = email.toLowerCase().trim();
     }
+    if (status) {
+      query.status = status.toUpperCase().trim();
+    }
 
     if (search) {
       const cleanSearch = search.trim();
@@ -27,7 +31,7 @@ export async function GET(req) {
           { gameTitle: { $regex: cleanSearch, $options: 'i' } }
         ]
       };
-      if (email) {
+      if (Object.keys(query).length > 0) {
         query = { $and: [query, searchCriteria] };
       } else {
         query = searchCriteria;

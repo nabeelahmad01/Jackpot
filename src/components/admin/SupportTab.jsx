@@ -33,12 +33,13 @@ export default function SupportTab({ adminUser }) {
         email: msg.userEmail,
         name: msg.userName,
         lastMessage: msg.message,
-        timestamp: msg.timestamp
+        timestamp: msg.timestamp,
+        unread: msg.senderType === 'player' && msg.read === false
       };
     }
   });
 
-  const conversations = Object.values(groups);
+  const conversations = Object.values(groups).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   const filteredConversations = conversations.filter(
     (c) =>
       c.email.toLowerCase().includes(chatSearch.toLowerCase()) ||
@@ -48,6 +49,25 @@ export default function SupportTab({ adminUser }) {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeChatMessages]);
+
+  useEffect(() => {
+    if (!activeChatEmail) return;
+
+    const markAsRead = async () => {
+      try {
+        await fetch('/api/support', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: activeChatEmail })
+        });
+        mutateConversations();
+      } catch (err) {
+        console.error('Failed to mark support messages as read:', err);
+      }
+    };
+
+    markAsRead();
+  }, [activeChatEmail, activeChatMessages.length, mutateConversations]);
 
   const handleSendAdminReply = async (e) => {
     e.preventDefault();
@@ -129,10 +149,29 @@ export default function SupportTab({ adminUser }) {
                   border: activeChatEmail === chat.email ? '1px solid rgba(255,215,0,0.25)' : '1px solid rgba(255,255,255,0.05)',
                   borderRadius: '8px',
                   cursor: 'pointer',
-                  transition: 'all 0.2s ease'
+                  transition: 'all 0.2s ease',
+                  position: 'relative'
                 }}
               >
-                <strong style={{ fontSize: '0.8rem', color: '#fff', display: 'block' }}>{chat.name || 'Player'}</strong>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <strong style={{ fontSize: '0.8rem', color: '#fff', display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', flex: 1, marginRight: '0.5rem' }}>
+                    {chat.name || 'Player'}
+                  </strong>
+                  {chat.unread && (
+                    <span style={{
+                      background: '#ef4444',
+                      color: '#fff',
+                      fontSize: '0.55rem',
+                      padding: '0.1rem 0.35rem',
+                      borderRadius: '10px',
+                      fontWeight: 'bold',
+                      textTransform: 'uppercase',
+                      flexShrink: 0
+                    }}>
+                      New
+                    </span>
+                  )}
+                </div>
                 <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', marginTop: '0.15rem' }}>
                   {chat.lastMessage}
                 </span>
