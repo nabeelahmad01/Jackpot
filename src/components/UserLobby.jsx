@@ -1078,6 +1078,40 @@ export default function UserLobby({
                   {/* Transaction Ledger */}
                   <div className="auth-card" style={{ maxWidth: '100%', padding: '1.5rem' }}>
                     <div className="glow-border-layer"></div>
+                    
+                    {/* Allotment Hold Notices */}
+                    {(() => {
+                      const userHoldAllotments = (coinsNotifications || []).filter(n => n.status === 'HOLD');
+                      if (userHoldAllotments.length === 0) return null;
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1.5rem' }}>
+                          {userHoldAllotments.map((noti) => (
+                            <div key={noti.id} style={{
+                              padding: '0.85rem 1rem',
+                              background: 'rgba(239, 68, 68, 0.05)',
+                              border: '1px solid rgba(239, 68, 68, 0.25)',
+                              borderRadius: '12px',
+                              color: '#f87171',
+                              fontSize: '0.75rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.75rem'
+                            }}>
+                              <i className="fa-solid fa-circle-exclamation" style={{ fontSize: '1.35rem', flexShrink: 0 }}></i>
+                              <div>
+                                <span style={{ display: 'block', fontWeight: 'bold', color: '#fff', marginBottom: '0.15rem' }}>
+                                  Allotment for {noti.gameTitle} is ON HOLD!
+                                </span>
+                                <span>
+                                  Reason: <strong style={{ color: '#fca5a5' }}>{noti.holdNote || 'Declined / Hold by Manager'}</strong>. Please check details or contact customer chat support.
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+
                     <div className="wallet-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
                       <h4 style={{ fontSize: '0.85rem', fontFamily: 'var(--font-heading)', color: '#fff', fontWeight: '900', textTransform: 'uppercase' }}>
                         Recent Transactions
@@ -1128,9 +1162,15 @@ export default function UserLobby({
                                   </span>
                                 </td>
                                 <td>
-                                  <span style={{ fontSize: '0.725rem', opacity: 0.8 }}>
-                                    {tx.note ? tx.note : `${tx.gateway} (${tx.code})`}
-                                  </span>
+                                  {tx.status === 'FAILED' ? (
+                                    <span style={{ fontSize: '0.725rem', color: '#f87171', fontWeight: 'bold' }}>
+                                      ❌ REJECTED: {tx.note || 'Declined by Admin'}
+                                    </span>
+                                  ) : (
+                                    <span style={{ fontSize: '0.725rem', opacity: 0.8 }}>
+                                      {tx.note ? tx.note : `${tx.gateway} (${tx.code})`}
+                                    </span>
+                                  )}
                                 </td>
                                 <td style={{ fontSize: '0.7rem', opacity: 0.7 }}>
                                   {tx.date}
