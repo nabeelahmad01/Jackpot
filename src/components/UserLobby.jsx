@@ -38,6 +38,70 @@ export default function UserLobby({
   const [referralsList, setReferralsList] = useState([]);
   const [claimBonus, setClaimBonus] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [activeTooltipId, setActiveTooltipId] = useState(null);
+
+  const renderFailedStatusWithTooltip = (tx) => {
+    const isTooltipActive = activeTooltipId === tx.id;
+    return (
+      <div style={{ position: 'relative', display: 'inline-block' }}>
+        <span
+          className="admin-badge-preview b-failed"
+          style={{
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.25rem',
+            padding: '0.2rem 0.5rem',
+            borderRadius: '4px',
+            background: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.25)',
+            color: '#f87171'
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setActiveTooltipId(activeTooltipId === tx.id ? null : tx.id);
+          }}
+          onMouseEnter={() => setActiveTooltipId(tx.id)}
+          onMouseLeave={() => setActiveTooltipId(null)}
+        >
+          FAILED <i className="fa-solid fa-circle-info" style={{ fontSize: '0.65rem' }}></i>
+        </span>
+        
+        {isTooltipActive && (
+          <div style={{
+            position: 'absolute',
+            bottom: '125%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#fff',
+            color: '#111',
+            padding: '0.6rem 0.8rem',
+            borderRadius: '10px',
+            boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+            zIndex: 999,
+            width: '200px',
+            fontSize: '0.725rem',
+            lineHeight: '1.4',
+            textAlign: 'left',
+            animation: 'scale-up 0.15s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            pointerEvents: 'none'
+          }}>
+            <strong style={{ color: '#000', display: 'block', marginBottom: '0.2rem' }}>Rejection Reason:</strong>
+            <span style={{ color: '#333', fontWeight: '500' }}>{tx.note || 'Declined by Administrator.'}</span>
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              left: '50%',
+              marginLeft: '-6px',
+              borderWidth: '6px',
+              borderStyle: 'solid',
+              borderColor: '#fff transparent transparent transparent'
+            }}></div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // Payment selection modal
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -1157,20 +1221,18 @@ export default function UserLobby({
                                   {tx.status === 'SUCCESS' ? `$${parseFloat(tx.amount).toFixed(2)}` : '—'}
                                 </td>
                                 <td>
-                                  <span className={`admin-badge-preview b-${tx.status === 'PENDING_COINS' ? 'new' : (tx.status.toLowerCase() === 'success' ? 'ready' : tx.status.toLowerCase())}`}>
-                                    {tx.status === 'PENDING_COINS' ? 'VERIFYING COINS' : tx.status}
-                                  </span>
-                                </td>
-                                <td>
                                   {tx.status === 'FAILED' ? (
-                                    <span style={{ fontSize: '0.725rem', color: '#f87171', fontWeight: 'bold' }}>
-                                      ❌ REJECTED: {tx.note || 'Declined by Admin'}
-                                    </span>
+                                    renderFailedStatusWithTooltip(tx)
                                   ) : (
-                                    <span style={{ fontSize: '0.725rem', opacity: 0.8 }}>
-                                      {tx.note ? tx.note : `${tx.gateway} (${tx.code})`}
+                                    <span className={`admin-badge-preview b-${tx.status === 'PENDING_COINS' ? 'new' : (tx.status.toLowerCase() === 'success' ? 'ready' : tx.status.toLowerCase())}`}>
+                                      {tx.status === 'PENDING_COINS' ? 'VERIFYING COINS' : tx.status}
                                     </span>
                                   )}
+                                </td>
+                                <td>
+                                  <span style={{ fontSize: '0.725rem', opacity: 0.8 }}>
+                                    {tx.note && tx.status !== 'FAILED' ? tx.note : `${tx.gateway} (${tx.code})`}
+                                  </span>
                                 </td>
                                 <td style={{ fontSize: '0.7rem', opacity: 0.7 }}>
                                   {tx.date}
