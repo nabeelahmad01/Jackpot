@@ -241,7 +241,7 @@ export default function PlayerAccountsTab({ adminUser, onDeleteUser }) {
               <div style={{ marginBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.75rem' }}>
                 <h4 style={{ margin: 0, fontSize: '1rem', color: '#fff' }}>{inspectedUser.name}</h4>
                 <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  Email: <strong>{inspectedUser.email}</strong> • Balance: <strong>{inspectedUser.coins || 0} Coins</strong>
+                  Email: <strong>{inspectedUser.email}</strong>
                 </p>
               </div>
 
