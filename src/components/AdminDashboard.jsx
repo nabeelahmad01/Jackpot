@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import useSWR from 'swr';
+import useSWR, { mutate } from 'swr';
 
 // Lazy load the sub-tab components to optimize bundle size and initial load speed
 const OverviewTab = lazy(() => import('./admin/OverviewTab'));
@@ -85,8 +85,18 @@ export default function AdminDashboard({
     const hasNewCoin = pendingCoinsCount > prev.coins;
     const hasNewChat = pendingChatsCount > prev.chats;
     
+    const countChanged =
+      pendingRequestsCount !== prev.requests ||
+      pendingTransactionsCount !== prev.transactions ||
+      pendingCoinsCount !== prev.coins ||
+      pendingChatsCount !== prev.chats;
+
     if (hasNewRequest || hasNewTx || hasNewCoin || hasNewChat) {
       playAlertSound();
+    }
+
+    if (countChanged) {
+      mutate((key) => true);
     }
     
     prevCountsRef.current = {

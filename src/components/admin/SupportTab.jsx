@@ -9,16 +9,16 @@ export default function SupportTab({ adminUser }) {
   const [adminReplyText, setAdminReplyText] = useState('');
   const chatEndRef = useRef(null);
 
-  // Poll conversation list every 5s
+  // Poll conversation list every 3s
   const { data: convData, mutate: mutateConversations } = useSWR('/api/support?limit=100', fetcher, {
-    refreshInterval: 5000
+    refreshInterval: 3000
   });
 
-  // Poll active chat messages every 3s if one is selected
+  // Poll active chat messages every 1.5s if one is selected
   const { data: activeChatData, mutate: mutateActiveChat } = useSWR(
     activeChatEmail ? `/api/support?email=${encodeURIComponent(activeChatEmail)}` : null,
     fetcher,
-    { refreshInterval: 3000 }
+    { refreshInterval: 1500 }
   );
 
   const allMessages = convData?.messages || [];
