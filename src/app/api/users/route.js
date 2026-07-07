@@ -77,6 +77,12 @@ export async function PUT(req) {
     if (role !== undefined) {
       updateFields.role = role;
     }
+    if (name !== undefined) {
+      updateFields.name = name;
+    }
+    if (password !== undefined) {
+      updateFields.password = password;
+    }
 
     const result = await usersCollection.updateOne(
       { email: email.toLowerCase().trim() },

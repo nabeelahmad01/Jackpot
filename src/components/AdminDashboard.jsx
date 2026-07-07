@@ -111,14 +111,20 @@ export default function AdminDashboard({
 
   // Helper: tab permissions checking based on role
   const hasAccess = (tabName) => {
-    if (!adminUser) return false;
-    const role = adminUser.role;
-    if (role === 'admin') return true; // Super Admin has full access
-    if (role === 'operation_admin') return true; // Operational Manager has full access
-    if (role === 'financial_admin') return ['dashboard', 'ledger'].includes(tabName);
-    if (role === 'support_admin') return ['dashboard', 'support'].includes(tabName);
-    if (role === 'coins_admin') return ['dashboard', 'games', 'users', 'requests', 'gateways', 'coins'].includes(tabName);
-    return false;
+    if (!adminUser?.role) return false;
+    const roleString = adminUser.role.toLowerCase();
+    
+    // Split roles by comma for multi-role access checks
+    const roles = roleString.split(',').map(r => r.trim());
+    
+    return roles.some((role) => {
+      if (role === 'admin') return true; // Super Admin has full access
+      if (role === 'operation_admin') return true; // Operational Manager has full access
+      if (role === 'financial_admin') return ['dashboard', 'ledger', 'requests'].includes(tabName);
+      if (role === 'support_admin') return ['dashboard', 'support'].includes(tabName);
+      if (role === 'coins_admin') return ['dashboard', 'games', 'users', 'requests', 'gateways', 'coins'].includes(tabName);
+      return false;
+    });
   };
 
   return (
@@ -474,7 +480,7 @@ export default function AdminDashboard({
             <GamesLibraryTab onAddGameClick={onAddGameClick} onEditGameClick={onEditGameClick} onDeleteGame={onDeleteGame} />
           )}
           {activeTab === 'users' && hasAccess('users') && (
-            <PlayerAccountsTab onDeleteUser={onDeleteUser} />
+            <PlayerAccountsTab adminUser={adminUser} onDeleteUser={onDeleteUser} />
           )}
           {activeTab === 'requests' && hasAccess('requests') && (
             <RequestsTab onApproveRequest={onApproveRequest} completedActionIds={completedActionIds} processingIds={processingIds} wrapAction={wrapAction} />
