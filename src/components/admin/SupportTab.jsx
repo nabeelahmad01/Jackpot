@@ -217,6 +217,24 @@ export default function SupportTab({ adminUser }) {
                       wordBreak: 'break-word'
                     }}>
                       {msg.message}
+                      {msg.attachment && (
+                        <div style={{ marginTop: '0.5rem' }}>
+                          <img
+                            src={msg.attachment}
+                            alt="User Attachment"
+                            style={{
+                              maxWidth: '100%',
+                              maxHeight: '180px',
+                              borderRadius: '6px',
+                              cursor: 'zoom-in',
+                              border: '1px solid rgba(255,255,255,0.1)',
+                              display: 'block'
+                            }}
+                            onClick={() => window.open(msg.attachment, '_blank')}
+                            title="Click to view full-size image proof"
+                          />
+                        </div>
+                      )}
                     </div>
                     <span style={{ fontSize: '0.55rem', opacity: 0.5, marginTop: '0.15rem' }}>
                       {isMe ? 'You (Agent)' : (msg.userName || 'Player')} • {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
