@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
+import { cache } from '../../../lib/cache';
 
 // GET support chat messages
 export async function GET(req) {
@@ -27,25 +28,27 @@ export async function GET(req) {
     // Admin view: get all messages, grouped or sorted so admin can list conversations
     // We fetch recent messages and let the backend/frontend group them by userEmail
     const skip = (page - 1) * limit;
-    const allMessages = await supportCollection.find()
+    const messages = await supportCollection
+      .find({})
       .sort({ timestamp: -1 })
       .skip(skip)
       .limit(limit)
       .toArray();
-    return NextResponse.json({ success: true, messages: allMessages });
+
+    return NextResponse.json({ success: true, messages });
   } catch (err) {
-    console.error('Support Messages API Error:', err);
+    console.error('Fetch Support Messages Error:', err);
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
   }
 }
 
-// POST send support message
+// POST new support message (Player or Admin reply)
 export async function POST(req) {
   try {
-    const { userEmail, userName, message, senderType, senderEmail, attachment } = await req.json();
+    const { userEmail, userName, message, attachment, senderType, senderEmail } = await req.json();
 
-    if (!userEmail || !senderType || !senderEmail || (!message && !attachment)) {
-      return NextResponse.json({ success: false, message: 'Missing message or attachment details.' }, { status: 400 });
+    if (!userEmail || !senderType) {
+      return NextResponse.json({ success: false, message: 'User email and sender type are required.' }, { status: 400 });
     }
 
     const db = await getDb();
@@ -58,7 +61,7 @@ export async function POST(req) {
       message: message ? message.trim() : '',
       attachment: attachment || '',
       senderType, // 'player' | 'admin'
-      senderEmail: senderEmail.toLowerCase().trim(),
+      senderEmail: senderEmail ? senderEmail.toLowerCase().trim() : '',
       read: senderType === 'admin', // default to read if admin, unread if player
       timestamp: new Date().toISOString()
     };
@@ -66,7 +69,6 @@ export async function POST(req) {
     await supportCollection.insertOne(newMsg);
 
     // Invalidate stats cache
-    const { cache } = await import('../../../lib/cache');
     cache.del('admin_stats');
 
     return NextResponse.json({ success: true, message: newMsg });
@@ -94,7 +96,6 @@ export async function PUT(req) {
     );
 
     // Invalidate stats cache
-    const { cache } = await import('../../../lib/cache');
     cache.del('admin_stats');
 
     return NextResponse.json({ success: true, message: 'Messages marked as read.' });
