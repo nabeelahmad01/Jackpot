@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
+import { cache } from '../../../lib/cache';
 
 // GET users (Admin listing, or referrals query)
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const referredBy = searchParams.get('referredBy');
+    const search = searchParams.get('search') || '';
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = parseInt(searchParams.get('limit') || '25', 10);
 
     const db = await getDb();
     const usersCollection = db.collection('users');
@@ -19,9 +23,35 @@ export async function GET(req) {
       return NextResponse.json({ success: true, referrals });
     }
 
-    // Fetch users (excluding password fields for security)
-    const users = await usersCollection.find({}, { projection: { password: 0 } }).toArray();
-    return NextResponse.json({ success: true, users });
+    // Prepare search query
+    let query = {};
+    if (search) {
+      const cleanSearch = search.trim();
+      query = {
+        $or: [
+          { name: { $regex: cleanSearch, $options: 'i' } },
+          { email: { $regex: cleanSearch, $options: 'i' } }
+        ]
+      };
+    }
+
+    const totalUsers = await usersCollection.countDocuments(query);
+    const skip = (page - 1) * limit;
+
+    // Fetch paginated users (excluding password fields for security)
+    const users = await usersCollection.find(query, { projection: { password: 0 } })
+      .sort({ name: 1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+
+    return NextResponse.json({
+      success: true,
+      users,
+      totalUsers,
+      totalPages: Math.ceil(totalUsers / limit),
+      currentPage: page
+    });
   } catch (err) {
     console.error('Fetch Users API Error:', err);
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
@@ -57,6 +87,9 @@ export async function PUT(req) {
       return NextResponse.json({ success: false, message: 'User not found.' }, { status: 404 });
     }
 
+    // Invalidate stats cache since coin/user edits could influence calculations
+    cache.del('admin_stats');
+
     return NextResponse.json({ success: true, message: 'User details updated successfully!' });
   } catch (err) {
     console.error('Update User API Error:', err);
@@ -78,9 +111,14 @@ export async function DELETE(req) {
     const usersCollection = db.collection('users');
 
     await usersCollection.deleteOne({ email: email.toLowerCase().trim() });
+    
+    // Invalidate caches
+    cache.del('admin_stats');
+
     return NextResponse.json({ success: true, message: 'User account deleted successfully.' });
   } catch (err) {
     console.error('Delete User API Error:', err);
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
   }
 }
+

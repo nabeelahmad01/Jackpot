@@ -1,9 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
+import { cache } from '../../../lib/cache';
 
 // GET settings
 export async function GET() {
   try {
+    const cachedSettings = cache.get('settings_all');
+    if (cachedSettings) {
+      return NextResponse.json({ success: true, settings: cachedSettings });
+    }
+
     const db = await getDb();
     const settingsCollection = db.collection('settings');
     
@@ -18,6 +24,7 @@ export async function GET() {
       settings.referralBonus = 10;
     }
     
+    cache.set('settings_all', settings, 60);
     return NextResponse.json({ success: true, settings });
   } catch (err) {
     console.error('Fetch Settings API Error:', err);
@@ -50,9 +57,14 @@ export async function PUT(req) {
       { upsert: true }
     );
 
+    // Invalidate caches
+    cache.del('settings_all');
+    cache.del('admin_stats'); // Settings can affect statistics/allotments
+
     return NextResponse.json({ success: true, message: 'Bonus settings updated successfully!' });
   } catch (err) {
     console.error('Update Settings API Error:', err);
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
   }
 }
+

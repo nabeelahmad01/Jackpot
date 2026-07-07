@@ -24,6 +24,7 @@ export default function UserLobby({
   // Navigation states
   const [activeGame, setActiveGame] = useState(null); // game object or null
   const [accordionOpen, setAccordionOpen] = useState(false);
+  const [txPage, setTxPage] = useState(1);
 
   // Financial inputs
   const [depositAmount, setDepositAmount] = useState('');
@@ -339,9 +340,18 @@ export default function UserLobby({
     ? gameAccounts.find((a) => a.gameTitle === activeGame.title && a.userEmail === currentUserEmail)
     : null;
 
+  useEffect(() => {
+    setTxPage(1);
+  }, [activeGame]);
+
   const filteredTransactions = activeGame
     ? transactions.filter((t) => t.gameTitle === activeGame.title && t.userEmail === currentUserEmail)
     : [];
+
+  const txLimit = 10;
+  const totalTx = filteredTransactions.length;
+  const totalTxPages = Math.ceil(totalTx / txLimit);
+  const paginatedTransactions = filteredTransactions.slice((txPage - 1) * txLimit, txPage * txLimit);
 
   const isFirstAccount = gameAccounts.length === 0 && !accountRequests.some(r => r.userEmail === currentUserEmail);
   const hasClaimedBonus = (transactions || []).some(t => t.type === 'BONUS' && t.userEmail === currentUserEmail && t.code === 'SIGNUP-FREE3');
@@ -656,7 +666,7 @@ export default function UserLobby({
                     {game.badge !== 'none' && <span className={`game-badge ${game.badge}`}>{game.badge.toUpperCase()}</span>}
                     <div className="game-image-wrapper" onClick={() => setActiveGame(game)} style={{ cursor: 'pointer' }}>
                       {game.image.startsWith('game_') ? (
-                        <img src={game.image} alt={game.title} />
+                        <img src={game.image} alt={game.title} loading="lazy" />
                       ) : (
                         <div className={`game-placeholder-card ${game.image === 'placeholder_2' ? 'pc-red' : game.image === 'placeholder_3' ? 'pc-blue' : 'pc-gold'}`}>
                           {game.title.slice(0, 2).toUpperCase()}
@@ -1072,7 +1082,7 @@ export default function UserLobby({
                         Recent Transactions
                       </h4>
                       <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                        Last 20 Records
+                        {totalTx} Records
                       </span>
                     </div>
 
@@ -1090,16 +1100,16 @@ export default function UserLobby({
                           </tr>
                         </thead>
                         <tbody>
-                          {filteredTransactions.length === 0 ? (
+                          {paginatedTransactions.length === 0 ? (
                             <tr>
                               <td colSpan="7" className="text-center text-muted" style={{ padding: '1.5rem' }}>
                                 No transactions recorded yet.
                               </td>
                             </tr>
                           ) : (
-                            filteredTransactions.map((tx, idx) => (
+                            paginatedTransactions.map((tx, idx) => (
                               <tr key={tx.id}>
-                                <td>{idx + 1}</td>
+                                <td>{(txPage - 1) * txLimit + idx + 1}</td>
                                 <td>
                                   <span className={`admin-badge-preview ${tx.type === 'DEPOSIT' ? 'b-hot' : tx.type === 'BONUS' ? 'b-vip' : 'b-new'}`} style={{ textTransform: 'uppercase', padding: '0.2rem 0.5rem', borderRadius: '4px', background: tx.type === 'BONUS' ? '#a855f7' : undefined, color: tx.type === 'BONUS' ? '#fff' : undefined }}>
                                     {tx.type}
@@ -1130,6 +1140,32 @@ export default function UserLobby({
                         </tbody>
                       </table>
                     </div>
+
+                    {totalTxPages > 1 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.25rem', padding: '0 0.25rem' }}>
+                        <span style={{ fontSize: '0.725rem', color: 'var(--text-muted)' }}>
+                          Page {txPage} of {totalTxPages}
+                        </span>
+                        <div style={{ display: 'flex', gap: '0.35rem' }}>
+                          <button
+                            onClick={() => txPage > 1 && setTxPage(txPage - 1)}
+                            disabled={txPage === 1}
+                            className="action-row-btn"
+                            style={{ width: 'auto', padding: '0.3rem 0.6rem', fontSize: '0.65rem', opacity: txPage === 1 ? 0.3 : 1, cursor: txPage === 1 ? 'not-allowed' : 'pointer' }}
+                          >
+                            &larr; Prev
+                          </button>
+                          <button
+                            onClick={() => txPage < totalTxPages && setTxPage(txPage + 1)}
+                            disabled={txPage === totalTxPages}
+                            className="action-row-btn"
+                            style={{ width: 'auto', padding: '0.3rem 0.6rem', fontSize: '0.65rem', opacity: txPage === totalTxPages ? 0.3 : 1, cursor: txPage === totalTxPages ? 'not-allowed' : 'pointer' }}
+                          >
+                            Next &rarr;
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

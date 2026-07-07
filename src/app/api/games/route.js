@@ -1,12 +1,20 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
+import { cache } from '../../../lib/cache';
 
 // GET all games
 export async function GET() {
   try {
+    const cachedGames = cache.get('games_all');
+    if (cachedGames) {
+      return NextResponse.json({ success: true, games: cachedGames });
+    }
+
     const db = await getDb();
     const gamesCollection = db.collection('games');
     const games = await gamesCollection.find().toArray();
+    
+    cache.set('games_all', games, 60);
     return NextResponse.json({ success: true, games });
   } catch (err) {
     console.error('Fetch Games API Error:', err);
@@ -35,6 +43,10 @@ export async function POST(req) {
     };
 
     await gamesCollection.insertOne(newGame);
+    
+    // Invalidate caches
+    cache.del('games_all');
+    
     return NextResponse.json({ success: true, game: newGame, message: 'Game added successfully!' });
   } catch (err) {
     console.error('Create Game API Error:', err);
@@ -65,6 +77,10 @@ export async function PUT(req) {
     Object.keys(updateFields).forEach(key => updateFields[key] === undefined && delete updateFields[key]);
 
     await gamesCollection.updateOne({ id: game.id }, { $set: updateFields });
+    
+    // Invalidate caches
+    cache.del('games_all');
+
     return NextResponse.json({ success: true, message: 'Game updated successfully!' });
   } catch (err) {
     console.error('Update Game API Error:', err);
@@ -86,9 +102,14 @@ export async function DELETE(req) {
     const gamesCollection = db.collection('games');
 
     await gamesCollection.deleteOne({ id });
+    
+    // Invalidate caches
+    cache.del('games_all');
+
     return NextResponse.json({ success: true, message: 'Game deleted successfully!' });
   } catch (err) {
     console.error('Delete Game API Error:', err);
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
   }
 }
+

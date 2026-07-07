@@ -6,22 +6,32 @@ export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const email = searchParams.get('email');
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = parseInt(searchParams.get('limit') || '50', 10);
 
     const db = await getDb();
     const supportCollection = db.collection('supportMessages');
 
     if (email) {
-      // Return full conversation history for a specific player
+      // Return full conversation history for a specific player (usually small, but paginated/limited to protect DB)
+      const skip = (page - 1) * limit;
       const messages = await supportCollection
         .find({ userEmail: email.toLowerCase().trim() })
         .sort({ timestamp: 1 })
+        .skip(skip)
+        .limit(limit)
         .toArray();
       return NextResponse.json({ success: true, messages });
     }
 
     // Admin view: get all messages, grouped or sorted so admin can list conversations
-    // We fetch all messages and let the backend/frontend group them by userEmail
-    const allMessages = await supportCollection.find().sort({ timestamp: -1 }).toArray();
+    // We fetch recent messages and let the backend/frontend group them by userEmail
+    const skip = (page - 1) * limit;
+    const allMessages = await supportCollection.find()
+      .sort({ timestamp: -1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray();
     return NextResponse.json({ success: true, messages: allMessages });
   } catch (err) {
     console.error('Support Messages API Error:', err);
@@ -58,3 +68,4 @@ export async function POST(req) {
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
   }
 }
+

@@ -59,15 +59,22 @@ const DEFAULT_SEEDS = {
 let client;
 let clientPromise;
 
+const clientOptions = {
+  maxPoolSize: 10,
+  minPoolSize: 2,
+  maxIdleTimeMS: 30000,
+  connectTimeoutMS: 10000,
+};
+
 if (MONGODB_URI) {
   if (process.env.NODE_ENV === 'development') {
     if (!global._mongoClientPromise) {
-      client = new MongoClient(MONGODB_URI);
+      client = new MongoClient(MONGODB_URI, clientOptions);
       global._mongoClientPromise = client.connect();
     }
     clientPromise = global._mongoClientPromise;
   } else {
-    client = new MongoClient(MONGODB_URI);
+    client = new MongoClient(MONGODB_URI, clientOptions);
     clientPromise = client.connect();
   }
 }
@@ -86,14 +93,118 @@ async function seedRealMongo(db) {
         }
       }
     }
+
+    // Ensure Indexes are created for high-performance queries
+    await db.collection('users').createIndex({ email: 1 }, { unique: true });
+    await db.collection('users').createIndex({ referredBy: 1 });
+    await db.collection('users').createIndex({ referralCode: 1 });
+
+    await db.collection('transactions').createIndex({ id: 1 }, { unique: true });
+    await db.collection('transactions').createIndex({ userEmail: 1 });
+    await db.collection('transactions').createIndex({ status: 1 });
+    await db.collection('transactions').createIndex({ type: 1 });
+    await db.collection('transactions').createIndex({ userEmail: 1, type: 1, status: 1 });
+
+    await db.collection('coinsNotifications').createIndex({ id: 1 }, { unique: true });
+    await db.collection('coinsNotifications').createIndex({ userEmail: 1 });
+    await db.collection('coinsNotifications').createIndex({ status: 1 });
+    await db.collection('coinsNotifications').createIndex({ timestamp: -1 });
+
+    await db.collection('accountRequests').createIndex({ id: 1 }, { unique: true });
+    await db.collection('accountRequests').createIndex({ userEmail: 1 });
+    await db.collection('accountRequests').createIndex({ status: 1 });
+
+    await db.collection('gameAccounts').createIndex({ userEmail: 1 });
+    await db.collection('gameAccounts').createIndex({ gameTitle: 1 });
+
+    await db.collection('supportMessages').createIndex({ userEmail: 1 });
+    await db.collection('supportMessages').createIndex({ timestamp: 1 });
+
+    await db.collection('games').createIndex({ id: 1 }, { unique: true });
+    await db.collection('gateways').createIndex({ id: 1 }, { unique: true });
+
+    console.log('[Seed Database] Database indexes verified and ensured in MongoDB Atlas.');
   } catch (err) {
-    console.error('Failed to seed real MongoDB:', err);
+    console.error('Failed to seed real MongoDB or create indexes:', err);
   }
 }
 
 // -------------------------------------------------------------
 // In-Memory JSON File Emulator Database Setup (Fallback)
 // -------------------------------------------------------------
+class MemoryCursor {
+  constructor(results) {
+    this.results = [...results];
+  }
+
+  sort(spec) {
+    const sortField = Object.keys(spec)[0];
+    const sortOrder = spec[sortField];
+    this.results.sort((a, b) => {
+      let valA = a[sortField];
+      let valB = b[sortField];
+
+      // Handle dates or string timestamps
+      if (sortField === 'timestamp' || sortField === 'date') {
+        const timeA = valA ? new Date(valA).getTime() : 0;
+        const timeB = valB ? new Date(valB).getTime() : 0;
+        return sortOrder === -1 ? timeB - timeA : timeA - timeB;
+      }
+
+      valA = valA || '';
+      valB = valB || '';
+      if (valA < valB) return sortOrder === -1 ? 1 : -1;
+      if (valA > valB) return sortOrder === -1 ? -1 : 1;
+      return 0;
+    });
+    return this;
+  }
+
+  skip(n) {
+    this.results = this.results.slice(n);
+    return this;
+  }
+
+  limit(n) {
+    this.results = this.results.slice(0, n);
+    return this;
+  }
+
+  project(projection) {
+    this.results = this.results.map(doc => {
+      const newDoc = {};
+      const keys = Object.keys(projection);
+      const includeKeys = keys.filter(k => projection[k] === 1);
+      const excludeKeys = keys.filter(k => projection[k] === 0);
+
+      if (includeKeys.length > 0) {
+        if (projection._id !== 0 && doc._id !== undefined) {
+          newDoc._id = doc._id;
+        }
+        includeKeys.forEach(k => {
+          if (k !== '_id') {
+            newDoc[k] = doc[k];
+          }
+        });
+      } else if (excludeKeys.length > 0) {
+        Object.keys(doc).forEach(k => {
+          if (!excludeKeys.includes(k)) {
+            newDoc[k] = doc[k];
+          }
+        });
+      } else {
+        return doc;
+      }
+      return newDoc;
+    });
+    return this;
+  }
+
+  async toArray() {
+    return JSON.parse(JSON.stringify(this.results));
+  }
+}
+
 class MemoryCollection {
   constructor(db, name) {
     this.db = db;
@@ -115,28 +226,7 @@ class MemoryCollection {
     if (Object.keys(query).length > 0) {
       results = results.filter(doc => this._match(doc, query));
     }
-    return {
-      toArray: async () => JSON.parse(JSON.stringify(results)),
-      limit: (n) => ({
-        toArray: async () => JSON.parse(JSON.stringify(results.slice(0, n)))
-      }),
-      sort: (s) => ({
-        toArray: async () => {
-          // Simple sort logic if sorting by date or ID descending
-          const sorted = [...results];
-          const sortField = Object.keys(s)[0];
-          const sortOrder = s[sortField];
-          sorted.sort((a, b) => {
-            const valA = a[sortField] || '';
-            const valB = b[sortField] || '';
-            if (valA < valB) return sortOrder === -1 ? 1 : -1;
-            if (valA > valB) return sortOrder === -1 ? -1 : 1;
-            return 0;
-          });
-          return JSON.parse(JSON.stringify(sorted));
-        }
-      })
-    };
+    return new MemoryCursor(results);
   }
 
   async findOne(query = {}) {

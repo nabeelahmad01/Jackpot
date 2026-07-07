@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import useSWR, { mutate } from 'swr';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import ParticlesBackground from '../components/ParticlesBackground';
 import AuthPortal from '../components/AuthPortal';
@@ -8,19 +9,12 @@ import UserLobby from '../components/UserLobby';
 import LoadingOverlay from '../components/LoadingOverlay';
 import { SupportModal, GoogleWarningModal } from '../components/Modals';
 
+const fetcher = (...args) => fetch(...args).then((res) => res.json());
+
 export default function Home() {
   const [mounted, setMounted] = useState(false);
   const [session, setSession] = useState(null);
   const [view, setView] = useState('loading');
-  
-  // Database State Stores
-  const [games, setGames] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [accountRequests, setAccountRequests] = useState([]);
-  const [gameAccounts, setGameAccounts] = useState([]);
-  const [transactions, setTransactions] = useState([]);
-  const [gateways, setGateways] = useState([]);
-  const [coinsNotifications, setCoinsNotifications] = useState([]);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
 
   // Overlay states
@@ -31,52 +25,46 @@ export default function Home() {
   const [supportOpen, setSupportOpen] = useState(false);
   const [googleWarnOpen, setGoogleWarnOpen] = useState(false);
 
-  // Load static things once on mount
-  const loadStaticData = async () => {
-    try {
-      const gamesRes = await fetch('/api/games');
-      const gamesData = await gamesRes.json();
-      if (gamesData.success) setGames(gamesData.games);
+  // Fetch static data (games and gateways catalog) with SWR (cached, no automatic polling)
+  const { data: gamesData } = useSWR('/api/games', fetcher);
+  const { data: gatewaysData } = useSWR('/api/gateways', fetcher);
 
-      const gatewaysRes = await fetch('/api/gateways');
-      const gatewaysData = await gatewaysRes.json();
-      if (gatewaysData.success) setGateways(gatewaysData.gateways);
-    } catch (err) {
-      console.error('Failed to load static games/gateways:', err);
-    }
-  };
+  const games = gamesData?.games || [];
+  const gateways = gatewaysData?.gateways || [];
 
-  // Load database lists from backend APIs
-  const loadDatabase = async (userSession = session) => {
-    try {
-      if (userSession && userSession.email) {
-        const emailQuery = encodeURIComponent(userSession.email);
-        
-        const [requestsRes, credentialsRes, txRes, notiRes] = await Promise.all([
-          fetch(`/api/account-requests?email=${emailQuery}`),
-          fetch(`/api/game-accounts?email=${emailQuery}`),
-          fetch(`/api/transactions?email=${emailQuery}`),
-          fetch(`/api/coins-notifications?email=${emailQuery}`)
-        ]);
+  // Fetch user-specific queues (only when player is logged in) with SWR polling every 5s
+  const emailQuery = session?.email ? encodeURIComponent(session.email) : null;
+  
+  const { data: requestsData } = useSWR(
+    emailQuery ? `/api/account-requests?email=${emailQuery}` : null,
+    fetcher,
+    { refreshInterval: 5000 }
+  );
 
-        const [requestsData, credentialsData, txData, notiData] = await Promise.all([
-          requestsRes.json(),
-          credentialsRes.json(),
-          txRes.json(),
-          notiRes.json()
-        ]);
+  const { data: credentialsData } = useSWR(
+    emailQuery ? `/api/game-accounts?email=${emailQuery}` : null,
+    fetcher,
+    { refreshInterval: 5000 }
+  );
 
-        if (requestsData.success) setAccountRequests(requestsData.accountRequests);
-        if (credentialsData.success) setGameAccounts(credentialsData.gameAccounts);
-        if (txData.success) setTransactions(txData.transactions);
-        if (notiData.success) setCoinsNotifications(notiData.coinsNotifications);
-      }
-    } catch (err) {
-      console.error('Failed to load transactional records:', err);
-    }
-  };
+  const { data: transactionsData } = useSWR(
+    emailQuery ? `/api/transactions?email=${emailQuery}&limit=100` : null,
+    fetcher,
+    { refreshInterval: 5000 }
+  );
 
-  // Initialize session and trigger data fetch
+  const { data: notificationsData } = useSWR(
+    emailQuery ? `/api/coins-notifications?email=${emailQuery}` : null,
+    fetcher,
+    { refreshInterval: 5000 }
+  );
+
+  const accountRequests = requestsData?.accountRequests || [];
+  const gameAccounts = credentialsData?.gameAccounts || [];
+  const transactions = transactionsData?.transactions || [];
+  const coinsNotifications = notificationsData?.coinsNotifications || [];
+
+  // Initialize session
   useEffect(() => {
     setMounted(true);
 
@@ -107,17 +95,6 @@ export default function Home() {
       setView('auth');
     }
     
-    loadStaticData();
-    loadDatabase(savedSession);
-
-    // Auto-poll user records from DB every 4 seconds for real-time updates
-    const interval = setInterval(() => {
-      const currentSess = JSON.parse(localStorage.getItem('jackpot_session') || 'null');
-      if (currentSess) {
-        loadDatabase(currentSess);
-      }
-    }, 4000);
-    
     // Register PWA Service Worker
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker
@@ -127,7 +104,6 @@ export default function Home() {
     }
 
     return () => {
-      clearInterval(interval);
       window.removeEventListener('beforeinstallprompt', handleInstallPrompt);
     };
   }, []);
@@ -144,7 +120,6 @@ export default function Home() {
           const parsed = JSON.parse(currentSess);
           setSession(parsed);
           setView('lobby');
-          loadDatabase(parsed);
         }
       }
     };
@@ -186,14 +161,12 @@ export default function Home() {
     setSession(user);
     localStorage.setItem('jackpot_session', JSON.stringify(user));
     setView('lobby');
-    loadDatabase(user);
   };
 
   const handleRegisterSuccess = (newUser) => {
     setSession(newUser);
     localStorage.setItem('jackpot_session', JSON.stringify(newUser));
     setView('lobby');
-    loadDatabase(newUser);
     showToast('Welcome to Jackpot Royals! Registration verified successfully.', 'success');
   };
 
@@ -217,7 +190,9 @@ export default function Home() {
       const data = await response.json();
       if (data.success) {
         showToast(`Account creation request submitted for ${gameTitle}!`, 'success');
-        loadDatabase(session);
+        
+        // Mutate account requests cache key
+        mutate(emailQuery ? `/api/account-requests?email=${emailQuery}` : null);
       } else {
         showToast(data.message || 'Failed to submit account request.', 'error');
       }
@@ -242,7 +217,11 @@ export default function Home() {
         } else {
           showToast(`Withdrawal request of $${parseFloat(newTx.amount).toFixed(2)} submitted.`, 'success');
         }
-        loadDatabase(session);
+        
+        // Mutate transactions and notifications cache keys
+        const url = emailQuery ? `/api/transactions?email=${emailQuery}&limit=100` : null;
+        mutate(url);
+        mutate(emailQuery ? `/api/coins-notifications?email=${emailQuery}` : null);
       } else {
         showToast(data.message || 'Transaction submission failed.', 'error');
       }
@@ -261,7 +240,8 @@ export default function Home() {
       });
       const data = await response.json();
       if (data.success) {
-        loadDatabase(session);
+        // Mutate notifications cache key
+        mutate(emailQuery ? `/api/coins-notifications?email=${emailQuery}` : null);
       }
     } catch (err) {
       console.error('Update coins notification error:', err);
@@ -351,3 +331,4 @@ export default function Home() {
     </GoogleOAuthProvider>
   );
 }
+

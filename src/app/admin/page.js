@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { mutate } from 'swr';
 import ParticlesBackground from '../../components/ParticlesBackground';
 import AdminDashboard from '../../components/AdminDashboard';
 import LoadingOverlay from '../../components/LoadingOverlay';
@@ -13,20 +14,11 @@ export default function AdminPage() {
   const [adminPassword, setAdminPassword] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  // Database State Stores
-  const [games, setGames] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [accountRequests, setAccountRequests] = useState([]);
-  const [gameAccounts, setGameAccounts] = useState([]);
-  const [transactions, setTransactions] = useState([]);
-  const [gateways, setGateways] = useState([]);
-  const [coinsNotifications, setCoinsNotifications] = useState([]);
-  const [systemSettings, setSystemSettings] = useState({ firstDepositBonus: 300, regularDepositBonus: 20, referralBonus: 10 });
-
-  // Modal Controls
+  // Overlay states
   const [loadingActive, setLoadingActive] = useState(false);
   const [toast, setToast] = useState(null);
   
+  // Modal Controls
   const [gameModalOpen, setGameModalOpen] = useState(false);
   const [editGameData, setEditGameData] = useState(null);
   
@@ -38,62 +30,6 @@ export default function AdminPage() {
 
   const [proofModalOpen, setProofModalOpen] = useState(false);
   const [proofImageUrl, setProofImageUrl] = useState('');
-
-  // 1. Initialise and load database values from server-side APIs
-  const loadDatabase = async () => {
-    try {
-      const [
-        gamesRes,
-        usersRes,
-        requestsRes,
-        credentialsRes,
-        txRes,
-        gatewaysRes,
-        notiRes,
-        settingsRes
-      ] = await Promise.all([
-        fetch('/api/games'),
-        fetch('/api/users'),
-        fetch('/api/account-requests'),
-        fetch('/api/game-accounts'),
-        fetch('/api/transactions'),
-        fetch('/api/gateways'),
-        fetch('/api/coins-notifications'),
-        fetch('/api/settings')
-      ]);
-
-      const [
-        gamesData,
-        usersData,
-        requestsData,
-        credentialsData,
-        txData,
-        gatewaysData,
-        notiData,
-        settingsData
-      ] = await Promise.all([
-        gamesRes.json(),
-        usersRes.json(),
-        requestsRes.json(),
-        credentialsRes.json(),
-        txRes.json(),
-        gatewaysRes.json(),
-        notiRes.json(),
-        settingsRes.json()
-      ]);
-
-      if (gamesData.success) setGames(gamesData.games);
-      if (usersData.success) setUsers(usersData.users);
-      if (requestsData.success) setAccountRequests(requestsData.accountRequests);
-      if (credentialsData.success) setGameAccounts(credentialsData.gameAccounts);
-      if (txData.success) setTransactions(txData.transactions);
-      if (gatewaysData.success) setGateways(gatewaysData.gateways);
-      if (notiData.success) setCoinsNotifications(notiData.coinsNotifications);
-      if (settingsData.success) setSystemSettings(settingsData.settings);
-    } catch (err) {
-      console.error('Failed to load admin database from APIs:', err);
-    }
-  };
 
   useEffect(() => {
     // Check local session
@@ -114,12 +50,7 @@ export default function AdminPage() {
       setAdminUser({ name: 'System Admin', email: 'admin@jackpot.com', role: 'admin' });
     }
 
-    loadDatabase();
-
-    // Auto background poll database tables every 4 seconds for real-time updates
-    const databaseInterval = setInterval(loadDatabase, 4000);
-
-    // 2. Multi-tab Real-Time Synchronization Listener
+    // Multi-tab Real-Time Synchronization Listener
     const handleStorageEvent = (e) => {
       if (e.key === 'jackpot_admin_session') {
         const sess = localStorage.getItem('jackpot_admin_session');
@@ -138,7 +69,6 @@ export default function AdminPage() {
     };
     window.addEventListener('storage', handleStorageEvent);
     return () => {
-      clearInterval(databaseInterval);
       window.removeEventListener('storage', handleStorageEvent);
     };
   }, []);
@@ -179,7 +109,9 @@ export default function AdminPage() {
             setAdminUser(user);
             localStorage.setItem('jackpot_admin_session', JSON.stringify(user));
             showToast(`Welcome back, ${user.name}! Session Initiated.`, 'success');
-            loadDatabase();
+            
+            // Refresh stats SWR cache globally
+            mutate('/api/admin/stats');
           });
         } else {
           setLoginError('Access Denied. You do not have administrator privileges.');
@@ -215,7 +147,9 @@ export default function AdminPage() {
       const data = await response.json();
       if (data.success) {
         showToast(`User coins updated to ${coins}!`, 'success');
-        loadDatabase();
+        
+        // Mutate users list caches
+        mutate((key) => typeof key === 'string' && key.startsWith('/api/users'));
       } else {
         showToast(data.message || 'Failed to update coins.', 'error');
       }
@@ -240,7 +174,9 @@ export default function AdminPage() {
       const data = await response.json();
       if (data.success) {
         showToast(`Admin staff account created for ${adminData.name}!`, 'success');
-        loadDatabase();
+        
+        // Revalidate users endpoint
+        mutate((key) => typeof key === 'string' && key.startsWith('/api/users'));
       } else {
         showToast(data.message || 'Failed to create admin staff.', 'error');
       }
@@ -260,7 +196,9 @@ export default function AdminPage() {
       const data = await response.json();
       if (data.success) {
         showToast('System settings updated successfully!', 'success');
-        loadDatabase();
+        
+        // Mutate SWR settings cache
+        mutate('/api/settings');
       } else {
         showToast(data.message || 'Failed to update settings.', 'error');
       }
@@ -270,21 +208,26 @@ export default function AdminPage() {
     }
   };
 
-  const handleUpdateCoinsNotification = async (id, status, read) => {
+  const handleUpdateCoinsNotification = async (id, status, read, holdNote) => {
     try {
       const response = await fetch('/api/coins-notifications', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status, read })
+        body: JSON.stringify({ id, status, read, holdNote })
       });
       const data = await response.json();
       if (data.success) {
         if (status === 'COMPLETED') {
           showToast('Coin allotment request marked as DONE!', 'success');
+        } else if (status === 'HOLD') {
+          showToast('Allotment task placed ON HOLD.', 'info');
         } else {
-          showToast('Notification read status updated.', 'success');
+          showToast('Notification status updated.', 'success');
         }
-        loadDatabase();
+        
+        // Revalidate stats & allotment queues caches
+        mutate('/api/admin/stats');
+        mutate((key) => typeof key === 'string' && key.startsWith('/api/coins-notifications'));
       } else {
         showToast(data.message || 'Failed to update notification.', 'error');
       }
@@ -304,7 +247,7 @@ export default function AdminPage() {
       const data = await response.json();
       if (data.success) {
         showToast('Game coins pool updated successfully!', 'success');
-        loadDatabase();
+        mutate('/api/games');
       } else {
         showToast(data.message || 'Failed to update coins pool.', 'error');
       }
@@ -326,7 +269,7 @@ export default function AdminPage() {
       const data = await response.json();
       if (data.success) {
         showToast(gameItem.id ? `Game updated successfully!` : `Game "${gameItem.title}" created successfully!`, 'success');
-        loadDatabase();
+        mutate('/api/games');
       } else {
         showToast(data.message || 'Failed to save game.', 'error');
       }
@@ -344,7 +287,7 @@ export default function AdminPage() {
         const data = await response.json();
         if (data.success) {
           showToast('Game deleted successfully.', 'error');
-          loadDatabase();
+          mutate('/api/games');
         } else {
           showToast(data.message || 'Failed to delete game.', 'error');
         }
@@ -362,7 +305,7 @@ export default function AdminPage() {
         const data = await response.json();
         if (data.success) {
           showToast('User account deleted.', 'error');
-          loadDatabase();
+          mutate((key) => typeof key === 'string' && key.startsWith('/api/users'));
         } else {
           showToast(data.message || 'Failed to delete user.', 'error');
         }
@@ -407,7 +350,10 @@ export default function AdminPage() {
 
       if (credResult.success && reqResult.success) {
         showToast(`Account credentials sent to ${credData.userEmail}!`, 'success');
-        loadDatabase();
+        
+        // Mutate stats and lists
+        mutate('/api/admin/stats');
+        mutate((key) => typeof key === 'string' && key.startsWith('/api/account-requests'));
       } else {
         showToast('Failed to finalize request approval.', 'error');
       }
@@ -430,7 +376,10 @@ export default function AdminPage() {
       const data = await response.json();
       if (data.success) {
         showToast(`Transaction approved successfully.`, 'success');
-        loadDatabase();
+        
+        // Mutate stats and transaction lists
+        mutate('/api/admin/stats');
+        mutate((key) => typeof key === 'string' && key.startsWith('/api/transactions'));
       } else {
         showToast(data.message || 'Failed to approve transaction.', 'error');
       }
@@ -442,7 +391,7 @@ export default function AdminPage() {
 
   const handleFailTransaction = async (txId) => {
     const feedbackMsg = window.prompt('Enter reason for rejection/failure:', 'Payment not received');
-    if (feedbackMsg === null) return; // Cancelled
+    if (feedbackMsg === null) return;
 
     try {
       const response = await fetch('/api/transactions', {
@@ -453,7 +402,10 @@ export default function AdminPage() {
       const data = await response.json();
       if (data.success) {
         showToast('Transaction set to FAILED status.', 'error');
-        loadDatabase();
+        
+        // Mutate stats and transaction lists
+        mutate('/api/admin/stats');
+        mutate((key) => typeof key === 'string' && key.startsWith('/api/transactions'));
       } else {
         showToast(data.message || 'Failed to decline transaction.', 'error');
       }
@@ -491,7 +443,7 @@ export default function AdminPage() {
       const data = await response.json();
       if (data.success) {
         showToast(gtData.id ? `Gateway "${gtData.name}" updated successfully.` : `Gateway "${gtData.name}" created successfully.`, 'success');
-        loadDatabase();
+        mutate('/api/gateways');
       } else {
         showToast(data.message || 'Failed to save gateway.', 'error');
       }
@@ -509,7 +461,7 @@ export default function AdminPage() {
         const data = await response.json();
         if (data.success) {
           showToast('Payment gateway deleted.', 'error');
-          loadDatabase();
+          mutate('/api/gateways');
         } else {
           showToast(data.message || 'Failed to delete gateway.', 'error');
         }
@@ -593,11 +545,6 @@ export default function AdminPage() {
       ) : (
         /* B) EXPANDED ADMINISTRATIVE WORKSPACE */
         <AdminDashboard
-          games={games}
-          users={users}
-          accountRequests={accountRequests}
-          transactions={transactions}
-          gateways={gateways}
           adminUser={adminUser}
           onLogout={handleAdminLogout}
           onAddGameClick={() => { setEditGameData(null); setGameModalOpen(true); }}
@@ -613,8 +560,6 @@ export default function AdminPage() {
           onDeleteGateway={handleDeleteGateway}
           onUpdateUserCoins={handleUpdateUserCoins}
           onCreateAdmin={handleCreateAdmin}
-          coinsNotifications={coinsNotifications}
-          systemSettings={systemSettings}
           onUpdateSettings={handleUpdateSettings}
           onUpdateCoinsNotification={handleUpdateCoinsNotification}
           onUpdateGameCoinsPool={handleUpdateGameCoinsPool}

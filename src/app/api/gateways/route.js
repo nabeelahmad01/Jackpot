@@ -1,12 +1,20 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
+import { cache } from '../../../lib/cache';
 
 // GET all gateways
 export async function GET() {
   try {
+    const cachedGateways = cache.get('gateways_all');
+    if (cachedGateways) {
+      return NextResponse.json({ success: true, gateways: cachedGateways });
+    }
+
     const db = await getDb();
     const gatewaysCollection = db.collection('gateways');
     const gateways = await gatewaysCollection.find().toArray();
+    
+    cache.set('gateways_all', gateways, 60);
     return NextResponse.json({ success: true, gateways });
   } catch (err) {
     console.error('Fetch Gateways API Error:', err);
@@ -36,6 +44,10 @@ export async function POST(req) {
     };
 
     await gatewaysCollection.insertOne(newGateway);
+    
+    // Invalidate caches
+    cache.del('gateways_all');
+
     return NextResponse.json({ success: true, gateway: newGateway, message: 'Payment gateway added successfully!' });
   } catch (err) {
     console.error('Create Gateway API Error:', err);
@@ -67,6 +79,10 @@ export async function PUT(req) {
     Object.keys(updateFields).forEach(key => updateFields[key] === undefined && delete updateFields[key]);
 
     await gatewaysCollection.updateOne({ id: gateway.id }, { $set: updateFields });
+    
+    // Invalidate caches
+    cache.del('gateways_all');
+
     return NextResponse.json({ success: true, message: 'Payment gateway updated successfully!' });
   } catch (err) {
     console.error('Update Gateway API Error:', err);
@@ -88,9 +104,14 @@ export async function DELETE(req) {
     const gatewaysCollection = db.collection('gateways');
 
     await gatewaysCollection.deleteOne({ id });
+    
+    // Invalidate caches
+    cache.del('gateways_all');
+
     return NextResponse.json({ success: true, message: 'Payment gateway deleted successfully!' });
   } catch (err) {
     console.error('Delete Gateway API Error:', err);
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
   }
 }
+

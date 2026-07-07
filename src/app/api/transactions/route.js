@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
+import { cache } from '../../../lib/cache';
 
 // GET transactions (supports filtering by email for users, or returning all for admins)
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const email = searchParams.get('email');
+    const search = searchParams.get('search') || '';
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = parseInt(searchParams.get('limit') || '25', 10);
 
     const db = await getDb();
     const transactionsCollection = db.collection('transactions');
@@ -15,15 +19,39 @@ export async function GET(req) {
       query.userEmail = email.toLowerCase().trim();
     }
 
-    // Sort by date or id descending
-    const transactions = await transactionsCollection.find(query).toArray();
-    
-    // Sort transactions by custom date or id descending to show newest first
-    transactions.sort((a, b) => {
-      return (b.id || 0) > (a.id || 0) ? 1 : -1;
-    });
+    if (search) {
+      const cleanSearch = search.trim();
+      const searchCriteria = {
+        $or: [
+          { userEmail: { $regex: cleanSearch, $options: 'i' } },
+          { gateway: { $regex: cleanSearch, $options: 'i' } },
+          { type: { $regex: cleanSearch, $options: 'i' } }
+        ]
+      };
+      if (email) {
+        query = { $and: [query, searchCriteria] };
+      } else {
+        query = searchCriteria;
+      }
+    }
 
-    return NextResponse.json({ success: true, transactions });
+    const totalTransactions = await transactionsCollection.countDocuments(query);
+    const skip = (page - 1) * limit;
+
+    // Sort by id descending in database (highly optimized using id index)
+    const transactions = await transactionsCollection.find(query)
+      .sort({ id: -1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+
+    return NextResponse.json({
+      success: true,
+      transactions,
+      totalTransactions,
+      totalPages: Math.ceil(totalTransactions / limit),
+      currentPage: page
+    });
   } catch (err) {
     console.error('Fetch Transactions API Error:', err);
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
@@ -83,6 +111,9 @@ export async function POST(req) {
       });
     }
 
+    // Invalidate stats cache
+    cache.del('admin_stats');
+
     return NextResponse.json({ success: true, transaction: txObject, message: 'Transaction request submitted successfully!' });
   } catch (err) {
     console.error('Create Transaction API Error:', err);
@@ -119,7 +150,7 @@ export async function PUT(req) {
       try {
         const userEmail = originalTx.userEmail.toLowerCase();
         
-        // 1. Count other existing successful deposits
+        // 1. Count other existing successful deposits (uses compound index)
         const successfulDepositsCount = await transactionsCollection.countDocuments({
           userEmail,
           type: 'DEPOSIT',
@@ -188,9 +219,13 @@ export async function PUT(req) {
       }
     }
 
+    // Invalidate stats cache
+    cache.del('admin_stats');
+
     return NextResponse.json({ success: true, message: `Transaction status updated to ${status}!` });
   } catch (err) {
     console.error('Update Transaction API Error:', err);
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
   }
 }
+
