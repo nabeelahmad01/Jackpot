@@ -665,7 +665,7 @@ export default function UserLobby({
                   <div key={game.id} className="game-card">
                     {game.badge !== 'none' && <span className={`game-badge ${game.badge}`}>{game.badge.toUpperCase()}</span>}
                     <div className="game-image-wrapper" onClick={() => setActiveGame(game)} style={{ cursor: 'pointer' }}>
-                      {game.image.startsWith('game_') ? (
+                      {game.image.startsWith('game_') || game.image.startsWith('data:') || game.image.startsWith('http') || game.image.startsWith('/') ? (
                         <img src={game.image} alt={game.title} loading="lazy" />
                       ) : (
                         <div className={`game-placeholder-card ${game.image === 'placeholder_2' ? 'pc-red' : game.image === 'placeholder_3' ? 'pc-blue' : 'pc-gold'}`}>

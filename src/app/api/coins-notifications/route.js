@@ -43,6 +43,20 @@ export async function GET(req) {
       .skip(skip)
       .limit(limit)
       .toArray();
+
+    // Fetch user game usernames for notifications
+    const gameAccountsCollection = db.collection('gameAccounts');
+    for (const noti of notifications) {
+      if (noti.gameTitle && noti.userEmail && noti.gameTitle !== 'Referral Reward') {
+        const account = await gameAccountsCollection.findOne({
+          userEmail: noti.userEmail.toLowerCase().trim(),
+          gameTitle: noti.gameTitle
+        });
+        noti.gameUsername = account ? account.username : '';
+      } else {
+        noti.gameUsername = '';
+      }
+    }
     
     return NextResponse.json({
       success: true,

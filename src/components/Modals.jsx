@@ -6,6 +6,8 @@ import React, { useState, useEffect, useRef } from 'react';
 export function SupportModal({ isOpen, onClose, currentUser }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
+  const [attachment, setAttachment] = useState('');
+  const fileInputRef = useRef(null);
   const chatEndRef = useRef(null);
 
   useEffect(() => {
@@ -35,12 +37,16 @@ export function SupportModal({ isOpen, onClose, currentUser }) {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!input.trim() || !currentUser) return;
+    if (!currentUser) return;
+    if (!input.trim() && !attachment) return;
 
     const userEmail = currentUser.email;
     const userName = currentUser.name;
     const msgText = input;
+    const currentAttachment = attachment;
+
     setInput('');
+    setAttachment('');
 
     try {
       const response = await fetch('/api/support', {
@@ -50,6 +56,7 @@ export function SupportModal({ isOpen, onClose, currentUser }) {
           userEmail,
           userName,
           message: msgText,
+          attachment: currentAttachment,
           senderType: 'player',
           senderEmail: userEmail
         })
@@ -106,6 +113,22 @@ export function SupportModal({ isOpen, onClose, currentUser }) {
                       wordBreak: 'break-word'
                     }}>
                       {msg.message}
+                      {msg.attachment && (
+                        <img
+                          src={msg.attachment}
+                          alt="Support Attachment"
+                          style={{
+                            maxWidth: '100%',
+                            maxHeight: '180px',
+                            display: 'block',
+                            borderRadius: '8px',
+                            marginTop: '0.4rem',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            cursor: 'zoom-in'
+                          }}
+                          onClick={() => window.open(msg.attachment, '_blank')}
+                        />
+                      )}
                     </div>
                     <span style={{ fontSize: '0.55rem', opacity: 0.5, marginTop: '0.2rem' }}>
                       {isMe ? 'You' : (msg.userName || 'Support Agent')} • {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -117,7 +140,55 @@ export function SupportModal({ isOpen, onClose, currentUser }) {
             <div ref={chatEndRef} />
           </div>
 
-          <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.75rem' }}>
+          {attachment && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.03)', padding: '0.4rem 0.6rem', borderRadius: '8px', border: '1px solid rgba(255,215,0,0.3)', marginBottom: '0.5rem' }}>
+              <img src={attachment} alt="attachment preview" style={{ width: '35px', height: '35px', objectFit: 'cover', borderRadius: '4px' }} />
+              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', flex: 1 }}>Image attached (ready to send)</span>
+              <button type="button" onClick={() => setAttachment('')} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.9rem', cursor: 'pointer', padding: '0 0.2rem' }}>&times;</button>
+            </div>
+          )}
+
+          <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.75rem', alignItems: 'center' }}>
+            <input
+              type="file"
+              ref={fileInputRef}
+              style={{ display: 'none' }}
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                if (file.size > 2 * 1024 * 1024) {
+                  alert('Screenshot attachment must be less than 2MB.');
+                  return;
+                }
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  setAttachment(reader.result);
+                };
+                reader.readAsDataURL(file);
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                background: '#1c1e2b',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '8px',
+                color: 'var(--gold-primary)',
+                cursor: 'pointer',
+                width: '40px',
+                height: '40px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: 0,
+                fontSize: '0.95rem'
+              }}
+              title="Attach screenshot proof"
+            >
+              <i className="fa-solid fa-paperclip"></i>
+            </button>
             <input
               type="text"
               placeholder="Type message here..."
@@ -131,11 +202,12 @@ export function SupportModal({ isOpen, onClose, currentUser }) {
                 padding: '0.65rem 1rem',
                 color: '#fff',
                 fontSize: '0.8rem',
-                outline: 'none'
+                outline: 'none',
+                height: '40px'
               }}
-              required
+              required={!attachment}
             />
-            <button type="submit" className="submit-btn" style={{ margin: 0, padding: '0.65rem 1.25rem', width: 'auto', background: 'linear-gradient(135deg, #ffd700 0%, #cca000 100%)', color: '#000', fontWeight: 'bold' }}>
+            <button type="submit" style={{ margin: 0, padding: 0, width: '40px', height: '40px', background: 'linear-gradient(135deg, #ffd700 0%, #cca000 100%)', border: 'none', borderRadius: '8px', color: '#000', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
               <i className="fa-solid fa-paper-plane"></i>
             </button>
           </form>

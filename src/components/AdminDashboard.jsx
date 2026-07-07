@@ -49,6 +49,53 @@ export default function AdminDashboard({
   const pendingTransactionsCount = statsData?.stats?.pendingTransactionsCount || 0;
   const pendingCoinsCount = statsData?.stats?.pendingCoinsCount || 0;
 
+  const prevCountsRef = React.useRef({ requests: 0, transactions: 0, coins: 0, chats: 0 });
+
+  const playAlertSound = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const playTone = (freq, startTime, duration) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, startTime);
+        gain.gain.setValueAtTime(0.12, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+      const now = ctx.currentTime;
+      playTone(523.25, now, 0.12);
+      playTone(659.25, now + 0.08, 0.25);
+    } catch (e) {
+      console.log('Synthesized audio failed:', e);
+    }
+  };
+
+  useEffect(() => {
+    if (!statsData?.stats) return;
+    const { pendingRequestsCount, pendingTransactionsCount, pendingCoinsCount, pendingChatsCount } = statsData.stats;
+    const prev = prevCountsRef.current;
+    
+    const hasNewRequest = pendingRequestsCount > prev.requests;
+    const hasNewTx = pendingTransactionsCount > prev.transactions;
+    const hasNewCoin = pendingCoinsCount > prev.coins;
+    const hasNewChat = pendingChatsCount > prev.chats;
+    
+    if (hasNewRequest || hasNewTx || hasNewCoin || hasNewChat) {
+      playAlertSound();
+    }
+    
+    prevCountsRef.current = {
+      requests: pendingRequestsCount,
+      transactions: pendingTransactionsCount,
+      coins: pendingCoinsCount,
+      chats: pendingChatsCount
+    };
+  }, [statsData]);
+
   const wrapAction = (id, actionFn) => async (...args) => {
     if (processingIds[id]) return;
     setProcessingIds(prev => ({ ...prev, [id]: true }));
@@ -332,11 +379,17 @@ export default function AdminDashboard({
                 border: 'none',
                 cursor: 'pointer',
                 textAlign: 'left',
+                position: 'relative',
                 transition: 'all 0.2s ease'
               }}
             >
               <i className="fa-solid fa-comments" style={{ width: '18px' }}></i>
               <span>Live Chat Support</span>
+              {statsData?.stats?.pendingChatsCount > 0 && (
+                <span style={{ marginLeft: 'auto', background: '#ef4444', color: '#fff', fontSize: '0.65rem', padding: '0.15rem 0.45rem', borderRadius: '10px', fontWeight: 'bold' }}>
+                  {statsData.stats.pendingChatsCount}
+                </span>
+              )}
             </button>
           )}
 

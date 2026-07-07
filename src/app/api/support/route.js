@@ -42,10 +42,10 @@ export async function GET(req) {
 // POST send support message
 export async function POST(req) {
   try {
-    const { userEmail, userName, message, senderType, senderEmail } = await req.json();
+    const { userEmail, userName, message, senderType, senderEmail, attachment } = await req.json();
 
-    if (!userEmail || !message || !senderType || !senderEmail) {
-      return NextResponse.json({ success: false, message: 'Missing message details.' }, { status: 400 });
+    if (!userEmail || !senderType || !senderEmail || (!message && !attachment)) {
+      return NextResponse.json({ success: false, message: 'Missing message or attachment details.' }, { status: 400 });
     }
 
     const db = await getDb();
@@ -55,7 +55,8 @@ export async function POST(req) {
       id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
       userEmail: userEmail.toLowerCase().trim(),
       userName: userName || 'Player',
-      message: message.trim(),
+      message: message ? message.trim() : '',
+      attachment: attachment || '',
       senderType, // 'player' | 'admin'
       senderEmail: senderEmail.toLowerCase().trim(),
       timestamp: new Date().toISOString()

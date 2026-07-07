@@ -15,12 +15,30 @@ export async function GET(req) {
     const [
       pendingRequestsCount,
       pendingTransactionsCount,
-      pendingCoinsCount
+      pendingCoinsCount,
+      chatStats
     ] = await Promise.all([
       db.collection('accountRequests').countDocuments({ status: 'PENDING' }),
       db.collection('transactions').countDocuments({ status: 'PENDING' }),
-      db.collection('coinsNotifications').countDocuments({ status: 'PENDING' })
+      db.collection('coinsNotifications').countDocuments({ status: 'PENDING' }),
+      db.collection('supportMessages').aggregate([
+        { $sort: { timestamp: -1 } },
+        {
+          $group: {
+            _id: "$userEmail",
+            latestSender: { $first: "$senderType" }
+          }
+        },
+        {
+          $match: { latestSender: "player" }
+        },
+        {
+          $count: "pendingChatsCount"
+        }
+      ]).toArray()
     ]);
+
+    const pendingChatsCount = chatStats[0]?.pendingChatsCount || 0;
 
     // Fetch successful transactions with projection to compute financial summaries
     const successfulTx = await db.collection('transactions')
@@ -62,7 +80,8 @@ export async function GET(req) {
       yesterdayWithdrawals,
       pendingRequestsCount,
       pendingTransactionsCount,
-      pendingCoinsCount
+      pendingCoinsCount,
+      pendingChatsCount
     };
 
     // Cache the statistics for 60 seconds

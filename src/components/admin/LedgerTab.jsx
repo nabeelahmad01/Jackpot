@@ -114,7 +114,14 @@ export default function LedgerTab({
                   depositsLedger.map((tx, idx) => (
                     <tr key={tx.id}>
                       <td>{(page - 1) * limit + idx + 1}</td>
-                      <td>{tx.userEmail}</td>
+                      <td>
+                        <div>{tx.userEmail}</div>
+                        {tx.gameUsername && (
+                          <div style={{ fontSize: '0.7rem', color: 'var(--gold-primary)', marginTop: '0.15rem' }}>
+                            <i className="fa-solid fa-gamepad" style={{ marginRight: '3px' }}></i> {tx.gameUsername}
+                          </div>
+                        )}
+                      </td>
                       <td><strong>{tx.gameTitle}</strong></td>
                       <td>
                         <span className="admin-badge-preview b-hot">
@@ -220,7 +227,14 @@ export default function LedgerTab({
                   withdrawalsLedger.map((tx, idx) => (
                     <tr key={tx.id}>
                       <td>{(page - 1) * limit + idx + 1}</td>
-                      <td>{tx.userEmail}</td>
+                      <td>
+                        <div>{tx.userEmail}</div>
+                        {tx.gameUsername && (
+                          <div style={{ fontSize: '0.7rem', color: 'var(--gold-primary)', marginTop: '0.15rem' }}>
+                            <i className="fa-solid fa-gamepad" style={{ marginRight: '3px' }}></i> {tx.gameUsername}
+                          </div>
+                        )}
+                      </td>
                       <td><strong>{tx.gameTitle}</strong></td>
                       <td>
                         <span className="admin-badge-preview b-new">

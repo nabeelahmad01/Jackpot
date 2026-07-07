@@ -102,7 +102,14 @@ export default function CoinsAllotmentTab({
               notifications.map((noti, idx) => (
                 <tr key={noti.id} style={{ opacity: noti.status === 'COMPLETED' ? 0.6 : 1 }}>
                   <td>{(page - 1) * limit + idx + 1}</td>
-                  <td><strong>{noti.userEmail}</strong></td>
+                  <td>
+                    <strong>{noti.userEmail}</strong>
+                    {noti.gameUsername && (
+                      <div style={{ fontSize: '0.7rem', color: 'var(--gold-primary)', marginTop: '0.15rem' }}>
+                        <i className="fa-solid fa-gamepad" style={{ marginRight: '3px' }}></i> {noti.gameUsername}
+                      </div>
+                    )}
+                  </td>
                   <td>
                     <span className={`admin-badge-preview ${noti.totalCoins < 0 ? 'b-new' : 'b-hot'}`}>{noti.gameTitle}</span>
                     {noti.holdNote && (

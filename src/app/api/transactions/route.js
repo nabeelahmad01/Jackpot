@@ -45,6 +45,20 @@ export async function GET(req) {
       .limit(limit)
       .toArray();
 
+    // Fetch user game usernames for transactions
+    const gameAccountsCollection = db.collection('gameAccounts');
+    for (const tx of transactions) {
+      if (tx.gameTitle && tx.userEmail) {
+        const account = await gameAccountsCollection.findOne({
+          userEmail: tx.userEmail.toLowerCase().trim(),
+          gameTitle: tx.gameTitle
+        });
+        tx.gameUsername = account ? account.username : '';
+      } else {
+        tx.gameUsername = '';
+      }
+    }
+
     return NextResponse.json({
       success: true,
       transactions,
