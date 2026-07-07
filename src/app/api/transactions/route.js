@@ -50,12 +50,9 @@ export async function GET(req) {
     const accountsMap = {};
     
     if (txPairs.length > 0) {
-      const matchCriteria = txPairs.map(t => ({
-        userEmail: t.userEmail.toLowerCase().trim(),
-        gameTitle: t.gameTitle
-      }));
+      const uniqueEmails = Array.from(new Set(txPairs.map(t => t.userEmail.toLowerCase().trim())));
       const gameAccountsCollection = db.collection('gameAccounts');
-      const accounts = await gameAccountsCollection.find({ $or: matchCriteria }).toArray();
+      const accounts = await gameAccountsCollection.find({ userEmail: { $in: uniqueEmails } }).toArray();
       accounts.forEach(a => {
         const key = `${a.userEmail.toLowerCase().trim()}_${a.gameTitle}`;
         accountsMap[key] = a.username;
