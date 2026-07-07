@@ -330,23 +330,7 @@ export default function UserLobby({
     setTimeout(() => setActionLoading(false), 2500);
 
     onRequestAccount(activeGame.title);
-    const isFirstAccount = gameAccounts.length === 0 && !accountRequests.some(r => r.userEmail === currentUserEmail);
-    const hasClaimedBonus = (transactions || []).some(t => t.type === 'BONUS' && t.userEmail === currentUserEmail && t.code === 'SIGNUP-FREE3');
-    const eligibleForSignupBonus = isFirstAccount && !hasClaimedBonus;
-
-    if (eligibleForSignupBonus && claimBonus) {
-      onSubmitTransaction({
-        gameTitle: activeGame.title,
-        type: 'BONUS',
-        amount: 3.00,
-        gateway: 'Signup Bonus',
-        code: 'SIGNUP-FREE3',
-        nameOnTag: currentUser?.name || 'Player',
-        phoneOnTag: '',
-        screenshot: ''
-      });
-      showToast('$3.00 Free Signup Bonus request submitted! Awaiting admin confirmation.', 'success');
-    }
+    showToast('Game account credentials request submitted! Awaiting admin response.', 'success');
   };
 
   const currentRequest = activeGame 

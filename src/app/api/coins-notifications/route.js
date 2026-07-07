@@ -100,10 +100,13 @@ export async function PUT(req) {
       const originalNoti = await notificationsCollection.findOne({ id });
       if (originalNoti && originalNoti.transactionId) {
         const transactionsCollection = db.collection('transactions');
-        await transactionsCollection.updateOne(
-          { id: originalNoti.transactionId },
-          { $set: { status: 'PENDING' } }
-        );
+        const parentTx = await transactionsCollection.findOne({ id: originalNoti.transactionId });
+        if (parentTx && parentTx.type === 'WITHDRAW') {
+          await transactionsCollection.updateOne(
+            { id: originalNoti.transactionId },
+            { $set: { status: 'PENDING' } }
+          );
+        }
       }
     }
 
