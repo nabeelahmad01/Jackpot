@@ -45,15 +45,27 @@ export async function GET(req) {
       .limit(limit)
       .toArray();
 
-    // Fetch user game usernames for transactions
-    const gameAccountsCollection = db.collection('gameAccounts');
+    // Fetch user game usernames for transactions in a batch (optimized from N+1 queries)
+    const txPairs = transactions.filter(t => t.gameTitle && t.userEmail);
+    const accountsMap = {};
+    
+    if (txPairs.length > 0) {
+      const matchCriteria = txPairs.map(t => ({
+        userEmail: t.userEmail.toLowerCase().trim(),
+        gameTitle: t.gameTitle
+      }));
+      const gameAccountsCollection = db.collection('gameAccounts');
+      const accounts = await gameAccountsCollection.find({ $or: matchCriteria }).toArray();
+      accounts.forEach(a => {
+        const key = `${a.userEmail.toLowerCase().trim()}_${a.gameTitle}`;
+        accountsMap[key] = a.username;
+      });
+    }
+
     for (const tx of transactions) {
       if (tx.gameTitle && tx.userEmail) {
-        const account = await gameAccountsCollection.findOne({
-          userEmail: tx.userEmail.toLowerCase().trim(),
-          gameTitle: tx.gameTitle
-        });
-        tx.gameUsername = account ? account.username : '';
+        const key = `${tx.userEmail.toLowerCase().trim()}_${tx.gameTitle}`;
+        tx.gameUsername = accountsMap[key] || '';
       } else {
         tx.gameUsername = '';
       }

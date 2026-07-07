@@ -44,15 +44,27 @@ export async function GET(req) {
       .limit(limit)
       .toArray();
 
-    // Fetch user game usernames for notifications
-    const gameAccountsCollection = db.collection('gameAccounts');
+    // Fetch user game usernames for notifications in a batch (optimized from N+1 queries)
+    const notiPairs = notifications.filter(n => n.gameTitle && n.userEmail && n.gameTitle !== 'Referral Reward');
+    const accountsMap = {};
+
+    if (notiPairs.length > 0) {
+      const matchCriteria = notiPairs.map(n => ({
+        userEmail: n.userEmail.toLowerCase().trim(),
+        gameTitle: n.gameTitle
+      }));
+      const gameAccountsCollection = db.collection('gameAccounts');
+      const accounts = await gameAccountsCollection.find({ $or: matchCriteria }).toArray();
+      accounts.forEach(a => {
+        const key = `${a.userEmail.toLowerCase().trim()}_${a.gameTitle}`;
+        accountsMap[key] = a.username;
+      });
+    }
+
     for (const noti of notifications) {
       if (noti.gameTitle && noti.userEmail && noti.gameTitle !== 'Referral Reward') {
-        const account = await gameAccountsCollection.findOne({
-          userEmail: noti.userEmail.toLowerCase().trim(),
-          gameTitle: noti.gameTitle
-        });
-        noti.gameUsername = account ? account.username : '';
+        const key = `${noti.userEmail.toLowerCase().trim()}_${noti.gameTitle}`;
+        noti.gameUsername = accountsMap[key] || '';
       } else {
         noti.gameUsername = '';
       }
