@@ -5,6 +5,7 @@ const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
 export default function CoinsAllotmentTab({
   onUpdateCoinsNotification,
+  completedActionIds = {},
   processingIds,
   wrapAction
 }) {
@@ -31,7 +32,7 @@ export default function CoinsAllotmentTab({
     { refreshInterval: 4000 }
   );
 
-  const notifications = data?.coinsNotifications || [];
+  const notifications = (data?.coinsNotifications || []).filter((n) => !completedActionIds[n.id]);
   const totalNotifications = data?.totalNotifications || 0;
   const totalPages = data?.totalPages || 1;
 

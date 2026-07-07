@@ -7,6 +7,7 @@ export default function LedgerTab({
   onInspectProof,
   onApproveTransaction,
   onFailTransaction,
+  completedActionIds = {},
   processingIds,
   wrapAction
 }) {
@@ -30,7 +31,7 @@ export default function LedgerTab({
     { refreshInterval: 4000 }
   );
 
-  const transactions = data?.transactions || [];
+  const transactions = (data?.transactions || []).filter((t) => !completedActionIds[t.id]);
   const totalTransactions = data?.totalTransactions || 0;
   const totalPages = data?.totalPages || 1;
 

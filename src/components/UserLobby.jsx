@@ -37,6 +37,7 @@ export default function UserLobby({
   const [lobbySubView, setLobbySubView] = useState('main'); // 'main' | 'referrals'
   const [referralsList, setReferralsList] = useState([]);
   const [claimBonus, setClaimBonus] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
 
   // Payment selection modal
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -183,11 +184,15 @@ export default function UserLobby({
 
   const handlePaidConfirm = () => {
     if (!activeInvoice || !activeGame) return;
+    if (actionLoading) return;
     
     if (!screenshotBase64) {
       showToast('Please upload a screenshot of your payment to continue.', 'error');
       return;
     }
+
+    setActionLoading(true);
+    setTimeout(() => setActionLoading(false), 2500);
 
     onSubmitTransaction({
       gameTitle: activeGame.title,
@@ -218,6 +223,7 @@ export default function UserLobby({
 
   const handleWithdrawConfirm = (e) => {
     e.preventDefault();
+    if (actionLoading) return;
     const amountVal = parseFloat(withdrawAmount);
     if (withdrawTag.trim() === '') {
       showToast('Please provide your payout tag.', 'error');
@@ -231,6 +237,9 @@ export default function UserLobby({
       showToast('Please upload a screenshot of your game balance.', 'error');
       return;
     }
+
+    setActionLoading(true);
+    setTimeout(() => setActionLoading(false), 2500);
 
     onSubmitTransaction({
       gameTitle: activeGame.title,
@@ -297,6 +306,10 @@ export default function UserLobby({
       return;
     }
 
+    if (actionLoading) return;
+    setActionLoading(true);
+    setTimeout(() => setActionLoading(false), 2500);
+
     // 4. Submit the Freeplay request directly!
     onSubmitTransaction({
       gameTitle: activeGame.title,
@@ -312,6 +325,10 @@ export default function UserLobby({
   };
 
   const handleRequestAccountWithBonus = () => {
+    if (actionLoading) return;
+    setActionLoading(true);
+    setTimeout(() => setActionLoading(false), 2500);
+
     onRequestAccount(activeGame.title);
     const isFirstAccount = gameAccounts.length === 0 && !accountRequests.some(r => r.userEmail === currentUserEmail);
     const hasClaimedBonus = (transactions || []).some(t => t.type === 'BONUS' && t.userEmail === currentUserEmail && t.code === 'SIGNUP-FREE3');

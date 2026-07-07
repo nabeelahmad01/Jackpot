@@ -17,6 +17,7 @@ export default function AdminPage() {
   // Overlay states
   const [loadingActive, setLoadingActive] = useState(false);
   const [toast, setToast] = useState(null);
+  const [completedActionIds, setCompletedActionIds] = useState({});
   
   // Modal Controls
   const [gameModalOpen, setGameModalOpen] = useState(false);
@@ -219,6 +220,7 @@ export default function AdminPage() {
       if (data.success) {
         if (status === 'COMPLETED') {
           showToast('Coin allotment request marked as DONE!', 'success');
+          setCompletedActionIds(prev => ({ ...prev, [id]: true }));
         } else if (status === 'HOLD') {
           showToast('Allotment task placed ON HOLD.', 'info');
         } else {
@@ -350,6 +352,7 @@ export default function AdminPage() {
 
       if (credResult.success && reqResult.success) {
         showToast(`Account credentials sent to ${credData.userEmail}!`, 'success');
+        setCompletedActionIds(prev => ({ ...prev, [credData.requestId]: true }));
         
         // Mutate stats and lists
         mutate('/api/admin/stats');
@@ -376,6 +379,7 @@ export default function AdminPage() {
       const data = await response.json();
       if (data.success) {
         showToast(`Transaction approved successfully.`, 'success');
+        setCompletedActionIds(prev => ({ ...prev, [txId]: true }));
         
         // Mutate stats and transaction lists
         mutate('/api/admin/stats');
@@ -402,6 +406,7 @@ export default function AdminPage() {
       const data = await response.json();
       if (data.success) {
         showToast('Transaction set to FAILED status.', 'error');
+        setCompletedActionIds(prev => ({ ...prev, [txId]: true }));
         
         // Mutate stats and transaction lists
         mutate('/api/admin/stats');
@@ -546,6 +551,7 @@ export default function AdminPage() {
         /* B) EXPANDED ADMINISTRATIVE WORKSPACE */
         <AdminDashboard
           adminUser={adminUser}
+          completedActionIds={completedActionIds}
           onLogout={handleAdminLogout}
           onAddGameClick={() => { setEditGameData(null); setGameModalOpen(true); }}
           onEditGameClick={(game) => { setEditGameData(game); setGameModalOpen(true); }}

@@ -3,7 +3,7 @@ import useSWR from 'swr';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
-export default function RequestsTab({ onApproveRequest, processingIds, wrapAction }) {
+export default function RequestsTab({ onApproveRequest, completedActionIds = {}, processingIds, wrapAction }) {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -24,7 +24,7 @@ export default function RequestsTab({ onApproveRequest, processingIds, wrapActio
     { refreshInterval: 4000 }
   );
 
-  const requests = data?.accountRequests || [];
+  const requests = (data?.accountRequests || []).filter((r) => !completedActionIds[r.id]);
   const totalRequests = data?.totalRequests || 0;
   const totalPages = data?.totalPages || 1;
 

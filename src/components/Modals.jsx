@@ -298,8 +298,11 @@ export function AdminGameModal({ isOpen, onClose, onSave, editGame }) {
     reader.readAsDataURL(file);
   };
 
-  const handleSubmit = (e) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
     let isValid = true;
 
     if (title.trim() === '') {
@@ -318,13 +321,18 @@ export function AdminGameModal({ isOpen, onClose, onSave, editGame }) {
     }
 
     if (isValid) {
-      onSave({
-        id: editGame ? editGame.id : null,
-        title: title.trim(),
-        badge,
-        image,
-        link: link.trim(),
-      });
+      setIsSubmitting(true);
+      try {
+        await onSave({
+          id: editGame ? editGame.id : null,
+          title: title.trim(),
+          badge,
+          image,
+          link: link.trim(),
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -422,8 +430,8 @@ export function AdminGameModal({ isOpen, onClose, onSave, editGame }) {
               <span className="error-msg">{linkError}</span>
             </div>
 
-            <button type="submit" className="submit-btn">
-              <span>{editGame ? 'UPDATE GAME' : 'SAVE GAME'}</span>
+            <button type="submit" className="submit-btn" disabled={isSubmitting}>
+              <span>{isSubmitting ? 'SAVING...' : (editGame ? 'UPDATE GAME' : 'SAVE GAME')}</span>
               <div className="btn-glow"></div>
             </button>
           </form>
@@ -528,8 +536,11 @@ export function ApproveAccountModal({ isOpen, onClose, onApprove, requestDetails
 
   if (!isOpen || !requestDetails) return null;
 
-  const handleSubmit = (e) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
     let isValid = true;
     if (username.trim() === '') {
       setUserError('Username is required');
@@ -541,13 +552,18 @@ export function ApproveAccountModal({ isOpen, onClose, onApprove, requestDetails
     }
 
     if (isValid) {
-      onApprove({
-        requestId: requestDetails.id,
-        userEmail: requestDetails.userEmail,
-        gameTitle: requestDetails.gameTitle,
-        username: username.trim(),
-        password: password.trim()
-      });
+      setIsSubmitting(true);
+      try {
+        await onApprove({
+          requestId: requestDetails.id,
+          userEmail: requestDetails.userEmail,
+          gameTitle: requestDetails.gameTitle,
+          username: username.trim(),
+          password: password.trim()
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -598,8 +614,8 @@ export function ApproveAccountModal({ isOpen, onClose, onApprove, requestDetails
               <span className="error-msg">{passError}</span>
             </div>
 
-            <button type="submit" className="submit-btn" style={{ marginTop: '0.5rem' }}>
-              <span>APPROVE & TRANSMIT</span>
+            <button type="submit" className="submit-btn" style={{ marginTop: '0.5rem' }} disabled={isSubmitting}>
+              <span>{isSubmitting ? 'TRANSMITTING...' : 'APPROVE & TRANSMIT'}</span>
               <div className="btn-glow"></div>
             </button>
           </form>
@@ -665,8 +681,11 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
     reader.readAsDataURL(file);
   };
 
-  const handleSubmit = (e) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
     let isValid = true;
 
     if (name.trim() === '') {
@@ -684,15 +703,20 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
     }
 
     if (isValid) {
-      onSave({
-        id: editGateway ? editGateway.id : null,
-        name: name.trim(),
-        subtitle: subtitle.trim(),
-        tag: tag.trim(),
-        phone: phone.trim(),
-        theme,
-        qrImage: qrImage
-      });
+      setIsSubmitting(true);
+      try {
+        await onSave({
+          id: editGateway ? editGateway.id : null,
+          name: name.trim(),
+          subtitle: subtitle.trim(),
+          tag: tag.trim(),
+          phone: phone.trim(),
+          theme,
+          qrImage: qrImage
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -815,8 +839,8 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
               )}
             </div>
 
-            <button type="submit" className="submit-btn">
-              <span>{editGateway ? 'UPDATE GATEWAY' : 'SAVE GATEWAY'}</span>
+            <button type="submit" className="submit-btn" disabled={isSubmitting}>
+              <span>{isSubmitting ? 'SAVING...' : (editGateway ? 'UPDATE GATEWAY' : 'SAVE GATEWAY')}</span>
               <div className="btn-glow"></div>
             </button>
           </form>

@@ -25,21 +25,29 @@ export default function StaffTab({ adminUser, onCreateAdmin, onDeleteUser }) {
       s.role.toLowerCase().includes(staffSearch.toLowerCase())
   );
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleAddStaffSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!newAdminName.trim() || !newAdminEmail.trim() || !newAdminPassword.trim()) return;
 
-    await onCreateAdmin({
-      name: newAdminName,
-      email: newAdminEmail,
-      password: newAdminPassword,
-      role: newAdminRole
-    });
+    setIsSubmitting(true);
+    try {
+      await onCreateAdmin({
+        name: newAdminName,
+        email: newAdminEmail,
+        password: newAdminPassword,
+        role: newAdminRole
+      });
 
-    setNewAdminName('');
-    setNewAdminEmail('');
-    setNewAdminPassword('');
-    setNewAdminRole('financial_admin');
+      setNewAdminName('');
+      setNewAdminEmail('');
+      setNewAdminPassword('');
+      setNewAdminRole('financial_admin');
+    } finally {
+      setIsSubmitting(false);
+    }
     mutate();
   };
 
@@ -124,8 +132,8 @@ export default function StaffTab({ adminUser, onCreateAdmin, onDeleteUser }) {
             </div>
           </div>
 
-          <button type="submit" className="submit-btn" style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold' }}>
-            CREATE STAFF USER &rarr;
+          <button type="submit" className="submit-btn" style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold' }} disabled={isSubmitting}>
+            {isSubmitting ? 'CREATING...' : 'CREATE STAFF USER ➔'}
           </button>
         </form>
       </section>

@@ -19,6 +19,7 @@ const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
 export default function AdminDashboard({
   adminUser,
+  completedActionIds = {},
   onLogout,
   onAddGameClick,
   onEditGameClick,
@@ -476,13 +477,14 @@ export default function AdminDashboard({
             <PlayerAccountsTab onDeleteUser={onDeleteUser} />
           )}
           {activeTab === 'requests' && hasAccess('requests') && (
-            <RequestsTab onApproveRequest={onApproveRequest} processingIds={processingIds} wrapAction={wrapAction} />
+            <RequestsTab onApproveRequest={onApproveRequest} completedActionIds={completedActionIds} processingIds={processingIds} wrapAction={wrapAction} />
           )}
           {activeTab === 'ledger' && hasAccess('ledger') && (
             <LedgerTab
               onInspectProof={onInspectProof}
               onApproveTransaction={onApproveTransaction}
               onFailTransaction={onFailTransaction}
+              completedActionIds={completedActionIds}
               processingIds={processingIds}
               wrapAction={wrapAction}
             />
@@ -493,6 +495,7 @@ export default function AdminDashboard({
           {activeTab === 'coins' && hasAccess('coins') && (
             <CoinsAllotmentTab
               onUpdateCoinsNotification={onUpdateCoinsNotification}
+              completedActionIds={completedActionIds}
               processingIds={processingIds}
               wrapAction={wrapAction}
             />
