@@ -150,7 +150,7 @@ export default function SupportTab({ adminUser }) {
       display: 'grid',
       gridTemplateColumns: '320px 1fr',
       gap: '1rem',
-      height: 'calc(100vh - 7.5rem)',
+      height: '100%',
       minHeight: '520px',
       maxHeight: '100%',
       animation: 'fade-in 0.2s ease-out'

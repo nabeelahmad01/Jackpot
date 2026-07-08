@@ -506,7 +506,7 @@ export default function AdminDashboard({
       </aside>
 
       {/* Main Content Workspace Wrapper */}
-      <main className="admin-main-workspace">
+      <main className="admin-main-workspace" style={activeTab === 'support' ? { overflowY: 'hidden', height: '100vh' } : {}}>
         <Suspense fallback={
           <div style={{ padding: '2rem', textAlign: 'center', opacity: 0.5 }}>
             <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '2rem', color: 'var(--gold-primary)', marginBottom: '1rem', display: 'block' }}></i>
