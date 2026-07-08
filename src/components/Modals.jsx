@@ -515,6 +515,7 @@ export function ApproveAccountModal({ isOpen, onClose, onApprove, requestDetails
   
   const [userError, setUserError] = useState('');
   const [passError, setPassError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isOpen && requestDetails && requestDetails.userEmail) {
@@ -536,8 +537,6 @@ export function ApproveAccountModal({ isOpen, onClose, onApprove, requestDetails
   }, [isOpen, requestDetails]);
 
   if (!isOpen || !requestDetails) return null;
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
