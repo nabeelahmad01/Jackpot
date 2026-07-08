@@ -147,7 +147,7 @@ export async function POST(req) {
 // PUT update transaction status (Admin action - approve/decline)
 export async function PUT(req) {
   try {
-    const { id, status, note } = await req.json();
+    const { id, status, note, payoutSent, payoutHold } = await req.json();
 
     if (!id || !status) {
       return NextResponse.json({ success: false, message: 'Transaction ID and status are required.' }, { status: 400 });
@@ -164,6 +164,12 @@ export async function PUT(req) {
     const updateFields = { status };
     if (note !== undefined) {
       updateFields.note = note;
+    }
+    if (payoutSent !== undefined) {
+      updateFields.payoutSent = Number(payoutSent);
+    }
+    if (payoutHold !== undefined) {
+      updateFields.payoutHold = Number(payoutHold);
     }
 
     await transactionsCollection.updateOne({ id }, { $set: updateFields });

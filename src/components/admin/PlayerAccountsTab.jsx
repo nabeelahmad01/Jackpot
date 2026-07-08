@@ -11,6 +11,57 @@ export default function PlayerAccountsTab({ adminUser, onDeleteUser }) {
 
   // Selected player for history modal inspection
   const [inspectedUser, setInspectedUser] = useState(null);
+
+  // Manual Player Registration State
+  const [registerModalOpen, setRegisterModalOpen] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newReferredBy, setNewReferredBy] = useState('');
+  const [registerResult, setRegisterResult] = useState(null);
+  const [isRegistering, setIsRegistering] = useState(false);
+
+  const handleManualRegister = async (e) => {
+    e.preventDefault();
+    if (!newName.trim() || !newEmail.trim()) {
+      alert('Please provide player Name and Gmail email.');
+      return;
+    }
+    setIsRegistering(true);
+    try {
+      const response = await fetch('/api/users/manual-create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newName,
+          email: newEmail,
+          password: newPassword,
+          referredBy: newReferredBy
+        })
+      });
+      const resData = await response.json();
+      if (resData.success) {
+        setRegisterResult(resData.player);
+        mutate();
+      } else {
+        alert(resData.message || 'Failed to register player.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Network error registering player.');
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
+  const resetRegisterForm = () => {
+    setNewName('');
+    setNewEmail('');
+    setNewPassword('');
+    setNewReferredBy('');
+    setRegisterResult(null);
+    setRegisterModalOpen(false);
+  };
   const [userHistory, setUserHistory] = useState({
     deposits: [],
     withdrawals: [],
@@ -126,7 +177,29 @@ export default function PlayerAccountsTab({ adminUser, onDeleteUser }) {
   return (
     <section className="admin-section-card" style={{ animation: 'fade-in 0.2s ease-out' }}>
       <div className="section-card-header" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }}>
-        <h3><i className="fa-solid fa-users text-red"></i> Player Accounts ({totalUsers} Registered)</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3><i className="fa-solid fa-users text-red"></i> Player Accounts ({totalUsers} Registered)</h3>
+          {isManagerOrAdmin && (
+            <button
+              onClick={() => setRegisterModalOpen(true)}
+              className="submit-btn"
+              style={{
+                margin: 0,
+                width: 'auto',
+                padding: '0.5rem 1.25rem',
+                background: 'var(--gold-primary)',
+                color: '#000',
+                fontWeight: 'bold',
+                fontSize: '0.75rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem'
+              }}
+            >
+              <i className="fa-solid fa-user-plus"></i> Register New Player
+            </button>
+          )}
+        </div>
         
         <div className="input-wrapper search-wrapper" style={{ background: '#0b0d16', width: '100%' }}>
           <i className="fa-solid fa-magnifying-glass input-icon"></i>
@@ -180,7 +253,7 @@ export default function PlayerAccountsTab({ adminUser, onDeleteUser }) {
                         title="Inspect Player Profile & History"
                         style={{ background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.3)', color: 'var(--gold-primary)' }}
                       >
-                        <i className="fa-solid fa-clock-history"></i>
+                        <i className="fa-solid fa-clock-rotate-left"></i>
                       </button>
                       <button
                         className="action-row-btn btn-delete"
@@ -333,6 +406,108 @@ export default function PlayerAccountsTab({ adminUser, onDeleteUser }) {
                   </div>
 
                 </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* MANUAL REGISTER PLAYER MODAL */}
+      {registerModalOpen && (
+        <div className="modal-backdrop-custom" onClick={resetRegisterForm}>
+          <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', width: '90%' }}>
+            <div className="modal-header">
+              <h3>
+                <i className="fa-solid fa-user-plus gold-text"></i> Register New Player
+              </h3>
+              <button type="button" className="close-modal" onClick={resetRegisterForm}>
+                &times;
+              </button>
+            </div>
+            <div className="modal-body">
+              {registerResult ? (
+                <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+                  <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(34,197,94,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#22c55e', margin: '0 auto 1rem auto', fontSize: '1.5rem' }}>
+                    <i className="fa-solid fa-circle-check"></i>
+                  </div>
+                  <h4 style={{ color: '#fff', marginBottom: '0.5rem' }}>Player Registered Successfully!</h4>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+                    Share these login credentials with the player:
+                  </p>
+                  
+                  <div style={{ background: '#0b0d16', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)', textAlign: 'left', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.8rem' }}>
+                    <div><span style={{ color: 'var(--text-muted)' }}>Email:</span> <strong style={{ color: '#fff' }}>{registerResult.email}</strong></div>
+                    <div><span style={{ color: 'var(--text-muted)' }}>Temporary Password:</span> <strong style={{ color: 'var(--gold-primary)', fontFamily: 'monospace' }}>{registerResult.password}</strong></div>
+                    <div><span style={{ color: 'var(--text-muted)' }}>Referral Code:</span> <strong style={{ color: '#a855f7', fontFamily: 'monospace' }}>{registerResult.referralCode}</strong></div>
+                  </div>
+
+                  <button onClick={resetRegisterForm} className="submit-btn" style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold' }}>
+                    DONE
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleManualRegister} noValidate>
+                  <div className="input-group">
+                    <label htmlFor="reg-name">Player Full Name</label>
+                    <div className="input-wrapper">
+                      <i className="fa-solid fa-user input-icon"></i>
+                      <input
+                        type="text"
+                        id="reg-name"
+                        placeholder="e.g. John Doe"
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="input-group">
+                    <label htmlFor="reg-email">Gmail Address</label>
+                    <div className="input-wrapper">
+                      <i className="fa-solid fa-envelope input-icon"></i>
+                      <input
+                        type="email"
+                        id="reg-email"
+                        placeholder="player@gmail.com"
+                        value={newEmail}
+                        onChange={(e) => setNewEmail(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="input-group">
+                    <label htmlFor="reg-pass">Password (Optional)</label>
+                    <div className="input-wrapper">
+                      <i className="fa-solid fa-lock input-icon"></i>
+                      <input
+                        type="text"
+                        id="reg-pass"
+                        placeholder="Type password or leave blank to auto-generate..."
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="input-group" style={{ marginBottom: '1.5rem' }}>
+                    <label htmlFor="reg-ref">Referred By Code (Optional)</label>
+                    <div className="input-wrapper">
+                      <i className="fa-solid fa-gift input-icon"></i>
+                      <input
+                        type="text"
+                        id="reg-ref"
+                        placeholder="e.g. JKP55"
+                        value={newReferredBy}
+                        onChange={(e) => setNewReferredBy(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <button type="submit" className="submit-btn" style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold' }} disabled={isRegistering}>
+                    {isRegistering ? 'REGISTERING...' : 'REGISTER PLAYER ➔'}
+                  </button>
+                </form>
               )}
             </div>
           </div>

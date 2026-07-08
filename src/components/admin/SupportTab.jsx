@@ -69,12 +69,40 @@ export default function SupportTab({ adminUser }) {
     markAsRead();
   }, [activeChatEmail, activeChatMessages.length, mutateConversations]);
 
+  const [adminAttachment, setAdminAttachment] = useState('');
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Please upload an image file.');
+      return;
+    }
+
+    if (file.size > 4 * 1024 * 1024) {
+      alert('Image file size must be less than 4MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAdminAttachment(reader.result);
+    };
+    reader.onerror = () => {
+      alert('Failed to read image file.');
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSendAdminReply = async (e) => {
     e.preventDefault();
-    if (!adminReplyText.trim() || !activeChatEmail || !adminUser) return;
+    if ((!adminReplyText.trim() && !adminAttachment) || !activeChatEmail || !adminUser) return;
 
-    const replyMsg = adminReplyText;
+    const replyMsg = adminReplyText.trim();
     setAdminReplyText('');
+    const replyAttachment = adminAttachment;
+    setAdminAttachment('');
 
     // Optimistic Update
     const tempMessage = {
@@ -82,6 +110,7 @@ export default function SupportTab({ adminUser }) {
       userEmail: activeChatEmail,
       userName: 'Support Agent',
       message: replyMsg,
+      attachment: replyAttachment,
       senderType: 'admin',
       senderEmail: adminUser.email,
       timestamp: new Date().toISOString()
@@ -101,6 +130,7 @@ export default function SupportTab({ adminUser }) {
           userEmail: activeChatEmail,
           userName: 'Support Agent',
           message: replyMsg,
+          attachment: replyAttachment,
           senderType: 'admin',
           senderEmail: adminUser.email
         })
@@ -116,12 +146,20 @@ export default function SupportTab({ adminUser }) {
   };
 
   return (
-    <div className="admin-layout-split" style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '1.5rem', height: '600px', animation: 'fade-in 0.2s ease-out' }}>
+    <div className="admin-layout-split" style={{
+      display: 'grid',
+      gridTemplateColumns: '320px 1fr',
+      gap: '1rem',
+      height: 'calc(100vh - 7.5rem)',
+      minHeight: '520px',
+      maxHeight: '100%',
+      animation: 'fade-in 0.2s ease-out'
+    }}>
       
       {/* Active chats list */}
       <div className="admin-section-card" style={{ display: 'flex', flexDirection: 'column', padding: '1rem', overflow: 'hidden' }}>
         <div style={{ marginBottom: '0.75rem' }}>
-          <h4 style={{ fontSize: '0.85rem', textTransform: 'uppercase', color: 'var(--gold-primary)', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+          <h4 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--gold-primary)', fontWeight: 'bold', marginBottom: '0.5rem', letterSpacing: '0.5px' }}>
             <i className="fa-solid fa-comments"></i> Active Conversations
           </h4>
           <div className="input-wrapper search-wrapper" style={{ background: '#0b0d16', padding: '0.35rem 0.75rem' }}>
@@ -144,37 +182,45 @@ export default function SupportTab({ adminUser }) {
                 key={chat.email}
                 onClick={() => setActiveChatEmail(chat.email)}
                 style={{
-                  padding: '0.75rem 1rem',
-                  background: activeChatEmail === chat.email ? 'rgba(255,215,0,0.1)' : 'rgba(255,255,255,0.02)',
-                  border: activeChatEmail === chat.email ? '1px solid rgba(255,215,0,0.25)' : '1px solid rgba(255,255,255,0.05)',
-                  borderRadius: '8px',
+                  padding: '0.75rem',
+                  background: activeChatEmail === chat.email ? 'rgba(255,215,0,0.1)' : 'rgba(255,255,255,0.01)',
+                  border: activeChatEmail === chat.email ? '1px solid rgba(255,215,0,0.25)' : '1px solid rgba(255,255,255,0.03)',
+                  borderRadius: '12px',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
-                  position: 'relative'
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem'
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <strong style={{ fontSize: '0.8rem', color: '#fff', display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', flex: 1, marginRight: '0.5rem' }}>
-                    {chat.name || 'Player'}
-                  </strong>
-                  {chat.unread && (
-                    <span style={{
-                      background: '#ef4444',
-                      color: '#fff',
-                      fontSize: '0.55rem',
-                      padding: '0.1rem 0.35rem',
-                      borderRadius: '10px',
-                      fontWeight: 'bold',
-                      textTransform: 'uppercase',
-                      flexShrink: 0
-                    }}>
-                      New
-                    </span>
-                  )}
+                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: activeChatEmail === chat.email ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: activeChatEmail === chat.email ? 'var(--gold-primary)' : 'var(--text-muted)', fontSize: '0.9rem', flexShrink: 0 }}>
+                  <i className="fa-solid fa-circle-user"></i>
                 </div>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', marginTop: '0.15rem' }}>
-                  {chat.lastMessage}
-                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <strong style={{ fontSize: '0.775rem', color: '#fff', display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', flex: 1, marginRight: '0.5rem' }}>
+                      {chat.name || chat.email.split('@')[0]}
+                    </strong>
+                    {chat.unread && (
+                      <span style={{
+                        background: '#ef4444',
+                        color: '#fff',
+                        fontSize: '0.55rem',
+                        padding: '0.1rem 0.35rem',
+                        borderRadius: '10px',
+                        fontWeight: 'bold',
+                        textTransform: 'uppercase',
+                        flexShrink: 0
+                      }}>
+                        New
+                      </span>
+                    )}
+                  </div>
+                  <span style={{ fontSize: '0.675rem', color: 'var(--text-muted)', display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', marginTop: '0.15rem' }}>
+                    {chat.lastMessage}
+                  </span>
+                </div>
               </div>
             ))
           )}
@@ -185,15 +231,22 @@ export default function SupportTab({ adminUser }) {
       <div className="admin-section-card" style={{ display: 'flex', flexDirection: 'column', padding: '1rem', overflow: 'hidden', background: '#07090f' }}>
         {activeChatEmail ? (
           <>
-            <div style={{ paddingBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h4 style={{ fontSize: '0.9rem', color: '#fff', fontWeight: 'bold' }}>Chat: {activeChatEmail}</h4>
-                <span style={{ fontSize: '0.7rem', color: '#ffd700' }}>Active Live Support Session</span>
+            <div style={{ padding: '0.75rem 1rem', background: '#0b0d16', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '-1rem -1rem 0 -1rem', borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(255,215,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-primary)', border: '1px solid rgba(255,215,0,0.2)' }}>
+                  <i className="fa-solid fa-user" style={{ fontSize: '1.1rem' }}></i>
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '0.85rem', color: '#fff', fontWeight: 'bold', margin: 0 }}>{activeChatEmail}</h4>
+                  <span style={{ fontSize: '0.65rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }}></span> Active Live Chat Support
+                  </span>
+                </div>
               </div>
               <button
                 onClick={() => { setActiveChatEmail(null); }}
                 className="close-modal"
-                style={{ fontSize: '1rem', border: '1px solid rgba(255,255,255,0.1)', padding: '0.2rem 0.5rem', borderRadius: '4px' }}
+                style={{ fontSize: '0.75rem', border: '1px solid rgba(255,255,255,0.1)', padding: '0.35rem 0.75rem', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', color: '#fff', cursor: 'pointer', margin: 0 }}
               >
                 Close Chat
               </button>
@@ -245,27 +298,86 @@ export default function SupportTab({ adminUser }) {
               <div ref={chatEndRef} />
             </div>
 
-            <form onSubmit={handleSendAdminReply} style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.75rem' }}>
-              <input
-                type="text"
-                placeholder="Type reply to player..."
-                value={adminReplyText}
-                onChange={(e) => setAdminReplyText(e.target.value)}
-                style={{
-                  flex: 1,
-                  background: '#0c0e17',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '8px',
-                  padding: '0.65rem 1rem',
-                  color: '#fff',
-                  fontSize: '0.8rem',
-                  outline: 'none'
-                }}
-                required
-              />
-              <button type="submit" className="submit-btn" style={{ margin: 0, padding: '0.65rem 1.25rem', width: 'auto', background: 'linear-gradient(135deg, #ffd700 0%, #cca000 100%)', color: '#000', fontWeight: 'bold' }}>
-                Reply
-              </button>
+            <form onSubmit={handleSendAdminReply} style={{ display: 'flex', flexDirection: 'column', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.75rem', gap: '0.5rem' }}>
+              {/* Attachment Preview */}
+              {adminAttachment && (
+                <div style={{ alignSelf: 'flex-start' }}>
+                  <div style={{ position: 'relative', display: 'inline-block', background: 'rgba(255,255,255,0.05)', padding: '0.5rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                    <img src={adminAttachment} alt="preview" style={{ maxHeight: '60px', borderRadius: '4px', display: 'block' }} />
+                    <button
+                      type="button"
+                      onClick={() => setAdminAttachment('')}
+                      style={{
+                        position: 'absolute',
+                        top: '-6px',
+                        right: '-6px',
+                        background: '#ef4444',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '16px',
+                        height: '16px',
+                        fontSize: '10px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      &times;
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                {/* Paperclip Button */}
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: '#0c0e17',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '8px',
+                    padding: '0.65rem 0.85rem',
+                    color: 'var(--gold-primary)',
+                    cursor: 'pointer',
+                    fontSize: '1rem',
+                    transition: 'all 0.2s'
+                  }}
+                  title="Attach Image Proof"
+                >
+                  <i className="fa-solid fa-paperclip"></i>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+
+                <input
+                  type="text"
+                  placeholder="Type reply to player..."
+                  value={adminReplyText}
+                  onChange={(e) => setAdminReplyText(e.target.value)}
+                  style={{
+                    flex: 1,
+                    background: '#0c0e17',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '8px',
+                    padding: '0.65rem 1rem',
+                    color: '#fff',
+                    fontSize: '0.8rem',
+                    outline: 'none'
+                  }}
+                  required={!adminAttachment}
+                />
+                <button type="submit" className="submit-btn" style={{ margin: 0, padding: '0.65rem 1.25rem', width: 'auto', background: 'linear-gradient(135deg, #ffd700 0%, #cca000 100%)', color: '#000', fontWeight: 'bold' }}>
+                  Reply
+                </button>
+              </div>
             </form>
           </>
         ) : (

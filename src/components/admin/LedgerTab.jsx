@@ -43,6 +43,89 @@ export default function LedgerTab({
     mutate();
   };
 
+  // Processing Withdrawal Payout State
+  const [payoutModalOpen, setPayoutModalOpen] = useState(false);
+  const [selectedPayoutTx, setSelectedPayoutTx] = useState(null);
+  const [payoutType, setPayoutType] = useState('full'); // 'full' | 'partial'
+  const [payoutSentAmount, setPayoutSentAmount] = useState('');
+  const [payoutHoldAmount, setPayoutHoldAmount] = useState('');
+  const [payoutGateway, setPayoutGateway] = useState('');
+  const [payoutCustomNote, setPayoutCustomNote] = useState('');
+  const [isProcessingPayout, setIsProcessingPayout] = useState(false);
+
+  const handleOpenPayoutModal = (tx) => {
+    setSelectedPayoutTx(tx);
+    setPayoutType('full');
+    setPayoutSentAmount(tx.amount.toString());
+    setPayoutHoldAmount('0');
+    setPayoutGateway(tx.gateway || 'Chime');
+    setPayoutCustomNote(`Full payout processed to ${tx.gateway || 'Chime'}`);
+    setPayoutModalOpen(true);
+  };
+
+  const handleSentAmountChange = (val) => {
+    setPayoutSentAmount(val);
+    if (!tx) return; // fallback
+    const total = parseFloat(selectedPayoutTx?.amount || 0);
+    const sent = parseFloat(val || 0);
+    const hold = Math.max(0, total - sent);
+    setPayoutHoldAmount(hold.toString());
+
+    if (payoutType === 'partial') {
+      setPayoutCustomNote(`$${sent} sent to your ${payoutGateway} & $${hold} is on hold`);
+    }
+  };
+
+  const handlePayoutTypeChange = (type) => {
+    setPayoutType(type);
+    if (!selectedPayoutTx) return;
+    if (type === 'full') {
+      setPayoutSentAmount(selectedPayoutTx.amount.toString());
+      setPayoutHoldAmount('0');
+      setPayoutCustomNote(`Full payout processed to ${selectedPayoutTx.gateway || 'Chime'}`);
+    } else {
+      const half = (parseFloat(selectedPayoutTx.amount || 0) / 2).toString();
+      setPayoutSentAmount(half);
+      const hold = parseFloat(selectedPayoutTx.amount || 0) - parseFloat(half);
+      setPayoutHoldAmount(hold.toString());
+      setPayoutCustomNote(`$${half} sent to your ${selectedPayoutTx.gateway || 'Chime'} & $${hold} is on hold`);
+    }
+  };
+
+  const handleProcessPayoutSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedPayoutTx) return;
+
+    setIsProcessingPayout(true);
+    try {
+      const payload = {
+        id: selectedPayoutTx.id,
+        status: 'SUCCESS',
+        note: payoutCustomNote.trim() || `Payout processed to ${payoutGateway}`,
+        payoutSent: parseFloat(payoutSentAmount || 0),
+        payoutHold: parseFloat(payoutHoldAmount || 0)
+      };
+
+      const response = await fetch('/api/transactions', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (data.success) {
+        setPayoutModalOpen(false);
+        mutate();
+      } else {
+        alert(data.message || 'Failed to process payout.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error processing payout.');
+    } finally {
+      setIsProcessingPayout(false);
+    }
+  };
+
   const handleFail = async (txId) => {
     await onFailTransaction(txId);
     mutate();
@@ -279,7 +362,13 @@ export default function LedgerTab({
                           <div className="table-actions" style={{ justifyContent: 'flex-start', gap: '0.5rem' }}>
                             <button
                               disabled={processingIds[tx.id]}
-                              onClick={wrapAction(tx.id, () => handleApprove(tx.id))}
+                              onClick={() => {
+                                if (tx.type === 'WITHDRAW') {
+                                  handleOpenPayoutModal(tx);
+                                } else {
+                                  wrapAction(tx.id, () => handleApprove(tx.id))();
+                                }
+                              }}
                               className="action-row-btn btn-edit"
                               style={{ background: '#22c55e', color: '#fff', opacity: processingIds[tx.id] ? 0.5 : 1 }}
                               title="Approve Payment"
@@ -336,6 +425,133 @@ export default function LedgerTab({
             </div>
           )}
         </>
+      )}
+      {/* PROCESSING WITHDRAWAL PAYOUT MODAL */}
+      {payoutModalOpen && selectedPayoutTx && (
+        <div className="modal-backdrop-custom" onClick={() => setPayoutModalOpen(false)}>
+          <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '460px', width: '90%' }}>
+            <div className="modal-header">
+              <h3>
+                <i className="fa-solid fa-money-bill-transfer gold-text"></i> Process Payout
+              </h3>
+              <button type="button" className="close-modal" onClick={() => setPayoutModalOpen(false)}>
+                &times;
+              </button>
+            </div>
+            <div className="modal-body">
+              <div style={{ marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                <div>Player: <strong style={{ color: '#fff' }}>{selectedPayoutTx.userEmail}</strong></div>
+                <div style={{ marginTop: '0.25rem' }}>Platform: <strong>{selectedPayoutTx.gateway}</strong> • Tag: <strong>{selectedPayoutTx.code}</strong></div>
+                <div style={{ marginTop: '0.25rem', fontSize: '0.95rem' }}>Total Requested: <strong style={{ color: 'var(--gold-primary)' }}>${parseFloat(selectedPayoutTx.amount).toFixed(2)}</strong></div>
+              </div>
+
+              <form onSubmit={handleProcessPayoutSubmit} noValidate>
+                
+                {/* Payout Options */}
+                <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                  <label style={{
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    padding: '0.6rem',
+                    background: payoutType === 'full' ? 'rgba(255, 215, 0, 0.1)' : '#0c0e17',
+                    border: payoutType === 'full' ? '1px solid var(--gold-primary)' : '1px solid rgba(255,255,255,0.05)',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold',
+                    color: payoutType === 'full' ? 'var(--gold-primary)' : '#fff'
+                  }}>
+                    <input
+                      type="radio"
+                      name="payoutType"
+                      checked={payoutType === 'full'}
+                      onChange={() => handlePayoutTypeChange('full')}
+                      style={{ marginBottom: '0.25rem' }}
+                    />
+                    Full Payout
+                  </label>
+
+                  <label style={{
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    padding: '0.6rem',
+                    background: payoutType === 'partial' ? 'rgba(255, 215, 0, 0.1)' : '#0c0e17',
+                    border: payoutType === 'partial' ? '1px solid var(--gold-primary)' : '1px solid rgba(255,255,255,0.05)',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold',
+                    color: payoutType === 'partial' ? 'var(--gold-primary)' : '#fff'
+                  }}>
+                    <input
+                      type="radio"
+                      name="payoutType"
+                      checked={payoutType === 'partial'}
+                      onChange={() => handlePayoutTypeChange('partial')}
+                      style={{ marginBottom: '0.25rem' }}
+                    />
+                    Partial Payout
+                  </label>
+                </div>
+
+                {/* Sent Amount input */}
+                <div className="input-group">
+                  <label htmlFor="sent-amount">Amount Sent Now ($)</label>
+                  <div className="input-wrapper">
+                    <i className="fa-solid fa-circle-dollar-to-slot input-icon"></i>
+                    <input
+                      type="number"
+                      id="sent-amount"
+                      placeholder="e.g. 50"
+                      value={payoutSentAmount}
+                      onChange={(e) => handleSentAmountChange(e.target.value)}
+                      disabled={payoutType === 'full'}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Remaining Hold Amount */}
+                <div className="input-group">
+                  <label>Amount Put On Hold ($)</label>
+                  <div className="input-wrapper" style={{ opacity: 0.6 }}>
+                    <i className="fa-solid fa-lock input-icon"></i>
+                    <input
+                      type="text"
+                      value={payoutHoldAmount}
+                      readOnly
+                      disabled
+                    />
+                  </div>
+                </div>
+
+                {/* Auto Payout Custom Note description */}
+                <div className="input-group" style={{ marginBottom: '1.5rem' }}>
+                  <label htmlFor="payout-note">Payout Note (Shown to Player)</label>
+                  <div className="input-wrapper">
+                    <i className="fa-solid fa-note-sticky input-icon"></i>
+                    <input
+                      type="text"
+                      id="payout-note"
+                      placeholder="Custom payout description..."
+                      value={payoutCustomNote}
+                      onChange={(e) => setPayoutCustomNote(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <button type="submit" className="submit-btn" style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold' }} disabled={isProcessingPayout}>
+                  {isProcessingPayout ? 'PROCESSING PAYOUT...' : 'CONFIRM PAYOUT ➔'}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
       )}
     </section>
   );

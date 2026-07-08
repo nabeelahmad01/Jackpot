@@ -124,6 +124,43 @@ export default function AuthPortal({
   const [resendDisabled, setResendDisabled] = useState(true);
   const [activeOtpCode, setActiveOtpCode] = useState(null);
   const [pendingUserData, setPendingUserData] = useState(null);
+  const [newResetPassword, setNewResetPassword] = useState('');
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+
+  const handlePasswordResetSubmit = async (e) => {
+    e.preventDefault();
+    if (newResetPassword.length < 8) {
+      setErrors({ resetPassword: 'Password must be at least 8 characters long' });
+      return;
+    }
+    setErrors({ resetPassword: '' });
+    setIsResettingPassword(true);
+
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: pendingUserData.recoveryEmail,
+          newPassword: newResetPassword
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        showToast('Password reset successfully! Log in now.', 'success');
+        setNewResetPassword('');
+        setPendingUserData(null);
+        switchTab('login');
+      } else {
+        setErrors({ resetPassword: data.message || 'Failed to reset password.' });
+      }
+    } catch (err) {
+      console.error(err);
+      setErrors({ resetPassword: 'Network error resetting password.' });
+    } finally {
+      setIsResettingPassword(false);
+    }
+  };
 
   // References for OTP boxes chaining
   const otpRefs = [useRef(null), useRef(null), useRef(null), useRef(null), useRef(null), useRef(null)];
@@ -361,14 +398,11 @@ export default function AuthPortal({
     triggerLoading(2000, () => {
       if (code === activeOtpCode) {
         if (pendingUserData && pendingUserData.recoveryEmail) {
-          // Password Recovery Case
-          showToast(
-            `Verification successful! Password recovery: Your password is "${pendingUserData.password}".`,
-            'success',
-            12000
-          );
+          // Password Recovery Case - transition to password reset input tab!
+          const email = pendingUserData.recoveryEmail;
           resetOtpState();
-          switchTab('login');
+          setPendingUserData({ recoveryEmail: email });
+          setActiveTab('forgot_reset');
         } else if (pendingUserData) {
           // Account Registration Case
           fetch('/api/auth/register', {
@@ -417,6 +451,7 @@ export default function AuthPortal({
     setRegEmail('');
     setRegPassword('');
     setForgotEmail('');
+    setNewResetPassword('');
     setErrors({});
   };
 
@@ -686,6 +721,55 @@ export default function AuthPortal({
                   </button>
                   <button type="button" className="slanted-action-btn register-btn" onClick={() => switchTab('register')}>
                     <span className="btn-inner">REGISTER</span>
+                  </button>
+                </div>
+              </section>
+            )}
+
+            {/* ==========================================
+                 4) RESET PASSWORD FORM (FORGOT PASSWORD VERIFIED STATE)
+                 ========================================== */}
+            {activeTab === 'forgot_reset' && (
+              <section className="auth-panel active" aria-labelledby="reset-header">
+                <h3 className="panel-heading" id="reset-header">Set New Password</h3>
+                <p className="panel-description">
+                  Enter a new secure password for your account.
+                </p>
+
+                <form onSubmit={handlePasswordResetSubmit} noValidate>
+                  <div className="input-group">
+                    <label htmlFor="reset-pass">New Password</label>
+                    <div className="input-wrapper">
+                      <i className="fa-solid fa-lock input-icon"></i>
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        id="reset-pass"
+                        placeholder="Min 8 characters"
+                        value={newResetPassword}
+                        onChange={(e) => setNewResetPassword(e.target.value)}
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="toggle-password"
+                        onClick={() => setShowPassword(!showPassword)}
+                        aria-label="Toggle Password Visibility"
+                      >
+                        <i className={`fa-solid ${showPassword ? 'fa-eye' : 'fa-eye-slash'}`}></i>
+                      </button>
+                    </div>
+                    <span className="error-msg">{errors.resetPassword}</span>
+                  </div>
+
+                  <button type="submit" className="submit-btn slanted-green-btn" disabled={isResettingPassword}>
+                    <span className="btn-inner">{isResettingPassword ? 'RESETTING...' : 'UPDATE PASSWORD'}</span>
+                    <div className="btn-glow"></div>
+                  </button>
+                </form>
+
+                <div className="bottom-action-buttons single-btn">
+                  <button type="button" className="slanted-action-btn login-btn" onClick={() => switchTab('login')}>
+                    <span className="btn-inner">CANCEL</span>
                   </button>
                 </div>
               </section>

@@ -28,9 +28,11 @@ export default function Home() {
   // Fetch static data (games and gateways catalog) with SWR (cached, no automatic polling)
   const { data: gamesData } = useSWR('/api/games', fetcher);
   const { data: gatewaysData } = useSWR('/api/gateways', fetcher);
+  const { data: frontendSettingsData } = useSWR('/api/settings/frontend', fetcher);
 
   const games = gamesData?.games || [];
   const gateways = gatewaysData?.gateways || [];
+  const frontendSettings = frontendSettingsData?.settings || {};
 
   // Fetch user-specific queues (only when player is logged in) with SWR polling every 5s
   const emailQuery = session?.email ? encodeURIComponent(session.email) : null;
@@ -315,6 +317,7 @@ export default function Home() {
           onOpenSupport={() => setSupportOpen(true)}
           onRequestAccount={handleRequestAccount}
           onSubmitTransaction={handleSubmitTransaction}
+          frontendSettings={frontendSettings}
         />
       )}
 

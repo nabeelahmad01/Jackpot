@@ -14,6 +14,7 @@ const CoinsAllotmentTab = lazy(() => import('./admin/CoinsAllotmentTab'));
 const SupportTab = lazy(() => import('./admin/SupportTab'));
 const StaffTab = lazy(() => import('./admin/StaffTab'));
 const SettingsTab = lazy(() => import('./admin/SettingsTab'));
+const FrontendSettingsTab = lazy(() => import('./admin/FrontendSettingsTab'));
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -129,7 +130,11 @@ export default function AdminDashboard({
     
     return roles.some((role) => {
       if (role === 'admin') return true; // Super Admin has full access
-      if (role === 'operation_admin') return true; // Operational Manager has full access
+      
+      // Frontend Settings tab is strictly reserved for main boss (Super Admin)
+      if (tabName === 'frontend_settings') return false;
+
+      if (role === 'operation_admin') return !['staff', 'settings'].includes(tabName); // Operational Manager has access to all EXCEPT staff and settings
       if (role === 'financial_admin') return ['dashboard', 'ledger', 'requests'].includes(tabName);
       if (role === 'support_admin') return ['dashboard', 'support'].includes(tabName);
       if (role === 'coins_admin') return ['dashboard', 'games', 'users', 'requests', 'gateways', 'coins'].includes(tabName);
@@ -459,6 +464,31 @@ export default function AdminDashboard({
               <span>System Settings</span>
             </button>
           )}
+
+          {hasAccess('frontend_settings') && (
+            <button
+              onClick={() => { setActiveTab('frontend_settings'); setSidebarOpen(false); }}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                background: activeTab === 'frontend_settings' ? 'var(--gold-primary)' : 'none',
+                color: activeTab === 'frontend_settings' ? '#111' : '#fff',
+                fontSize: '0.8rem',
+                fontWeight: 'bold',
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <i className="fa-solid fa-palette" style={{ width: '18px' }}></i>
+              <span>Frontend CMS</span>
+            </button>
+          )}
         </nav>
 
         {/* Profile Card & Logout */}
@@ -493,7 +523,7 @@ export default function AdminDashboard({
             <PlayerAccountsTab adminUser={adminUser} onDeleteUser={onDeleteUser} />
           )}
           {activeTab === 'requests' && hasAccess('requests') && (
-            <RequestsTab onApproveRequest={onApproveRequest} completedActionIds={completedActionIds} processingIds={processingIds} wrapAction={wrapAction} />
+            <RequestsTab adminUser={adminUser} onApproveRequest={onApproveRequest} completedActionIds={completedActionIds} processingIds={processingIds} wrapAction={wrapAction} />
           )}
           {activeTab === 'ledger' && hasAccess('ledger') && (
             <LedgerTab
@@ -524,6 +554,9 @@ export default function AdminDashboard({
           )}
           {activeTab === 'settings' && hasAccess('settings') && (
             <SettingsTab onUpdateSettings={onUpdateSettings} />
+          )}
+          {activeTab === 'frontend_settings' && hasAccess('frontend_settings') && (
+            <FrontendSettingsTab adminUser={adminUser} />
           )}
         </Suspense>
       </main>

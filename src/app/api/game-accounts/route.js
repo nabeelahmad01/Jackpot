@@ -50,3 +50,40 @@ export async function POST(req) {
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
   }
 }
+
+// PUT update or create game credentials manually (Admin adjustment)
+export async function PUT(req) {
+  try {
+    const { gameTitle, userEmail, username, password } = await req.json();
+
+    if (!gameTitle || !userEmail || !username || !password) {
+      return NextResponse.json({ success: false, message: 'Missing credentials parameters.' }, { status: 400 });
+    }
+
+    const db = await getDb();
+    const gameAccountsCollection = db.collection('gameAccounts');
+
+    const cleanEmail = userEmail.toLowerCase().trim();
+
+    // Use updateOne with upsert to update if exists or insert if new
+    await gameAccountsCollection.updateOne(
+      { userEmail: cleanEmail, gameTitle },
+      {
+        $set: {
+          username: username.trim(),
+          password: password.trim(),
+          status: 'READY'
+        }
+      },
+      { upsert: true }
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: 'In-game credentials updated successfully!'
+    });
+  } catch (err) {
+    console.error('Update Game Account API Error:', err);
+    return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
+  }
+}

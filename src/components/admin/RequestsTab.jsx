@@ -3,11 +3,64 @@ import useSWR from 'swr';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
-export default function RequestsTab({ onApproveRequest, completedActionIds = {}, processingIds, wrapAction }) {
+export default function RequestsTab({ adminUser, onApproveRequest, completedActionIds = {}, processingIds, wrapAction }) {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
   const limit = 15;
+
+  // Manual Credentials Editing State
+  const [credentialsModalOpen, setCredentialsModalOpen] = useState(false);
+  const [targetEmail, setTargetEmail] = useState('');
+  const [targetGame, setTargetGame] = useState('');
+  const [manualUsername, setManualUsername] = useState('');
+  const [manualPassword, setManualPassword] = useState('');
+  const [isUpdatingCreds, setIsUpdatingCreds] = useState(false);
+
+  const cleanRoles = (adminUser?.role || '').toLowerCase().split(',').map(r => r.trim());
+  const canUpdateCredentials = cleanRoles.some(r => ['admin', 'operation_admin', 'coins_admin'].includes(r));
+
+  const handleOpenManualCredentials = (reqItem) => {
+    setTargetEmail(reqItem.userEmail);
+    setTargetGame(reqItem.gameTitle);
+    setManualUsername('');
+    setManualPassword('');
+    setCredentialsModalOpen(true);
+  };
+
+  const handleManualCredentialsSubmit = async (e) => {
+    e.preventDefault();
+    if (!manualUsername.trim() || !manualPassword.trim()) {
+      alert('Please fill in both username and password fields.');
+      return;
+    }
+    setIsUpdatingCreds(true);
+    try {
+      const response = await fetch('/api/game-accounts', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gameTitle: targetGame,
+          userEmail: targetEmail,
+          username: manualUsername,
+          password: manualPassword
+        })
+      });
+      const resData = await response.json();
+      if (resData.success) {
+        alert('Credentials successfully updated manually!');
+        setCredentialsModalOpen(false);
+        mutate();
+      } else {
+        alert(resData.message || 'Failed to update credentials.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error updating credentials.');
+    } finally {
+      setIsUpdatingCreds(false);
+    }
+  };
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -101,30 +154,51 @@ export default function RequestsTab({ onApproveRequest, completedActionIds = {},
                     </span>
                   </td>
                   <td>
-                    {req.status === 'PENDING' ? (
-                      <button
-                        disabled={processingIds[req.id]}
-                        onClick={wrapAction(req.id, () => handleApprove(req))}
-                        className="submit-btn"
-                        style={{
-                          background: '#22c55e',
-                          margin: 0,
-                          padding: '0.4rem 0.85rem',
-                          width: 'auto',
-                          display: 'inline-flex',
-                          gap: '0.4rem',
-                          alignItems: 'center',
-                          opacity: processingIds[req.id] ? 0.6 : 1
-                        }}
-                      >
-                        {processingIds[req.id] ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-user-check"></i>}
-                        <span style={{ fontSize: '0.7rem' }}>
-                          {processingIds[req.id] ? 'Approving...' : 'Approve Request'}
-                        </span>
-                      </button>
-                    ) : (
-                      <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>Credentials Issued</span>
-                    )}
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      {req.status === 'PENDING' && (
+                        <button
+                          disabled={processingIds[req.id]}
+                          onClick={wrapAction(req.id, () => handleApprove(req))}
+                          className="submit-btn"
+                          style={{
+                            margin: 0,
+                            padding: '0.4rem 0.85rem',
+                            width: 'auto',
+                            display: 'inline-flex',
+                            gap: '0.4rem',
+                            alignItems: 'center',
+                            opacity: processingIds[req.id] ? 0.6 : 1,
+                            background: '#22c55e'
+                          }}
+                        >
+                          {processingIds[req.id] ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-user-check"></i>}
+                          <span style={{ fontSize: '0.7rem' }}>
+                            {processingIds[req.id] ? 'Approving...' : 'Approve'}
+                          </span>
+                        </button>
+                      )}
+                      {canUpdateCredentials && (
+                        <button
+                          onClick={() => handleOpenManualCredentials(req)}
+                          className="action-row-btn"
+                          style={{
+                            background: 'rgba(255, 215, 0, 0.1)',
+                            border: '1px solid rgba(255, 215, 0, 0.3)',
+                            color: 'var(--gold-primary)',
+                            padding: '0.4rem 0.85rem',
+                            fontSize: '0.7rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            borderRadius: '6px',
+                            cursor: 'pointer'
+                          }}
+                          title="Update Username & Password Profile Manually"
+                        >
+                          <i className="fa-solid fa-key"></i> Manual Credentials
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -156,6 +230,67 @@ export default function RequestsTab({ onApproveRequest, completedActionIds = {},
             >
               Next &rarr;
             </button>
+          </div>
+        </div>
+      )}
+      {/* MANUAL CREDENTIALS UPDATE MODAL */}
+      {credentialsModalOpen && (
+        <div className="modal-backdrop-custom" onClick={() => setCredentialsModalOpen(false)}>
+          <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', width: '90%' }}>
+            <div className="modal-header">
+              <h3>
+                <i className="fa-solid fa-key gold-text"></i> Update Credentials Manually
+              </h3>
+              <button type="button" className="close-modal" onClick={() => setCredentialsModalOpen(false)}>
+                &times;
+              </button>
+            </div>
+            <div className="modal-body">
+              <div style={{ marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  User: <strong style={{ color: '#fff' }}>{targetEmail}</strong>
+                </p>
+                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Game: <strong style={{ color: 'var(--gold-primary)' }}>{targetGame}</strong>
+                </p>
+              </div>
+
+              <form onSubmit={handleManualCredentialsSubmit} noValidate>
+                <div className="input-group">
+                  <label htmlFor="cred-username">Username for {targetGame}</label>
+                  <div className="input-wrapper">
+                    <i className="fa-solid fa-user-tag input-icon"></i>
+                    <input
+                      type="text"
+                      id="cred-username"
+                      placeholder="Enter game username..."
+                      value={manualUsername}
+                      onChange={(e) => setManualUsername(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="input-group" style={{ marginBottom: '1.5rem' }}>
+                  <label htmlFor="cred-password">Password for {targetGame}</label>
+                  <div className="input-wrapper">
+                    <i className="fa-solid fa-lock input-icon"></i>
+                    <input
+                      type="text"
+                      id="cred-password"
+                      placeholder="Enter game password..."
+                      value={manualPassword}
+                      onChange={(e) => setManualPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <button type="submit" className="submit-btn" style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold' }} disabled={isUpdatingCreds}>
+                  {isUpdatingCreds ? 'UPDATING...' : 'SAVE CREDENTIALS'}
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       )}

@@ -20,6 +20,7 @@ export default function UserLobby({
   onOpenSupport,
   onRequestAccount,
   onSubmitTransaction,
+  frontendSettings = {}
 }) {
   // Navigation states
   const [activeGame, setActiveGame] = useState(null); // game object or null
@@ -427,10 +428,17 @@ export default function UserLobby({
       {/* Dynamic Header */}
       <header className="dashboard-header">
         <div className="lobby-brand" onClick={() => { setActiveGame(null); setActiveInvoice(null); setLobbySubView('main'); }} style={{ cursor: 'pointer' }}>
-          <div className="lobby-logo-box" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000', border: '1px solid rgba(255,215,0,0.4)', borderRadius: '50%', boxShadow: '0 0 15px rgba(255,215,0,0.25)' }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            borderRadius: '50%',
+            overflow: 'hidden',
+            border: '2px solid var(--gold-primary)',
+            background: '#000'
+          }}>
             <img
-              src="/jackpot_lion_mascot.png?v=2"
-              alt="Jackpot Lion Mascot"
+              src={frontendSettings?.logoUrl || "/jackpot_lion_mascot.png?v=2"}
+              alt="Logo"
               style={{
                 width: '100%',
                 height: '100%',
@@ -565,8 +573,8 @@ export default function UserLobby({
 
           <section className="lobby-hero">
             <div className="hero-promo-block">
-              <h2 className="hero-promo-headline">
-                GET <span className="highlight-yellow">300%</span> SIGNUP BONUS ON YOUR FIRST DEPOSIT
+              <h2 className="hero-promo-headline" style={{ textTransform: 'uppercase' }}>
+                {frontendSettings?.withdrawNotice || "GET 300% SIGNUP BONUS ON YOUR FIRST DEPOSIT"}
               </h2>
               <div className="hero-trust-badges">
                 <div className="trust-pill"><i className="fa-solid fa-shield-halved"></i> Instant Withdrawals</div>
@@ -1118,6 +1126,12 @@ export default function UserLobby({
                           </div>
                         </div>
 
+                        {frontendSettings?.cashoutNotice && (
+                          <div style={{ padding: '0.6rem 0.85rem', background: 'rgba(239,68,68,0.06)', borderRadius: '8px', fontSize: '0.65rem', color: '#f87171', borderLeft: '2px solid #ef4444', marginBottom: '0.75rem', lineHeight: '1.4' }}>
+                            {frontendSettings.cashoutNotice}
+                          </div>
+                        )}
+
                         <form onSubmit={handleWithdrawInitiate}>
                           <div className="input-group" style={{ marginBottom: '1rem' }}>
                             <div className="input-wrapper" style={{ background: '#0b0c16' }}>
@@ -1315,60 +1329,64 @@ export default function UserLobby({
                 <label style={{ marginBottom: '0.5rem', display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Choose Payment Method</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                   {/* Chime Option */}
-                  <label
-                    onClick={() => setWithdrawMethod('Chime')}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '0.85rem 1rem',
-                      background: withdrawMethod === 'Chime' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.01)',
-                      border: withdrawMethod === 'Chime' ? '1.5px solid var(--gold-primary)' : '1.5px solid rgba(255,255,255,0.05)',
-                      borderRadius: '12px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <div>
-                      <strong style={{ display: 'block', fontSize: '0.85rem', color: '#fff' }}>Chime</strong>
-                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Withdraw to your Chime tag</span>
-                    </div>
-                    <input
-                      type="radio"
-                      name="withdrawMethod"
-                      checked={withdrawMethod === 'Chime'}
-                      onChange={() => setWithdrawMethod('Chime')}
-                      style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--gold-primary)' }}
-                    />
-                  </label>
+                  {frontendSettings?.chimeActive !== false && (
+                    <label
+                      onClick={() => setWithdrawMethod('Chime')}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '0.85rem 1rem',
+                        background: withdrawMethod === 'Chime' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.01)',
+                        border: withdrawMethod === 'Chime' ? '1.5px solid var(--gold-primary)' : '1.5px solid rgba(255,255,255,0.05)',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <div>
+                        <strong style={{ display: 'block', fontSize: '0.85rem', color: '#fff' }}>Chime</strong>
+                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Withdraw to your Chime tag</span>
+                      </div>
+                      <input
+                        type="radio"
+                        name="withdrawMethod"
+                        checked={withdrawMethod === 'Chime'}
+                        onChange={() => setWithdrawMethod('Chime')}
+                        style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--gold-primary)' }}
+                      />
+                    </label>
+                  )}
 
                   {/* Cash App Option */}
-                  <label
-                    onClick={() => setWithdrawMethod('Cash App')}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '0.85rem 1rem',
-                      background: withdrawMethod === 'Cash App' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.01)',
-                      border: withdrawMethod === 'Cash App' ? '1.5px solid var(--gold-primary)' : '1.5px solid rgba(255,255,255,0.05)',
-                      borderRadius: '12px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <div>
-                      <strong style={{ display: 'block', fontSize: '0.85rem', color: '#fff' }}>Cash App</strong>
-                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Withdraw to your Cash App tag</span>
-                    </div>
-                    <input
-                      type="radio"
-                      name="withdrawMethod"
-                      checked={withdrawMethod === 'Cash App'}
-                      onChange={() => setWithdrawMethod('Cash App')}
-                      style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--gold-primary)' }}
-                    />
-                  </label>
+                  {frontendSettings?.cashappActive !== false && (
+                    <label
+                      onClick={() => setWithdrawMethod('Cash App')}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '0.85rem 1rem',
+                        background: withdrawMethod === 'Cash App' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.01)',
+                        border: withdrawMethod === 'Cash App' ? '1.5px solid var(--gold-primary)' : '1.5px solid rgba(255,255,255,0.05)',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <div>
+                        <strong style={{ display: 'block', fontSize: '0.85rem', color: '#fff' }}>Cash App</strong>
+                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Withdraw to your Cash App tag</span>
+                      </div>
+                      <input
+                        type="radio"
+                        name="withdrawMethod"
+                        checked={withdrawMethod === 'Cash App'}
+                        onChange={() => setWithdrawMethod('Cash App')}
+                        style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--gold-primary)' }}
+                      />
+                    </label>
+                  )}
                 </div>
               </div>
 

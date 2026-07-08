@@ -32,8 +32,7 @@ export async function GET(req) {
     return NextResponse.json({
       success: true,
       exists: true,
-      name: user.name,
-      password: user.password
+      name: user.name
     });
   } catch (err) {
     console.error('Email Check API Error:', err);
@@ -106,6 +105,48 @@ export async function POST(req) {
     console.error('Registration API Error:', err);
     return NextResponse.json(
       { success: false, message: 'Server error during registration: ' + err.message },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT updates user's password (Forgot Password reset case)
+export async function PUT(req) {
+  try {
+    const { email, newPassword } = await req.json();
+
+    if (!email || !newPassword) {
+      return NextResponse.json(
+        { success: false, message: 'Email and new password are required.' },
+        { status: 400 }
+      );
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    const db = await getDb();
+    const usersCollection = db.collection('users');
+
+    const user = await usersCollection.findOne({ email: cleanEmail });
+    if (!user) {
+      return NextResponse.json(
+        { success: false, message: 'Account not found.' },
+        { status: 404 }
+      );
+    }
+
+    await usersCollection.updateOne(
+      { email: cleanEmail },
+      { $set: { password: newPassword.trim() } }
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: 'Password successfully updated!'
+    });
+  } catch (err) {
+    console.error('Password Reset API Error:', err);
+    return NextResponse.json(
+      { success: false, message: 'Server error during password reset: ' + err.message },
       { status: 500 }
     );
   }
