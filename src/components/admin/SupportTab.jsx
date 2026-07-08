@@ -153,6 +153,7 @@ export default function SupportTab({ adminUser }) {
       height: '100%',
       minHeight: '520px',
       maxHeight: '100%',
+      alignItems: 'stretch',
       animation: 'fade-in 0.2s ease-out'
     }}>
       
