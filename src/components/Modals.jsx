@@ -517,9 +517,10 @@ export function ApproveAccountModal({ isOpen, onClose, onApprove, requestDetails
   const [passError, setPassError] = useState('');
 
   useEffect(() => {
-    if (isOpen && requestDetails) {
+    if (isOpen && requestDetails && requestDetails.userEmail) {
       const randomSuf = Math.floor(100 + Math.random() * 900);
-      const cleanEmail = requestDetails.userEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+      const emailStr = requestDetails.userEmail || '';
+      const cleanEmail = (emailStr.split('@')[0] || '').toLowerCase().replace(/[^a-z0-9]/g, '');
       setUsername(`${cleanEmail}${randomSuf}`);
       
       const charSet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -555,9 +556,9 @@ export function ApproveAccountModal({ isOpen, onClose, onApprove, requestDetails
       setIsSubmitting(true);
       try {
         await onApprove({
-          requestId: requestDetails.id,
-          userEmail: requestDetails.userEmail,
-          gameTitle: requestDetails.gameTitle,
+          requestId: requestDetails?.id || '',
+          userEmail: requestDetails?.userEmail || '',
+          gameTitle: requestDetails?.gameTitle || '',
           username: username.trim(),
           password: password.trim()
         });
@@ -580,7 +581,7 @@ export function ApproveAccountModal({ isOpen, onClose, onApprove, requestDetails
         </div>
         <div className="modal-body">
           <p style={{ fontSize: '0.775rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
-            Allocating a new gaming account for player <strong>{requestDetails.userEmail}</strong> on game <strong>{requestDetails.gameTitle}</strong>.
+            Allocating a new gaming account for player <strong>{requestDetails?.userEmail || 'Unknown'}</strong> on game <strong>{requestDetails?.gameTitle || 'Unknown'}</strong>.
           </p>
 
           <form onSubmit={handleSubmit} noValidate>
