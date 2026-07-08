@@ -177,7 +177,7 @@ export default function PlayerAccountsTab({ adminUser, onDeleteUser }) {
   return (
     <section className="admin-section-card" style={{ animation: 'fade-in 0.2s ease-out' }}>
       <div className="section-card-header" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '0.5rem' }}>
           <h3><i className="fa-solid fa-users text-red"></i> Player Accounts ({totalUsers} Registered)</h3>
           {isManagerOrAdmin && (
             <button
