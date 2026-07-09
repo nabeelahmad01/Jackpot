@@ -133,7 +133,7 @@ export default function AdminDashboard({
     return roles.some((role) => {
       if (role === 'admin') return true; // Super Admin has full access
       
-      if (tabName === 'shift_dashboard') return true;
+      if (tabName === 'shift_dashboard') return role === 'operation_admin';
       // Frontend Settings tab is strictly reserved for main boss (Super Admin)
       if (tabName === 'frontend_settings') return false;
       if (tabName === 'shift_reports') return role === 'operation_admin';
