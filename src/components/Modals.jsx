@@ -10,12 +10,37 @@ export function SupportModal({ isOpen, onClose, currentUser }) {
   const fileInputRef = useRef(null);
   const chatEndRef = useRef(null);
 
+  // Get active email & name for chat (either logged-in user or guest)
+  const getChatIdentity = () => {
+    if (currentUser) {
+      return { email: currentUser.email, name: currentUser.name || currentUser.email.split('@')[0], isGuest: false };
+    }
+    
+    // Check localStorage for guest
+    if (typeof window !== 'undefined') {
+      let email = localStorage.getItem('jackpot_guest_email');
+      let name = localStorage.getItem('jackpot_guest_name');
+      if (!email) {
+        const randId = Math.floor(100000 + Math.random() * 900000);
+        email = `guest_${randId}@jackpotguest.com`;
+        name = `Guest #${randId}`;
+        localStorage.setItem('jackpot_guest_email', email);
+        localStorage.setItem('jackpot_guest_name', name);
+      }
+      return { email, name, isGuest: true };
+    }
+    
+    return { email: 'guest@jackpotguest.com', name: 'Guest', isGuest: true };
+  };
+
   useEffect(() => {
-    if (!isOpen || !currentUser) return;
+    if (!isOpen) return;
+
+    const identity = getChatIdentity();
 
     const fetchMessages = async () => {
       try {
-        const res = await fetch(`/api/support?email=${encodeURIComponent(currentUser.email)}`);
+        const res = await fetch(`/api/support?email=${encodeURIComponent(identity.email)}`);
         const data = await res.json();
         if (data.success) {
           setMessages(data.messages);
@@ -29,7 +54,7 @@ export function SupportModal({ isOpen, onClose, currentUser }) {
     const interval = setInterval(fetchMessages, 3000); // Poll replies every 3 seconds
 
     return () => clearInterval(interval);
-  }, [isOpen, currentUser]);
+  }, [isOpen]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -37,11 +62,9 @@ export function SupportModal({ isOpen, onClose, currentUser }) {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!currentUser) return;
     if (!input.trim() && !attachment) return;
 
-    const userEmail = currentUser.email;
-    const userName = currentUser.name;
+    const { email: userEmail, name: userName } = getChatIdentity();
     const msgText = input;
     const currentAttachment = attachment;
 
