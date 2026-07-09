@@ -179,7 +179,7 @@ export default function CoinsAllotmentTab({
                             <span style={{ fontSize: '0.65rem' }}>DONE</span>
                           </button>
                           
-                          {noti.totalCoins > 0 && (noti.status === 'PENDING' || noti.status === 'CLAIM_REQUESTED') && (
+                          {(noti.status === 'PENDING' || noti.status === 'CLAIM_REQUESTED') && (
                             <button
                               onClick={() => {
                                 setActiveHoldId(noti.id);

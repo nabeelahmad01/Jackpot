@@ -523,10 +523,10 @@ export default function UserLobby({
                     </div>
                     <div>
                       <h4 style={{ fontSize: '0.9rem', color: '#fff', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
-                        Allotment Status: <span style={{ color: noti.status === 'HOLD' ? '#f59e0b' : '#38bdf8' }}>{noti.status === 'HOLD' ? 'ON HOLD' : 'CLAIM REQUESTED'}</span>
+                        {noti.totalCoins < 0 ? 'Withdrawal Status: ' : 'Allotment Status: '}<span style={{ color: noti.status === 'HOLD' ? '#f59e0b' : '#38bdf8' }}>{noti.status === 'HOLD' ? 'ON HOLD' : 'CLAIM REQUESTED'}</span>
                       </h4>
                       <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)', margin: '0.25rem 0' }}>
-                        Coins to credit: <strong style={{ color: 'var(--gold-primary)' }}>{noti.totalCoins} Coins</strong> for <strong>{noti.gameTitle}</strong>
+                        {noti.totalCoins < 0 ? 'Coins to deduct: ' : 'Coins to credit: '}<strong style={{ color: noti.totalCoins < 0 ? '#ff4d6d' : 'var(--gold-primary)' }}>{Math.abs(noti.totalCoins)} Coins</strong> for <strong>{noti.gameTitle}</strong>
                       </p>
                       {noti.holdNote && (
                         <div style={{ padding: '0.5rem 0.75rem', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', borderLeft: '3px solid #f59e0b', fontSize: '0.7rem', color: '#e2e8f0', marginTop: '0.5rem', fontStyle: 'italic', maxWidth: '500px' }}>
@@ -1178,7 +1178,7 @@ export default function UserLobby({
                               <i className="fa-solid fa-circle-exclamation" style={{ fontSize: '1.35rem', flexShrink: 0 }}></i>
                               <div>
                                 <span style={{ display: 'block', fontWeight: 'bold', color: '#fff', marginBottom: '0.15rem' }}>
-                                  Allotment for {noti.gameTitle} is ON HOLD!
+                                  {noti.totalCoins < 0 ? 'Withdrawal' : 'Allotment'} for {noti.gameTitle} is ON HOLD!
                                 </span>
                                 <span>
                                   Reason: <strong style={{ color: '#fca5a5' }}>{noti.holdNote || 'Declined / Hold by Manager'}</strong>. Please check details or contact customer chat support.

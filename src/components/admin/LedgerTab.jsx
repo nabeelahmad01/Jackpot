@@ -89,11 +89,24 @@ export default function LedgerTab({
 
   const handleSentAmountChange = (val) => {
     setPayoutSentAmount(val);
-    if (!tx) return; // fallback
-    const total = parseFloat(selectedPayoutTx?.amount || 0);
+    if (!selectedPayoutTx) return;
+    const total = parseFloat(selectedPayoutTx.amount || 0);
     const sent = parseFloat(val || 0);
     const hold = Math.max(0, total - sent);
     setPayoutHoldAmount(hold.toString());
+
+    if (payoutType === 'partial') {
+      setPayoutCustomNote(`$${sent} sent to your ${payoutGateway} & $${hold} is on hold`);
+    }
+  };
+
+  const handleHoldAmountChange = (val) => {
+    setPayoutHoldAmount(val);
+    if (!selectedPayoutTx) return;
+    const total = parseFloat(selectedPayoutTx.amount || 0);
+    const hold = parseFloat(val || 0);
+    const sent = Math.max(0, total - hold);
+    setPayoutSentAmount(sent.toString());
 
     if (payoutType === 'partial') {
       setPayoutCustomNote(`$${sent} sent to your ${payoutGateway} & $${hold} is on hold`);
@@ -756,14 +769,17 @@ export default function LedgerTab({
 
                 {/* Remaining Hold Amount */}
                 <div className="input-group">
-                  <label>Amount Put On Hold ($)</label>
-                  <div className="input-wrapper" style={{ opacity: 0.6 }}>
+                  <label htmlFor="hold-amount">Amount Put On Hold ($)</label>
+                  <div className="input-wrapper" style={payoutType === 'full' ? { opacity: 0.6 } : {}}>
                     <i className="fa-solid fa-lock input-icon"></i>
                     <input
-                      type="text"
+                      type="number"
+                      id="hold-amount"
+                      placeholder="e.g. 30"
                       value={payoutHoldAmount}
-                      readOnly
-                      disabled
+                      onChange={(e) => handleHoldAmountChange(e.target.value)}
+                      disabled={payoutType === 'full'}
+                      required
                     />
                   </div>
                 </div>
