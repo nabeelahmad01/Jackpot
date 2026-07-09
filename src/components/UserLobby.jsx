@@ -623,12 +623,12 @@ export default function UserLobby({
           <section className="lobby-hero">
             <div className="hero-promo-block">
               <h2 className="hero-promo-headline" style={{ textTransform: 'uppercase' }}>
-                {frontendSettings?.withdrawNotice || "GET 300% SIGNUP BONUS ON YOUR FIRST DEPOSIT"}
+                {frontendSettings?.lobbyHeroPromo || "GET 300% SIGNUP BONUS ON YOUR FIRST DEPOSIT"}
               </h2>
               <div className="hero-trust-badges">
-                <div className="trust-pill"><i className="fa-solid fa-shield-halved"></i> Instant Withdrawals</div>
-                <div className="trust-pill"><i className="fa-solid fa-lock"></i> Secure & Safe</div>
-                <div className="trust-pill"><i className="fa-solid fa-trophy"></i> Trusted by 1B+ Players</div>
+                <div className="trust-pill"><i className="fa-solid fa-shield-halved"></i> {frontendSettings?.lobbyTrustBadge1 || "Instant Withdrawals"}</div>
+                <div className="trust-pill"><i className="fa-solid fa-lock"></i> {frontendSettings?.lobbyTrustBadge2 || "Secure & Safe"}</div>
+                <div className="trust-pill"><i className="fa-solid fa-trophy"></i> {frontendSettings?.lobbyTrustBadge3 || "Trusted by 1B+ Players"}</div>
               </div>
             </div>
 
@@ -662,22 +662,22 @@ export default function UserLobby({
                     />
                   </div>
                 </div>
-                <h3 className="freeplay-value">$3</h3>
-                <h4 className="freeplay-label">FREEPLAY</h4>
-                <p className="freeplay-condition">ON SIGNUP!</p>
+                <h3 className="freeplay-value">{frontendSettings?.lobbyFreeplayValue || "$3"}</h3>
+                <h4 className="freeplay-label">{frontendSettings?.lobbyFreeplayLabel || "FREEPLAY"}</h4>
+                <p className="freeplay-condition">{frontendSettings?.lobbyFreeplayCondition || "ON SIGNUP!"}</p>
 
                 <div className="freeplay-bullets">
                   <div className="bullet-item">
                     <i className="fa-solid fa-circle-play text-green"></i>
-                    <div className="bullet-desc"><strong>PLAY</strong><span>Explore exciting games</span></div>
+                    <div className="bullet-desc"><strong>{frontendSettings?.lobbyBullet1Title || "PLAY"}</strong><span>{frontendSettings?.lobbyBullet1Desc || "Explore exciting games"}</span></div>
                   </div>
                   <div className="bullet-item">
                     <i className="fa-solid fa-circle-check text-blue"></i>
-                    <div className="bullet-desc"><strong>WIN</strong><span>Win real rewards</span></div>
+                    <div className="bullet-desc"><strong>{frontendSettings?.lobbyBullet2Title || "WIN"}</strong><span>{frontendSettings?.lobbyBullet2Desc || "Win real rewards"}</span></div>
                   </div>
                   <div className="bullet-item">
                     <i className="fa-solid fa-circle-dollar-to-slot text-magenta"></i>
-                    <div className="bullet-desc"><strong>CASH OUT</strong><span>Fast withdrawals</span></div>
+                    <div className="bullet-desc"><strong>{frontendSettings?.lobbyBullet3Title || "CASH OUT"}</strong><span>{frontendSettings?.lobbyBullet3Desc || "Fast withdrawals"}</span></div>
                   </div>
                 </div>
                 <button
@@ -697,7 +697,7 @@ export default function UserLobby({
                     cursor: 'pointer'
                   }}
                 >
-                  <i className="fa-solid fa-gift" style={{ marginRight: '6px' }}></i> CLAIM FREEPLAY NOW
+                  <i className="fa-solid fa-gift" style={{ marginRight: '6px' }}></i> {frontendSettings?.lobbyFreeplayClaimBtn || "CLAIM FREEPLAY NOW"}
                 </button>
               </div>
             </div>

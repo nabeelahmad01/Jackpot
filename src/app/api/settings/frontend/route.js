@@ -24,6 +24,22 @@ const DEFAULT_SETTINGS = {
   landingOrCreate: 'or create account with email',
   landingMessengerWarning: 'Google sign-in is not supported inside Messenger. Please open this page in Chrome or Safari.',
   
+  // Lobby Homepage Hero & Freeplay Texts
+  lobbyHeroPromo: 'GET 300% SIGNUP BONUS ON YOUR FIRST DEPOSIT',
+  lobbyTrustBadge1: 'Instant Withdrawals',
+  lobbyTrustBadge2: 'Secure & Safe',
+  lobbyTrustBadge3: 'Trusted by 1B+ Players',
+  lobbyFreeplayValue: '$3',
+  lobbyFreeplayLabel: 'FREEPLAY',
+  lobbyFreeplayCondition: 'ON SIGNUP!',
+  lobbyBullet1Title: 'PLAY',
+  lobbyBullet1Desc: 'Explore exciting games',
+  lobbyBullet2Title: 'WIN',
+  lobbyBullet2Desc: 'Win real rewards',
+  lobbyBullet3Title: 'CASH OUT',
+  lobbyBullet3Desc: 'Fast withdrawals',
+  lobbyFreeplayClaimBtn: 'CLAIM FREEPLAY NOW',
+  
   // Marquee Cards
   marqueePayouts: [
     { name: 'Elizabeth Audrey', amount: '$208.00', time: '1 hour ago', color: 'av-purple', init: 'EA' },

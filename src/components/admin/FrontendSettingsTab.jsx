@@ -22,13 +22,29 @@ export default function FrontendSettingsTab({ adminUser }) {
   const [minimumDepositLimit, setMinimumDepositLimit] = useState(5);
   const [minimumWithdrawalLimit, setMinimumWithdrawalLimit] = useState(5);
 
-  // New Landing Copy line settings
+  // Landing Page Texts
   const [landingWelcome, setLandingWelcome] = useState('');
   const [landingGrab, setLandingGrab] = useState('');
   const [landingQuickSignup, setLandingQuickSignup] = useState('');
   const [landingSignupWithGoogle, setLandingSignupWithGoogle] = useState('');
   const [landingOrCreate, setLandingOrCreate] = useState('');
   const [landingMessengerWarning, setLandingMessengerWarning] = useState('');
+
+  // Lobby Home Page Texts
+  const [lobbyHeroPromo, setLobbyHeroPromo] = useState('');
+  const [lobbyTrustBadge1, setLobbyTrustBadge1] = useState('');
+  const [lobbyTrustBadge2, setLobbyTrustBadge2] = useState('');
+  const [lobbyTrustBadge3, setLobbyTrustBadge3] = useState('');
+  const [lobbyFreeplayValue, setLobbyFreeplayValue] = useState('');
+  const [lobbyFreeplayLabel, setLobbyFreeplayLabel] = useState('');
+  const [lobbyFreeplayCondition, setLobbyFreeplayCondition] = useState('');
+  const [lobbyBullet1Title, setLobbyBullet1Title] = useState('');
+  const [lobbyBullet1Desc, setLobbyBullet1Desc] = useState('');
+  const [lobbyBullet2Title, setLobbyBullet2Title] = useState('');
+  const [lobbyBullet2Desc, setLobbyBullet2Desc] = useState('');
+  const [lobbyBullet3Title, setLobbyBullet3Title] = useState('');
+  const [lobbyBullet3Desc, setLobbyBullet3Desc] = useState('');
+  const [lobbyFreeplayClaimBtn, setLobbyFreeplayClaimBtn] = useState('');
 
   // Marquee Cards
   const [marqueePayouts, setMarqueePayouts] = useState([]);
@@ -63,6 +79,21 @@ export default function FrontendSettingsTab({ adminUser }) {
       setLandingSignupWithGoogle(s.landingSignupWithGoogle || 'Sign up with Google');
       setLandingOrCreate(s.landingOrCreate || 'or create account with email');
       setLandingMessengerWarning(s.landingMessengerWarning || 'Google sign-in is not supported inside Messenger. Please open this page in Chrome or Safari.');
+
+      setLobbyHeroPromo(s.lobbyHeroPromo || 'GET 300% SIGNUP BONUS ON YOUR FIRST DEPOSIT');
+      setLobbyTrustBadge1(s.lobbyTrustBadge1 || 'Instant Withdrawals');
+      setLobbyTrustBadge2(s.lobbyTrustBadge2 || 'Secure & Safe');
+      setLobbyTrustBadge3(s.lobbyTrustBadge3 || 'Trusted by 1B+ Players');
+      setLobbyFreeplayValue(s.lobbyFreeplayValue || '$3');
+      setLobbyFreeplayLabel(s.lobbyFreeplayLabel || 'FREEPLAY');
+      setLobbyFreeplayCondition(s.lobbyFreeplayCondition || 'ON SIGNUP!');
+      setLobbyBullet1Title(s.lobbyBullet1Title || 'PLAY');
+      setLobbyBullet1Desc(s.lobbyBullet1Desc || 'Explore exciting games');
+      setLobbyBullet2Title(s.lobbyBullet2Title || 'WIN');
+      setLobbyBullet2Desc(s.lobbyBullet2Desc || 'Win real rewards');
+      setLobbyBullet3Title(s.lobbyBullet3Title || 'CASH OUT');
+      setLobbyBullet3Desc(s.lobbyBullet3Desc || 'Fast withdrawals');
+      setLobbyFreeplayClaimBtn(s.lobbyFreeplayClaimBtn || 'CLAIM FREEPLAY NOW');
 
       setMarqueePayouts(s.marqueePayouts || []);
       setCashoutRules(s.cashoutRules || []);
@@ -122,6 +153,22 @@ export default function FrontendSettingsTab({ adminUser }) {
           landingSignupWithGoogle,
           landingOrCreate,
           landingMessengerWarning,
+
+          lobbyHeroPromo,
+          lobbyTrustBadge1,
+          lobbyTrustBadge2,
+          lobbyTrustBadge3,
+          lobbyFreeplayValue,
+          lobbyFreeplayLabel,
+          lobbyFreeplayCondition,
+          lobbyBullet1Title,
+          lobbyBullet1Desc,
+          lobbyBullet2Title,
+          lobbyBullet2Desc,
+          lobbyBullet3Title,
+          lobbyBullet3Desc,
+          lobbyFreeplayClaimBtn,
+
           marqueePayouts,
           cashoutRules
         })
@@ -170,10 +217,117 @@ export default function FrontendSettingsTab({ adminUser }) {
             </div>
           )}
 
+          {/* Lobby Homepage copy texts section */}
+          <div style={{ background: '#0b0d16', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1.5rem' }}>
+            <h4 style={{ fontSize: '0.8rem', color: '#fff', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
+              Lobby Home Screen Copy Lines
+            </h4>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div className="input-group" style={{ margin: 0 }}>
+                <label>Lobby Hero Banner Promotion Title</label>
+                <div className="input-wrapper" style={{ background: '#07090f' }}>
+                  <i className="fa-solid fa-gift input-icon"></i>
+                  <input type="text" value={lobbyHeroPromo} onChange={(e) => setLobbyHeroPromo(e.target.value)} required />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
+                <div className="input-group" style={{ flex: 1, margin: 0 }}>
+                  <label>Lobby Trust Badge 1</label>
+                  <div className="input-wrapper" style={{ background: '#07090f' }}>
+                    <i className="fa-solid fa-shield-halved input-icon"></i>
+                    <input type="text" value={lobbyTrustBadge1} onChange={(e) => setLobbyTrustBadge1(e.target.value)} required />
+                  </div>
+                </div>
+                <div className="input-group" style={{ flex: 1, margin: 0 }}>
+                  <label>Lobby Trust Badge 2</label>
+                  <div className="input-wrapper" style={{ background: '#07090f' }}>
+                    <i className="fa-solid fa-lock input-icon"></i>
+                    <input type="text" value={lobbyTrustBadge2} onChange={(e) => setLobbyTrustBadge2(e.target.value)} required />
+                  </div>
+                </div>
+                <div className="input-group" style={{ flex: 1, margin: 0 }}>
+                  <label>Lobby Trust Badge 3</label>
+                  <div className="input-wrapper" style={{ background: '#07090f' }}>
+                    <i className="fa-solid fa-trophy input-icon"></i>
+                    <input type="text" value={lobbyTrustBadge3} onChange={(e) => setLobbyTrustBadge3(e.target.value)} required />
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
+                <div className="input-group" style={{ flex: 1, margin: 0 }}>
+                  <label>Freeplay Card Value Text</label>
+                  <div className="input-wrapper" style={{ background: '#07090f' }}>
+                    <i className="fa-solid fa-dollar-sign input-icon"></i>
+                    <input type="text" value={lobbyFreeplayValue} onChange={(e) => setLobbyFreeplayValue(e.target.value)} required />
+                  </div>
+                </div>
+                <div className="input-group" style={{ flex: 1, margin: 0 }}>
+                  <label>Freeplay Card Title Label</label>
+                  <div className="input-wrapper" style={{ background: '#07090f' }}>
+                    <i className="fa-solid fa-tag input-icon"></i>
+                    <input type="text" value={lobbyFreeplayLabel} onChange={(e) => setLobbyFreeplayLabel(e.target.value)} required />
+                  </div>
+                </div>
+                <div className="input-group" style={{ flex: 1, margin: 0 }}>
+                  <label>Freeplay Card Condition Label</label>
+                  <div className="input-wrapper" style={{ background: '#07090f' }}>
+                    <i className="fa-solid fa-circle-question input-icon"></i>
+                    <input type="text" value={lobbyFreeplayCondition} onChange={(e) => setLobbyFreeplayCondition(e.target.value)} required />
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px' }}>
+                <span style={{ fontSize: '0.725rem', color: 'var(--gold-primary)', fontWeight: 'bold' }}>Freeplay Card Step Bullets</span>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div className="input-group" style={{ flex: 1, margin: 0 }}>
+                    <label>Bullet 1 Title</label>
+                    <input type="text" style={{ background: '#07090f', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.4rem', borderRadius: '6px', fontSize: '0.75rem' }} value={lobbyBullet1Title} onChange={(e) => setLobbyBullet1Title(e.target.value)} required />
+                  </div>
+                  <div className="input-group" style={{ flex: 2, margin: 0 }}>
+                    <label>Bullet 1 Description</label>
+                    <input type="text" style={{ background: '#07090f', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.4rem', borderRadius: '6px', fontSize: '0.75rem', width: '100%' }} value={lobbyBullet1Desc} onChange={(e) => setLobbyBullet1Desc(e.target.value)} required />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div className="input-group" style={{ flex: 1, margin: 0 }}>
+                    <label>Bullet 2 Title</label>
+                    <input type="text" style={{ background: '#07090f', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.4rem', borderRadius: '6px', fontSize: '0.75rem' }} value={lobbyBullet2Title} onChange={(e) => setLobbyBullet2Title(e.target.value)} required />
+                  </div>
+                  <div className="input-group" style={{ flex: 2, margin: 0 }}>
+                    <label>Bullet 2 Description</label>
+                    <input type="text" style={{ background: '#07090f', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.4rem', borderRadius: '6px', fontSize: '0.75rem', width: '100%' }} value={lobbyBullet2Desc} onChange={(e) => setLobbyBullet2Desc(e.target.value)} required />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div className="input-group" style={{ flex: 1, margin: 0 }}>
+                    <label>Bullet 3 Title</label>
+                    <input type="text" style={{ background: '#07090f', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.4rem', borderRadius: '6px', fontSize: '0.75rem' }} value={lobbyBullet3Title} onChange={(e) => setLobbyBullet3Title(e.target.value)} required />
+                  </div>
+                  <div className="input-group" style={{ flex: 2, margin: 0 }}>
+                    <label>Bullet 3 Description</label>
+                    <input type="text" style={{ background: '#07090f', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.4rem', borderRadius: '6px', fontSize: '0.75rem', width: '100%' }} value={lobbyBullet3Desc} onChange={(e) => setLobbyBullet3Desc(e.target.value)} required />
+                  </div>
+                </div>
+              </div>
+
+              <div className="input-group" style={{ margin: 0 }}>
+                <label>Freeplay Claim Button CTA Text</label>
+                <div className="input-wrapper" style={{ background: '#07090f' }}>
+                  <i className="fa-solid fa-gift input-icon"></i>
+                  <input type="text" value={lobbyFreeplayClaimBtn} onChange={(e) => setLobbyFreeplayClaimBtn(e.target.value)} required />
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Landing page copy texts section */}
           <div style={{ background: '#0b0d16', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1.5rem' }}>
             <h4 style={{ fontSize: '0.8rem', color: '#fff', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
-              Landing Page Copy & Layout Lines
+              Landing Sign-In Card Copy & Layout Lines
             </h4>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
