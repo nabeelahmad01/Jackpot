@@ -166,6 +166,7 @@ export function SupportModal({ isOpen, onClose, currentUser }) {
                   setAttachment(reader.result);
                 };
                 reader.readAsDataURL(file);
+                e.target.value = '';
               }}
             />
             <button

@@ -4,6 +4,46 @@ import useSWR from 'swr';
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
 export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
+  const [shiftName, setShiftName] = React.useState('Morning Shift (8 AM - 4 PM)');
+  const [totalLoaded, setTotalLoaded] = React.useState('');
+  const [notes, setNotes] = React.useState('');
+  const [isSubmittingReport, setIsSubmittingReport] = React.useState(false);
+
+  const handleShiftReportSubmit = async (e) => {
+    e.preventDefault();
+    if (!totalLoaded || isNaN(parseFloat(totalLoaded)) || parseFloat(totalLoaded) < 0) {
+      alert('Please enter a valid positive number for total loaded coins.');
+      return;
+    }
+    
+    setIsSubmittingReport(true);
+    try {
+      const response = await fetch('/api/admin/shift-reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          staffEmail: adminUser.email,
+          shiftName,
+          totalLoaded: parseFloat(totalLoaded),
+          notes
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setTotalLoaded('');
+        setNotes('');
+        alert('End of shift report submitted successfully!');
+      } else {
+        alert(data.message || 'Failed to submit report.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error submitting report.');
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  };
+
   // Use SWR to poll stats every 4s and games list
   const { data: statsData, error: statsError } = useSWR('/api/admin/stats', fetcher, {
     refreshInterval: 4000,
@@ -73,6 +113,80 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
           </div>
         </div>
       </section>
+
+      {/* End of Shift Coins Loading Report Card (Visible to staff/coins admin to submit) */}
+      {adminUser && adminUser.role !== 'admin' && adminUser.role !== 'operation_admin' && (
+        <section className="admin-section-card" style={{ borderLeft: '4px solid var(--gold-primary)', background: '#0a0d16' }}>
+          <div className="section-card-header" style={{ marginBottom: '0.75rem' }}>
+            <div>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <i className="fa-solid fa-clock-rotate-left text-red"></i> Submit End of Shift Loading Report
+              </h3>
+              <span className="game-tap-tip">Submit your shift statistics directly to the Boss & Operation Manager</span>
+            </div>
+          </div>
+
+          <form onSubmit={handleShiftReportSubmit} style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginTop: '0.5rem' }}>
+            <div className="input-group" style={{ flex: '1 1 200px', margin: 0 }}>
+              <label style={{ fontSize: '0.7rem' }}>Select Shift Timeframe</label>
+              <div className="input-wrapper" style={{ background: '#07090f' }}>
+                <i className="fa-solid fa-clock input-icon"></i>
+                <select
+                  value={shiftName}
+                  onChange={(e) => setShiftName(e.target.value)}
+                  style={{ background: 'none', border: 'none', color: '#fff', width: '100%', fontSize: '0.775rem', height: '100%', padding: '0 0.5rem', outline: 'none' }}
+                >
+                  <option value="Morning Shift (8 AM - 4 PM)">Morning Shift (8 AM - 4 PM)</option>
+                  <option value="Evening Shift (4 PM - 12 AM)">Evening Shift (4 PM - 12 AM)</option>
+                  <option value="Night Shift (12 AM - 8 AM)">Night Shift (12 AM - 8 AM)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="input-group" style={{ flex: '1 1 200px', margin: 0 }}>
+              <label style={{ fontSize: '0.7rem' }}>Total Coins Loaded during shift ($)</label>
+              <div className="input-wrapper" style={{ background: '#07090f' }}>
+                <i className="fa-solid fa-coins input-icon"></i>
+                <input
+                  type="number"
+                  placeholder="e.g. 1500.00"
+                  step="0.01"
+                  value={totalLoaded}
+                  onChange={(e) => setTotalLoaded(e.target.value)}
+                  style={{ fontSize: '0.775rem' }}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="input-group" style={{ flex: '1 1 100%', margin: 0 }}>
+              <label style={{ fontSize: '0.7rem' }}>Shift Notes & Hand-over Comments</label>
+              <textarea
+                placeholder="Write highlights, hand-over notes, or shift details..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                style={{
+                  background: '#07090f',
+                  border: '1px solid rgba(255,255,255,0.05)',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  width: '100%',
+                  minHeight: '80px',
+                  padding: '0.75rem',
+                  fontSize: '0.775rem',
+                  outline: 'none',
+                  resize: 'vertical'
+                }}
+              />
+            </div>
+
+            <button type="submit" className="submit-btn" style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold', width: 'auto', padding: '0.65rem 1.5rem', margin: 0 }} disabled={isSubmittingReport}>
+              <span>{isSubmittingReport ? 'SUBMITTING...' : 'SUBMIT SHIFT REPORT ➔'}</span>
+              <div className="btn-glow"></div>
+            </button>
+          </form>
+        </section>
+      )}
 
       {/* Game coins pool status */}
       <section className="admin-section-card">

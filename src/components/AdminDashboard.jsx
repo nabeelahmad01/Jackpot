@@ -15,6 +15,7 @@ const SupportTab = lazy(() => import('./admin/SupportTab'));
 const StaffTab = lazy(() => import('./admin/StaffTab'));
 const SettingsTab = lazy(() => import('./admin/SettingsTab'));
 const FrontendSettingsTab = lazy(() => import('./admin/FrontendSettingsTab'));
+const ShiftReportsTab = lazy(() => import('./admin/ShiftReportsTab'));
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -133,9 +134,10 @@ export default function AdminDashboard({
       
       // Frontend Settings tab is strictly reserved for main boss (Super Admin)
       if (tabName === 'frontend_settings') return false;
+      if (tabName === 'shift_reports') return role === 'operation_admin';
 
       if (role === 'operation_admin') return !['staff', 'settings'].includes(tabName); // Operational Manager has access to all EXCEPT staff and settings
-      if (role === 'financial_admin') return ['dashboard', 'ledger', 'requests'].includes(tabName);
+      if (role === 'financial_admin') return ['dashboard', 'ledger', 'requests', 'gateways'].includes(tabName);
       if (role === 'support_admin') return ['dashboard', 'support'].includes(tabName);
       if (role === 'coins_admin') return ['dashboard', 'games', 'users', 'requests', 'gateways', 'coins'].includes(tabName);
       return false;
@@ -384,6 +386,31 @@ export default function AdminDashboard({
             </button>
           )}
 
+          {hasAccess('shift_reports') && (
+            <button
+              onClick={() => { setActiveTab('shift_reports'); setSidebarOpen(false); }}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                background: activeTab === 'shift_reports' ? 'var(--gold-primary)' : 'none',
+                color: activeTab === 'shift_reports' ? '#111' : '#fff',
+                fontSize: '0.8rem',
+                fontWeight: 'bold',
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <i className="fa-solid fa-clock-rotate-left" style={{ width: '18px' }}></i>
+              <span>Shift Reports</span>
+            </button>
+          )}
+
           {hasAccess('support') && (
             <button
               onClick={() => { setActiveTab('support'); setSidebarOpen(false); }}
@@ -557,6 +584,9 @@ export default function AdminDashboard({
           )}
           {activeTab === 'frontend_settings' && hasAccess('frontend_settings') && (
             <FrontendSettingsTab adminUser={adminUser} />
+          )}
+          {activeTab === 'shift_reports' && hasAccess('shift_reports') && (
+            <ShiftReportsTab />
           )}
         </Suspense>
       </main>

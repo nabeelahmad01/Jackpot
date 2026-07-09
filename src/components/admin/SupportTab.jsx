@@ -93,6 +93,7 @@ export default function SupportTab({ adminUser }) {
       alert('Failed to read image file.');
     };
     reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   const handleSendAdminReply = async (e) => {
