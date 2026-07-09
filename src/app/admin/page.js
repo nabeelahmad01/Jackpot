@@ -421,9 +421,30 @@ export default function AdminPage() {
   };
 
   // View Screenshot proof trigger
-  const handleInspectProof = (imgUrl) => {
-    setProofImageUrl(imgUrl);
-    setProofModalOpen(true);
+  const handleInspectProof = async (imgUrl, txId) => {
+    if (!imgUrl) return;
+
+    if (typeof imgUrl === 'string' && imgUrl.startsWith('data:')) {
+      setProofImageUrl(imgUrl);
+      setProofModalOpen(true);
+    } else if (txId) {
+      setProofImageUrl(''); // Set to empty to trigger loading spinner
+      setProofModalOpen(true);
+      try {
+        const res = await fetch(`/api/transactions?id=${txId}`);
+        const data = await res.json();
+        if (data.success && data.transaction?.screenshot) {
+          setProofImageUrl(data.transaction.screenshot);
+        } else {
+          alert('Failed to load payment receipt screenshot.');
+          setProofModalOpen(false);
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Error fetching payment proof.');
+        setProofModalOpen(false);
+      }
+    }
   };
 
   // Payment Gateway CRUDs

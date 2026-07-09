@@ -6,6 +6,17 @@ import { cache } from '../../../lib/cache';
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+    
+    if (id) {
+      const db = await getDb();
+      const tx = await db.collection('transactions').findOne({ id });
+      if (!tx) {
+        return NextResponse.json({ success: false, message: 'Transaction not found.' }, { status: 404 });
+      }
+      return NextResponse.json({ success: true, transaction: tx });
+    }
+
     const email = searchParams.get('email');
     const status = searchParams.get('status');
     const type = searchParams.get('type');
@@ -53,6 +64,23 @@ export async function GET(req) {
 
     // Sort by id descending in database (highly optimized using id index)
     const transactions = await transactionsCollection.find(query)
+      .project({
+        screenshot: { $cond: { if: { $eq: [ { $ifNull: [ "$screenshot", "" ] }, "" ] }, then: false, else: true } },
+        id: 1,
+        userEmail: 1,
+        date: 1,
+        status: 1,
+        note: 1,
+        gameTitle: 1,
+        type: 1,
+        amount: 1,
+        gateway: 1,
+        code: 1,
+        nameOnTag: 1,
+        phoneOnTag: 1,
+        payoutSent: 1,
+        payoutHold: 1
+      })
       .sort({ id: -1 })
       .skip(skip)
       .limit(limit)

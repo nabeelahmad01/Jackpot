@@ -310,7 +310,7 @@ export default function LedgerTab({
                       <td>
                         {tx.screenshot ? (
                           <button
-                            onClick={() => onInspectProof(tx.screenshot)}
+                            onClick={() => onInspectProof(tx.screenshot, tx.id)}
                             className="submit-btn"
                             style={{ background: '#3498db', margin: 0, padding: '0.35rem 0.65rem', width: 'auto', display: 'inline-flex', gap: '0.3rem', alignItems: 'center' }}
                           >
@@ -423,7 +423,7 @@ export default function LedgerTab({
                       <td>
                         {tx.screenshot ? (
                           <button
-                            onClick={() => onInspectProof(tx.screenshot)}
+                            onClick={() => onInspectProof(tx.screenshot, tx.id)}
                             className="submit-btn"
                             style={{ background: '#eab308', color: '#000', margin: 0, padding: '0.35rem 0.65rem', width: 'auto', display: 'inline-flex', gap: '0.3rem', alignItems: 'center' }}
                           >
@@ -620,7 +620,7 @@ export default function LedgerTab({
                       <td>
                         {tx.screenshot ? (
                           <button
-                            onClick={() => onInspectProof(tx.screenshot)}
+                            onClick={() => onInspectProof(tx.screenshot, tx.id)}
                             className="submit-btn"
                             style={{ background: '#3498db', margin: 0, padding: '0.35rem 0.65rem', width: 'auto', display: 'inline-flex', gap: '0.3rem', alignItems: 'center' }}
                           >

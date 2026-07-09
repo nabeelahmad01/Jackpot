@@ -852,7 +852,7 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
 
 // --- G) VIEW RECEIPT PROOF MODAL ---
 export function ViewProofModal({ isOpen, onClose, proofUrl }) {
-  if (!isOpen || !proofUrl) return null;
+  if (!isOpen) return null;
 
   return (
     <div className="modal-backdrop-custom" onClick={onClose}>
@@ -866,12 +866,19 @@ export function ViewProofModal({ isOpen, onClose, proofUrl }) {
           </button>
         </div>
         <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', padding: '1.5rem' }}>
-          <div style={{ width: '100%', maxHeight: '450px', overflowY: 'auto', borderRadius: '12px', background: '#090a10', border: '1px solid rgba(255,255,255,0.05)', padding: '0.25rem' }}>
-            <img
-              src={proofUrl}
-              alt="Payment Screenshot Receipt proof"
-              style={{ width: '100%', height: 'auto', display: 'block', borderRadius: '8px', objectFit: 'contain' }}
-            />
+          <div style={{ width: '100%', minHeight: '180px', maxHeight: '450px', overflowY: 'auto', borderRadius: '12px', background: '#090a10', border: '1px solid rgba(255,255,255,0.05)', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {proofUrl ? (
+              <img
+                src={proofUrl}
+                alt="Payment Screenshot Receipt proof"
+                style={{ width: '100%', height: 'auto', display: 'block', borderRadius: '8px', objectFit: 'contain' }}
+              />
+            ) : (
+              <div style={{ textAlign: 'center', padding: '2rem', opacity: 0.6 }}>
+                <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '2rem', color: 'var(--gold-primary)', marginBottom: '0.5rem', display: 'block' }}></i>
+                <div style={{ fontSize: '0.75rem' }}>Loading receipt proof...</div>
+              </div>
+            )}
           </div>
           <button type="button" className="submit-btn" onClick={onClose} style={{ marginTop: '0.5rem' }}>
             <span>CLOSE INSPECTOR</span>
