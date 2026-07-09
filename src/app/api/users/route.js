@@ -23,16 +23,36 @@ export async function GET(req) {
       return NextResponse.json({ success: true, referrals });
     }
 
+    const segment = searchParams.get('segment');
+
     // Prepare search query
     let query = {};
+    if (segment === 'subscribed') {
+      query.isSubscribed = true;
+    } else if (segment === 'unsubscribed') {
+      query.isSubscribed = { $ne: true };
+    } else if (segment === 'active') {
+      const txs = await db.collection('transactions').find({
+        type: 'DEPOSIT',
+        status: 'SUCCESS'
+      }).project({ userEmail: 1 }).toArray();
+      const activeEmails = Array.from(new Set(txs.map(t => t.userEmail.toLowerCase().trim())));
+      query.email = { $in: activeEmails };
+    }
+
     if (search) {
       const cleanSearch = search.trim();
-      query = {
+      const searchCriteria = {
         $or: [
           { name: { $regex: cleanSearch, $options: 'i' } },
           { email: { $regex: cleanSearch, $options: 'i' } }
         ]
       };
+      if (Object.keys(query).length > 0) {
+        query = { $and: [query, searchCriteria] };
+      } else {
+        query = searchCriteria;
+      }
     }
 
     const totalUsers = await usersCollection.countDocuments(query);

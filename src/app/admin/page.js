@@ -7,7 +7,7 @@ import AdminDashboard from '../../components/AdminDashboard';
 import LoadingOverlay from '../../components/LoadingOverlay';
 import { AdminGameModal, ApproveAccountModal, AdminGatewayModal, ViewProofModal } from '../../components/Modals';
 
-export default function AdminPage() {
+export default function AdminPage({ portalName, forcedRole }) {
   const [authenticated, setAuthenticated] = useState(false);
   const [adminUser, setAdminUser] = useState(null);
   const [adminEmail, setAdminEmail] = useState('');
@@ -39,8 +39,15 @@ export default function AdminPage() {
       try {
         const parsed = JSON.parse(adminSession);
         if (parsed && parsed.role) {
-          setAuthenticated(true);
-          setAdminUser(parsed);
+          const cleanRoles = (parsed.role || '').toLowerCase().split(',').map(r => r.trim());
+          if (forcedRole && !cleanRoles.includes(forcedRole) && !cleanRoles.includes('admin')) {
+            localStorage.removeItem('jackpot_admin_session');
+            setAuthenticated(false);
+            setAdminUser(null);
+          } else {
+            setAuthenticated(true);
+            setAdminUser(parsed);
+          }
         }
       } catch (e) {
         setAuthenticated(true);
@@ -104,7 +111,14 @@ export default function AdminPage() {
       if (data.success) {
         const user = data.user;
         const allowedRoles = ['admin', 'financial_admin', 'coins_admin', 'support_admin', 'operation_admin'];
-        if (allowedRoles.includes(user.role)) {
+        const cleanRoles = (user.role || '').toLowerCase().split(',').map(r => r.trim());
+
+        if (allowedRoles.some(r => cleanRoles.includes(r))) {
+          if (forcedRole && !cleanRoles.includes(forcedRole) && !cleanRoles.includes('admin')) {
+            setLoginError(`Access Denied: This portal is strictly restricted to ${forcedRole.toUpperCase().replace('_', ' ')} accounts.`);
+            return;
+          }
+
           triggerLoading(1200, () => {
             setAuthenticated(true);
             setAdminUser(user);
@@ -523,10 +537,10 @@ export default function AdminPage() {
                 <div className="logo-glow"></div>
               </div>
               <h2 className="brand-title" style={{ fontSize: '1.5rem' }}>
-                <span className="gold-text-1">ADMIN</span>
-                <span className="gold-text-2">SECURE</span>
+                <span className="gold-text-1">{portalName ? portalName.split(' ')[0].toUpperCase() : 'ADMIN'}</span>
+                <span className="gold-text-2">{portalName ? portalName.split(' ').slice(1).join(' ').toUpperCase() : 'SECURE'}</span>
               </h2>
-              <p className="brand-subheading" style={{ fontSize: '0.7rem' }}>Authorized staff personnel only.</p>
+              <p className="brand-subheading" style={{ fontSize: '0.7rem' }}>{portalName ? `${portalName} access panel.` : 'Authorized staff personnel only.'}</p>
             </div>
 
             <form onSubmit={handleAdminLogin} noValidate>

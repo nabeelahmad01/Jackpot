@@ -41,6 +41,43 @@ export default function UserLobby({
   const [actionLoading, setActionLoading] = useState(false);
   const [activeTooltipId, setActiveTooltipId] = useState(null);
 
+  // Subscription Alert Prompt states
+  const [showSubPrompt, setShowSubPrompt] = useState(false);
+  const [subscribing, setSubscribing] = useState(false);
+
+  useEffect(() => {
+    if (currentUser && (!currentUser.isSubscribed)) {
+      const dismissed = sessionStorage.getItem('jackpot_sub_dismissed');
+      if (!dismissed) {
+        setShowSubPrompt(true);
+      }
+    }
+  }, [currentUser]);
+
+  // Targeted Promotions states
+  const [activePromos, setActivePromos] = useState([]);
+  const [currentPromoToShow, setCurrentPromoToShow] = useState(null);
+
+  useEffect(() => {
+    if (!currentUserEmail) return;
+
+    fetch(`/api/promotions?email=${encodeURIComponent(currentUserEmail)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.promotions && data.promotions.length > 0) {
+          const dismissedRaw = localStorage.getItem('dismissed_promotions');
+          const dismissedIds = dismissedRaw ? JSON.parse(dismissedRaw) : [];
+          const unseen = data.promotions.filter(p => !dismissedIds.includes(p.id));
+          
+          setActivePromos(unseen);
+          if (unseen.length > 0) {
+            setCurrentPromoToShow(unseen[0]);
+          }
+        }
+      })
+      .catch(err => console.error('Failed to load promotions:', err));
+  }, [currentUserEmail]);
+
   const renderFailedStatusWithTooltip = (tx) => {
     const isTooltipActive = activeTooltipId === tx.id;
     return (
@@ -259,6 +296,11 @@ export default function UserLobby({
     setActionLoading(true);
     setTimeout(() => setActionLoading(false), 2500);
 
+    const allottedAcc = (gameAccounts || []).find(
+      (acc) => acc.gameTitle === activeGame.title
+    );
+    const gameUsername = allottedAcc ? allottedAcc.username : '';
+
     onSubmitTransaction({
       gameTitle: activeGame.title,
       type: 'DEPOSIT',
@@ -266,6 +308,7 @@ export default function UserLobby({
       gateway: activeInvoice.gateway.name,
       code: activeInvoice.noteCode,
       screenshot: screenshotBase64, // Pass Base64 image
+      gameUsername: gameUsername || ''
     });
 
     setActiveInvoice(null);
@@ -306,6 +349,11 @@ export default function UserLobby({
     setActionLoading(true);
     setTimeout(() => setActionLoading(false), 2500);
 
+    const allottedAcc = (gameAccounts || []).find(
+      (acc) => acc.gameTitle === activeGame.title
+    );
+    const gameUsername = allottedAcc ? allottedAcc.username : '';
+
     onSubmitTransaction({
       gameTitle: activeGame.title,
       type: 'WITHDRAW',
@@ -314,7 +362,8 @@ export default function UserLobby({
       code: withdrawTag.trim(),
       nameOnTag: nameOnTag.trim(),
       phoneOnTag: phoneOnTag.trim(),
-      screenshot: withdrawScreenshot
+      screenshot: withdrawScreenshot,
+      gameUsername: gameUsername || ''
     });
 
     setWithdrawAmount('');
@@ -1476,6 +1525,193 @@ export default function UserLobby({
                 CONFIRM WITHDRAW
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Subscription Alert Prompt Modal */}
+      {showSubPrompt && (
+        <div className="modal-backdrop-custom" style={{ zIndex: 2000 }}>
+          <div className="modal-content border-gold animate-float" style={{ maxWidth: '420px', width: '90%', textAlign: 'center', padding: '2rem 1.5rem' }}>
+            <div style={{ marginBottom: '1.25rem' }}>
+              <div style={{
+                width: '64px',
+                height: '64px',
+                margin: '0 auto 1rem auto',
+                borderRadius: '50%',
+                background: 'rgba(255, 215, 0, 0.1)',
+                border: '1px solid var(--gold-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.75rem',
+                color: 'var(--gold-primary)',
+                boxShadow: '0 0 20px rgba(255,215,0,0.2)'
+              }}>
+                <i className="fa-solid fa-bell animate-pulse"></i>
+              </div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#fff', marginBottom: '0.5rem' }}>Unlock VIP Promos & Bonuses!</h3>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                Subscribe to our official Jackpot Royals newsletter to receive exclusive first deposit bonuses, freeplay coins, and daily game updates directly in your inbox.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <button
+                onClick={async () => {
+                  setSubscribing(true);
+                  try {
+                    const res = await fetch('/api/users/subscribe', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ email: currentUserEmail, isSubscribed: true })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                      showToast('Thank you for subscribing!', 'success');
+                      if (currentUser) {
+                        currentUser.isSubscribed = true;
+                      }
+                      setShowSubPrompt(false);
+                    } else {
+                      showToast(data.message || 'Subscription failed.', 'error');
+                    }
+                  } catch (err) {
+                    console.error(err);
+                    showToast('Connection error. Please try again.', 'error');
+                  } finally {
+                    setSubscribing(false);
+                  }
+                }}
+                disabled={subscribing}
+                className="submit-btn"
+                style={{
+                  background: 'var(--gold-primary)',
+                  color: '#000',
+                  fontWeight: 'bold',
+                  margin: 0
+                }}
+              >
+                {subscribing ? 'SUBSCRIBING...' : 'SUBSCRIBE NOW'}
+              </button>
+              <button
+                onClick={() => {
+                  sessionStorage.setItem('jackpot_sub_dismissed', 'true');
+                  setShowSubPrompt(false);
+                }}
+                className="action-row-btn"
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  color: '#fff',
+                  border: 'none',
+                  fontSize: '0.7rem',
+                  padding: '0.5rem',
+                  borderRadius: '8px',
+                  cursor: 'pointer'
+                }}
+              >
+                No thanks, maybe later
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Targeted Promotion Announcement Modal Popup */}
+      {currentPromoToShow && (
+        <div className="modal-backdrop-custom" style={{ zIndex: 3000 }}>
+          <div className="modal-content border-gold animate-float" style={{ maxWidth: '460px', width: '90%', padding: 0, overflow: 'hidden' }}>
+            {currentPromoToShow.image ? (
+              <div style={{ width: '100%', height: '180px', position: 'relative' }}>
+                <img
+                  src={currentPromoToShow.image}
+                  alt={currentPromoToShow.title}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(to bottom, transparent 30%, rgba(10, 13, 22, 0.95) 100%)'
+                }}></div>
+              </div>
+            ) : (
+              <div style={{
+                width: '100%',
+                height: '120px',
+                background: 'linear-gradient(135deg, #ffd700 0%, #b38600 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative'
+              }}>
+                <i className="fa-solid fa-gift" style={{ fontSize: '3rem', color: '#000', opacity: 0.85 }}></i>
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(to bottom, transparent 30%, rgba(10, 13, 22, 0.95) 100%)'
+                }}></div>
+              </div>
+            )}
+
+            <div style={{ padding: '1.5rem', background: '#0a0d16', textAlign: 'center' }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '900', color: 'var(--gold-primary)', textTransform: 'uppercase', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>
+                {currentPromoToShow.title}
+              </h3>
+              <p style={{ fontSize: '0.8rem', color: '#e2e8f0', lineHeight: '1.5', marginBottom: '1.5rem', whiteSpace: 'normal' }}>
+                {currentPromoToShow.message}
+              </p>
+
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button
+                  onClick={() => {
+                    const dismissedRaw = localStorage.getItem('dismissed_promotions');
+                    const dismissedIds = dismissedRaw ? JSON.parse(dismissedRaw) : [];
+                    dismissedIds.push(currentPromoToShow.id);
+                    localStorage.setItem('dismissed_promotions', JSON.stringify(dismissedIds));
+
+                    const nextPromos = activePromos.filter(p => p.id !== currentPromoToShow.id);
+                    setActivePromos(nextPromos);
+                    if (nextPromos.length > 0) {
+                      setCurrentPromoToShow(nextPromos[0]);
+                    } else {
+                      setCurrentPromoToShow(null);
+                    }
+                  }}
+                  className="submit-btn"
+                  style={{
+                    background: 'var(--gold-primary)',
+                    color: '#000',
+                    fontWeight: 'bold',
+                    margin: 0
+                  }}
+                >
+                  CLAIM OFFER NOW
+                </button>
+                <button
+                  onClick={() => {
+                    const dismissedRaw = localStorage.getItem('dismissed_promotions');
+                    const dismissedIds = dismissedRaw ? JSON.parse(dismissedRaw) : [];
+                    dismissedIds.push(currentPromoToShow.id);
+                    localStorage.setItem('dismissed_promotions', JSON.stringify(dismissedIds));
+
+                    setCurrentPromoToShow(null);
+                  }}
+                  className="action-row-btn"
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    color: '#fff',
+                    border: 'none',
+                    fontSize: '0.75rem',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '8px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
           </div>
         </div>
       )}

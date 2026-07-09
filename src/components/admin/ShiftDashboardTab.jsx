@@ -423,6 +423,7 @@ export default function ShiftDashboardTab({ adminUser }) {
                     </td>
                     <td>
                       <strong>{tx.userEmail}</strong>
+                      {tx.gameUsername && <div style={{ fontSize: '0.65rem', color: 'var(--gold-primary)', marginTop: '0.15rem' }}>({tx.gameUsername})</div>}
                       <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Tag: {tx.code} ({tx.gateway})</div>
                     </td>
                     <td>
