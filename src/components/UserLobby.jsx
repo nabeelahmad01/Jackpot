@@ -67,7 +67,7 @@ export default function UserLobby({
         >
           FAILED <i className="fa-solid fa-circle-info" style={{ fontSize: '0.65rem' }}></i>
         </span>
-        
+
         {isTooltipActive && (
           <div style={{
             position: 'absolute',
@@ -218,13 +218,13 @@ export default function UserLobby({
       showToast('Minimum deposit limit is $5.00.', 'error');
       return;
     }
-    
+
     setPaymentModalOpen(true);
   };
 
   const handleSelectGateway = (gatewayObj) => {
     setPaymentModalOpen(false);
-    
+
     // Generate Random Transaction Reference Code (e.g. JKP-837291)
     const randNum = Math.floor(100000 + Math.random() * 900000);
     const code = `JKP-${randNum}`;
@@ -250,7 +250,7 @@ export default function UserLobby({
   const handlePaidConfirm = () => {
     if (!activeInvoice || !activeGame) return;
     if (actionLoading) return;
-    
+
     if (!screenshotBase64) {
       showToast('Please upload a screenshot of your payment to continue.', 'error');
       return;
@@ -267,7 +267,7 @@ export default function UserLobby({
       code: activeInvoice.noteCode,
       screenshot: screenshotBase64, // Pass Base64 image
     });
-    
+
     setActiveInvoice(null);
     setScreenshotBase64('');
   };
@@ -398,7 +398,7 @@ export default function UserLobby({
     showToast('Game account credentials request submitted! Awaiting admin response.', 'success');
   };
 
-  const currentRequest = activeGame 
+  const currentRequest = activeGame
     ? accountRequests.find((r) => r.gameTitle === activeGame.title && r.userEmail === currentUserEmail)
     : null;
 
@@ -781,7 +781,7 @@ export default function UserLobby({
              VIEW B: GAME ACCESS DRILL-DOWN PANEL
              ============================================================== */
         <div className="lobby-content-container game-access-portal-view">
-          
+
           <div className="game-access-header">
             <div className="game-header-brand">
               <div className="lobby-logo-box" style={{ width: '50px', height: '50px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000', border: '1px solid rgba(255,215,0,0.4)', borderRadius: '50%', boxShadow: '0 0 15px rgba(255,215,0,0.25)' }}>
@@ -831,7 +831,7 @@ export default function UserLobby({
               </div>
 
               <div className="invoice-grid-split" style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '1.5rem' }}>
-                
+
                 {/* Left Invoice elements */}
                 <div className="invoice-card" style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '1.5rem' }}>
                   <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
@@ -858,7 +858,7 @@ export default function UserLobby({
                   </div>
 
                   <div className="tag-details-box" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    
+
                     {/* Copy actions styled with blue copy icon - NO COPY TEXT */}
                     <div className="tag-field-row" style={{ background: '#0b0c16', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
@@ -961,7 +961,7 @@ export default function UserLobby({
               </div>
             </div>
           ) : (
-            
+
             /* NORMAL ACCOUNT VIEWS */
             <>
               {/* STATE A: REQUEST LOGIN */}
@@ -1035,7 +1035,7 @@ export default function UserLobby({
               {/* STATE C: ACCOUNT READY */}
               {currentAccount && currentAccount.status === 'READY' && (
                 <div className="game-access-panel active" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                  
+
                   {/* Account detail */}
                   <div className="auth-card" style={{ maxWidth: '100%', padding: '1.5rem' }}>
                     <div className="glow-border-layer"></div>
@@ -1067,7 +1067,7 @@ export default function UserLobby({
                   {/* Wallet Forms */}
                   <div className="auth-card" style={{ maxWidth: '100%', padding: '1.5rem' }}>
                     <div className="glow-border-layer"></div>
-                    
+
                     <div className="yellow-strip-notice" style={{ padding: '0.75rem 1rem', border: '1px solid rgba(230,142,0,0.3)', background: 'rgba(230,142,0,0.05)', borderRadius: '12px', color: '#ffd043', fontSize: '0.725rem', marginBottom: '1.25rem', fontWeight: 'bold' }}>
                       <i className="fa-solid fa-triangle-exclamation"></i>
                       <span> Important: Please deposit only if your in-game balance is less than 1. If you face any problem, contact Customer Support.</span>
@@ -1156,7 +1156,7 @@ export default function UserLobby({
                   {/* Transaction Ledger */}
                   <div className="auth-card" style={{ maxWidth: '100%', padding: '1.5rem' }}>
                     <div className="glow-border-layer"></div>
-                    
+
                     {/* Allotment Hold Notices */}
                     {(() => {
                       const userHoldAllotments = (coinsNotifications || []).filter(n => n.status === 'HOLD');
@@ -1305,7 +1305,7 @@ export default function UserLobby({
         <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: '2rem 0', backdropFilter: 'blur(8px)', animation: 'fade-in 0.25s ease-out' }}>
           <div className="auth-card" style={{ maxWidth: '460px', width: '92%', padding: '2rem 1.75rem', position: 'relative', animation: 'scale-up 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)' }}>
             <div className="glow-border-layer"></div>
-            
+
             <button
               onClick={() => setWithdrawModalOpen(false)}
               className="close-modal"
@@ -1324,7 +1324,7 @@ export default function UserLobby({
             </div>
 
             <form onSubmit={handleWithdrawConfirm} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }} noValidate>
-              
+
               <div className="input-group">
                 <label style={{ marginBottom: '0.5rem', display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Choose Payment Method</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>

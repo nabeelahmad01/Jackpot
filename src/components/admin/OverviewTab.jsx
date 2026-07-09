@@ -114,8 +114,8 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
         </div>
       </section>
 
-      {/* End of Shift Coins Loading Report Card (Visible to staff/coins admin to submit) */}
-      {adminUser && adminUser.role !== 'admin' && adminUser.role !== 'operation_admin' && (
+      {/* End of Shift Coins Loading Report Card (Visible to all admins/staff to submit) */}
+      {adminUser && (
         <section className="admin-section-card" style={{ borderLeft: '4px solid var(--gold-primary)', background: '#0a0d16' }}>
           <div className="section-card-header" style={{ marginBottom: '0.75rem' }}>
             <div>

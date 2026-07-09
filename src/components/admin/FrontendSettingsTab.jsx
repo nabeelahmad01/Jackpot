@@ -15,6 +15,12 @@ export default function FrontendSettingsTab({ adminUser }) {
   const [chimeActive, setChimeActive] = useState(true);
   const [venmoActive, setVenmoActive] = useState(true);
   const [cashappActive, setCashappActive] = useState(true);
+
+  // Rewards & limit configurations
+  const [firstDepositBonus, setFirstDepositBonus] = useState(300);
+  const [signupFreeplay, setSignupFreeplay] = useState(3);
+  const [minimumDepositLimit, setMinimumDepositLimit] = useState(5);
+  const [minimumWithdrawalLimit, setMinimumWithdrawalLimit] = useState(5);
   
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -32,6 +38,10 @@ export default function FrontendSettingsTab({ adminUser }) {
       setChimeActive(s.chimeActive !== false);
       setVenmoActive(s.venmoActive !== false);
       setCashappActive(s.cashappActive !== false);
+      setFirstDepositBonus(s.firstDepositBonus !== undefined ? s.firstDepositBonus : 300);
+      setSignupFreeplay(s.signupFreeplay !== undefined ? s.signupFreeplay : 3);
+      setMinimumDepositLimit(s.minimumDepositLimit !== undefined ? s.minimumDepositLimit : 5);
+      setMinimumWithdrawalLimit(s.minimumWithdrawalLimit !== undefined ? s.minimumWithdrawalLimit : 5);
     }
   }, [data]);
 
@@ -51,7 +61,11 @@ export default function FrontendSettingsTab({ adminUser }) {
           slides: [slide1, slide2, slide3],
           chimeActive,
           venmoActive,
-          cashappActive
+          cashappActive,
+          firstDepositBonus: Number(firstDepositBonus),
+          signupFreeplay: Number(signupFreeplay),
+          minimumDepositLimit: Number(minimumDepositLimit),
+          minimumWithdrawalLimit: Number(minimumWithdrawalLimit)
         })
       });
 
@@ -224,6 +238,71 @@ export default function FrontendSettingsTab({ adminUser }) {
                 />
                 Cash App Payment Gateway Active
               </label>
+            </div>
+          </div>
+
+          {/* Promo & Limit Constraints */}
+          <div style={{ background: '#0b0d16', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1.5rem' }}>
+            <h4 style={{ fontSize: '0.8rem', color: '#fff', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
+              Promotional Rewards & Financial Limits
+            </h4>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+              <div className="input-group" style={{ flex: '1 1 200px', margin: 0 }}>
+                <label>First Deposit Promo Bonus (%)</label>
+                <div className="input-wrapper" style={{ background: '#07090f' }}>
+                  <i className="fa-solid fa-gift input-icon"></i>
+                  <input
+                    type="number"
+                    placeholder="300"
+                    value={firstDepositBonus}
+                    onChange={(e) => setFirstDepositBonus(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="input-group" style={{ flex: '1 1 200px', margin: 0 }}>
+                <label>Freeplay Signup Reward ($)</label>
+                <div className="input-wrapper" style={{ background: '#07090f' }}>
+                  <i className="fa-solid fa-gift input-icon"></i>
+                  <input
+                    type="number"
+                    placeholder="3"
+                    value={signupFreeplay}
+                    onChange={(e) => setSignupFreeplay(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="input-group" style={{ flex: '1 1 200px', margin: 0 }}>
+                <label>Minimum Deposit Limit ($)</label>
+                <div className="input-wrapper" style={{ background: '#07090f' }}>
+                  <i className="fa-solid fa-coins input-icon"></i>
+                  <input
+                    type="number"
+                    placeholder="5"
+                    value={minimumDepositLimit}
+                    onChange={(e) => setMinimumDepositLimit(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="input-group" style={{ flex: '1 1 200px', margin: 0 }}>
+                <label>Minimum Cashout Limit ($)</label>
+                <div className="input-wrapper" style={{ background: '#07090f' }}>
+                  <i className="fa-solid fa-wallet input-icon"></i>
+                  <input
+                    type="number"
+                    placeholder="5"
+                    value={minimumWithdrawalLimit}
+                    onChange={(e) => setMinimumWithdrawalLimit(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
             </div>
           </div>
 

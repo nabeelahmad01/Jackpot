@@ -233,12 +233,14 @@ export async function PUT(req) {
         // 2. Fetch system settings
         const settingsCollection = db.collection('settings');
         let settings = await settingsCollection.findOne({ id: 'global_settings' });
-        if (!settings) {
-          settings = { firstDepositBonus: 300, regularDepositBonus: 20 };
-        }
+        let frontendSettings = await settingsCollection.findOne({ id: 'frontend_settings' });
+        
+        const firstBonusPercent = (frontendSettings && frontendSettings.firstDepositBonus !== undefined)
+          ? Number(frontendSettings.firstDepositBonus)
+          : (settings ? Number(settings.firstDepositBonus) : 300);
 
         const isBonus = originalTx.type === 'BONUS';
-        const bonusPercentage = isBonus ? 0 : (isFirstDeposit ? settings.firstDepositBonus : settings.regularDepositBonus);
+        const bonusPercentage = isBonus ? 0 : (isFirstDeposit ? firstBonusPercent : (settings ? Number(settings.regularDepositBonus) : 20));
         
         // Calculate total coins to allot
         const amount = parseFloat(originalTx.amount);

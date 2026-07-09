@@ -25,7 +25,11 @@ export async function GET() {
         slides: ['/slide1.jpg', '/slide2.jpg', '/slide3.jpg'],
         chimeActive: true,
         venmoActive: true,
-        cashappActive: true
+        cashappActive: true,
+        firstDepositBonus: 300,
+        signupFreeplay: 3,
+        minimumDepositLimit: 5,
+        minimumWithdrawalLimit: 5
       };
       await settingsCollection.insertOne(settings);
     }
@@ -42,7 +46,19 @@ export async function GET() {
 export async function PUT(req) {
   try {
     const body = await req.json();
-    const { logoUrl, withdrawNotice, cashoutNotice, slides, chimeActive, venmoActive, cashappActive } = body;
+    const {
+      logoUrl,
+      withdrawNotice,
+      cashoutNotice,
+      slides,
+      chimeActive,
+      venmoActive,
+      cashappActive,
+      firstDepositBonus,
+      signupFreeplay,
+      minimumDepositLimit,
+      minimumWithdrawalLimit
+    } = body;
 
     const db = await getDb();
     const settingsCollection = db.collection('settings');
@@ -55,6 +71,10 @@ export async function PUT(req) {
     if (chimeActive !== undefined) updateFields.chimeActive = Boolean(chimeActive);
     if (venmoActive !== undefined) updateFields.venmoActive = Boolean(venmoActive);
     if (cashappActive !== undefined) updateFields.cashappActive = Boolean(cashappActive);
+    if (firstDepositBonus !== undefined) updateFields.firstDepositBonus = Number(firstDepositBonus);
+    if (signupFreeplay !== undefined) updateFields.signupFreeplay = Number(signupFreeplay);
+    if (minimumDepositLimit !== undefined) updateFields.minimumDepositLimit = Number(minimumDepositLimit);
+    if (minimumWithdrawalLimit !== undefined) updateFields.minimumWithdrawalLimit = Number(minimumWithdrawalLimit);
 
     await settingsCollection.updateOne(
       { id: 'frontend_settings' },
