@@ -881,3 +881,223 @@ export function ViewProofModal({ isOpen, onClose, proofUrl }) {
     </div>
   );
 }
+
+// --- H) ADJUST BALANCE MODAL ---
+export function AdjustBalanceModal({ isOpen, onClose, onAdjust, user }) {
+  const [amount, setAmount] = useState('');
+  const [adjType, setAdjType] = useState('credit'); // 'credit' | 'debit'
+  const [errorMsg, setErrorMsg] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setAmount('');
+      setAdjType('credit');
+      setErrorMsg('');
+      setIsSubmitting(false);
+    }
+  }, [isOpen]);
+
+  if (!isOpen || !user) return null;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+    const amt = parseFloat(amount);
+    if (isNaN(amt) || amt <= 0) {
+      setErrorMsg('Please enter a valid amount greater than 0.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const currentCoins = parseFloat(user.coins || 0);
+      const targetCoins = adjType === 'credit' 
+        ? currentCoins + amt 
+        : Math.max(0, currentCoins - amt);
+
+      await onAdjust(user.email, targetCoins);
+      onClose();
+    } catch (err) {
+      console.error(err);
+      setErrorMsg('Failed to adjust player balance.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop-custom" onClick={onClose}>
+      <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', width: '90%' }}>
+        <div className="modal-header">
+          <h3>
+            <i className="fa-solid fa-scale-unbalanced gold-text"></i> Adjust Player Balance
+          </h3>
+          <button type="button" className="close-modal" onClick={onClose}>
+            &times;
+          </button>
+        </div>
+        <div className="modal-body">
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+            Adjusting balance for player <strong style={{ color: '#fff' }}>{user.email}</strong>. <br />
+            Current Balance: <strong style={{ color: 'var(--gold-primary)' }}>${parseFloat(user.coins || 0).toFixed(2)}</strong>
+          </p>
+
+          <form onSubmit={handleSubmit} noValidate>
+            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem' }}>
+              <label style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                padding: '0.6rem',
+                background: adjType === 'credit' ? 'rgba(34, 197, 94, 0.1)' : '#0c0e17',
+                border: adjType === 'credit' ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.05)',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '0.75rem',
+                fontWeight: 'bold',
+                color: adjType === 'credit' ? '#22c55e' : '#fff'
+              }}>
+                <input
+                  type="radio"
+                  name="adjType"
+                  checked={adjType === 'credit'}
+                  onChange={() => setAdjType('credit')}
+                  style={{ marginBottom: '0.25rem' }}
+                />
+                Credit (Add)
+              </label>
+
+              <label style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                padding: '0.6rem',
+                background: adjType === 'debit' ? 'rgba(239, 68, 68, 0.1)' : '#0c0e17',
+                border: adjType === 'debit' ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.05)',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '0.75rem',
+                fontWeight: 'bold',
+                color: adjType === 'debit' ? '#ef4444' : '#fff'
+              }}>
+                <input
+                  type="radio"
+                  name="adjType"
+                  checked={adjType === 'debit'}
+                  onChange={() => setAdjType('debit')}
+                  style={{ marginBottom: '0.25rem' }}
+                />
+                Debit (Deduct)
+              </label>
+            </div>
+
+            <div className="input-group" style={{ marginBottom: '1.25rem' }}>
+              <label htmlFor="adjust-amount">Adjustment Amount ($)</label>
+              <div className="input-wrapper">
+                <i className="fa-solid fa-coins input-icon"></i>
+                <input
+                  type="number"
+                  id="adjust-amount"
+                  placeholder="e.g. 50.00"
+                  step="0.01"
+                  value={amount}
+                  onChange={(e) => { setAmount(e.target.value); setErrorMsg(''); }}
+                  required
+                />
+              </div>
+              <span className="error-msg">{errorMsg}</span>
+            </div>
+
+            <button type="submit" className="submit-btn" style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold' }} disabled={isSubmitting}>
+              <span>{isSubmitting ? 'UPDATING BALANCE...' : 'CONFIRM ADJUSTMENT'}</span>
+              <div className="btn-glow"></div>
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- I) ADMIN RESET PASSWORD MODAL ---
+export function AdminResetPasswordModal({ isOpen, onClose, onReset, user }) {
+  const [newPassword, setNewPassword] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setNewPassword('');
+      setErrorMsg('');
+      setIsSubmitting(false);
+    }
+  }, [isOpen]);
+
+  if (!isOpen || !user) return null;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+    if (newPassword.trim().length < 4) {
+      setErrorMsg('Password must be at least 4 characters long.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await onReset(user.email, newPassword.trim());
+      onClose();
+    } catch (err) {
+      console.error(err);
+      setErrorMsg('Failed to update player password.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop-custom" onClick={onClose}>
+      <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', width: '90%' }}>
+        <div className="modal-header">
+          <h3>
+            <i className="fa-solid fa-key gold-text"></i> Reset Player Password
+          </h3>
+          <button type="button" className="close-modal" onClick={onClose}>
+            &times;
+          </button>
+        </div>
+        <div className="modal-body">
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+            Setting a new password for player <strong style={{ color: '#fff' }}>{user.email}</strong>.
+          </p>
+
+          <form onSubmit={handleSubmit} noValidate>
+            <div className="input-group" style={{ marginBottom: '1.5rem' }}>
+              <label htmlFor="reset-new-password">New Login Password</label>
+              <div className="input-wrapper">
+                <i className="fa-solid fa-lock input-icon"></i>
+                <input
+                  type="text"
+                  id="reset-new-password"
+                  placeholder="Enter new password..."
+                  value={newPassword}
+                  onChange={(e) => { setNewPassword(e.target.value); setErrorMsg(''); }}
+                  required
+                />
+              </div>
+              <span className="error-msg">{errorMsg}</span>
+            </div>
+
+            <button type="submit" className="submit-btn" style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold' }} disabled={isSubmitting}>
+              <span>{isSubmitting ? 'SAVING PASSWORD...' : 'OVERWRITE PASSWORD'}</span>
+              <div className="btn-glow"></div>
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}

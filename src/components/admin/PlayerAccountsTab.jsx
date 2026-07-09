@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
+import { AdjustBalanceModal, AdminResetPasswordModal } from '../Modals';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -20,6 +21,69 @@ export default function PlayerAccountsTab({ adminUser, onDeleteUser }) {
   const [newReferredBy, setNewReferredBy] = useState('');
   const [registerResult, setRegisterResult] = useState(null);
   const [isRegistering, setIsRegistering] = useState(false);
+  // Modal states for balance and password reset
+  const [balanceModalOpen, setBalanceModalOpen] = useState(false);
+  const [adjustBalanceUser, setAdjustBalanceUser] = useState(null);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [resetPasswordUser, setResetPasswordUser] = useState(null);
+
+  const handleAdjustBalanceSubmit = async (email, targetCoins) => {
+    const response = await fetch('/api/users', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, coins: targetCoins })
+    });
+    const resData = await response.json();
+    if (resData.success) {
+      alert('Player balance adjusted successfully!');
+      mutate();
+    } else {
+      throw new Error(resData.message || 'Failed to adjust balance.');
+    }
+  };
+
+  const handleResetPasswordSubmit = async (email, newPassword) => {
+    const response = await fetch('/api/users', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: newPassword })
+    });
+    const resData = await response.json();
+    if (resData.success) {
+      alert('Player password updated successfully!');
+      mutate();
+    } else {
+      throw new Error(resData.message || 'Failed to reset password.');
+    }
+  };
+
+  const handleToggleSuspend = async (user) => {
+    const isSuspended = user.status === 'SUSPENDED';
+    const actionText = isSuspended ? 'reactivate' : 'suspend';
+    if (!window.confirm(`Are you sure you want to ${actionText} player account "${user.email}"?`)) {
+      return;
+    }
+    try {
+      const response = await fetch('/api/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: user.email,
+          status: isSuspended ? 'ACTIVE' : 'SUSPENDED'
+        })
+      });
+      const resData = await response.json();
+      if (resData.success) {
+        alert(`Account successfully ${isSuspended ? 'reactivated' : 'suspended'}!`);
+        mutate();
+      } else {
+        alert(resData.message || 'Failed to update player status.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error updating player status.');
+    }
+  };
 
   const handleManualRegister = async (e) => {
     e.preventDefault();
@@ -218,35 +282,44 @@ export default function PlayerAccountsTab({ adminUser, onDeleteUser }) {
             <tr>
               <th>Full Name</th>
               <th>Email Address</th>
+              <th>Balance</th>
               <th>Referral Code</th>
-              <th>Privilege Role</th>
+              <th>Status</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan="5" className="text-center text-muted" style={{ padding: '2rem' }}>
+                <td colSpan="6" className="text-center text-muted" style={{ padding: '2rem' }}>
                   <i className="fa-solid fa-spinner fa-spin" style={{ color: 'var(--gold-primary)', marginRight: '6px' }}></i> Loading accounts...
                 </td>
               </tr>
             ) : users.length === 0 ? (
-              <tr><td colSpan="5" className="text-center text-muted">No matching players.</td></tr>
+              <tr><td colSpan="6" className="text-center text-muted">No matching players.</td></tr>
             ) : (
               users.map((user) => (
                 <tr key={user.email}>
                   <td>{user.name}</td>
                   <td>{user.email}</td>
                   <td>
+                    <strong style={{ color: 'var(--gold-primary)' }}>
+                      ${parseFloat(user.coins || 0).toFixed(2)}
+                    </strong>
+                  </td>
+                  <td>
                     <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#a855f7', fontWeight: 700 }}>
                       {user.referralCode || '—'}
                     </span>
                   </td>
                   <td>
-                    <span className="admin-badge-preview b-new">PLAYER</span>
+                    <span className={`admin-badge-preview b-${user.status === 'SUSPENDED' ? 'failed' : 'ready'}`}>
+                      {user.status === 'SUSPENDED' ? 'SUSPENDED' : 'ACTIVE'}
+                    </span>
                   </td>
                   <td>
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                      {/* Inspect History */}
                       <button
                         className="action-row-btn"
                         onClick={() => setInspectedUser(user)}
@@ -255,6 +328,48 @@ export default function PlayerAccountsTab({ adminUser, onDeleteUser }) {
                       >
                         <i className="fa-solid fa-clock-rotate-left"></i>
                       </button>
+
+                      {/* Adjust Balance */}
+                      {isManagerOrAdmin && (
+                        <button
+                          className="action-row-btn"
+                          onClick={() => { setAdjustBalanceUser(user); setBalanceModalOpen(true); }}
+                          title="Adjust Coins Balance"
+                          style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', color: '#22c55e' }}
+                        >
+                          <i className="fa-solid fa-coins"></i>
+                        </button>
+                      )}
+
+                      {/* Reset Password */}
+                      {isManagerOrAdmin && (
+                        <button
+                          className="action-row-btn"
+                          onClick={() => { setResetPasswordUser(user); setPasswordModalOpen(true); }}
+                          title="Reset Password"
+                          style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', color: '#3b82f6' }}
+                        >
+                          <i className="fa-solid fa-key"></i>
+                        </button>
+                      )}
+
+                      {/* Suspend / Reactivate */}
+                      {isManagerOrAdmin && (
+                        <button
+                          className="action-row-btn"
+                          onClick={() => handleToggleSuspend(user)}
+                          title={user.status === 'SUSPENDED' ? 'Reactivate User' : 'Suspend User'}
+                          style={{
+                            background: user.status === 'SUSPENDED' ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.1)',
+                            border: user.status === 'SUSPENDED' ? '1px solid rgba(239,68,68,0.4)' : '1px solid rgba(245,158,11,0.3)',
+                            color: user.status === 'SUSPENDED' ? '#ef4444' : '#f59e0b'
+                          }}
+                        >
+                          {user.status === 'SUSPENDED' ? <i className="fa-solid fa-user-lock"></i> : <i className="fa-solid fa-ban"></i>}
+                        </button>
+                      )}
+
+                      {/* Delete User */}
                       <button
                         className="action-row-btn btn-delete"
                         onClick={() => handleDelete(user.email)}
@@ -513,6 +628,21 @@ export default function PlayerAccountsTab({ adminUser, onDeleteUser }) {
           </div>
         </div>
       )}
+      {/* Balance Adjustment Modal */}
+      <AdjustBalanceModal
+        isOpen={balanceModalOpen}
+        onClose={() => { setBalanceModalOpen(false); setAdjustBalanceUser(null); }}
+        onAdjust={handleAdjustBalanceSubmit}
+        user={adjustBalanceUser}
+      />
+
+      {/* Password Reset Modal */}
+      <AdminResetPasswordModal
+        isOpen={passwordModalOpen}
+        onClose={() => { setPasswordModalOpen(false); setResetPasswordUser(null); }}
+        onReset={handleResetPasswordSubmit}
+        user={resetPasswordUser}
+      />
     </section>
   );
 }

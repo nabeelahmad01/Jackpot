@@ -24,6 +24,13 @@ export async function POST(req) {
     let matchedUser = await usersCollection.findOne({ email: cleanEmail });
     let isNewUser = false;
 
+    if (matchedUser && matchedUser.status === 'SUSPENDED') {
+      return NextResponse.json(
+        { success: false, message: 'Your account has been suspended. Please contact customer support.' },
+        { status: 403 }
+      );
+    }
+
     if (!matchedUser) {
       // Generate a unique referral code
       let referralCode = generateReferralCode();

@@ -61,18 +61,30 @@ export async function GET(req) {
 // PUT update user details (Admin adjustment of coins or role modifications)
 export async function PUT(req) {
   try {
-    const { email, coins, role, name, password } = await req.json();
+    const { email, coins, role, name, password, status } = await req.json();
 
     if (!email) {
       return NextResponse.json({ success: false, message: 'User email is required.' }, { status: 400 });
     }
 
+    const cleanEmail = email.toLowerCase().trim();
     const db = await getDb();
     const usersCollection = db.collection('users');
 
+    const currentUser = await usersCollection.findOne({ email: cleanEmail });
+    if (!currentUser) {
+      return NextResponse.json({ success: false, message: 'User not found.' }, { status: 404 });
+    }
+
     const updateFields = {};
+    let balanceChanged = false;
+    const oldBalance = parseFloat(currentUser.coins || 0);
+    let newBalance = oldBalance;
+
     if (coins !== undefined) {
-      updateFields.coins = Number(coins);
+      newBalance = parseFloat(coins);
+      updateFields.coins = newBalance;
+      balanceChanged = (newBalance !== oldBalance);
     }
     if (role !== undefined) {
       updateFields.role = role;
@@ -83,14 +95,33 @@ export async function PUT(req) {
     if (password !== undefined) {
       updateFields.password = password;
     }
+    if (status !== undefined) {
+      updateFields.status = status;
+    }
 
     const result = await usersCollection.updateOne(
-      { email: email.toLowerCase().trim() },
+      { email: cleanEmail },
       { $set: updateFields }
     );
 
-    if (result.matchedCount === 0) {
-      return NextResponse.json({ success: false, message: 'User not found.' }, { status: 404 });
+    if (balanceChanged) {
+      const diff = newBalance - oldBalance;
+      const amountVal = Math.abs(diff);
+      const diffText = diff > 0 ? `Credit of $${amountVal.toFixed(2)}` : `Debit of $${amountVal.toFixed(2)}`;
+      
+      const transactionsCollection = db.collection('transactions');
+      const auditTx = {
+        id: (Date.now() + Math.floor(Math.random() * 100)).toString(),
+        userEmail: cleanEmail,
+        date: new Date().toLocaleString(),
+        status: 'SUCCESS',
+        type: 'BONUS',
+        amount: amountVal,
+        gateway: 'Admin Adjustment',
+        gameTitle: 'Lobby',
+        note: `Admin adjusted balance: ${diffText} (Previous: $${oldBalance.toFixed(2)}, New: $${newBalance.toFixed(2)})`
+      };
+      await transactionsCollection.insertOne(auditTx);
     }
 
     // Invalidate stats cache since coin/user edits could influence calculations

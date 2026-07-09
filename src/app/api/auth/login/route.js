@@ -27,6 +27,13 @@ export async function POST(req) {
       );
     }
 
+    if (matchedUser.status === 'SUSPENDED') {
+      return NextResponse.json(
+        { success: false, message: 'Your account has been suspended. Please contact customer support.' },
+        { status: 403 }
+      );
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Login successful!',

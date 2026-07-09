@@ -7,6 +7,8 @@ export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const email = searchParams.get('email');
+    const status = searchParams.get('status');
+    const type = searchParams.get('type');
     const search = searchParams.get('search') || '';
     const page = parseInt(searchParams.get('page') || '1', 10);
     const limit = parseInt(searchParams.get('limit') || '25', 10);
@@ -18,6 +20,17 @@ export async function GET(req) {
     if (email) {
       query.userEmail = email.toLowerCase().trim();
     }
+    if (status) {
+      const statuses = status.split(',').map(s => s.toUpperCase().trim());
+      if (statuses.length > 1) {
+        query.status = { $in: statuses };
+      } else {
+        query.status = statuses[0];
+      }
+    }
+    if (type) {
+      query.type = type.toUpperCase().trim();
+    }
 
     if (search) {
       const cleanSearch = search.trim();
@@ -28,7 +41,7 @@ export async function GET(req) {
           { type: { $regex: cleanSearch, $options: 'i' } }
         ]
       };
-      if (email) {
+      if (Object.keys(query).length > 0) {
         query = { $and: [query, searchCriteria] };
       } else {
         query = searchCriteria;
