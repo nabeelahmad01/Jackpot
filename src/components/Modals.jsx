@@ -661,6 +661,7 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
   const [nameError, setNameError] = useState('');
   const [tagError, setTagError] = useState('');
   const [qrError, setQrError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -705,7 +706,6 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
     reader.readAsDataURL(file);
   };
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
