@@ -1178,12 +1178,6 @@ export default function UserLobby({
                           </div>
                         </div>
 
-                        {frontendSettings?.cashoutNotice && (
-                          <div style={{ padding: '0.6rem 0.85rem', background: 'rgba(239,68,68,0.06)', borderRadius: '8px', fontSize: '0.65rem', color: '#f87171', borderLeft: '2px solid #ef4444', marginBottom: '0.75rem', lineHeight: '1.4' }}>
-                            {frontendSettings.cashoutNotice}
-                          </div>
-                        )}
-
                         <form onSubmit={handleWithdrawInitiate}>
                           <div className="input-group" style={{ marginBottom: '1rem' }}>
                             <div className="input-wrapper" style={{ background: '#0b0c16' }}>
