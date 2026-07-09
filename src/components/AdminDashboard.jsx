@@ -614,6 +614,7 @@ export default function AdminDashboard({
               completedActionIds={completedActionIds}
               processingIds={processingIds}
               wrapAction={wrapAction}
+              adminUser={adminUser}
             />
           )}
           {activeTab === 'gateways' && hasAccess('gateways') && (

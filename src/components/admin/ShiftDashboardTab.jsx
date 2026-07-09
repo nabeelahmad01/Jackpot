@@ -97,7 +97,7 @@ export default function ShiftDashboardTab({ adminUser }) {
       const res = await fetch('/api/coins-notifications', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: notiId, status: 'COMPLETED', read: true })
+        body: JSON.stringify({ id: notiId, status: 'COMPLETED', read: true, processedBy: adminUser?.email || 'admin@jackpot.com' })
       });
       const data = await res.json();
       if (data.success) {
@@ -126,7 +126,7 @@ export default function ShiftDashboardTab({ adminUser }) {
       const res = await fetch('/api/coins-notifications', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: notiId, status: 'HOLD', read: true, holdNote: reason })
+        body: JSON.stringify({ id: notiId, status: 'HOLD', read: true, holdNote: reason, processedBy: adminUser?.email || 'admin@jackpot.com' })
       });
       const data = await res.json();
       if (data.success) {
@@ -193,7 +193,8 @@ export default function ShiftDashboardTab({ adminUser }) {
           status: 'SUCCESS',
           note: payoutCustomNote.trim(),
           payoutSent: parseFloat(payoutSentAmount || 0),
-          payoutHold: parseFloat(payoutHoldAmount || 0)
+          payoutHold: parseFloat(payoutHoldAmount || 0),
+          processedBy: adminUser?.email || 'admin@jackpot.com'
         })
       });
       const data = await res.json();
@@ -220,7 +221,7 @@ export default function ShiftDashboardTab({ adminUser }) {
       const res = await fetch('/api/transactions', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: txId, status: 'FAILED', note: reason })
+        body: JSON.stringify({ id: txId, status: 'FAILED', note: reason, processedBy: adminUser?.email || 'admin@jackpot.com' })
       });
       const data = await res.json();
       if (data.success) {

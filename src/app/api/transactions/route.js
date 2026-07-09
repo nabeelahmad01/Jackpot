@@ -201,7 +201,7 @@ export async function POST(req) {
 // PUT update transaction status (Admin action - approve/decline)
 export async function PUT(req) {
   try {
-    const { id, status, note, payoutSent, payoutHold } = await req.json();
+    const { id, status, note, payoutSent, payoutHold, processedBy } = await req.json();
 
     if (!id || !status) {
       return NextResponse.json({ success: false, message: 'Transaction ID and status are required.' }, { status: 400 });
@@ -224,6 +224,9 @@ export async function PUT(req) {
     }
     if (payoutHold !== undefined) {
       updateFields.payoutHold = Number(payoutHold);
+    }
+    if (processedBy !== undefined) {
+      updateFields.approvedBy = processedBy;
     }
 
     await transactionsCollection.updateOne({ id }, { $set: updateFields });
@@ -270,7 +273,8 @@ export async function PUT(req) {
           totalCoins: Math.round(totalCoins * 100) / 100,
           status: 'PENDING',
           read: false,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          transactionId: originalTx.id // Linked parent transaction!
         });
 
         // 4. Referral System Bonus: Check if this depositor was referred by someone

@@ -140,7 +140,8 @@ export default function LedgerTab({
         status: 'SUCCESS',
         note: payoutCustomNote.trim() || `Payout processed to ${payoutGateway}`,
         payoutSent: parseFloat(payoutSentAmount || 0),
-        payoutHold: parseFloat(payoutHoldAmount || 0)
+        payoutHold: parseFloat(payoutHoldAmount || 0),
+        processedBy: adminUser?.email || 'admin@jackpot.com'
       };
 
       const response = await fetch('/api/transactions', {
@@ -426,6 +427,20 @@ export default function LedgerTab({
                           </div>
                         )}
                         {tx.note && <p style={{ fontSize: '0.65rem', color: '#ff8787', margin: '0.2rem 0 0 0' }}>{tx.note}</p>}
+                        {tx.approvedBy && (
+                          <div style={{ fontSize: '0.65rem', marginTop: '0.25rem', color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <i className="fa-solid fa-user-shield text-blue" style={{ fontSize: '0.65rem' }}></i>
+                            <span>Approved By:</span>
+                            <span style={{ color: 'var(--gold-primary)', fontWeight: 'bold' }}>{tx.approvedBy}</span>
+                          </div>
+                        )}
+                        {tx.allottedBy && (
+                          <div style={{ fontSize: '0.65rem', marginTop: '0.15rem', color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <i className="fa-solid fa-circle-dollar-to-slot text-green" style={{ fontSize: '0.65rem' }}></i>
+                            <span>Coins Allotted By:</span>
+                            <span style={{ color: 'var(--gold-primary)', fontWeight: 'bold' }}>{tx.allottedBy}</span>
+                          </div>
+                        )}
                       </td>
                       <td style={{ fontSize: '0.7rem' }}>{tx.date}</td>
                       <td>
@@ -617,6 +632,20 @@ export default function LedgerTab({
                           {tx.gateway || '—'} {tx.code ? `(${tx.code})` : ''}
                         </span>
                         {tx.note && <p style={{ fontSize: '0.675rem', color: 'var(--text-muted)', margin: '0.2rem 0 0 0' }}>{tx.note}</p>}
+                        {tx.approvedBy && (
+                          <div style={{ fontSize: '0.65rem', marginTop: '0.25rem', color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <i className="fa-solid fa-user-shield text-blue" style={{ fontSize: '0.65rem' }}></i>
+                            <span>Approved By:</span>
+                            <span style={{ color: 'var(--gold-primary)', fontWeight: 'bold' }}>{tx.approvedBy}</span>
+                          </div>
+                        )}
+                        {tx.allottedBy && (
+                          <div style={{ fontSize: '0.65rem', marginTop: '0.15rem', color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <i className="fa-solid fa-circle-dollar-to-slot text-green" style={{ fontSize: '0.65rem' }}></i>
+                            <span>Coins Allotted By:</span>
+                            <span style={{ color: 'var(--gold-primary)', fontWeight: 'bold' }}>{tx.allottedBy}</span>
+                          </div>
+                        )}
                         {tx.payoutSent !== undefined && (
                           <div style={{ fontSize: '0.675rem', marginTop: '0.25rem', color: '#10b981', fontWeight: 'bold' }}>
                             <i className="fa-solid fa-circle-check"></i> Paid: ${parseFloat(tx.payoutSent).toFixed(2)}

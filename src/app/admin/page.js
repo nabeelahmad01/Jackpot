@@ -228,7 +228,7 @@ export default function AdminPage({ portalName, forcedRole }) {
       const response = await fetch('/api/coins-notifications', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status, read, holdNote })
+        body: JSON.stringify({ id, status, read, holdNote, processedBy: adminUser?.email || 'admin@jackpot.com' })
       });
       const data = await response.json();
       if (data.success) {
@@ -388,7 +388,7 @@ export default function AdminPage({ portalName, forcedRole }) {
       const response = await fetch('/api/transactions', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: txId, status: 'SUCCESS' })
+        body: JSON.stringify({ id: txId, status: 'SUCCESS', processedBy: adminUser?.email || 'admin@jackpot.com' })
       });
       const data = await response.json();
       if (data.success) {
@@ -415,7 +415,7 @@ export default function AdminPage({ portalName, forcedRole }) {
       const response = await fetch('/api/transactions', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: txId, status: 'FAILED', note: feedbackMsg || 'Declined by Admin' })
+        body: JSON.stringify({ id: txId, status: 'FAILED', note: feedbackMsg || 'Declined by Admin', processedBy: adminUser?.email || 'admin@jackpot.com' })
       });
       const data = await response.json();
       if (data.success) {

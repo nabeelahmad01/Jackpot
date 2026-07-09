@@ -83,7 +83,7 @@ export async function GET(req) {
 // PUT update status, read indicator, or hold note
 export async function PUT(req) {
   try {
-    const { id, status, read, holdNote } = await req.json();
+    const { id, status, read, holdNote, processedBy } = await req.json();
 
     if (!id) {
       return NextResponse.json({ success: false, message: 'Notification ID is required.' }, { status: 400 });
@@ -102,6 +102,9 @@ export async function PUT(req) {
     if (holdNote !== undefined) {
       updateFields.holdNote = holdNote;
     }
+    if (processedBy !== undefined) {
+      updateFields.processedBy = processedBy;
+    }
 
     await notificationsCollection.updateOne({ id }, { $set: updateFields });
 
@@ -110,10 +113,14 @@ export async function PUT(req) {
       if (originalNoti && originalNoti.transactionId) {
         const transactionsCollection = db.collection('transactions');
         const parentTx = await transactionsCollection.findOne({ id: originalNoti.transactionId });
-        if (parentTx && parentTx.type === 'WITHDRAW') {
+        if (parentTx) {
+          const txUpdate = { allottedBy: processedBy || originalNoti.processedBy || 'system' };
+          if (parentTx.type === 'WITHDRAW') {
+            txUpdate.status = 'PENDING';
+          }
           await transactionsCollection.updateOne(
             { id: originalNoti.transactionId },
-            { $set: { status: 'PENDING' } }
+            { $set: txUpdate }
           );
         }
       }
