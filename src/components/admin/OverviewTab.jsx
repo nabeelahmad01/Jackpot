@@ -127,19 +127,56 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
           </div>
 
           <form onSubmit={handleShiftReportSubmit} style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginTop: '0.5rem' }}>
-            <div className="input-group" style={{ flex: '1 1 200px', margin: 0 }}>
-              <label style={{ fontSize: '0.7rem' }}>Select Shift Timeframe</label>
-              <div className="input-wrapper" style={{ background: '#07090f' }}>
-                <i className="fa-solid fa-clock input-icon"></i>
-                <select
-                  value={shiftName}
-                  onChange={(e) => setShiftName(e.target.value)}
-                  style={{ background: 'none', border: 'none', color: '#fff', width: '100%', fontSize: '0.775rem', height: '100%', padding: '0 0.5rem', outline: 'none' }}
-                >
-                  <option value="Morning Shift (8 AM - 4 PM)">Morning Shift (8 AM - 4 PM)</option>
-                  <option value="Evening Shift (4 PM - 12 AM)">Evening Shift (4 PM - 12 AM)</option>
-                  <option value="Night Shift (12 AM - 8 AM)">Night Shift (12 AM - 8 AM)</option>
-                </select>
+            <div className="input-group" style={{ flex: '1 1 100%', margin: 0 }}>
+              <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.5rem' }}>Select Shift Timeframe</label>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {[
+                  { value: 'Morning Shift (8 AM - 4 PM)', label: 'Morning Shift', hours: '8 AM - 4 PM', icon: 'fa-sun' },
+                  { value: 'Evening Shift (4 PM - 12 AM)', label: 'Evening Shift', hours: '4 PM - 12 AM', icon: 'fa-moon' },
+                  { value: 'Night Shift (12 AM - 8 AM)', label: 'Night Shift', hours: '12 AM - 8 AM', icon: 'fa-star' }
+                ].map((s) => {
+                  const isSelected = shiftName === s.value;
+                  return (
+                    <button
+                      key={s.value}
+                      type="button"
+                      onClick={() => setShiftName(s.value)}
+                      style={{
+                        flex: '1 1 180px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                        padding: '0.65rem 1rem',
+                        background: isSelected ? 'rgba(255, 215, 0, 0.1)' : '#070912',
+                        border: isSelected ? '1px solid var(--gold-primary)' : '1px solid rgba(255,255,255,0.05)',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'all 0.2s ease',
+                        color: isSelected ? 'var(--gold-primary)' : '#fff',
+                        margin: 0
+                      }}
+                    >
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        background: isSelected ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.05)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '0.9rem',
+                        color: isSelected ? 'var(--gold-primary)' : 'var(--text-muted)'
+                      }}>
+                        <i className={`fa-solid ${s.icon}`}></i>
+                      </div>
+                      <div>
+                        <strong style={{ fontSize: '0.75rem', display: 'block' }}>{s.label}</strong>
+                        <span style={{ fontSize: '0.6rem', opacity: 0.6, display: 'block', marginTop: '0.15rem' }}>{s.hours}</span>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
