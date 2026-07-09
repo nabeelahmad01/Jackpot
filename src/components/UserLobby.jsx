@@ -153,7 +153,7 @@ export default function UserLobby({
   const timerRef = useRef(null);
 
   // Seeded withdrawals for marquee loop
-  const payouts = [
+  const payouts = frontendSettings.marqueePayouts || [
     { name: 'Elizabeth Audrey', amount: '$208.00', time: '1 hour ago', color: 'av-purple', init: 'EA' },
     { name: 'Jamie', amount: '$30.00', time: '1 hour ago', color: 'av-blue', init: 'JM' },
     { name: 'Angel', amount: '$90.00', time: '1 hour ago', color: 'av-green', init: 'AN' },
@@ -812,14 +812,17 @@ export default function UserLobby({
               </div>
               <div className="accordion-body">
                 <div className="rules-content">
-                  <h5>1. Account Verification</h5>
-                  <p>Before requesting your first cashout, your email must be verified. Go to customer support if you need assistance updating details.</p>
-                  <h5>2. Playthrough Requirements</h5>
-                  <p>Sign-up bonuses and deposit match values carry a standard 1x playthrough requirement before funds are eligible for withdrawal requests.</p>
-                  <h5>3. Minimum & Maximum Cashouts</h5>
-                  <p>The minimum cashout limit is $5. Daily maximum cashouts are capped at $5,000 for standard players. Support can raise limits for VIP accounts.</p>
-                  <h5>4. Payout Duration</h5>
-                  <p>Withdrawal requests are processed instantly or within 10-15 minutes on average via digital wallets.</p>
+                  {(frontendSettings.cashoutRules || [
+                    { title: '1. Account Verification', description: 'Before requesting your first cashout, your email must be verified. Go to customer support if you need assistance updating details.' },
+                    { title: '2. Playthrough Requirements', description: 'Sign-up bonuses and deposit match values carry a standard 1x playthrough requirement before funds are eligible for withdrawal requests.' },
+                    { title: '3. Minimum & Maximum Cashouts', description: 'The minimum cashout limit is $5. Daily maximum cashouts are capped at $5,000 for standard players. Support can raise limits for VIP accounts.' },
+                    { title: '4. Payout Duration', description: 'Withdrawal requests are processed instantly or within 10-15 minutes on average via digital wallets.' }
+                  ]).map((rule, idx) => (
+                    <React.Fragment key={idx}>
+                      <h5>{rule.title}</h5>
+                      <p>{rule.description}</p>
+                    </React.Fragment>
+                  ))}
                 </div>
               </div>
             </div>
@@ -1532,7 +1535,32 @@ export default function UserLobby({
       {/* Subscription Alert Prompt Modal */}
       {showSubPrompt && (
         <div className="modal-backdrop-custom" style={{ zIndex: 2000 }}>
-          <div className="modal-content border-gold animate-float" style={{ maxWidth: '420px', width: '90%', textAlign: 'center', padding: '2rem 1.5rem' }}>
+          <div className="modal-content border-gold animate-float" style={{ maxWidth: '420px', width: '90%', textAlign: 'center', padding: '2rem 1.5rem', position: 'relative' }}>
+            {/* Top-Right Close Button */}
+            <button
+              onClick={() => {
+                sessionStorage.setItem('jackpot_sub_dismissed', 'true');
+                setShowSubPrompt(false);
+              }}
+              style={{
+                position: 'absolute',
+                top: '12px',
+                right: '16px',
+                background: 'none',
+                border: 'none',
+                color: 'rgba(255,255,255,0.4)',
+                fontSize: '1.4rem',
+                cursor: 'pointer',
+                transition: 'color 0.2s',
+                lineHeight: 1
+              }}
+              onMouseEnter={(e) => e.target.style.color = '#fff'}
+              onMouseLeave={(e) => e.target.style.color = 'rgba(255,255,255,0.4)'}
+              aria-label="Close"
+            >
+              &times;
+            </button>
+
             <div style={{ marginBottom: '1.25rem' }}>
               <div style={{
                 width: '64px',
@@ -1556,7 +1584,7 @@ export default function UserLobby({
               </p>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
               <button
                 onClick={async () => {
                   setSubscribing(true);
@@ -1589,26 +1617,30 @@ export default function UserLobby({
                   background: 'var(--gold-primary)',
                   color: '#000',
                   fontWeight: 'bold',
-                  margin: 0
+                  margin: 0,
+                  width: '100%'
                 }}
               >
                 {subscribing ? 'SUBSCRIBING...' : 'SUBSCRIBE NOW'}
               </button>
+              
               <button
                 onClick={() => {
                   sessionStorage.setItem('jackpot_sub_dismissed', 'true');
                   setShowSubPrompt(false);
                 }}
-                className="action-row-btn"
                 style={{
-                  background: 'rgba(255,255,255,0.05)',
-                  color: '#fff',
+                  background: 'none',
+                  color: 'rgba(255, 255, 255, 0.4)',
                   border: 'none',
-                  fontSize: '0.7rem',
-                  padding: '0.5rem',
-                  borderRadius: '8px',
-                  cursor: 'pointer'
+                  fontSize: '0.725rem',
+                  cursor: 'pointer',
+                  marginTop: '0.5rem',
+                  textDecoration: 'underline',
+                  transition: 'color 0.2s'
                 }}
+                onMouseEnter={(e) => e.target.style.color = '#fff'}
+                onMouseLeave={(e) => e.target.style.color = 'rgba(255, 255, 255, 0.4)'}
               >
                 No thanks, maybe later
               </button>

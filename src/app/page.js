@@ -299,6 +299,7 @@ export default function Home() {
           triggerLoading={triggerLoading}
           showToast={showToast}
           onOpenSupport={() => setSupportOpen(true)}
+          frontendSettings={frontendSettings}
         />
       ) : (
         <UserLobby
