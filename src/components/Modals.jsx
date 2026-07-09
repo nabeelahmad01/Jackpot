@@ -54,7 +54,7 @@ export function SupportModal({ isOpen, onClose, currentUser }) {
     const interval = setInterval(fetchMessages, 3000); // Poll replies every 3 seconds
 
     return () => clearInterval(interval);
-  }, [isOpen]);
+  }, [isOpen, currentUser]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
