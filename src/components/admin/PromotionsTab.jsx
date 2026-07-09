@@ -197,7 +197,6 @@ export default function PromotionsTab({ adminUser }) {
                   <th>#</th>
                   <th>Player Name</th>
                   <th>Email Address</th>
-                  <th>Current Coins</th>
                   <th>Subscriber Status</th>
                   <th>Account Status</th>
                 </tr>
@@ -205,13 +204,13 @@ export default function PromotionsTab({ adminUser }) {
               <tbody>
                 {!userData && !userError ? (
                   <tr>
-                    <td colSpan="6" className="text-center text-muted" style={{ padding: '2rem' }}>
+                    <td colSpan="5" className="text-center text-muted" style={{ padding: '2rem' }}>
                       <i className="fa-solid fa-spinner fa-spin" style={{ color: 'var(--gold-primary)', marginRight: '6px' }}></i> Loading segment players...
                     </td>
                   </tr>
                 ) : usersList.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="text-center text-muted" style={{ padding: '2rem' }}>No players found matching this criteria.</td>
+                    <td colSpan="5" className="text-center text-muted" style={{ padding: '2rem' }}>No players found matching this criteria.</td>
                   </tr>
                 ) : (
                   usersList.map((user, idx) => (
@@ -219,11 +218,6 @@ export default function PromotionsTab({ adminUser }) {
                       <td>{(page - 1) * limit + idx + 1}</td>
                       <td><strong>{user.name}</strong></td>
                       <td>{user.email}</td>
-                      <td>
-                        <strong style={{ color: 'var(--gold-primary)' }}>
-                          {(user.coins || 0).toFixed(2)}
-                        </strong>
-                      </td>
                       <td>
                         <span className={`admin-badge-preview ${user.isSubscribed ? 'b-ready' : 'b-new'}`} style={{ fontSize: '0.65rem' }}>
                           {user.isSubscribed ? 'SUBSCRIBED' : 'UNSUBSCRIBED'}

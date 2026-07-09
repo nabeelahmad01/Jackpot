@@ -45,13 +45,26 @@ export async function GET(req) {
 
     if (search) {
       const cleanSearch = search.trim();
+      
+      const gameAccountsCollection = db.collection('gameAccounts');
+      const matchingAccs = await gameAccountsCollection.find({
+        username: { $regex: cleanSearch, $options: 'i' }
+      }).project({ userEmail: 1 }).toArray();
+      const matchingEmails = Array.from(new Set(matchingAccs.map(a => a.userEmail.toLowerCase().trim())));
+
       const searchCriteria = {
         $or: [
           { userEmail: { $regex: cleanSearch, $options: 'i' } },
           { gateway: { $regex: cleanSearch, $options: 'i' } },
-          { type: { $regex: cleanSearch, $options: 'i' } }
+          { type: { $regex: cleanSearch, $options: 'i' } },
+          { gameUsername: { $regex: cleanSearch, $options: 'i' } }
         ]
       };
+
+      if (matchingEmails.length > 0) {
+        searchCriteria.$or.push({ userEmail: { $in: matchingEmails } });
+      }
+
       if (Object.keys(query).length > 0) {
         query = { $and: [query, searchCriteria] };
       } else {

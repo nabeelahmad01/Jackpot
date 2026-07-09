@@ -282,7 +282,6 @@ export default function PlayerAccountsTab({ adminUser, onDeleteUser }) {
             <tr>
               <th>Full Name</th>
               <th>Email Address</th>
-              <th>Balance</th>
               <th>Referral Code</th>
               <th>Status</th>
               <th>Actions</th>
@@ -302,11 +301,6 @@ export default function PlayerAccountsTab({ adminUser, onDeleteUser }) {
                 <tr key={user.email}>
                   <td>{user.name}</td>
                   <td>{user.email}</td>
-                  <td>
-                    <strong style={{ color: 'var(--gold-primary)' }}>
-                      ${parseFloat(user.coins || 0).toFixed(2)}
-                    </strong>
-                  </td>
                   <td>
                     <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#a855f7', fontWeight: 700 }}>
                       {user.referralCode || '—'}
@@ -328,18 +322,6 @@ export default function PlayerAccountsTab({ adminUser, onDeleteUser }) {
                       >
                         <i className="fa-solid fa-clock-rotate-left"></i>
                       </button>
-
-                      {/* Adjust Balance */}
-                      {isManagerOrAdmin && (
-                        <button
-                          className="action-row-btn"
-                          onClick={() => { setAdjustBalanceUser(user); setBalanceModalOpen(true); }}
-                          title="Adjust Coins Balance"
-                          style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', color: '#22c55e' }}
-                        >
-                          <i className="fa-solid fa-coins"></i>
-                        </button>
-                      )}
 
                       {/* Reset Password */}
                       {isManagerOrAdmin && (
@@ -628,13 +610,7 @@ export default function PlayerAccountsTab({ adminUser, onDeleteUser }) {
           </div>
         </div>
       )}
-      {/* Balance Adjustment Modal */}
-      <AdjustBalanceModal
-        isOpen={balanceModalOpen}
-        onClose={() => { setBalanceModalOpen(false); setAdjustBalanceUser(null); }}
-        onAdjust={handleAdjustBalanceSubmit}
-        user={adjustBalanceUser}
-      />
+
 
       {/* Password Reset Modal */}
       <AdminResetPasswordModal
