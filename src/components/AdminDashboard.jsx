@@ -16,6 +16,7 @@ const StaffTab = lazy(() => import('./admin/StaffTab'));
 const SettingsTab = lazy(() => import('./admin/SettingsTab'));
 const FrontendSettingsTab = lazy(() => import('./admin/FrontendSettingsTab'));
 const ShiftReportsTab = lazy(() => import('./admin/ShiftReportsTab'));
+const ShiftDashboardTab = lazy(() => import('./admin/ShiftDashboardTab'));
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -132,6 +133,7 @@ export default function AdminDashboard({
     return roles.some((role) => {
       if (role === 'admin') return true; // Super Admin has full access
       
+      if (tabName === 'shift_dashboard') return true;
       // Frontend Settings tab is strictly reserved for main boss (Super Admin)
       if (tabName === 'frontend_settings') return false;
       if (tabName === 'shift_reports') return role === 'operation_admin';
@@ -215,6 +217,31 @@ export default function AdminDashboard({
             >
               <i className="fa-solid fa-chart-line" style={{ width: '18px' }}></i>
               <span>Overview Welcome</span>
+            </button>
+          )}
+
+          {hasAccess('shift_dashboard') && (
+            <button
+              onClick={() => { setActiveTab('shift_dashboard'); setSidebarOpen(false); }}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                background: activeTab === 'shift_dashboard' ? 'var(--gold-primary)' : 'none',
+                color: activeTab === 'shift_dashboard' ? '#111' : '#fff',
+                fontSize: '0.8rem',
+                fontWeight: 'bold',
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <i className="fa-solid fa-business-time" style={{ width: '18px' }}></i>
+              <span>Shift Dashboard</span>
             </button>
           )}
 
@@ -587,6 +614,9 @@ export default function AdminDashboard({
           )}
           {activeTab === 'shift_reports' && hasAccess('shift_reports') && (
             <ShiftReportsTab />
+          )}
+          {activeTab === 'shift_dashboard' && hasAccess('shift_dashboard') && (
+            <ShiftDashboardTab adminUser={adminUser} />
           )}
         </Suspense>
       </main>
