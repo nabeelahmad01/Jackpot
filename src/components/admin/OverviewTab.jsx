@@ -167,8 +167,8 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
         </div>
       </section>
 
-      {/* End of Shift Coins Loading Report Card (Visible to all admins/staff to submit) */}
-      {adminUser && (
+      {/* End of Shift Coins Loading Report Card (Visible to all admins/staff to submit except financial_admin) */}
+      {adminUser && !adminUser.role?.toLowerCase().split(',').map(r => r.trim()).includes('financial_admin') && (
         <section className="admin-section-card" style={{ borderLeft: '4px solid var(--gold-primary)', background: '#0a0d16' }}>
           <div className="section-card-header" style={{ marginBottom: '0.75rem' }}>
             <div>
@@ -278,8 +278,9 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
         </section>
       )}
 
-      {/* Game coins pool status */}
-      <section className="admin-section-card">
+      {/* Game coins pool status (Hidden for financial_admin) */}
+      {adminUser && !adminUser.role?.toLowerCase().split(',').map(r => r.trim()).includes('financial_admin') && (
+        <section className="admin-section-card">
         <div className="section-card-header">
           <div>
             <h3><i className="fa-solid fa-coins gold-text"></i> Game Coins Remaining Pool</h3>
@@ -350,6 +351,7 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
           </table>
         </div>
       </section>
+      )}
 
       {/* Update Pool Modal */}
       {updateModalOpen && selectedGame && (
