@@ -302,6 +302,8 @@ export function AdminGameModal({ isOpen, onClose, onSave, editGame }) {
     }
   }, [isOpen, editGame]);
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   if (!isOpen) return null;
 
   const handleLogoUpload = (e) => {
@@ -321,8 +323,6 @@ export function AdminGameModal({ isOpen, onClose, onSave, editGame }) {
     };
     reader.readAsDataURL(file);
   };
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
