@@ -4,7 +4,7 @@ import useSWR from 'swr';
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
 export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
-  const [shiftName, setShiftName] = React.useState('Morning Shift (8 AM - 4 PM)');
+  const [shiftName, setShiftName] = React.useState('Morning Shift (5 AM - 1 PM)');
   const [totalLoaded, setTotalLoaded] = React.useState('');
   const [notes, setNotes] = React.useState('');
   const [isSubmittingReport, setIsSubmittingReport] = React.useState(false);
@@ -162,9 +162,9 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
               <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.5rem' }}>Select Shift Timeframe</label>
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 {[
-                  { value: 'Morning Shift (8 AM - 4 PM)', label: 'Morning Shift', hours: '8 AM - 4 PM', icon: 'fa-sun' },
-                  { value: 'Evening Shift (4 PM - 12 AM)', label: 'Evening Shift', hours: '4 PM - 12 AM', icon: 'fa-moon' },
-                  { value: 'Night Shift (12 AM - 8 AM)', label: 'Night Shift', hours: '12 AM - 8 AM', icon: 'fa-star' }
+                  { value: 'Morning Shift (5 AM - 1 PM)', label: 'Morning Shift', hours: '5 AM - 1 PM', icon: 'fa-sun' },
+                  { value: 'Day Shift (1 PM - 9 PM)', label: 'Day Shift', hours: '1 PM - 9 PM', icon: 'fa-moon' },
+                  { value: 'Night Shift (9 PM - 5 AM)', label: 'Night Shift', hours: '9 PM - 5 AM', icon: 'fa-star' }
                 ].map((s) => {
                   const isSelected = shiftName === s.value;
                   return (

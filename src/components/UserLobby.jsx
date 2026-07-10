@@ -1253,25 +1253,53 @@ export default function UserLobby({
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1.5rem' }}>
                           {userHoldAllotments.map((noti) => (
                             <div key={noti.id} style={{
-                              padding: '0.85rem 1rem',
-                              background: 'rgba(239, 68, 68, 0.05)',
-                              border: '1px solid rgba(239, 68, 68, 0.25)',
-                              borderRadius: '12px',
-                              color: '#f87171',
+                              padding: '0.85rem 1.25rem',
+                              background: 'linear-gradient(135deg, rgba(8, 10, 17, 0.95) 0%, rgba(20, 15, 5, 0.95) 100%)',
+                              border: '1.5px solid rgba(245, 158, 11, 0.4)',
+                              borderRadius: '14px',
+                              color: '#fff',
                               fontSize: '0.75rem',
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '0.75rem'
+                              justifyContent: 'space-between',
+                              gap: '1rem',
+                              flexWrap: 'wrap',
+                              boxShadow: '0 4px 15px rgba(0,0,0,0.3)'
                             }}>
-                              <i className="fa-solid fa-circle-exclamation" style={{ fontSize: '1.35rem', flexShrink: 0 }}></i>
-                              <div>
-                                <span style={{ display: 'block', fontWeight: 'bold', color: '#fff', marginBottom: '0.15rem' }}>
-                                  {noti.totalCoins < 0 ? 'Withdrawal' : 'Allotment'} for {noti.gameTitle} is ON HOLD!
-                                </span>
-                                <span>
-                                  Reason: <strong style={{ color: '#fca5a5' }}>{noti.holdNote || 'Declined / Hold by Manager'}</strong>. Please check details or contact customer chat support.
-                                </span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <i className="fa-solid fa-circle-exclamation" style={{ fontSize: '1.35rem', color: '#f59e0b', flexShrink: 0 }}></i>
+                                <div>
+                                  <span style={{ display: 'block', fontWeight: 'bold', color: '#fff', marginBottom: '0.15rem' }}>
+                                    {noti.totalCoins < 0 ? 'Withdrawal' : 'Allotment'} for {noti.gameTitle} is ON HOLD!
+                                  </span>
+                                  <span style={{ color: 'rgba(255,255,255,0.7)' }}>
+                                    Reason: <strong style={{ color: '#fca5a5' }}>{noti.holdNote || 'Declined / Hold by Manager'}</strong>.
+                                  </span>
+                                </div>
                               </div>
+                              <button
+                                onClick={async () => {
+                                  if (onUpdateCoinsNotification) {
+                                    await onUpdateCoinsNotification(noti.id, 'CLAIM_REQUESTED');
+                                    showToast("Coins claim request sent to manager!", "success");
+                                  }
+                                }}
+                                className="submit-btn"
+                                style={{
+                                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                  color: '#000',
+                                  fontWeight: 'bold',
+                                  padding: '0.45rem 1rem',
+                                  borderRadius: '8px',
+                                  fontSize: '0.65rem',
+                                  width: 'auto',
+                                  margin: 0,
+                                  flexShrink: 0,
+                                  boxShadow: '0 4px 10px rgba(245,158,11,0.2)'
+                                }}
+                              >
+                                Claim Coins (Played Existing)
+                              </button>
                             </div>
                           ))}
                         </div>
