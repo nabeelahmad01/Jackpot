@@ -9,7 +9,8 @@ export default function LedgerTab({
   onFailTransaction,
   completedActionIds = {},
   processingIds,
-  wrapAction
+  wrapAction,
+  adminUser
 }) {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
