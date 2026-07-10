@@ -92,7 +92,9 @@ export async function GET(req) {
         nameOnTag: 1,
         phoneOnTag: 1,
         payoutSent: 1,
-        payoutHold: 1
+        payoutHold: 1,
+        approvedBy: 1,
+        allottedBy: 1
       })
       .sort({ id: -1 })
       .skip(skip)

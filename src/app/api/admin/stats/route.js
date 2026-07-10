@@ -20,7 +20,7 @@ export async function GET(req) {
     ] = await Promise.all([
       db.collection('accountRequests').countDocuments({ status: 'PENDING' }),
       db.collection('transactions').countDocuments({ status: 'PENDING' }),
-      db.collection('coinsNotifications').countDocuments({ status: 'PENDING' }),
+      db.collection('coinsNotifications').countDocuments({ status: { $in: ['PENDING', 'CLAIM_REQUESTED'] } }),
       db.collection('supportMessages').distinct('userEmail', { senderType: 'player', read: false })
     ]);
 
