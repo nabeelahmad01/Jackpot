@@ -319,6 +319,10 @@ export default function Home() {
           onRequestAccount={handleRequestAccount}
           onSubmitTransaction={handleSubmitTransaction}
           frontendSettings={frontendSettings}
+          onUpdateUser={(updated) => {
+            setSession(updated);
+            localStorage.setItem('jackpot_session', JSON.stringify(updated));
+          }}
         />
       )}
 

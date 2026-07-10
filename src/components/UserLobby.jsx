@@ -20,7 +20,8 @@ export default function UserLobby({
   onOpenSupport,
   onRequestAccount,
   onSubmitTransaction,
-  frontendSettings = {}
+  frontendSettings = {},
+  onUpdateUser
 }) {
   // Navigation states
   const [activeGame, setActiveGame] = useState(null); // game object or null
@@ -1812,7 +1813,9 @@ export default function UserLobby({
                     const data = await res.json();
                     if (data.success) {
                       showToast('Thank you for subscribing!', 'success');
-                      if (currentUser) {
+                      if (onUpdateUser) {
+                        onUpdateUser({ ...currentUser, isSubscribed: true });
+                      } else if (currentUser) {
                         currentUser.isSubscribed = true;
                       }
                       setShowSubPrompt(false);
