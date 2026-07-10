@@ -277,9 +277,16 @@ export default function UserLobby({
   const handleSelectGateway = (gatewayObj) => {
     setPaymentModalOpen(false);
 
-    // Generate Random Transaction Reference Code (e.g. JKP-837291)
-    const randNum = Math.floor(100000 + Math.random() * 900000);
-    const code = `JKP-${randNum}`;
+    // Generate Random Transaction Reference Code (e.g. Book321, Car123, Rocky432)
+    const words = [
+      'Book', 'Car', 'Rocky', 'Apple', 'Tiger', 'Lion', 'Sky', 'Tree', 'Star', 
+      'Moon', 'Sun', 'River', 'Bird', 'Fish', 'Ring', 'King', 'Queen', 'Royal', 
+      'Club', 'Jack', 'Gold', 'Card', 'Play', 'Game', 'Win', 'Luck', 'Cash',
+      'Ace', 'Diamond', 'Heart', 'Spade', 'Crown', 'Ruby', 'Pearl', 'Coin'
+    ];
+    const randWord = words[Math.floor(Math.random() * words.length)];
+    const randNum = Math.floor(100 + Math.random() * 900); // 3 digits
+    const code = `${randWord}${randNum}`;
 
     setScreenshotBase64('');
 
