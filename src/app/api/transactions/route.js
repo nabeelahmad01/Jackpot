@@ -231,6 +231,22 @@ export async function PUT(req) {
 
     await transactionsCollection.updateOne({ id }, { $set: updateFields });
 
+    // Deduct/refund coins from dynamic game pools on successful withdrawal processing
+    if (status === 'SUCCESS' && originalTx.type === 'WITHDRAW' && originalTx.status !== 'SUCCESS') {
+      try {
+        const gamesCollection = db.collection('games');
+        const game = await gamesCollection.findOne({ title: { $regex: new RegExp(`^${originalTx.gameTitle}$`, 'i') } });
+        if (game) {
+          const currentCoins = parseFloat(game.availableCoins || 0);
+          const newCoins = currentCoins + parseFloat(originalTx.amount || 0);
+          await gamesCollection.updateOne({ id: game.id }, { $set: { availableCoins: newCoins } });
+          cache.del('games_all');
+        }
+      } catch (poolErr) {
+        console.error('Failed to update game coin pool for withdrawal success:', poolErr);
+      }
+    }
+
     // Trigger Coins notification if this transaction is approved as SUCCESS and it is a DEPOSIT or a BONUS
     if (status === 'SUCCESS' && (originalTx.type === 'DEPOSIT' || originalTx.type === 'BONUS') && originalTx.status !== 'SUCCESS') {
       try {

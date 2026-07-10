@@ -40,7 +40,12 @@ export async function POST(req) {
       tag: gateway.tag,
       phone: gateway.phone || '',
       theme: gateway.theme || 'cashapp',
-      qrImage: gateway.qrImage || `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(gateway.name + '-' + gateway.tag)}`
+      qrImage: gateway.qrImage || `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(gateway.name + '-' + gateway.tag)}`,
+      isWithdrawActive: Boolean(gateway.isWithdrawActive),
+      requireNameOnTag: Boolean(gateway.requireNameOnTag),
+      requireTag: Boolean(gateway.requireTag),
+      requirePhoneOnTag: Boolean(gateway.requirePhoneOnTag),
+      requireEmailOnTag: Boolean(gateway.requireEmailOnTag)
     };
 
     await gatewaysCollection.insertOne(newGateway);
@@ -72,7 +77,12 @@ export async function PUT(req) {
       tag: gateway.tag,
       phone: gateway.phone,
       theme: gateway.theme,
-      qrImage: gateway.qrImage
+      qrImage: gateway.qrImage,
+      isWithdrawActive: gateway.isWithdrawActive !== undefined ? Boolean(gateway.isWithdrawActive) : undefined,
+      requireNameOnTag: gateway.requireNameOnTag !== undefined ? Boolean(gateway.requireNameOnTag) : undefined,
+      requireTag: gateway.requireTag !== undefined ? Boolean(gateway.requireTag) : undefined,
+      requirePhoneOnTag: gateway.requirePhoneOnTag !== undefined ? Boolean(gateway.requirePhoneOnTag) : undefined,
+      requireEmailOnTag: gateway.requireEmailOnTag !== undefined ? Boolean(gateway.requireEmailOnTag) : undefined
     };
 
     // Clean undefined fields

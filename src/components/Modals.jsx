@@ -658,6 +658,13 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
   const [theme, setTheme] = useState('chime');
   const [qrImage, setQrImage] = useState('');
 
+  // Withdrawal configurations
+  const [isWithdrawActive, setIsWithdrawActive] = useState(false);
+  const [requireNameOnTag, setRequireNameOnTag] = useState(true);
+  const [requireTag, setRequireTag] = useState(true);
+  const [requirePhoneOnTag, setRequirePhoneOnTag] = useState(true);
+  const [requireEmailOnTag, setRequireEmailOnTag] = useState(false);
+
   const [nameError, setNameError] = useState('');
   const [tagError, setTagError] = useState('');
   const [qrError, setQrError] = useState('');
@@ -672,6 +679,11 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
         setPhone(editGateway.phone);
         setTheme(editGateway.theme);
         setQrImage(editGateway.qrImage);
+        setIsWithdrawActive(editGateway.isWithdrawActive === true);
+        setRequireNameOnTag(editGateway.requireNameOnTag !== false);
+        setRequireTag(editGateway.requireTag !== false);
+        setRequirePhoneOnTag(editGateway.requirePhoneOnTag !== false);
+        setRequireEmailOnTag(editGateway.requireEmailOnTag === true);
       } else {
         setName('');
         setSubtitle('');
@@ -679,6 +691,11 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
         setPhone('');
         setTheme('chime');
         setQrImage('');
+        setIsWithdrawActive(false);
+        setRequireNameOnTag(true);
+        setRequireTag(true);
+        setRequirePhoneOnTag(true);
+        setRequireEmailOnTag(false);
       }
       setNameError('');
       setTagError('');
@@ -692,20 +709,43 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      setQrError('QR graphic cover image size must be less than 2MB.');
+    if (file.size > 8 * 1024 * 1024) {
+      setQrError('QR graphic cover image size must be less than 8MB.');
       e.target.value = '';
       return;
     }
 
     const reader = new FileReader();
     reader.onloadend = () => {
-      setQrImage(reader.result);
-      setQrError('');
+      const img = new Image();
+      img.src = reader.result;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const max_size = 350; // High resolution but low payload footprint
+        if (width > height) {
+          if (width > max_size) {
+            height *= max_size / width;
+            width = max_size;
+          }
+        } else {
+          if (height > max_size) {
+            width *= max_size / height;
+            height = max_size;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7); // 70% quality JPEG is tiny!
+        setQrImage(compressedBase64);
+        setQrError('');
+      };
     };
     reader.readAsDataURL(file);
   };
-
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -736,7 +776,12 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
           tag: tag.trim(),
           phone: phone.trim(),
           theme,
-          qrImage: qrImage
+          qrImage: qrImage,
+          isWithdrawActive,
+          requireNameOnTag: isWithdrawActive ? requireNameOnTag : false,
+          requireTag: isWithdrawActive ? requireTag : false,
+          requirePhoneOnTag: isWithdrawActive ? requirePhoneOnTag : false,
+          requireEmailOnTag: isWithdrawActive ? requireEmailOnTag : false
         });
       } finally {
         setIsSubmitting(false);
@@ -746,7 +791,7 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
 
   return (
     <div className="modal-backdrop-custom" onClick={onClose}>
-      <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()} style={{ overflowY: 'auto', maxHeight: '90vh', maxWidth: '480px', width: '92%' }}>
         <div className="modal-header">
           <h3>
             <i className="fa-solid fa-sliders gold-text"></i>{' '}
@@ -836,6 +881,65 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
                   <option value="venmo">Venmo Cyan</option>
                 </select>
               </div>
+            </div>
+
+            {/* Withdrawal CMS Configuration Settings */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.75rem', color: '#fff', fontWeight: 'bold' }}>Enable for Payout Withdrawals</span>
+                <input
+                  type="checkbox"
+                  checked={isWithdrawActive}
+                  onChange={(e) => setIsWithdrawActive(e.target.checked)}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--gold-primary)' }}
+                />
+              </div>
+
+              {isWithdrawActive && (
+                <div style={{ paddingLeft: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', borderLeft: '2px solid var(--gold-primary)', marginTop: '0.25rem' }}>
+                  <span style={{ fontSize: '0.675rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem' }}>Required Payout Fields from Player:</span>
+                  
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.725rem', color: '#fff', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={requireNameOnTag}
+                      onChange={(e) => setRequireNameOnTag(e.target.checked)}
+                      style={{ accentColor: 'var(--gold-primary)' }}
+                    />
+                    Name on Payout Tag
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.725rem', color: '#fff', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={requireTag}
+                      onChange={(e) => setRequireTag(e.target.checked)}
+                      style={{ accentColor: 'var(--gold-primary)' }}
+                    />
+                    Payout Tag/Address ($handle, email, etc.)
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.725rem', color: '#fff', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={requirePhoneOnTag}
+                      onChange={(e) => setRequirePhoneOnTag(e.target.checked)}
+                      style={{ accentColor: 'var(--gold-primary)' }}
+                    />
+                    Linked Phone Number
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.725rem', color: '#fff', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={requireEmailOnTag}
+                      onChange={(e) => setRequireEmailOnTag(e.target.checked)}
+                      style={{ accentColor: 'var(--gold-primary)' }}
+                    />
+                    Email Address
+                  </label>
+                </div>
+              )}
             </div>
 
             {/* QR Graphic File Uploader */}

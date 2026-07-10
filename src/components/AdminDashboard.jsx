@@ -18,6 +18,7 @@ const FrontendSettingsTab = lazy(() => import('./admin/FrontendSettingsTab'));
 const ShiftReportsTab = lazy(() => import('./admin/ShiftReportsTab'));
 const ShiftDashboardTab = lazy(() => import('./admin/ShiftDashboardTab'));
 const PromotionsTab = lazy(() => import('./admin/PromotionsTab'));
+const TxSearchTab = lazy(() => import('./admin/TxSearchTab'));
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -44,6 +45,7 @@ export default function AdminDashboard({
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [processingIds, setProcessingIds] = useState({});
+  const [inactiveStaffAlerts, setInactiveStaffAlerts] = useState([]);
 
   // Use SWR to poll counts/stats for the sidebar badges
   const { data: statsData } = useSWR('/api/admin/stats', fetcher, {
@@ -111,6 +113,67 @@ export default function AdminDashboard({
     };
   }, [statsData]);
 
+  useEffect(() => {
+    if (!adminUser?.email) return;
+
+    // Heartbeat ping tracker for current admin
+    let lastPing = 0;
+    const sendPing = async () => {
+      const now = Date.now();
+      if (now - lastPing < 30000) return; // limit to once every 30s
+      lastPing = now;
+      try {
+        await fetch('/api/admin/activity', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: adminUser.email })
+        });
+      } catch (err) {
+        console.error('Heartbeat update failed:', err);
+      }
+    };
+
+    sendPing();
+    const triggerPing = () => sendPing();
+    window.addEventListener('mousemove', triggerPing);
+    window.addEventListener('keydown', triggerPing);
+    window.addEventListener('click', triggerPing);
+
+    return () => {
+      window.removeEventListener('mousemove', triggerPing);
+      window.removeEventListener('keydown', triggerPing);
+      window.removeEventListener('click', triggerPing);
+    };
+  }, [adminUser]);
+
+  // Monitor inactive staff members if Boss or Operation Manager
+  useEffect(() => {
+    const isBossOrOp = adminUser?.role === 'admin' || adminUser?.role?.toLowerCase().split(',').map(r => r.trim()).includes('operation_admin');
+    if (!isBossOrOp) return;
+
+    const checkInactivity = async () => {
+      try {
+        const res = await fetch('/api/admin/activity');
+        const data = await res.json();
+        if (data.success && data.staff) {
+          const inactive = data.staff.filter(st => {
+            if (!st.lastActive) return true; // Never active is also inactive!
+            const lastActiveTime = new Date(st.lastActive).getTime();
+            // Older than 2 minutes
+            return (Date.now() - lastActiveTime) > 2 * 60 * 1000;
+          });
+          setInactiveStaffAlerts(inactive);
+        }
+      } catch (err) {
+        console.error('Failed to poll staff activity:', err);
+      }
+    };
+
+    checkInactivity();
+    const interval = setInterval(checkInactivity, 15000); // Check every 15 seconds
+    return () => clearInterval(interval);
+  }, [adminUser]);
+
   const wrapAction = (id, actionFn) => async (...args) => {
     if (processingIds[id]) return;
     setProcessingIds(prev => ({ ...prev, [id]: true }));
@@ -141,9 +204,9 @@ export default function AdminDashboard({
       if (tabName === 'shift_reports') return role === 'operation_admin';
 
       if (role === 'operation_admin') return !['staff', 'settings'].includes(tabName); // Operational Manager has access to all EXCEPT staff and settings
-      if (role === 'financial_admin') return ['dashboard', 'ledger', 'requests', 'gateways'].includes(tabName);
+      if (role === 'financial_admin') return ['dashboard', 'ledger', 'requests', 'gateways', 'tx_search'].includes(tabName);
       if (role === 'support_admin') return ['dashboard', 'support'].includes(tabName);
-      if (role === 'coins_admin') return ['dashboard', 'games', 'users', 'requests', 'gateways', 'coins'].includes(tabName);
+      if (role === 'coins_admin') return ['dashboard', 'games', 'users', 'requests', 'gateways', 'coins', 'tx_search'].includes(tabName);
       return false;
     });
   };
@@ -409,6 +472,31 @@ export default function AdminDashboard({
             </button>
           )}
 
+          {hasAccess('tx_search') && (
+            <button
+              onClick={() => { setActiveTab('tx_search'); setSidebarOpen(false); }}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                background: activeTab === 'tx_search' ? 'var(--gold-primary)' : 'none',
+                color: activeTab === 'tx_search' ? '#111' : '#fff',
+                fontSize: '0.8rem',
+                fontWeight: 'bold',
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <i className="fa-solid fa-clock-rotate-left" style={{ width: '18px' }}></i>
+              <span>Transaction Logs</span>
+            </button>
+          )}
+
           {hasAccess('coins') && (
             <button
               onClick={() => { setActiveTab('coins'); setSidebarOpen(false); }}
@@ -588,6 +676,35 @@ export default function AdminDashboard({
 
       {/* Main Content Workspace Wrapper */}
       <main className="admin-main-workspace" style={activeTab === 'support' ? { overflowY: 'hidden', height: '100vh' } : {}}>
+        {inactiveStaffAlerts.length > 0 && (
+          <div style={{
+            background: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            borderRadius: '10px',
+            padding: '1rem',
+            marginBottom: '1.25rem',
+            boxShadow: '0 4px 15px rgba(239, 68, 68, 0.15)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.5rem',
+            animation: 'pulse 2s infinite ease-in-out'
+          }}>
+            <h4 style={{ color: '#ef4444', margin: 0, fontSize: '0.85rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <i className="fa-solid fa-triangle-exclamation animate-bounce"></i> Inactive Staff Alert
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              {inactiveStaffAlerts.map((staff) => {
+                const timeDiff = staff.lastActive ? Math.round((Date.now() - new Date(staff.lastActive).getTime()) / 60000) : null;
+                const activeText = timeDiff !== null ? `${timeDiff} min ago` : 'Never';
+                return (
+                  <div key={staff.email} style={{ fontSize: '0.725rem', color: '#fff' }}>
+                    ⚠️ <strong style={{ color: '#ef4444' }}>{staff.name || staff.email}</strong> ({staff.role.replace('_', ' ')}) has been inactive for <strong style={{ color: '#ef4444' }}>{activeText}</strong>.
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         <Suspense fallback={
           <div style={{ padding: '2rem', textAlign: 'center', opacity: 0.5 }}>
             <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '2rem', color: 'var(--gold-primary)', marginBottom: '1rem', display: 'block' }}></i>
@@ -648,6 +765,9 @@ export default function AdminDashboard({
           )}
           {activeTab === 'promotions' && hasAccess('promotions') && (
             <PromotionsTab adminUser={adminUser} />
+          )}
+          {activeTab === 'tx_search' && hasAccess('tx_search') && (
+            <TxSearchTab onInspectProof={onInspectProof} />
           )}
         </Suspense>
       </main>

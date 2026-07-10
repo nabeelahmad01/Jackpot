@@ -37,8 +37,44 @@ export default function PromotionsTab({ adminUser }) {
   const [promoTitle, setPromoTitle] = useState('');
   const [promoMessage, setPromoMessage] = useState('');
   const [promoImage, setPromoImage] = useState('');
+  const [promoImageError, setPromoImageError] = useState('');
   const [promoTarget, setPromoTarget] = useState('all'); // 'all' | 'subscribed' | 'unsubscribed' | 'active'
   const [isBroadcasting, setIsBroadcasting] = useState(false);
+
+  const handlePromoImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 8 * 1024 * 1024) {
+      setPromoImageError('Image flyer size must be less than 8MB.');
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const img = new Image();
+      img.src = reader.result;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const max_width = 800; // Optimal width for lobby banner flyer
+        if (width > max_width) {
+          height *= max_width / width;
+          width = max_width;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.75); // 75% JPEG
+        setPromoImage(compressedBase64);
+        setPromoImageError('');
+      };
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Fetch past broadcasts
   const { data: promoData, mutate: mutatePromos } = useSWR('/api/promotions', fetcher);
@@ -306,17 +342,27 @@ export default function PromotionsTab({ adminUser }) {
               </div>
 
               <div className="input-group">
-                <label htmlFor="promo-image">Promotion Flyer Image Graphic Link (Optional)</label>
-                <div className="input-wrapper">
-                  <i className="fa-solid fa-image input-icon"></i>
+                <label htmlFor="promo-image-uploader">Upload Promotion Banner Image (Optional)</label>
+                <div className="input-wrapper" style={{ background: '#07090f' }}>
+                  <i className="fa-solid fa-file-image input-icon" style={{ color: 'var(--gold-primary)' }}></i>
                   <input
-                    type="text"
-                    id="promo-image"
-                    placeholder="https://example.com/banner.jpg"
-                    value={promoImage}
-                    onChange={(e) => setPromoImage(e.target.value)}
+                    type="file"
+                    id="promo-image-uploader"
+                    accept="image/*"
+                    onChange={handlePromoImageUpload}
+                    style={{ border: 'none', background: 'none', color: '#fff', fontSize: '0.75rem', cursor: 'pointer', padding: '0.4rem 0 0.4rem 2.5rem', width: '100%' }}
                   />
                 </div>
+                {promoImageError && <span className="error-msg">{promoImageError}</span>}
+                {promoImage && (
+                  <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{ width: '80px', height: '45px', overflow: 'hidden', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                      <img src={promoImage} alt="Promo Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </div>
+                    <span style={{ fontSize: '0.7rem', color: '#4ade80', fontWeight: 'bold' }}>Banner flyer selected ✓</span>
+                    <button type="button" onClick={() => setPromoImage('')} style={{ background: 'none', border: 'none', color: '#f87171', fontSize: '0.7rem', cursor: 'pointer', textDecoration: 'underline', marginLeft: 'auto' }}>Remove</button>
+                  </div>
+                )}
               </div>
 
               <div className="input-group" style={{ marginBottom: '1.5rem' }}>

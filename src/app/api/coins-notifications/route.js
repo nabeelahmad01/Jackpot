@@ -92,9 +92,17 @@ export async function PUT(req) {
     const db = await getDb();
     const notificationsCollection = db.collection('coinsNotifications');
 
+    const originalNoti = await notificationsCollection.findOne({ id });
+    if (!originalNoti) {
+      return NextResponse.json({ success: false, message: 'Notification not found.' }, { status: 404 });
+    }
+
     const updateFields = {};
     if (status !== undefined) {
       updateFields.status = status;
+      if (status === 'CLAIM_REQUESTED') {
+        updateFields.timestamp = new Date().toISOString();
+      }
     }
     if (read !== undefined) {
       updateFields.read = Boolean(read);
@@ -108,9 +116,27 @@ export async function PUT(req) {
 
     await notificationsCollection.updateOne({ id }, { $set: updateFields });
 
-    if (status === 'COMPLETED') {
-      const originalNoti = await notificationsCollection.findOne({ id });
-      if (originalNoti && originalNoti.transactionId) {
+    if (status === 'COMPLETED' && originalNoti.status !== 'COMPLETED') {
+      // Deduct coins from dynamic game pools on allotment completion
+      const gameTitle = originalNoti.gameTitle;
+      const amountToDeduct = parseFloat(originalNoti.totalCoins || 0);
+
+      if (gameTitle && gameTitle !== 'Referral Reward' && gameTitle !== 'Lobby') {
+        try {
+          const gamesCollection = db.collection('games');
+          const game = await gamesCollection.findOne({ title: { $regex: new RegExp(`^${gameTitle}$`, 'i') } });
+          if (game) {
+            const currentCoins = parseFloat(game.availableCoins || 0);
+            const newCoins = Math.max(0, currentCoins - amountToDeduct);
+            await gamesCollection.updateOne({ id: game.id }, { $set: { availableCoins: newCoins } });
+            cache.del('games_all');
+          }
+        } catch (poolErr) {
+          console.error('Failed to deduct game coin pool for completed allotment:', poolErr);
+        }
+      }
+
+      if (originalNoti.transactionId) {
         const transactionsCollection = db.collection('transactions');
         const parentTx = await transactionsCollection.findOne({ id: originalNoti.transactionId });
         if (parentTx) {

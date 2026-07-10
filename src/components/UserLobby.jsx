@@ -35,6 +35,8 @@ export default function UserLobby({
   const [withdrawMethod, setWithdrawMethod] = useState('Chime');
   const [nameOnTag, setNameOnTag] = useState('');
   const [phoneOnTag, setPhoneOnTag] = useState('');
+  const [withdrawEmail, setWithdrawEmail] = useState('');
+  const [selectedWithdrawGateway, setSelectedWithdrawGateway] = useState(null);
   const [lobbySubView, setLobbySubView] = useState('main'); // 'main' | 'referrals'
   const [referralsList, setReferralsList] = useState([]);
   const [claimBonus, setClaimBonus] = useState(true);
@@ -53,6 +55,19 @@ export default function UserLobby({
       }
     }
   }, [currentUser]);
+
+  useEffect(() => {
+    if (withdrawModalOpen) {
+      const activeGts = (gateways || []).filter(g => g.isWithdrawActive);
+      if (activeGts.length > 0) {
+        setSelectedWithdrawGateway(activeGts[0]);
+        setWithdrawMethod(activeGts[0].name);
+      } else {
+        setSelectedWithdrawGateway(null);
+        setWithdrawMethod('Chime');
+      }
+    }
+  }, [withdrawModalOpen, gateways]);
 
   // Targeted Promotions states
   const [activePromos, setActivePromos] = useState([]);
@@ -329,16 +344,34 @@ export default function UserLobby({
     setWithdrawModalOpen(true);
   };
 
+  const shouldShowField = (fieldName) => {
+    if (!selectedWithdrawGateway) return true; // Legacy fallback
+    if (fieldName === 'name') return selectedWithdrawGateway.requireNameOnTag !== false;
+    if (fieldName === 'tag') return selectedWithdrawGateway.requireTag !== false;
+    if (fieldName === 'phone') return selectedWithdrawGateway.requirePhoneOnTag !== false;
+    if (fieldName === 'email') return selectedWithdrawGateway.requireEmailOnTag === true;
+    return false;
+  };
+
   const handleWithdrawConfirm = (e) => {
     e.preventDefault();
     if (actionLoading) return;
     const amountVal = parseFloat(withdrawAmount);
-    if (withdrawTag.trim() === '') {
+    
+    if (shouldShowField('tag') && withdrawTag.trim() === '') {
       showToast('Please provide your payout tag.', 'error');
       return;
     }
-    if (nameOnTag.trim() === '') {
+    if (shouldShowField('name') && nameOnTag.trim() === '') {
       showToast('Please provide the name on your tag.', 'error');
+      return;
+    }
+    if (shouldShowField('phone') && phoneOnTag.trim() === '') {
+      showToast('Please provide the linked phone number.', 'error');
+      return;
+    }
+    if (shouldShowField('email') && withdrawEmail.trim() === '') {
+      showToast('Please provide the email address.', 'error');
       return;
     }
     if (!withdrawScreenshot) {
@@ -359,9 +392,10 @@ export default function UserLobby({
       type: 'WITHDRAW',
       amount: amountVal,
       gateway: withdrawMethod,
-      code: withdrawTag.trim(),
-      nameOnTag: nameOnTag.trim(),
-      phoneOnTag: phoneOnTag.trim(),
+      code: shouldShowField('tag') ? withdrawTag.trim() : '—',
+      nameOnTag: shouldShowField('name') ? nameOnTag.trim() : '',
+      phoneOnTag: shouldShowField('phone') ? phoneOnTag.trim() : '',
+      emailOnTag: shouldShowField('email') ? withdrawEmail.trim() : '',
       screenshot: withdrawScreenshot,
       gameUsername: gameUsername || ''
     });
@@ -370,6 +404,7 @@ export default function UserLobby({
     setWithdrawTag('');
     setNameOnTag('');
     setPhoneOnTag('');
+    setWithdrawEmail('');
     setWithdrawScreenshot('');
     setWithdrawModalOpen(false);
     showToast('Withdrawal request submitted successfully!', 'success');
@@ -1374,115 +1409,190 @@ export default function UserLobby({
               <div className="input-group">
                 <label style={{ marginBottom: '0.5rem', display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Choose Payment Method</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                  {/* Chime Option */}
-                  {frontendSettings?.chimeActive !== false && (
-                    <label
-                      onClick={() => setWithdrawMethod('Chime')}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '0.85rem 1rem',
-                        background: withdrawMethod === 'Chime' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.01)',
-                        border: withdrawMethod === 'Chime' ? '1.5px solid var(--gold-primary)' : '1.5px solid rgba(255,255,255,0.05)',
-                        borderRadius: '12px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      <div>
-                        <strong style={{ display: 'block', fontSize: '0.85rem', color: '#fff' }}>Chime</strong>
-                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Withdraw to your Chime tag</span>
-                      </div>
-                      <input
-                        type="radio"
-                        name="withdrawMethod"
-                        checked={withdrawMethod === 'Chime'}
-                        onChange={() => setWithdrawMethod('Chime')}
-                        style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--gold-primary)' }}
-                      />
-                    </label>
-                  )}
+                  {(() => {
+                    const activeGts = (gateways || []).filter(g => g.isWithdrawActive);
+                    if (activeGts.length > 0) {
+                      return activeGts.map((gt) => (
+                        <label
+                          key={gt.id}
+                          onClick={() => {
+                            setSelectedWithdrawGateway(gt);
+                            setWithdrawMethod(gt.name);
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '0.85rem 1rem',
+                            background: withdrawMethod === gt.name ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.01)',
+                            border: withdrawMethod === gt.name ? '1.5px solid var(--gold-primary)' : '1.5px solid rgba(255,255,255,0.05)',
+                            borderRadius: '12px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <div>
+                            <strong style={{ display: 'block', fontSize: '0.85rem', color: '#fff' }}>{gt.name}</strong>
+                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{gt.subtitle || `Withdraw to your ${gt.name} tag`}</span>
+                          </div>
+                          <input
+                            type="radio"
+                            name="withdrawMethod"
+                            checked={withdrawMethod === gt.name}
+                            onChange={() => {
+                              setSelectedWithdrawGateway(gt);
+                              setWithdrawMethod(gt.name);
+                            }}
+                            style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--gold-primary)' }}
+                          />
+                        </label>
+                      ));
+                    }
 
-                  {/* Cash App Option */}
-                  {frontendSettings?.cashappActive !== false && (
-                    <label
-                      onClick={() => setWithdrawMethod('Cash App')}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '0.85rem 1rem',
-                        background: withdrawMethod === 'Cash App' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.01)',
-                        border: withdrawMethod === 'Cash App' ? '1.5px solid var(--gold-primary)' : '1.5px solid rgba(255,255,255,0.05)',
-                        borderRadius: '12px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      <div>
-                        <strong style={{ display: 'block', fontSize: '0.85rem', color: '#fff' }}>Cash App</strong>
-                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Withdraw to your Cash App tag</span>
-                      </div>
-                      <input
-                        type="radio"
-                        name="withdrawMethod"
-                        checked={withdrawMethod === 'Cash App'}
-                        onChange={() => setWithdrawMethod('Cash App')}
-                        style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--gold-primary)' }}
-                      />
-                    </label>
-                  )}
+                    // Fallback to static if no withdrawal gateways configured in CMS
+                    return (
+                      <>
+                        <label
+                          onClick={() => {
+                            setSelectedWithdrawGateway(null);
+                            setWithdrawMethod('Chime');
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '0.85rem 1rem',
+                            background: withdrawMethod === 'Chime' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.01)',
+                            border: withdrawMethod === 'Chime' ? '1.5px solid var(--gold-primary)' : '1.5px solid rgba(255,255,255,0.05)',
+                            borderRadius: '12px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <div>
+                            <strong style={{ display: 'block', fontSize: '0.85rem', color: '#fff' }}>Chime</strong>
+                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Withdraw to your Chime tag</span>
+                          </div>
+                          <input
+                            type="radio"
+                            name="withdrawMethod"
+                            checked={withdrawMethod === 'Chime'}
+                            onChange={() => {
+                              setSelectedWithdrawGateway(null);
+                              setWithdrawMethod('Chime');
+                            }}
+                            style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--gold-primary)' }}
+                          />
+                        </label>
+                        <label
+                          onClick={() => {
+                            setSelectedWithdrawGateway(null);
+                            setWithdrawMethod('Cash App');
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '0.85rem 1rem',
+                            background: withdrawMethod === 'Cash App' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.01)',
+                            border: withdrawMethod === 'Cash App' ? '1.5px solid var(--gold-primary)' : '1.5px solid rgba(255,255,255,0.05)',
+                            borderRadius: '12px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <div>
+                            <strong style={{ display: 'block', fontSize: '0.85rem', color: '#fff' }}>Cash App</strong>
+                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Withdraw to your Cash App tag</span>
+                          </div>
+                          <input
+                            type="radio"
+                            name="withdrawMethod"
+                            checked={withdrawMethod === 'Cash App'}
+                            onChange={() => {
+                              setSelectedWithdrawGateway(null);
+                              setWithdrawMethod('Cash App');
+                            }}
+                            style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--gold-primary)' }}
+                          />
+                        </label>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
 
-              <div className="input-group">
-                <label htmlFor="tag-name">Name on Tag</label>
-                <div className="input-wrapper" style={{ background: '#0b0c16' }}>
-                  <i className="fa-solid fa-user input-icon"></i>
-                  <input
-                    type="text"
-                    id="tag-name"
-                    placeholder="e.g. John Doe"
-                    value={nameOnTag}
-                    onChange={(e) => setNameOnTag(e.target.value)}
-                    style={{ paddingLeft: '2.5rem' }}
-                    required
-                  />
+              {shouldShowField('name') && (
+                <div className="input-group">
+                  <label htmlFor="tag-name">Name on Tag</label>
+                  <div className="input-wrapper" style={{ background: '#0b0c16' }}>
+                    <i className="fa-solid fa-user input-icon"></i>
+                    <input
+                      type="text"
+                      id="tag-name"
+                      placeholder="e.g. John Doe"
+                      value={nameOnTag}
+                      onChange={(e) => setNameOnTag(e.target.value)}
+                      style={{ paddingLeft: '2.5rem' }}
+                      required
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <div className="input-group">
-                <label htmlFor="tag-code">Tag</label>
-                <div className="input-wrapper" style={{ background: '#0b0c16' }}>
-                  <i className="fa-solid fa-at input-icon"></i>
-                  <input
-                    type="text"
-                    id="tag-code"
-                    placeholder="e.g. $john777 or @john"
-                    value={withdrawTag}
-                    onChange={(e) => setWithdrawTag(e.target.value)}
-                    style={{ paddingLeft: '2.5rem' }}
-                    required
-                  />
+              {shouldShowField('tag') && (
+                <div className="input-group">
+                  <label htmlFor="tag-code">Tag / Address</label>
+                  <div className="input-wrapper" style={{ background: '#0b0c16' }}>
+                    <i className="fa-solid fa-at input-icon"></i>
+                    <input
+                      type="text"
+                      id="tag-code"
+                      placeholder="e.g. $john777 or @john"
+                      value={withdrawTag}
+                      onChange={(e) => setWithdrawTag(e.target.value)}
+                      style={{ paddingLeft: '2.5rem' }}
+                      required
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <div className="input-group">
-                <label htmlFor="tag-phone">Linked number on Tag</label>
-                <div className="input-wrapper" style={{ background: '#0b0c16' }}>
-                  <i className="fa-solid fa-phone input-icon"></i>
-                  <input
-                    type="tel"
-                    id="tag-phone"
-                    placeholder="e.g. +1 555 123 4567"
-                    value={phoneOnTag}
-                    onChange={(e) => setPhoneOnTag(e.target.value)}
-                    style={{ paddingLeft: '2.5rem' }}
-                    required
-                  />
+              {shouldShowField('phone') && (
+                <div className="input-group">
+                  <label htmlFor="tag-phone">Linked number on Tag</label>
+                  <div className="input-wrapper" style={{ background: '#0b0c16' }}>
+                    <i className="fa-solid fa-phone input-icon"></i>
+                    <input
+                      type="tel"
+                      id="tag-phone"
+                      placeholder="e.g. +1 555 123 4567"
+                      value={phoneOnTag}
+                      onChange={(e) => setPhoneOnTag(e.target.value)}
+                      style={{ paddingLeft: '2.5rem' }}
+                      required
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {shouldShowField('email') && (
+                <div className="input-group">
+                  <label htmlFor="tag-email">Email Address</label>
+                  <div className="input-wrapper" style={{ background: '#0b0c16' }}>
+                    <i className="fa-solid fa-envelope input-icon"></i>
+                    <input
+                      type="email"
+                      id="tag-email"
+                      placeholder="e.g. name@email.com"
+                      value={withdrawEmail}
+                      onChange={(e) => setWithdrawEmail(e.target.value)}
+                      style={{ paddingLeft: '2.5rem' }}
+                      required
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="input-group" style={{ marginTop: '0.5rem' }}>
                 <label htmlFor="withdraw-screenshot-receipt" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.35rem' }}>

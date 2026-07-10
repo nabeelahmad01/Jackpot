@@ -66,7 +66,7 @@ export async function POST(req) {
       success: true,
       message: isNewUser ? 'Google account registered successfully!' : 'Welcome back!',
       isNewUser,
-      user: { name: matchedUser.name, email: matchedUser.email, role: matchedUser.role, coins: matchedUser.coins || 100, referralCode: matchedUser.referralCode || '' }
+      user: { name: matchedUser.name, email: matchedUser.email, role: matchedUser.role, coins: matchedUser.coins || 100, referralCode: matchedUser.referralCode || '', isSubscribed: matchedUser.isSubscribed || false }
     });
   } catch (err) {
     console.error('Google OAuth API Error:', err);

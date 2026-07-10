@@ -99,7 +99,7 @@ export async function POST(req) {
     return NextResponse.json({
       success: true,
       message: 'Account successfully registered!',
-      user: { name: newUser.name, email: newUser.email, role: newUser.role, coins: newUser.coins, referralCode: newUser.referralCode }
+      user: { name: newUser.name, email: newUser.email, role: newUser.role, coins: newUser.coins, referralCode: newUser.referralCode, isSubscribed: false }
     });
   } catch (err) {
     console.error('Registration API Error:', err);
