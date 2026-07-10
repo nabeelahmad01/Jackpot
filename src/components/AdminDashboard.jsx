@@ -206,7 +206,7 @@ export default function AdminDashboard({
       if (role === 'operation_admin') return !['staff', 'settings'].includes(tabName); // Operational Manager has access to all EXCEPT staff and settings
       if (role === 'financial_admin') return ['dashboard', 'ledger', 'requests', 'gateways', 'tx_search'].includes(tabName);
       if (role === 'support_admin') return ['dashboard', 'support'].includes(tabName);
-      if (role === 'coins_admin') return ['dashboard', 'games', 'users', 'requests', 'gateways', 'coins', 'tx_search'].includes(tabName);
+      if (role === 'coins_admin') return ['dashboard', 'games', 'users', 'requests', 'coins', 'tx_search'].includes(tabName);
       return false;
     });
   };
