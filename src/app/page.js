@@ -329,7 +329,7 @@ export default function Home() {
         currentUser={session}
       />
 
-      {!supportOpen && (
+      {!supportOpen && view === 'auth' && (
         <button
           onClick={() => setSupportOpen(true)}
           style={{
