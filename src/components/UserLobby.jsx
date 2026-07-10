@@ -42,6 +42,7 @@ export default function UserLobby({
   const [claimBonus, setClaimBonus] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [activeTooltipId, setActiveTooltipId] = useState(null);
+  const [lightboxImage, setLightboxImage] = useState(null);
 
   // Subscription Alert Prompt states
   const [showSubPrompt, setShowSubPrompt] = useState(false);
@@ -845,6 +846,81 @@ export default function UserLobby({
               })}
             </div>
           </section>
+
+          {/* Cashout Proof Screenshots Slider/Gallery */}
+          {frontendSettings?.proofScreenshots && frontendSettings.proofScreenshots.length > 0 && (
+            <section className="rules-accordion-section" style={{ marginTop: '2.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
+                <i className="fa-solid fa-circle-check" style={{ color: '#2ecc71', fontSize: '1.2rem' }}></i>
+                <h4 style={{ fontSize: '1.05rem', fontFamily: 'var(--font-heading)', color: '#fff', margin: 0, textTransform: 'uppercase', letterSpacing: '1px' }}>
+                  Our Cashout Proofs & Winnings
+                </h4>
+              </div>
+              <div 
+                className="proof-gallery-scroll"
+                style={{ 
+                  display: 'flex', 
+                  gap: '1.25rem', 
+                  overflowX: 'auto', 
+                  paddingBottom: '1rem',
+                  scrollBehavior: 'smooth',
+                  scrollbarWidth: 'thin',
+                  WebkitOverflowScrolling: 'touch'
+                }}
+              >
+                {frontendSettings.proofScreenshots.map((proof, idx) => (
+                  <div 
+                    key={proof.id || idx} 
+                    onClick={() => setLightboxImage(proof.imageUrl)}
+                    style={{ 
+                      flex: '0 0 165px', 
+                      height: '290px', 
+                      borderRadius: '16px', 
+                      overflow: 'hidden', 
+                      background: '#090c15', 
+                      border: '1.5px solid rgba(255,215,0,0.15)',
+                      cursor: 'pointer',
+                      position: 'relative',
+                      boxShadow: '0 8px 25px rgba(0,0,0,0.4)',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-4px)';
+                      e.currentTarget.style.borderColor = 'var(--gold-primary)';
+                      e.currentTarget.style.boxShadow = '0 12px 30px rgba(255,215,0,0.15)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.borderColor = 'rgba(255,215,0,0.15)';
+                      e.currentTarget.style.boxShadow = '0 8px 25px rgba(0,0,0,0.4)';
+                    }}
+                  >
+                    <img 
+                      src={proof.imageUrl} 
+                      alt={proof.title || 'Cashout proof'} 
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                    />
+                    <div style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0) 100%)',
+                      padding: '1rem 0.5rem 0.5rem 0.5rem',
+                      display: 'flex',
+                      alignItems: 'flex-end',
+                      justifyContent: 'center',
+                      textAlign: 'center'
+                    }}>
+                      <span style={{ fontSize: '0.65rem', color: '#fff', fontWeight: 'bold', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
+                        {proof.title || 'Cashout Completed'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           <section className="rules-accordion-section" style={{ marginTop: '2rem' }}>
             <div className={`accordion-item ${accordionOpen ? 'active' : ''}`}>
@@ -1884,6 +1960,54 @@ export default function UserLobby({
             </div>
 
           </div>
+        </div>
+      )}
+
+      {/* Lightbox Modal */}
+      {lightboxImage && (
+        <div 
+          onClick={() => setLightboxImage(null)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.92)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '2rem',
+            animation: 'fade-in 0.25s ease-out'
+          }}
+        >
+          <button 
+            onClick={() => setLightboxImage(null)}
+            style={{
+              position: 'absolute',
+              top: '1.5rem',
+              right: '1.5rem',
+              background: 'none',
+              border: 'none',
+              color: '#fff',
+              fontSize: '2rem',
+              cursor: 'pointer'
+            }}
+          >
+            &times;
+          </button>
+          <img 
+            src={lightboxImage} 
+            alt="Winnings Proof High Resolution" 
+            style={{
+              maxWidth: '95%',
+              maxHeight: '90vh',
+              borderRadius: '12px',
+              border: '2px solid var(--gold-primary)',
+              boxShadow: '0 0 35px rgba(255,215,0,0.2)'
+            }}
+          />
         </div>
       )}
 

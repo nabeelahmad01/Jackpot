@@ -56,7 +56,8 @@ const DEFAULT_SETTINGS = {
     { title: '2. Playthrough Requirements', description: 'Sign-up bonuses and deposit match values carry a standard 1x playthrough requirement before funds are eligible for withdrawal requests.' },
     { title: '3. Minimum & Maximum Cashouts', description: 'The minimum cashout limit is $5. Daily maximum cashouts are capped at $5,000 for standard players. Support can raise limits for VIP accounts.' },
     { title: '4. Payout Duration', description: 'Withdrawal requests are processed instantly or within 10-15 minutes on average via digital wallets.' }
-  ]
+  ],
+  proofScreenshots: []
 };
 
 // GET Frontend Settings

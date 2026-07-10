@@ -51,6 +51,7 @@ export default function FrontendSettingsTab({ adminUser }) {
 
   // Accordion cashout rules
   const [cashoutRules, setCashoutRules] = useState([]);
+  const [proofScreenshots, setProofScreenshots] = useState([]);
   
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -97,6 +98,7 @@ export default function FrontendSettingsTab({ adminUser }) {
 
       setMarqueePayouts(s.marqueePayouts || []);
       setCashoutRules(s.cashoutRules || []);
+      setProofScreenshots(s.proofScreenshots || []);
     }
   }, [data]);
 
@@ -170,7 +172,8 @@ export default function FrontendSettingsTab({ adminUser }) {
           lobbyFreeplayClaimBtn,
 
           marqueePayouts,
-          cashoutRules
+          cashoutRules,
+          proofScreenshots
         })
       });
 
@@ -437,6 +440,102 @@ export default function FrontendSettingsTab({ adminUser }) {
                       </button>
                     </div>
                     <textarea rows="2" style={{ background: 'none', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-muted)', fontSize: '0.75rem', padding: '0.25rem', resize: 'none', outline: 'none' }} placeholder="Rule Description text content..." value={rule.description} onChange={(e) => updateRule(idx, 'description', e.target.value)} />
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Cashout Proof Screenshots Management Section */}
+          <div style={{ background: '#0b0d16', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
+              <h4 style={{ fontSize: '0.8rem', color: '#fff', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>
+                Homepage Cashout Proof Screenshots
+              </h4>
+            </div>
+
+            {/* Input to add a new screenshot proof */}
+            <div style={{ background: '#07090f', padding: '0.75rem', borderRadius: '8px', marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.725rem', color: 'var(--gold-primary)', fontWeight: 'bold' }}>Add Cashout Proof Screenshot</span>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ flex: 1, minWidth: '200px' }}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (file.size > 8 * 1024 * 1024) {
+                        alert('Image file size must be less than 8MB.');
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onloadend = () => {
+                        const img = new Image();
+                        img.src = reader.result;
+                        img.onload = () => {
+                          const canvas = document.createElement('canvas');
+                          let width = img.width;
+                          let height = img.height;
+                          const max_width = 600; // screenshots are vertical and do not need to be very wide
+                          if (width > max_width) {
+                            height *= max_width / width;
+                            width = max_width;
+                          }
+                          canvas.width = width;
+                          canvas.height = height;
+                          const ctx = canvas.getContext('2d');
+                          ctx.drawImage(img, 0, 0, width, height);
+                          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+                          // Generate new proof item
+                          setProofScreenshots(prev => [
+                            ...prev,
+                            { id: Date.now().toString(), imageUrl: compressedBase64, title: 'Cashout Completed' }
+                          ]);
+                          e.target.value = '';
+                        };
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                    style={{ fontSize: '0.75rem', color: '#fff' }}
+                  />
+                  <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                    Select an image. It will be auto-compressed and scaled.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* List of screenshots */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '300px', overflowY: 'auto', paddingRight: '0.5rem' }}>
+              {proofScreenshots.length === 0 ? (
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', padding: '1rem' }}>No proof screenshots added yet.</div>
+              ) : (
+                proofScreenshots.map((proof, idx) => (
+                  <div key={proof.id || idx} style={{ display: 'flex', gap: '0.75rem', background: '#07090f', padding: '0.5rem', borderRadius: '8px', alignItems: 'center' }}>
+                    <img src={proof.imageUrl} alt="Proof" style={{ width: '45px', height: '60px', borderRadius: '4px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} />
+                    <div style={{ flex: 1 }}>
+                      <input
+                        type="text"
+                        style={{ width: '100%', background: 'none', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.75rem', padding: '0.25rem 0' }}
+                        placeholder="Screenshot Title (e.g. $100 Cashout completed!)"
+                        value={proof.title}
+                        onChange={(e) => {
+                          const updated = [...proofScreenshots];
+                          updated[idx] = { ...updated[idx], title: e.target.value };
+                          setProofScreenshots(updated);
+                        }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProofScreenshots(proofScreenshots.filter((_, i) => i !== idx));
+                      }}
+                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.5rem' }}
+                    >
+                      <i className="fa-solid fa-trash"></i>
+                    </button>
                   </div>
                 ))
               )}
