@@ -39,7 +39,8 @@ export async function POST(req) {
       badge: game.badge || 'none',
       image: game.image || 'placeholder_1',
       link: game.link,
-      availableCoins: Number(game.availableCoins || 0)
+      availableCoins: Number(game.availableCoins || 0),
+      usedCoins: 0
     };
 
     await gamesCollection.insertOne(newGame);

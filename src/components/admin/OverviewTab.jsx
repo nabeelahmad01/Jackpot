@@ -272,6 +272,7 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
                 <th>Game Title</th>
                 <th>Game Badge</th>
                 <th>Remaining Coins Balance</th>
+                <th>Used Coins</th>
                 <th>Fulfillment Portal</th>
                 <th>Action</th>
               </tr>
@@ -279,7 +280,7 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
             <tbody>
               {games.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="text-center text-muted">No games loaded in library.</td>
+                  <td colSpan="6" className="text-center text-muted">No games loaded in library.</td>
                 </tr>
               ) : (
                 games.map((game) => (
@@ -289,6 +290,11 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
                     <td>
                       <strong style={{ fontSize: '0.95rem', color: (game.availableCoins || 0) < 5000 ? '#ef4444' : '#ffd700' }}>
                         <i className="fa-solid fa-coins" style={{ color: '#ffd700', marginRight: '4px' }}></i> {game.availableCoins || 0} Coins
+                      </strong>
+                    </td>
+                    <td>
+                      <strong style={{ fontSize: '0.95rem', color: '#10b981' }}>
+                        <i className="fa-solid fa-circle-dollar-to-slot" style={{ color: '#10b981', marginRight: '4px' }}></i> {game.usedCoins || 0} Coins
                       </strong>
                     </td>
                     <td>

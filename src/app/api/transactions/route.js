@@ -241,7 +241,9 @@ export async function PUT(req) {
         if (game) {
           const currentCoins = parseFloat(game.availableCoins || 0);
           const newCoins = currentCoins + parseFloat(originalTx.amount || 0);
-          await gamesCollection.updateOne({ id: game.id }, { $set: { availableCoins: newCoins } });
+          const currentUsed = parseFloat(game.usedCoins || 0);
+          const newUsed = Math.max(0, currentUsed - parseFloat(originalTx.amount || 0));
+          await gamesCollection.updateOne({ id: game.id }, { $set: { availableCoins: newCoins, usedCoins: newUsed } });
           cache.del('games_all');
         }
       } catch (poolErr) {
