@@ -45,7 +45,6 @@ export default function AdminDashboard({
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [processingIds, setProcessingIds] = useState({});
-  const [inactiveStaffAlerts, setInactiveStaffAlerts] = useState([]);
 
   // Use SWR to poll counts/stats for the sidebar badges
   const { data: statsData } = useSWR('/api/admin/stats', fetcher, {
@@ -146,33 +145,7 @@ export default function AdminDashboard({
     };
   }, [adminUser]);
 
-  // Monitor inactive staff members if Boss or Operation Manager
-  useEffect(() => {
-    const isBossOrOp = adminUser?.role === 'admin' || adminUser?.role?.toLowerCase().split(',').map(r => r.trim()).includes('operation_admin');
-    if (!isBossOrOp) return;
 
-    const checkInactivity = async () => {
-      try {
-        const res = await fetch('/api/admin/activity');
-        const data = await res.json();
-        if (data.success && data.staff) {
-          const inactive = data.staff.filter(st => {
-            if (!st.lastActive) return true; // Never active is also inactive!
-            const lastActiveTime = new Date(st.lastActive).getTime();
-            // Older than 2 minutes
-            return (Date.now() - lastActiveTime) > 2 * 60 * 1000;
-          });
-          setInactiveStaffAlerts(inactive);
-        }
-      } catch (err) {
-        console.error('Failed to poll staff activity:', err);
-      }
-    };
-
-    checkInactivity();
-    const interval = setInterval(checkInactivity, 15000); // Check every 15 seconds
-    return () => clearInterval(interval);
-  }, [adminUser]);
 
   const wrapAction = (id, actionFn) => async (...args) => {
     if (processingIds[id]) return;
@@ -676,35 +649,6 @@ export default function AdminDashboard({
 
       {/* Main Content Workspace Wrapper */}
       <main className="admin-main-workspace" style={activeTab === 'support' ? { overflowY: 'hidden', height: '100vh' } : {}}>
-        {inactiveStaffAlerts.length > 0 && (
-          <div style={{
-            background: 'rgba(239, 68, 68, 0.1)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-            borderRadius: '10px',
-            padding: '1rem',
-            marginBottom: '1.25rem',
-            boxShadow: '0 4px 15px rgba(239, 68, 68, 0.15)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.5rem',
-            animation: 'pulse 2s infinite ease-in-out'
-          }}>
-            <h4 style={{ color: '#ef4444', margin: 0, fontSize: '0.85rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <i className="fa-solid fa-triangle-exclamation animate-bounce"></i> Inactive Staff Alert
-            </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-              {inactiveStaffAlerts.map((staff) => {
-                const timeDiff = staff.lastActive ? Math.round((Date.now() - new Date(staff.lastActive).getTime()) / 60000) : null;
-                const activeText = timeDiff !== null ? `${timeDiff} min ago` : 'Never';
-                return (
-                  <div key={staff.email} style={{ fontSize: '0.725rem', color: '#fff' }}>
-                    ⚠️ <strong style={{ color: '#ef4444' }}>{staff.name || staff.email}</strong> ({staff.role.replace('_', ' ')}) has been inactive for <strong style={{ color: '#ef4444' }}>{activeText}</strong>.
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
         <Suspense fallback={
           <div style={{ padding: '2rem', textAlign: 'center', opacity: 0.5 }}>
             <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '2rem', color: 'var(--gold-primary)', marginBottom: '1rem', display: 'block' }}></i>

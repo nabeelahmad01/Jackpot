@@ -13,7 +13,51 @@ export async function GET(req) {
       { projection: { name: 1, email: 1, role: 1, lastActive: 1 } }
     ).toArray();
 
-    return NextResponse.json({ success: true, staff });
+    // Calculate active staff list (heartbeat in the last 10 minutes)
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    const activeStaff = staff.filter(s => s.lastActive && new Date(s.lastActive) > tenMinutesAgo);
+
+    let hasUnrespondedRequest = false;
+    let pendingCount = 0;
+
+    if (activeStaff.length > 0) {
+      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+
+      // Check accountRequests
+      const pendingAccounts = await db.collection('accountRequests').find({ status: 'PENDING' }).toArray();
+      const unrespondedAccounts = pendingAccounts.filter(r => {
+        const time = r.timestamp || r.date;
+        return time && new Date(time) < twoMinutesAgo;
+      });
+
+      // Check transactions
+      const pendingTx = await db.collection('transactions').find({ status: 'PENDING' }).toArray();
+      const unrespondedTx = pendingTx.filter(t => {
+        const time = t.date;
+        return time && new Date(time) < twoMinutesAgo;
+      });
+
+      // Check coinsNotifications
+      const pendingCoins = await db.collection('coinsNotifications').find({ status: { $in: ['PENDING', 'CLAIM_REQUESTED'] } }).toArray();
+      const unrespondedCoins = pendingCoins.filter(n => {
+        const time = n.timestamp || n.date;
+        return time && new Date(time) < twoMinutesAgo;
+      });
+
+      pendingCount = unrespondedAccounts.length + unrespondedTx.length + unrespondedCoins.length;
+      if (pendingCount > 0) {
+        hasUnrespondedRequest = true;
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      staff,
+      activeStaffCount: activeStaff.length,
+      activeStaffList: activeStaff,
+      hasUnrespondedRequest,
+      pendingCount
+    });
   } catch (err) {
     console.error('Fetch Activity API Error:', err);
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });

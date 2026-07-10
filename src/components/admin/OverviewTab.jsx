@@ -50,6 +50,10 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
     revalidateOnFocus: true
   });
   const { data: gamesData, error: gamesError, mutate: mutateGames } = useSWR('/api/games', fetcher);
+  const { data: activityData } = useSWR('/api/admin/activity', fetcher, {
+    refreshInterval: 10000,
+    revalidateOnFocus: true
+  });
 
   const stats = statsData?.stats || {
     todayDeposits: 0,
@@ -86,6 +90,33 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', animation: 'fade-in 0.2s ease-out' }}>
       
+      {/* Inactive Staff / Unresponded Request alert box */}
+      {(adminUser?.role === 'admin' || adminUser?.role?.toLowerCase().split(',').map(r => r.trim()).includes('operation_admin')) && activityData?.hasUnrespondedRequest && activityData?.activeStaffCount > 0 && (
+        <div style={{
+          background: 'rgba(239, 68, 68, 0.1)',
+          border: '1.5px solid rgba(239, 68, 68, 0.4)',
+          borderRadius: '16px',
+          padding: '1.25rem',
+          boxShadow: '0 4px 20px rgba(239, 68, 68, 0.15)',
+          animation: 'pulse-lion 2s infinite ease-in-out'
+        }}>
+          <h4 style={{ color: '#ef4444', margin: 0, fontSize: '0.85rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <i className="fa-solid fa-bell animate-bounce" style={{ color: '#ef4444' }}></i>
+            Unresponded Request Alert (Staff Logged In)
+          </h4>
+          <p style={{ fontSize: '0.75rem', color: '#cbd5e1', margin: '0.5rem 0' }}>
+            There are currently <strong style={{ color: '#ef4444' }}>{activityData?.activeStaffCount} active staff member(s)</strong> logged in, but one or more requests have been pending for **over 2 minutes** without a response!
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.5rem' }}>
+            {activityData?.activeStaffList?.map((s) => (
+              <span key={s.email} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', padding: '0.25rem 0.5rem', borderRadius: '6px', fontSize: '0.65rem', color: '#ffd700' }}>
+                👤 {s.name || s.email} ({s.role.replace('_', ' ')})
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Daily Financial Summaries */}
       <section className="admin-stats-grid">
         <div className="stat-card" style={{ borderLeft: '4px solid #2ecc71' }}>
