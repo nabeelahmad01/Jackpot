@@ -170,7 +170,7 @@ export default function AdminDashboard({
     return roles.some((role) => {
       if (role === 'admin') return true; // Super Admin has full access
       
-      if (tabName === 'shift_dashboard') return role === 'operation_admin';
+      if (tabName === 'shift_dashboard') return role === 'operation_admin' || role === 'coins_admin';
       if (tabName === 'promotions') return role === 'operation_admin';
       // Frontend Settings tab is strictly reserved for main boss (Super Admin)
       if (tabName === 'frontend_settings') return false;
@@ -179,7 +179,7 @@ export default function AdminDashboard({
       if (role === 'operation_admin') return !['staff', 'settings'].includes(tabName); // Operational Manager has access to all EXCEPT staff and settings
       if (role === 'financial_admin') return ['dashboard', 'ledger', 'requests', 'gateways', 'tx_search'].includes(tabName);
       if (role === 'support_admin') return ['dashboard', 'support'].includes(tabName);
-      if (role === 'coins_admin') return ['dashboard', 'games', 'users', 'requests', 'coins', 'tx_search'].includes(tabName);
+      if (role === 'coins_admin') return ['dashboard', 'games', 'requests', 'coins', 'tx_search', 'shift_dashboard'].includes(tabName);
       return false;
     });
   };

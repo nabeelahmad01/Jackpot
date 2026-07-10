@@ -64,16 +64,38 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
 
   const games = gamesData?.games || [];
 
-  const triggerPoolUpdate = async (game) => {
-    const promptVal = window.prompt(`Update available/remaining coins pool for ${game.title}:`, game.availableCoins || 0);
-    if (promptVal === null) return;
-    const val = parseInt(promptVal, 10);
-    if (isNaN(val) || val < 0) {
-      alert('Please enter a valid positive number.');
+  const [updateModalOpen, setUpdateModalOpen] = React.useState(false);
+  const [selectedGame, setSelectedGame] = React.useState(null);
+  const [updateCoins, setUpdateCoins] = React.useState('');
+  const [updateLink, setUpdateLink] = React.useState('');
+  const [isUpdatingPool, setIsUpdatingPool] = React.useState(false);
+
+  const triggerPoolUpdate = (game) => {
+    setSelectedGame(game);
+    setUpdateCoins(game.availableCoins || 0);
+    setUpdateLink(game.link || '');
+    setUpdateModalOpen(true);
+  };
+
+  const handlePoolUpdateSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedGame) return;
+    const coinsVal = Number(updateCoins);
+    if (isNaN(coinsVal) || coinsVal < 0) {
+      alert('Please enter a valid positive number for coins.');
       return;
     }
-    await onUpdateGameCoinsPool(game.id, val);
-    mutateGames(); // immediately refresh games pool
+    setIsUpdatingPool(true);
+    try {
+      await onUpdateGameCoinsPool(selectedGame.id, coinsVal, updateLink);
+      mutateGames();
+      setUpdateModalOpen(false);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update game details.');
+    } finally {
+      setIsUpdatingPool(false);
+    }
   };
 
   const isLoading = !statsData || !gamesData;
@@ -303,18 +325,23 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
                       </a>
                     </td>
                     <td>
-                      {(adminUser?.role === 'admin' || adminUser?.role === 'coins_admin') ? (
-                        <button
-                          onClick={() => triggerPoolUpdate(game)}
-                          className="action-row-btn btn-edit"
-                          style={{ width: 'auto', padding: '0.35rem 0.75rem', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
-                          title="Update Remaining Pool"
-                        >
-                          <i className="fa-solid fa-pen-to-square"></i> Update Pool
-                        </button>
-                      ) : (
-                        <span style={{ fontSize: '0.7rem', opacity: 0.5 }}>Restricted</span>
-                      )}
+                      {(() => {
+                        const roles = (adminUser?.role || '').toLowerCase().split(',').map(r => r.trim());
+                        const canUpdate = roles.includes('admin') || roles.includes('coins_admin') || roles.includes('operation_admin');
+                        if (canUpdate) {
+                          return (
+                            <button
+                              onClick={() => triggerPoolUpdate(game)}
+                              className="action-row-btn btn-edit"
+                              style={{ width: 'auto', padding: '0.35rem 0.75rem', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                              title="Update Remaining Pool & Link"
+                            >
+                              <i className="fa-solid fa-pen-to-square"></i> Update Pool
+                            </button>
+                          );
+                        }
+                        return <span style={{ fontSize: '0.7rem', opacity: 0.5 }}>Restricted</span>;
+                      })()}
                     </td>
                   </tr>
                 ))
@@ -323,6 +350,103 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
           </table>
         </div>
       </section>
+
+      {/* Update Pool Modal */}
+      {updateModalOpen && selectedGame && (
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.85)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1.5rem',
+            animation: 'fade-in 0.2s ease-out'
+          }}
+        >
+          <div 
+            style={{
+              background: '#0a0d16',
+              border: '1.5px solid var(--gold-primary)',
+              borderRadius: '16px',
+              maxWidth: '480px',
+              width: '100%',
+              padding: '1.5rem',
+              boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
+              position: 'relative'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 'bold', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <i className="fa-solid fa-pen-to-square text-gold" style={{ color: 'var(--gold-primary)' }}></i>
+                Update {selectedGame.title} Pool
+              </h3>
+              <button 
+                onClick={() => setUpdateModalOpen(false)}
+                style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.25rem', cursor: 'pointer', padding: 0 }}
+              >
+                &times;
+              </button>
+            </div>
+
+            <form onSubmit={handlePoolUpdateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="input-group" style={{ margin: 0 }}>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.35rem' }}>
+                  Available/Remaining Coins
+                </label>
+                <div className="input-wrapper" style={{ background: '#07090f' }}>
+                  <i className="fa-solid fa-coins input-icon" style={{ color: 'var(--gold-primary)' }}></i>
+                  <input
+                    type="number"
+                    value={updateCoins}
+                    onChange={(e) => setUpdateCoins(e.target.value)}
+                    placeholder="Enter coin balance"
+                    style={{ fontSize: '0.75rem' }}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="input-group" style={{ margin: 0 }}>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.35rem' }}>
+                  Fulfillment Portal URL (Open Panel Link)
+                </label>
+                <div className="input-wrapper" style={{ background: '#07090f' }}>
+                  <i className="fa-solid fa-link input-icon" style={{ color: 'var(--gold-primary)' }}></i>
+                  <input
+                    type="url"
+                    value={updateLink}
+                    onChange={(e) => setUpdateLink(e.target.value)}
+                    placeholder="https://example.com/panel"
+                    style={{ fontSize: '0.75rem' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button 
+                  type="submit" 
+                  className="submit-btn" 
+                  style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold', margin: 0, flex: 1 }} 
+                  disabled={isUpdatingPool}
+                >
+                  {isUpdatingPool ? 'SAVING...' : 'SAVE CHANGES'}
+                </button>
+                <button 
+                  type="button" 
+                  className="action-row-btn" 
+                  onClick={() => setUpdateModalOpen(false)}
+                  style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '8px', cursor: 'pointer', margin: 0 }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

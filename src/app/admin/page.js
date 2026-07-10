@@ -253,23 +253,27 @@ export default function AdminPage({ portalName, forcedRole }) {
     }
   };
 
-  const handleUpdateGameCoinsPool = async (gameId, coins) => {
+  const handleUpdateGameCoinsPool = async (gameId, coins, link) => {
     try {
+      const body = { id: gameId };
+      if (coins !== undefined) body.availableCoins = Number(coins);
+      if (link !== undefined) body.link = link;
+
       const response = await fetch('/api/games', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: gameId, availableCoins: coins })
+        body: JSON.stringify(body)
       });
       const data = await response.json();
       if (data.success) {
-        showToast('Game coins pool updated successfully!', 'success');
+        showToast('Game pool details updated successfully!', 'success');
         mutate('/api/games');
       } else {
-        showToast(data.message || 'Failed to update coins pool.', 'error');
+        showToast(data.message || 'Failed to update game details.', 'error');
       }
     } catch (err) {
-      console.error('Update coins pool API error:', err);
-      showToast('Connection error updating coins pool.', 'error');
+      console.error('Update game details API error:', err);
+      showToast('Connection error updating game details.', 'error');
     }
   };
 
