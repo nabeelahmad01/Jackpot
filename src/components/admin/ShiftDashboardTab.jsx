@@ -346,7 +346,16 @@ export default function ShiftDashboardTab({ adminUser }) {
                       <strong>{noti.userEmail}</strong>
                       {noti.gameUsername && <div style={{ fontSize: '0.65rem', color: 'var(--gold-primary)' }}>({noti.gameUsername})</div>}
                     </td>
-                    <td><span className="admin-badge-preview b-hot" style={{ fontSize: '0.65rem' }}>{noti.gameTitle}</span></td>
+                    <td>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.2rem' }}>
+                        <span className="admin-badge-preview b-hot" style={{ fontSize: '0.65rem' }}>{noti.gameTitle}</span>
+                        {noti.isFreeplayWithdraw && (
+                          <div style={{ fontSize: '0.55rem', color: '#ff4d6d', fontWeight: 'bold', marginTop: '0.15rem', display: 'inline-block' }}>
+                            ⚠️ FREEPLAY WIN: MAX PAYOUT $30
+                          </div>
+                        )}
+                      </div>
+                    </td>
                     <td>
                       <span style={{ fontSize: '0.725rem', color: '#ff4d6d', textTransform: 'uppercase', fontWeight: 'bold' }}>
                         withdraw

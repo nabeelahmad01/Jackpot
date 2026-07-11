@@ -191,6 +191,30 @@ export async function POST(req) {
       ...newTx
     };
 
+    let isFreeplayWithdraw = false;
+    if (txObject.type === 'WITHDRAW') {
+      try {
+        const lastFreeplay = await transactionsCollection.findOne(
+          { userEmail: txObject.userEmail, type: 'BONUS', code: 'SIGNUP-FREE3' },
+          { sort: { id: -1 } }
+        );
+        if (lastFreeplay) {
+          const lastSuccessWithdraw = await transactionsCollection.findOne(
+            { userEmail: txObject.userEmail, type: 'WITHDRAW', status: 'SUCCESS' },
+            { sort: { id: -1 } }
+          );
+          if (!lastSuccessWithdraw || parseFloat(lastFreeplay.id) > parseFloat(lastSuccessWithdraw.id)) {
+            isFreeplayWithdraw = true;
+          }
+        }
+      } catch (checkErr) {
+        console.error('Error checking freeplay session state:', checkErr);
+      }
+      if (isFreeplayWithdraw) {
+        txObject.isFreeplayWithdraw = true;
+      }
+    }
+
     await transactionsCollection.insertOne(txObject);
 
     if (txObject.type === 'WITHDRAW') {
@@ -205,7 +229,8 @@ export async function POST(req) {
         status: 'PENDING',
         read: false,
         timestamp: new Date().toISOString(),
-        transactionId: txObject.id
+        transactionId: txObject.id,
+        isFreeplayWithdraw: Boolean(txObject.isFreeplayWithdraw)
       });
     } else if (txObject.type === 'BONUS' && txObject.code === 'SIGNUP-FREE3') {
       const notificationsCollection = db.collection('coinsNotifications');

@@ -134,7 +134,14 @@ export default function CoinsAllotmentTab({
                     )}
                   </td>
                   <td>
-                    <span className={`admin-badge-preview ${noti.totalCoins < 0 ? 'b-new' : 'b-hot'}`}>{noti.gameTitle}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.2rem' }}>
+                      <span className={`admin-badge-preview ${noti.totalCoins < 0 ? 'b-new' : 'b-hot'}`}>{noti.gameTitle}</span>
+                      {noti.isFreeplayWithdraw && (
+                        <div style={{ fontSize: '0.6rem', color: '#ff4d6d', background: 'rgba(255, 77, 109, 0.1)', border: '1px solid rgba(255, 77, 109, 0.25)', padding: '0.15rem 0.35rem', borderRadius: '4px', fontWeight: 'bold', display: 'inline-block' }}>
+                          ⚠️ FREEPLAY WIN: MAX PAYOUT $30
+                        </div>
+                      )}
+                    </div>
                     {noti.holdNote && (
                       <div style={{ fontSize: '0.65rem', color: '#f59e0b', marginTop: '0.25rem', maxWidth: '200px', whiteSpace: 'normal', fontStyle: 'italic' }}>
                         Note: "{noti.holdNote}"

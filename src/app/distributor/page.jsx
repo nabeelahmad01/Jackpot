@@ -890,6 +890,11 @@ export default function DistributorPortal() {
                           <div>
                             <strong style={{ fontSize: '0.8rem' }}>{noti.gameTitle}</strong>
                             <div style={{ fontSize: '0.65rem', color: '#888' }}>{noti.email}</div>
+                            {noti.isFreeplayWithdraw && (
+                              <div style={{ fontSize: '0.55rem', color: '#ff4d6d', fontWeight: 'bold', marginTop: '0.2rem' }}>
+                                ⚠️ FREEPLAY WIN: MAX PAYOUT $30
+                              </div>
+                            )}
                           </div>
                           <span style={{
                             background: noti.totalCoins < 0 ? 'rgba(239,68,68,0.15)' : 'rgba(46,204,113,0.15)',

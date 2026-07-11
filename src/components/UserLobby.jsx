@@ -518,8 +518,29 @@ export default function UserLobby({
     const hasClaimedFreeplay = (transactions || []).some(
       (t) => t.type === 'BONUS' && t.code === 'SIGNUP-FREE3'
     );
-    if (hasClaimedFreeplay) {
-      showToast("You have already claimed your $3.00 signup Freeplay bonus!", "error");
+    
+    // Evaluate eligibility for repeat freeplay after a successful $30+ cashout
+    const successfulWithdrawals30 = (transactions || []).filter(
+      (t) => t.type === 'WITHDRAW' && t.status === 'SUCCESS' && parseFloat(t.amount || 0) >= 30
+    );
+    const freeplayClaims = (transactions || []).filter(
+      (t) => t.type === 'BONUS' && t.code === 'SIGNUP-FREE3'
+    );
+
+    const mostRecentWithdrawal30 = successfulWithdrawals30[0];
+    const mostRecentFreeplay = freeplayClaims[0];
+
+    let isEligibleForRepeatFreeplay = false;
+    if (mostRecentWithdrawal30 && mostRecentFreeplay) {
+      const withdrawalTime = new Date(mostRecentWithdrawal30.date).getTime();
+      const freeplayTime = new Date(mostRecentFreeplay.date).getTime();
+      if (withdrawalTime > freeplayTime || parseFloat(mostRecentWithdrawal30.id) > parseFloat(mostRecentFreeplay.id)) {
+        isEligibleForRepeatFreeplay = true;
+      }
+    }
+
+    if (hasClaimedFreeplay && !isEligibleForRepeatFreeplay) {
+      showToast("You have already claimed your $3.00 Freeplay bonus! Complete a cashout of $30.00 or more to claim another.", "error");
       return;
     }
 

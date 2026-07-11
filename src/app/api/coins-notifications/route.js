@@ -149,6 +149,23 @@ export async function PUT(req) {
           const txUpdate = { allottedBy: processedBy || originalNoti.processedBy || 'system' };
           if (parentTx.type === 'WITHDRAW') {
             txUpdate.status = 'PENDING';
+            if (originalNoti.isFreeplayWithdraw) {
+              const requestedAmount = parseFloat(parentTx.amount || 0);
+              if (requestedAmount > 30) {
+                txUpdate.amount = 30;
+                txUpdate.note = "Freeplay win capped at $30 max cashout.";
+                const refundAmount = requestedAmount - 30;
+                try {
+                  const usersCollection = db.collection('users');
+                  await usersCollection.updateOne(
+                    { email: originalNoti.userEmail.toLowerCase().trim() },
+                    { $inc: { coins: refundAmount } }
+                  );
+                } catch (userErr) {
+                  console.error('Failed to refund remaining coins on freeplay win capping:', userErr);
+                }
+              }
+            }
           }
           await transactionsCollection.updateOne(
             { id: originalNoti.transactionId },
