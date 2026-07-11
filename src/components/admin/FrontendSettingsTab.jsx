@@ -634,7 +634,7 @@ export default function FrontendSettingsTab({ adminUser }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
                   <input
                     type="file"
-                    accept="audio/*"
+                    accept="audio/*,video/mpeg,audio/mpeg,audio/mp3,audio/wav,.mpeg,.mp3,.wav"
                     onChange={handleAudioUpload}
                     style={{ fontSize: '0.75rem', color: '#fff' }}
                   />
