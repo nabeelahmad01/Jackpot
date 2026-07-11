@@ -1530,29 +1530,31 @@ export default function UserLobby({
                                   </span>
                                 </div>
                               </div>
-                              <button
-                                onClick={async () => {
-                                  if (onUpdateCoinsNotification) {
-                                    await onUpdateCoinsNotification(noti.id, 'CLAIM_REQUESTED');
-                                    showToast("Coins claim request sent to manager!", "success");
-                                  }
-                                }}
-                                className="submit-btn"
-                                style={{
-                                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                                  color: '#000',
-                                  fontWeight: 'bold',
-                                  padding: '0.45rem 1rem',
-                                  borderRadius: '8px',
-                                  fontSize: '0.65rem',
-                                  width: 'auto',
-                                  margin: 0,
-                                  flexShrink: 0,
-                                  boxShadow: '0 4px 10px rgba(245,158,11,0.2)'
-                                }}
-                              >
-                                Claim Coins (Played Existing)
-                              </button>
+                              {noti.totalCoins >= 0 && (
+                                <button
+                                  onClick={async () => {
+                                    if (onUpdateCoinsNotification) {
+                                      await onUpdateCoinsNotification(noti.id, 'CLAIM_REQUESTED');
+                                      showToast("Coins claim request sent to manager!", "success");
+                                    }
+                                  }}
+                                  className="submit-btn"
+                                  style={{
+                                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                    color: '#000',
+                                    fontWeight: 'bold',
+                                    padding: '0.45rem 1rem',
+                                    borderRadius: '8px',
+                                    fontSize: '0.65rem',
+                                    width: 'auto',
+                                    margin: 0,
+                                    flexShrink: 0,
+                                    boxShadow: '0 4px 10px rgba(245,158,11,0.2)'
+                                  }}
+                                >
+                                  Claim Coins (Played Existing)
+                                </button>
+                              )}
                             </div>
                           ))}
                         </div>
