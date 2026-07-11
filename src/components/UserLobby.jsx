@@ -1102,7 +1102,7 @@ export default function UserLobby({
           <section className="rules-accordion-section" style={{ marginTop: '2rem' }}>
             <div className={`accordion-item ${accordionOpen ? 'active' : ''}`}>
               <div className="accordion-header" onClick={() => setAccordionOpen(!accordionOpen)}>
-                <span><i className="fa-scroll fa-solid gold-text"></i> CASHOUT RULES & PLAYER INFO</span>
+                <span><i className="fa-scroll fa-solid gold-text"></i> CASHOUT RULES & PLAY INFO</span>
                 <i className="fa-solid fa-chevron-down arrow-icon"></i>
               </div>
               <div className="accordion-body">
@@ -1115,7 +1115,7 @@ export default function UserLobby({
                   ]).map((rule, idx) => (
                     <React.Fragment key={idx}>
                       <h5>{rule.title}</h5>
-                      <p>{rule.description}</p>
+                      <p style={{ whiteSpace: 'pre-line' }}>{rule.description}</p>
                     </React.Fragment>
                   ))}
                 </div>
