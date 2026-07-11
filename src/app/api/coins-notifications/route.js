@@ -99,7 +99,11 @@ export async function PUT(req) {
 
     const updateFields = {};
     if (status !== undefined) {
-      updateFields.status = status;
+      if (status === 'HOLD' && originalNoti.totalCoins < 0) {
+        updateFields.status = 'FAILED';
+      } else {
+        updateFields.status = status;
+      }
       if (status === 'CLAIM_REQUESTED') {
         updateFields.timestamp = new Date().toISOString();
       }
@@ -146,6 +150,23 @@ export async function PUT(req) {
           if (parentTx.type === 'WITHDRAW') {
             txUpdate.status = 'PENDING';
           }
+          await transactionsCollection.updateOne(
+            { id: originalNoti.transactionId },
+            { $set: txUpdate }
+          );
+        }
+      }
+    } else if (status === 'HOLD' && originalNoti.totalCoins < 0) {
+      // If a withdrawal coin check is invalidated, directly fail the parent transaction
+      if (originalNoti.transactionId) {
+        const transactionsCollection = db.collection('transactions');
+        const parentTx = await transactionsCollection.findOne({ id: originalNoti.transactionId });
+        if (parentTx) {
+          const txUpdate = {
+            status: 'FAILED',
+            note: holdNote || 'Declined by Administrator.',
+            allottedBy: processedBy || originalNoti.processedBy || 'system'
+          };
           await transactionsCollection.updateOne(
             { id: originalNoti.transactionId },
             { $set: txUpdate }
