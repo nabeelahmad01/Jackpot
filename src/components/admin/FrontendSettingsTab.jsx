@@ -7,6 +7,7 @@ export default function FrontendSettingsTab({ adminUser }) {
   const { data, error, mutate } = useSWR('/api/settings/frontend', fetcher);
 
   const [logoUrl, setLogoUrl] = useState('');
+  const [notificationSoundUrl, setNotificationSoundUrl] = useState('');
   const [withdrawNotice, setWithdrawNotice] = useState('');
   const [cashoutNotice, setCashoutNotice] = useState('');
   const [slide1, setSlide1] = useState('');
@@ -61,6 +62,7 @@ export default function FrontendSettingsTab({ adminUser }) {
     if (data?.settings) {
       const s = data.settings;
       setLogoUrl(s.logoUrl || '/jackpot_lion_mascot.png?v=2');
+      setNotificationSoundUrl(s.notificationSoundUrl || 'https://raw.githubusercontent.com/AUTOMATIC1111/stable-diffusion-webui/master/notification.mp3');
       setWithdrawNotice(s.withdrawNotice || 'Fastest Withdrawals inside 5 Minutes!');
       setCashoutNotice(s.cashoutNotice || 'Standard cashout processing hours: 9 AM - 11 PM EST');
       setSlide1(s.slides?.[0] || '/slide1.jpg');
@@ -138,6 +140,7 @@ export default function FrontendSettingsTab({ adminUser }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           logoUrl,
+          notificationSoundUrl,
           withdrawNotice,
           cashoutNotice,
           slides: [slide1, slide2, slide3],
@@ -602,6 +605,25 @@ export default function FrontendSettingsTab({ adminUser }) {
                     onChange={(e) => setMinimumWithdrawalLimit(e.target.value)}
                     required
                   />
+                </div>
+              </div>
+            </div>
+
+            <div style={{ marginTop: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+              <div className="input-group" style={{ margin: 0 }}>
+                <label>Custom Notification Alert Sound URL (.mp3 / .wav)</label>
+                <div className="input-wrapper" style={{ background: '#07090f' }}>
+                  <i className="fa-solid fa-volume-high input-icon" style={{ color: 'var(--gold-primary)' }}></i>
+                  <input
+                    type="url"
+                    placeholder="https://example.com/sound.mp3"
+                    value={notificationSoundUrl}
+                    onChange={(e) => setNotificationSoundUrl(e.target.value)}
+                    required
+                  />
+                </div>
+                <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                  Enter a direct audio link. Plays on Shift Dashboard and Coins Allotment pages when new tasks arrive.
                 </div>
               </div>
             </div>

@@ -25,10 +25,27 @@ export default function ShiftDashboardTab({ adminUser }) {
   const [invalidReasons, setInvalidReasons] = useState({}); // { notificationId: reason }
   const [processingCoinId, setProcessingCoinId] = useState(null);
 
-
+  const { data: settingsData } = useSWR('/api/settings/frontend', fetcher);
+  const [prevPendingCount, setPrevPendingCount] = useState(null);
 
   const pendingRequests = reqData?.accountRequests || [];
   const pendingCoins = (coinData?.coinsNotifications || []).filter(n => n.status === 'PENDING' || n.status === 'CLAIM_REQUESTED');
+
+  useEffect(() => {
+    if (reqData && coinData) {
+      const currentCount = pendingRequests.length + pendingCoins.length;
+      if (prevPendingCount !== null && currentCount > prevPendingCount) {
+        try {
+          const soundUrl = settingsData?.settings?.notificationSoundUrl || 'https://raw.githubusercontent.com/AUTOMATIC1111/stable-diffusion-webui/master/notification.mp3';
+          const audio = new Audio(soundUrl);
+          audio.play().catch(err => console.log('Audio playback blocked or failed:', err));
+        } catch (audioErr) {
+          console.error('Audio play error:', audioErr);
+        }
+      }
+      setPrevPendingCount(currentCount);
+    }
+  }, [reqData, coinData, pendingRequests.length, pendingCoins.length, settingsData]);
 
 
   // Handle saving credentials

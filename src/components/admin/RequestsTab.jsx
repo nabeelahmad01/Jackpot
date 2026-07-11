@@ -139,6 +139,25 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
   const totalRequests = data?.totalRequests || 0;
   const totalPages = data?.totalPages || 1;
 
+  const { data: settingsData } = useSWR('/api/settings/frontend', fetcher);
+  const [prevCount, setPrevCount] = useState(null);
+
+  useEffect(() => {
+    if (data) {
+      const currentCount = (data.accountRequests || []).length;
+      if (prevCount !== null && currentCount > prevCount) {
+        try {
+          const soundUrl = settingsData?.settings?.notificationSoundUrl || 'https://raw.githubusercontent.com/AUTOMATIC1111/stable-diffusion-webui/master/notification.mp3';
+          const audio = new Audio(soundUrl);
+          audio.play().catch(err => console.log('Audio playback blocked or failed:', err));
+        } catch (audioErr) {
+          console.error('Audio play error:', audioErr);
+        }
+      }
+      setPrevCount(currentCount);
+    }
+  }, [data, settingsData]);
+
   const handleApprove = async (reqItem) => {
     // Approve action wrapper handles state modifications
     await onApproveRequest(reqItem);

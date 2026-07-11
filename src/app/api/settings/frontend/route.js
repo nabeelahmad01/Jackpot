@@ -5,6 +5,7 @@ import { cache } from '../../../../lib/cache';
 const DEFAULT_SETTINGS = {
   id: 'frontend_settings',
   logoUrl: '/jackpot_lion_mascot.png?v=2',
+  notificationSoundUrl: 'https://raw.githubusercontent.com/AUTOMATIC1111/stable-diffusion-webui/master/notification.mp3',
   withdrawNotice: 'Fastest Withdrawals inside 5 Minutes!',
   cashoutNotice: 'Standard cashout processing hours: 9 AM - 11 PM EST',
   slides: ['/slide1.jpg', '/slide2.jpg', '/slide3.jpg'],

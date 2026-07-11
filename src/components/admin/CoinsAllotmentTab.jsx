@@ -36,6 +36,25 @@ export default function CoinsAllotmentTab({
   const totalNotifications = data?.totalNotifications || 0;
   const totalPages = data?.totalPages || 1;
 
+  const { data: settingsData } = useSWR('/api/settings/frontend', fetcher);
+  const [prevCount, setPrevCount] = useState(null);
+
+  useEffect(() => {
+    if (data) {
+      const currentCount = (data.coinsNotifications || []).filter(n => n.status === 'PENDING' || n.status === 'CLAIM_REQUESTED').length;
+      if (prevCount !== null && currentCount > prevCount) {
+        try {
+          const soundUrl = settingsData?.settings?.notificationSoundUrl || 'https://raw.githubusercontent.com/AUTOMATIC1111/stable-diffusion-webui/master/notification.mp3';
+          const audio = new Audio(soundUrl);
+          audio.play().catch(err => console.log('Audio playback blocked or failed:', err));
+        } catch (audioErr) {
+          console.error('Audio play error:', audioErr);
+        }
+      }
+      setPrevCount(currentCount);
+    }
+  }, [data, settingsData]);
+
   const handleUpdate = async (id, status, read, holdNote) => {
     await onUpdateCoinsNotification(id, status, read, holdNote);
     mutate();
