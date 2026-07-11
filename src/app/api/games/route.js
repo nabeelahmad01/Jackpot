@@ -39,6 +39,7 @@ export async function POST(req) {
       badge: game.badge || 'none',
       image: game.image || 'placeholder_1',
       link: game.link,
+      openPanelLink: game.openPanelLink || '',
       availableCoins: Number(game.availableCoins || 0),
       usedCoins: 0
     };
@@ -71,6 +72,7 @@ export async function PUT(req) {
       badge: game.badge,
       image: game.image,
       link: game.link,
+      openPanelLink: game.openPanelLink,
       availableCoins: game.availableCoins !== undefined ? Number(game.availableCoins) : undefined
     };
 

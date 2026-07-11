@@ -253,11 +253,11 @@ export default function AdminPage({ portalName, forcedRole }) {
     }
   };
 
-  const handleUpdateGameCoinsPool = async (gameId, coins, link) => {
+  const handleUpdateGameCoinsPool = async (gameId, coins, openPanelLink) => {
     try {
       const body = { id: gameId };
       if (coins !== undefined) body.availableCoins = Number(coins);
-      if (link !== undefined) body.link = link;
+      if (openPanelLink !== undefined) body.openPanelLink = openPanelLink;
 
       const response = await fetch('/api/games', {
         method: 'PUT',

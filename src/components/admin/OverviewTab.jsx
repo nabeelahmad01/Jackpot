@@ -73,7 +73,7 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
   const triggerPoolUpdate = (game) => {
     setSelectedGame(game);
     setUpdateCoins(game.availableCoins || 0);
-    setUpdateLink(game.link || '');
+    setUpdateLink(game.openPanelLink || game.link || '');
     setUpdateModalOpen(true);
   };
 
@@ -321,7 +321,7 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
                       </strong>
                     </td>
                     <td>
-                      <a href={game.link} target="_blank" rel="noopener noreferrer" className="gold-text" style={{ fontSize: '0.75rem', textDecoration: 'none' }}>
+                      <a href={game.openPanelLink || game.link} target="_blank" rel="noopener noreferrer" className="gold-text" style={{ fontSize: '0.75rem', textDecoration: 'none' }}>
                         Open Panel &rarr;
                       </a>
                     </td>
