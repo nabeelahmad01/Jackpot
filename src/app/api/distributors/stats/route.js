@@ -1,0 +1,77 @@
+import { NextResponse } from 'next/server';
+import { getDb } from '../../../../lib/mongodb';
+
+// GET stats, referred players, and transactions ledger for a distributor
+export async function GET(req) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const distributorId = searchParams.get('distributorId');
+
+    if (!distributorId) {
+      return NextResponse.json({ success: false, message: 'Distributor ID parameter is required.' }, { status: 400 });
+    }
+
+    const db = await getDb();
+    const distributorsCollection = db.collection('distributors');
+    const usersCollection = db.collection('users');
+    const transactionsCollection = db.collection('transactions');
+
+    const distributor = await distributorsCollection.findOne({ id: distributorId });
+    if (!distributor) {
+      return NextResponse.json({ success: false, message: 'Distributor not found.' }, { status: 404 });
+    }
+
+    // 1. Fetch referred users
+    const players = await usersCollection.find(
+      { distributorId },
+      { projection: { name: 1, email: 1, role: 1, coins: 1, isSubscribed: 1 } }
+    ).toArray();
+    const playerEmails = players.map(p => p.email.toLowerCase().trim());
+
+    // 2. Fetch transaction logs and compile totals
+    let transactions = [];
+    let totalDeposits = 0;
+    let totalWithdrawals = 0;
+
+    if (playerEmails.length > 0) {
+      // Find all successful transactions to compute totals
+      const successTxs = await transactionsCollection.find({
+        userEmail: { $in: playerEmails },
+        status: 'SUCCESS'
+      }).toArray();
+
+      successTxs.forEach(tx => {
+        if (tx.type === 'DEPOSIT') {
+          totalDeposits += parseFloat(tx.amount || 0);
+        } else if (tx.type === 'WITHDRAW') {
+          totalWithdrawals += parseFloat(tx.amount || 0);
+        }
+      });
+
+      // Get full transaction history (all statuses) sorted by date/ID descending
+      transactions = await transactionsCollection.find({
+        userEmail: { $in: playerEmails }
+      })
+      .sort({ id: -1 })
+      .toArray();
+    }
+
+    const commissionEarned = totalDeposits * ((distributor.commissionRate || 0) / 100);
+
+    return NextResponse.json({
+      success: true,
+      stats: {
+        playersCount: players.length,
+        totalDeposits,
+        totalWithdrawals,
+        commissionEarned,
+        commissionRate: distributor.commissionRate || 0
+      },
+      players,
+      transactions
+    });
+  } catch (err) {
+    console.error('Fetch Distributor Stats API Error:', err);
+    return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
+  }
+}

@@ -27,7 +27,8 @@ export default function Home() {
 
   // Fetch static data (games and gateways catalog) with SWR (cached, no automatic polling)
   const { data: gamesData } = useSWR('/api/games', fetcher);
-  const { data: gatewaysData } = useSWR('/api/gateways', fetcher);
+  const gatewaysQuery = session?.distributorId ? `/api/gateways?distributorId=${session.distributorId}` : '/api/gateways';
+  const { data: gatewaysData } = useSWR(gatewaysQuery, fetcher);
   const { data: frontendSettingsData } = useSWR('/api/settings/frontend', fetcher);
 
   const games = gamesData?.games || [];
@@ -81,6 +82,10 @@ export default function Home() {
       const ref = params.get('ref');
       if (ref) {
         localStorage.setItem('jackpot_ref_code', ref);
+      }
+      const dist = params.get('distributor') || params.get('dist');
+      if (dist) {
+        localStorage.setItem('jackpot_distributor_id', dist);
       }
     }
 

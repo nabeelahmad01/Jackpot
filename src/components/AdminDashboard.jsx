@@ -19,6 +19,7 @@ const ShiftReportsTab = lazy(() => import('./admin/ShiftReportsTab'));
 const ShiftDashboardTab = lazy(() => import('./admin/ShiftDashboardTab'));
 const PromotionsTab = lazy(() => import('./admin/PromotionsTab'));
 const TxSearchTab = lazy(() => import('./admin/TxSearchTab'));
+const DistributorsTab = lazy(() => import('./admin/DistributorsTab'));
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -609,6 +610,31 @@ export default function AdminDashboard({
             </button>
           )}
 
+          {hasAccess('distributors') && (
+            <button
+              onClick={() => { setActiveTab('distributors'); setSidebarOpen(false); }}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                background: activeTab === 'distributors' ? 'var(--gold-primary)' : 'none',
+                color: activeTab === 'distributors' ? '#111' : '#fff',
+                fontSize: '0.8rem',
+                fontWeight: 'bold',
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <i className="fa-solid fa-users-gear" style={{ width: '18px' }}></i>
+              <span>Distributors</span>
+            </button>
+          )}
+
           {hasAccess('settings') && (
             <button
               onClick={() => { setActiveTab('settings'); setSidebarOpen(false); }}
@@ -721,6 +747,9 @@ export default function AdminDashboard({
           )}
           {activeTab === 'staff' && hasAccess('staff') && (
             <StaffTab adminUser={adminUser} onCreateAdmin={onCreateAdmin} onDeleteUser={onDeleteUser} />
+          )}
+          {activeTab === 'distributors' && hasAccess('distributors') && (
+            <DistributorsTab />
           )}
           {activeTab === 'settings' && hasAccess('settings') && (
             <SettingsTab onUpdateSettings={onUpdateSettings} />

@@ -46,7 +46,7 @@ export async function GET(req) {
 // POST registers a new user
 export async function POST(req) {
   try {
-    const { email, password, name, role, referredBy } = await req.json();
+    const { email, password, name, role, referredBy, distributorId } = await req.json();
 
     if (!email || !password || !name) {
       return NextResponse.json(
@@ -90,7 +90,8 @@ export async function POST(req) {
       role: role || 'user',
       coins: 100,
       referralCode,
-      referredBy: resolvedReferrer
+      referredBy: resolvedReferrer,
+      distributorId: distributorId || ''
     };
 
     const result = await usersCollection.insertOne(newUser);

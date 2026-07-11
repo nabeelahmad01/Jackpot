@@ -43,7 +43,12 @@ export default function AuthPortal({
             const googleRes = await fetch('/api/auth/google', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email: userEmail, name: userName, referredBy: localStorage.getItem('jackpot_ref_code') || '' })
+              body: JSON.stringify({
+                email: userEmail,
+                name: userName,
+                referredBy: localStorage.getItem('jackpot_ref_code') || '',
+                distributorId: localStorage.getItem('jackpot_distributor_id') || ''
+              })
             });
             const googleData = await googleRes.json();
             
@@ -89,7 +94,12 @@ export default function AuthPortal({
             const googleRes = await fetch('/api/auth/google', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email: testUser.email, name: testUser.name, referredBy: localStorage.getItem('jackpot_ref_code') || '' })
+              body: JSON.stringify({
+                email: testUser.email,
+                name: testUser.name,
+                referredBy: localStorage.getItem('jackpot_ref_code') || '',
+                distributorId: localStorage.getItem('jackpot_distributor_id') || ''
+              })
             });
             const googleData = await googleRes.json();
             if (googleData.success) {
@@ -318,6 +328,7 @@ export default function AuthPortal({
         password: regPassword,
         role: 'user',
         referredBy: localStorage.getItem('jackpot_ref_code') || '',
+        distributorId: localStorage.getItem('jackpot_distributor_id') || ''
       };
 
       triggerLoading(1200, () => {

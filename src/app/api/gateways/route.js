@@ -3,18 +3,39 @@ import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
 
 // GET all gateways
-export async function GET() {
+export async function GET(req) {
   try {
-    const cachedGateways = cache.get('gateways_all');
+    const { searchParams } = new URL(req.url);
+    const distributorId = searchParams.get('distributorId');
+
+    const cacheKey = distributorId ? `gateways_dist_${distributorId}` : 'gateways_all';
+    const cachedGateways = cache.get(cacheKey);
     if (cachedGateways) {
       return NextResponse.json({ success: true, gateways: cachedGateways });
     }
 
     const db = await getDb();
     const gatewaysCollection = db.collection('gateways');
-    const gateways = await gatewaysCollection.find().toArray();
     
-    cache.set('gateways_all', gateways, 60);
+    let query = {};
+    if (distributorId) {
+      const distributorsCollection = db.collection('distributors');
+      const dist = await distributorsCollection.findOne({ id: distributorId });
+      if (dist && dist.type === 'B') {
+        // Type B distributor -> only return their own gateways
+        query.distributorId = distributorId;
+      } else {
+        // Type A distributor or main platform -> return main platform gateways
+        query = { $or: [{ distributorId: { $exists: false } }, { distributorId: '' }] };
+      }
+    } else {
+      // Main platform gateways
+      query = { $or: [{ distributorId: { $exists: false } }, { distributorId: '' }] };
+    }
+
+    const gateways = await gatewaysCollection.find(query).toArray();
+    
+    cache.set(cacheKey, gateways, 60);
     return NextResponse.json({ success: true, gateways });
   } catch (err) {
     console.error('Fetch Gateways API Error:', err);

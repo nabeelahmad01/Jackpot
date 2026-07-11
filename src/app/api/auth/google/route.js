@@ -8,7 +8,7 @@ function generateReferralCode() {
 
 export async function POST(req) {
   try {
-    const { email, name, referredBy } = await req.json();
+    const { email, name, referredBy, distributorId } = await req.json();
 
     if (!email || !name) {
       return NextResponse.json(
@@ -55,7 +55,8 @@ export async function POST(req) {
         role: 'user',
         coins: 100,
         referralCode,
-        referredBy: resolvedReferrer
+        referredBy: resolvedReferrer,
+        distributorId: distributorId || ''
       };
       const result = await usersCollection.insertOne(matchedUser);
       matchedUser._id = result.insertedId;
