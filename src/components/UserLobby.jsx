@@ -387,6 +387,32 @@ export default function UserLobby({
     setScreenshotBase64('');
   };
 
+  const handleClaimRemainder = async (tx) => {
+    if (actionLoading) return;
+    if (!window.confirm(`Do you want to submit a payout request for the remaining $${parseFloat(tx.payoutHold).toFixed(2)} on Hold?`)) {
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      onSubmitTransaction({
+        isRemainderRequest: true,
+        parentTxId: tx.id,
+        amount: parseFloat(tx.payoutHold),
+        gateway: tx.gateway,
+        code: tx.code || '—',
+        gameTitle: tx.gameTitle || 'Lobby',
+        type: 'WITHDRAW'
+      });
+      // The parent onSubmitTransaction handler will hit API, trigger mutate, and show success toast!
+    } catch (err) {
+      console.error(err);
+      showToast('Error submitting remainder request.', 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleWithdrawInitiate = (e) => {
     e.preventDefault();
     const amountVal = parseFloat(withdrawAmount);
@@ -394,8 +420,8 @@ export default function UserLobby({
       showToast('Please enter a valid withdrawal amount.', 'error');
       return;
     }
-    if (amountVal < 5) {
-      showToast('Minimum withdrawal limit is $5.00.', 'error');
+    if (amountVal < 25) {
+      showToast('Minimum withdrawal limit is $25.00.', 'error');
       return;
     }
     setWithdrawModalOpen(true);
@@ -1110,7 +1136,7 @@ export default function UserLobby({
                   {(frontendSettings.cashoutRules || [
                     { title: '1. Account Verification', description: 'Before requesting your first cashout, your email must be verified. Go to customer support if you need assistance updating details.' },
                     { title: '2. Playthrough Requirements', description: 'Sign-up bonuses and deposit match values carry a standard 1x playthrough requirement before funds are eligible for withdrawal requests.' },
-                    { title: '3. Minimum & Maximum Cashouts', description: 'The minimum cashout limit is $5. Daily maximum cashouts are capped at $5,000 for standard players. Support can raise limits for VIP accounts.' },
+                    { title: '3. Minimum & Maximum Cashouts', description: 'The minimum cashout limit is $25. Daily maximum cashouts are capped at $5,000 for standard players. Support can raise limits for VIP accounts.' },
                     { title: '4. Payout Duration', description: 'Withdrawal requests are processed instantly or within 10-15 minutes on average via digital wallets.' }
                   ]).map((rule, idx) => (
                     <React.Fragment key={idx}>
@@ -1615,9 +1641,48 @@ export default function UserLobby({
                                   )}
                                 </td>
                                 <td>
-                                  <span style={{ fontSize: '0.725rem', opacity: 0.8 }}>
-                                    {tx.note && tx.status !== 'FAILED' ? tx.note : `${tx.gateway} (${tx.code})`}
-                                  </span>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                    <span style={{ fontSize: '0.725rem', opacity: 0.8 }}>
+                                      {tx.note && tx.status !== 'FAILED' ? tx.note : `${tx.gateway} (${tx.code})`}
+                                    </span>
+                                    {tx.type === 'WITHDRAW' && tx.status === 'SUCCESS' && tx.payoutHold > 0 && !tx.remainderRequested && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleClaimRemainder(tx);
+                                        }}
+                                        style={{
+                                          alignSelf: 'flex-start',
+                                          background: 'rgba(255,215,0,0.1)',
+                                          border: '1px solid var(--gold-primary)',
+                                          color: 'var(--gold-primary)',
+                                          fontSize: '0.625rem',
+                                          padding: '0.2rem 0.5rem',
+                                          borderRadius: '4px',
+                                          cursor: 'pointer',
+                                          fontWeight: 'bold',
+                                          marginTop: '0.25rem',
+                                          transition: 'all 0.2s ease',
+                                          textTransform: 'uppercase'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          e.target.style.background = 'var(--gold-primary)';
+                                          e.target.style.color = '#000';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          e.target.style.background = 'rgba(255,215,0,0.1)';
+                                          e.target.style.color = 'var(--gold-primary)';
+                                        }}
+                                      >
+                                        Claim Remainder (${parseFloat(tx.payoutHold).toFixed(2)})
+                                      </button>
+                                    )}
+                                    {tx.type === 'WITHDRAW' && tx.status === 'SUCCESS' && tx.payoutHold > 0 && tx.remainderRequested && (
+                                      <span style={{ fontSize: '0.625rem', color: '#888', fontStyle: 'italic' }}>
+                                        Remainder Requested
+                                      </span>
+                                    )}
+                                  </div>
                                 </td>
                                 <td style={{ fontSize: '0.7rem', opacity: 0.7 }}>
                                   {tx.date}

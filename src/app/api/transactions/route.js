@@ -142,12 +142,45 @@ export async function POST(req) {
   try {
     const newTx = await req.json();
 
-    if (!newTx.type || !newTx.amount || !newTx.userEmail) {
+    if (!newTx.amount || !newTx.userEmail) {
       return NextResponse.json({ success: false, message: 'Missing transaction details.' }, { status: 400 });
     }
 
     const db = await getDb();
     const transactionsCollection = db.collection('transactions');
+
+    if (newTx.isRemainderRequest) {
+      // Create remainder payout request
+      const txObject = {
+        id: (Date.now() + Math.floor(Math.random() * 100)).toString(),
+        userEmail: newTx.userEmail.toLowerCase().trim(),
+        date: new Date().toLocaleString(),
+        status: 'PENDING', // Directly ready for payout ledger (no coins verification needed!)
+        type: 'WITHDRAW',
+        amount: parseFloat(newTx.amount),
+        gateway: newTx.gateway || 'Chime',
+        code: newTx.code || '—',
+        gameTitle: newTx.gameTitle || 'Lobby',
+        note: `Remaining payout request for Tx #${newTx.parentTxId}`
+      };
+
+      await transactionsCollection.insertOne(txObject);
+
+      // Update parent transaction
+      await transactionsCollection.updateOne(
+        { id: newTx.parentTxId },
+        { $set: { remainderRequested: true } }
+      );
+
+      // Invalidate stats cache
+      cache.del('admin_stats');
+
+      return NextResponse.json({ success: true, transaction: txObject, message: 'Remaining payout request submitted successfully!' });
+    }
+
+    if (!newTx.type) {
+      return NextResponse.json({ success: false, message: 'Missing transaction type.' }, { status: 400 });
+    }
 
     const txObject = {
       id: (Date.now() + Math.floor(Math.random() * 100)).toString(),
