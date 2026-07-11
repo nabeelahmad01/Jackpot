@@ -233,14 +233,14 @@ export default function ShiftDashboardTab({ adminUser }) {
         </div>
       </section>
 
-      {/* SECTION 2: VERIFIED TRANSACTIONS (COIN ALLOTMENTS) */}
+      {/* SECTION 2: VERIFIED DEPOSITS */}
       <section className="admin-section-card" style={{ background: '#0a0d16', border: '1px solid rgba(255,255,255,0.05)' }}>
         <div className="section-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
           <div>
-            <h3 style={{ fontSize: '0.9rem', color: '#fff', fontWeight: 'bold' }}>Verified Transactions</h3>
-            <span className="game-tap-tip">Mark verified deposits/withdrawals as processed or invalid.</span>
+            <h3 style={{ fontSize: '0.9rem', color: '#fff', fontWeight: 'bold' }}>Verified Deposits</h3>
+            <span className="game-tap-tip">Mark verified deposits as processed (Loaded) or invalid.</span>
           </div>
-          <span className="admin-badge-preview b-ready" style={{ background: 'rgba(34,197,94,0.15)', color: '#2ecc71', border: '1px solid rgba(34,197,94,0.25)' }}>LIVE</span>
+          <span className="admin-badge-preview b-ready" style={{ background: 'rgba(34,197,94,0.15)', color: '#2ecc71', border: '1px solid rgba(34,197,94,0.25)' }}>LIVE DEPOSITS</span>
         </div>
 
         <div className="table-responsive">
@@ -255,12 +255,12 @@ export default function ShiftDashboardTab({ adminUser }) {
               </tr>
             </thead>
             <tbody>
-              {pendingCoins.length === 0 ? (
+              {pendingCoins.filter(n => n.totalCoins >= 0).length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="text-center text-muted" style={{ padding: '1.5rem' }}>No pending transactions to allot.</td>
+                  <td colSpan="5" className="text-center text-muted" style={{ padding: '1.5rem' }}>No pending deposits to allot.</td>
                 </tr>
               ) : (
-                pendingCoins.map((noti) => (
+                pendingCoins.filter(n => n.totalCoins >= 0).map((noti) => (
                   <tr key={noti.id}>
                     <td>
                       <strong>{noti.userEmail}</strong>
@@ -268,12 +268,12 @@ export default function ShiftDashboardTab({ adminUser }) {
                     </td>
                     <td><span className="admin-badge-preview b-hot" style={{ fontSize: '0.65rem' }}>{noti.gameTitle}</span></td>
                     <td>
-                      <span style={{ fontSize: '0.725rem', color: noti.totalCoins < 0 ? '#ff4d6d' : '#2ecc71', textTransform: 'uppercase', fontWeight: 'bold' }}>
-                        {noti.totalCoins < 0 ? 'withdraw' : 'deposit'}
+                      <span style={{ fontSize: '0.725rem', color: '#2ecc71', textTransform: 'uppercase', fontWeight: 'bold' }}>
+                        deposit
                       </span>
                     </td>
                     <td>
-                      <strong style={{ color: noti.totalCoins < 0 ? '#ff4d6d' : 'var(--gold-primary)', fontSize: '0.85rem' }}>
+                      <strong style={{ color: 'var(--gold-primary)', fontSize: '0.85rem' }}>
                         {Math.abs(noti.totalCoins).toFixed(2)}
                       </strong>
                     </td>
@@ -283,9 +283,88 @@ export default function ShiftDashboardTab({ adminUser }) {
                           onClick={() => handleCoinAllotmentSuccess(noti.id)}
                           disabled={processingCoinId === noti.id}
                           className="submit-btn"
-                          style={{ background: '#7c3aed', color: '#fff', margin: 0, padding: '0.35rem 0.85rem', width: 'auto', fontSize: '0.7rem', fontWeight: 'bold' }}
+                          style={{ background: '#22c55e', color: '#fff', margin: 0, padding: '0.35rem 0.85rem', width: 'auto', fontSize: '0.7rem', fontWeight: 'bold' }}
                         >
                           Loaded
+                        </button>
+                        <input
+                          type="text"
+                          placeholder="Reason (required)"
+                          value={invalidReasons[noti.id] || ''}
+                          onChange={(e) => setInvalidReasons(prev => ({ ...prev, [noti.id]: e.target.value }))}
+                          style={{ background: '#070912', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.725rem', padding: '0.35rem 0.5rem', borderRadius: '6px', width: '140px' }}
+                        />
+                        <button
+                          onClick={() => handleCoinAllotmentInvalid(noti.id)}
+                          disabled={processingCoinId === noti.id}
+                          className="submit-btn"
+                          style={{ background: '#ef4444', color: '#fff', margin: 0, padding: '0.35rem 0.85rem', width: 'auto', fontSize: '0.7rem', fontWeight: 'bold' }}
+                        >
+                          Invalid
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* SECTION 3: VERIFIED WITHDRAWALS */}
+      <section className="admin-section-card" style={{ background: '#0a0d16', border: '1px solid rgba(255,255,255,0.05)', marginTop: '1.5rem' }}>
+        <div className="section-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <div>
+            <h3 style={{ fontSize: '0.9rem', color: '#fff', fontWeight: 'bold' }}>Verified Withdrawals</h3>
+            <span className="game-tap-tip">Mark verified withdrawals as processed (Withdrawal) or invalid.</span>
+          </div>
+          <span className="admin-badge-preview b-hot" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)' }}>LIVE WITHDRAWALS</span>
+        </div>
+
+        <div className="table-responsive">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>USERNAME</th>
+                <th>GAME</th>
+                <th>TYPE</th>
+                <th>LD AMOUNT</th>
+                <th>ACTION</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pendingCoins.filter(n => n.totalCoins < 0).length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="text-center text-muted" style={{ padding: '1.5rem' }}>No pending withdrawals to allot.</td>
+                </tr>
+              ) : (
+                pendingCoins.filter(n => n.totalCoins < 0).map((noti) => (
+                  <tr key={noti.id}>
+                    <td>
+                      <strong>{noti.userEmail}</strong>
+                      {noti.gameUsername && <div style={{ fontSize: '0.65rem', color: 'var(--gold-primary)' }}>({noti.gameUsername})</div>}
+                    </td>
+                    <td><span className="admin-badge-preview b-hot" style={{ fontSize: '0.65rem' }}>{noti.gameTitle}</span></td>
+                    <td>
+                      <span style={{ fontSize: '0.725rem', color: '#ff4d6d', textTransform: 'uppercase', fontWeight: 'bold' }}>
+                        withdraw
+                      </span>
+                    </td>
+                    <td>
+                      <strong style={{ color: '#ff4d6d', fontSize: '0.85rem' }}>
+                        {Math.abs(noti.totalCoins).toFixed(2)}
+                      </strong>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <button
+                          onClick={() => handleCoinAllotmentSuccess(noti.id)}
+                          disabled={processingCoinId === noti.id}
+                          className="submit-btn"
+                          style={{ background: '#e11d48', color: '#fff', margin: 0, padding: '0.35rem 0.85rem', width: 'auto', fontSize: '0.7rem', fontWeight: 'bold' }}
+                        >
+                          Withdrawal
                         </button>
                         <input
                           type="text"

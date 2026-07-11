@@ -104,6 +104,23 @@ export default function FrontendSettingsTab({ adminUser }) {
     }
   }, [data]);
 
+  const handleAudioUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Audio file size must be less than 5MB.');
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setNotificationSoundUrl(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
   // Handlers for dynamic lists
   const addPayout = () => {
     setMarqueePayouts([...marqueePayouts, { name: 'Player Name', amount: '$100.00', time: 'Just now', color: 'av-purple', init: 'PL' }]);
@@ -611,19 +628,34 @@ export default function FrontendSettingsTab({ adminUser }) {
 
             <div style={{ marginTop: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
               <div className="input-group" style={{ margin: 0 }}>
-                <label>Custom Notification Alert Sound URL (.mp3 / .wav)</label>
-                <div className="input-wrapper" style={{ background: '#07090f' }}>
-                  <i className="fa-solid fa-volume-high input-icon" style={{ color: 'var(--gold-primary)' }}></i>
+                <label>Upload Custom Notification Alert Sound (.mp3 / .wav)</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
                   <input
-                    type="url"
-                    placeholder="https://example.com/sound.mp3"
-                    value={notificationSoundUrl}
-                    onChange={(e) => setNotificationSoundUrl(e.target.value)}
-                    required
+                    type="file"
+                    accept="audio/*"
+                    onChange={handleAudioUpload}
+                    style={{ fontSize: '0.75rem', color: '#fff' }}
                   />
+                  {notificationSoundUrl && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try {
+                          const audio = new Audio(notificationSoundUrl);
+                          audio.play().catch(err => alert('Playback blocked by browser autoplay settings. Please click anywhere on the page and try again!'));
+                        } catch (err) {
+                          alert('Error playing audio: ' + err.message);
+                        }
+                      }}
+                      className="submit-btn"
+                      style={{ width: 'auto', background: 'rgba(255,255,255,0.1)', color: '#fff', margin: 0, padding: '0.35rem 0.75rem', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                    >
+                      <i className="fa-solid fa-play"></i> Test Notification Sound
+                    </button>
+                  )}
                 </div>
                 <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                  Enter a direct audio link. Plays on Shift Dashboard and Coins Allotment pages when new tasks arrive.
+                  Upload any sound file under 5MB (MP3/WAV/etc). Audio will play on the Shift Dashboard and Coins Allotment pages when new queue items arrive.
                 </div>
               </div>
             </div>
