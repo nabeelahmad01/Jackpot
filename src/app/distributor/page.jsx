@@ -650,8 +650,61 @@ export default function DistributorPortal() {
                     <input type="text" placeholder="+1234..." value={gwPhone} onChange={(e) => setGwPhone(e.target.value)} style={{ width: '100%', background: '#040509', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', padding: '0.4rem 0.6rem', color: '#fff', fontSize: '0.75rem', outline: 'none' }} />
                   </div>
                   <div style={{ marginBottom: '0.75rem' }}>
-                    <label style={{ fontSize: '0.65rem', color: '#aaa', display: 'block', marginBottom: '0.2rem' }}>QR Image URL (Optional)</label>
-                    <input type="text" placeholder="https://..." value={gwQr} onChange={(e) => setGwQr(e.target.value)} style={{ width: '100%', background: '#040509', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', padding: '0.4rem 0.6rem', color: '#fff', fontSize: '0.75rem', outline: 'none' }} />
+                    <label style={{ fontSize: '0.65rem', color: '#aaa', display: 'block', marginBottom: '0.2rem' }}>QR Code Image (Optional)</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={(e) => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            if (file.size > 3 * 1024 * 1024) {
+                              alert('Image is too large. Please select a file smaller than 3MB.');
+                              e.target.value = '';
+                              return;
+                            }
+                            const reader = new FileReader();
+                            reader.onload = (event) => {
+                              setGwQr(event.target.result);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        style={{ display: 'none' }}
+                        id="dist-gw-qr-file"
+                      />
+                      <label 
+                        htmlFor="dist-gw-qr-file"
+                        style={{
+                          background: '#040509',
+                          border: '1px dashed rgba(255,255,255,0.15)',
+                          borderRadius: '6px',
+                          padding: '0.6rem',
+                          color: 'var(--gold-primary)',
+                          fontSize: '0.75rem',
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          fontWeight: 'bold',
+                          display: 'block'
+                        }}
+                      >
+                        <i className="fa-solid fa-cloud-arrow-up" style={{ marginRight: '0.4rem' }}></i>
+                        {gwQr ? 'CHANGE QR IMAGE' : 'CHOOSE QR IMAGE'}
+                      </label>
+                      {gwQr && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.4rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                          <img src={gwQr} alt="QR Preview" style={{ width: '40px', height: '40px', objectFit: 'contain', borderRadius: '4px' }} />
+                          <span style={{ fontSize: '0.625rem', color: '#888', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>QR Image Selected</span>
+                          <button 
+                            type="button" 
+                            onClick={() => setGwQr('')}
+                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.8rem' }}
+                          >
+                            <i className="fa-solid fa-trash-can"></i>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div style={{ marginBottom: '0.75rem' }}>
                     <label style={{ fontSize: '0.65rem', color: '#aaa', display: 'block', marginBottom: '0.2rem' }}>Theme Color</label>
