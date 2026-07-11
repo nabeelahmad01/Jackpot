@@ -478,7 +478,9 @@ export default function UserLobby({
   };
 
   const handleDownloadApp = () => {
-    if (onInstallApp) {
+    if (activeGame && activeGame.link) {
+      window.open(activeGame.link, '_blank', 'noopener,noreferrer');
+    } else if (onInstallApp) {
       onInstallApp();
     } else {
       showToast('To Install App: Click browser settings menu and select "Add to Home Screen".', 'info');
