@@ -118,7 +118,12 @@ export default function FrontendSettingsTab({ adminUser }) {
 
     const reader = new FileReader();
     reader.onloadend = () => {
-      setNotificationSoundUrl(reader.result);
+      let result = reader.result;
+      if (typeof result === 'string') {
+        // Convert any video mime-types (like video/mpeg) to audio/mpeg
+        result = result.replace(/^data:video\/[^;]+;/, 'data:audio/mpeg;');
+      }
+      setNotificationSoundUrl(result);
     };
     reader.readAsDataURL(file);
   };
@@ -643,7 +648,8 @@ export default function FrontendSettingsTab({ adminUser }) {
                       type="button"
                       onClick={() => {
                         try {
-                          const audio = new Audio(notificationSoundUrl);
+                          const cleanUrl = (notificationSoundUrl || '').replace(/^data:video\/[^;]+;/, 'data:audio/mpeg;');
+                          const audio = new Audio(cleanUrl);
                           audio.play().catch(err => alert('Playback blocked by browser autoplay settings. Please click anywhere on the page and try again!'));
                         } catch (err) {
                           alert('Error playing audio: ' + err.message);

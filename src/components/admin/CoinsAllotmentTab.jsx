@@ -46,8 +46,9 @@ export default function CoinsAllotmentTab({
       const currentCount = (data.coinsNotifications || []).filter(n => n.status === 'PENDING' || n.status === 'CLAIM_REQUESTED').length;
       if (prevCount !== null && currentCount > prevCount) {
         try {
-          const soundUrl = settingsData?.settings?.notificationSoundUrl || 'https://raw.githubusercontent.com/AUTOMATIC1111/stable-diffusion-webui/master/notification.mp3';
-          const audio = new Audio(soundUrl);
+          const rawUrl = settingsData?.settings?.notificationSoundUrl || 'https://raw.githubusercontent.com/AUTOMATIC1111/stable-diffusion-webui/master/notification.mp3';
+          const cleanUrl = rawUrl.replace(/^data:video\/[^;]+;/, 'data:audio/mpeg;');
+          const audio = new Audio(cleanUrl);
           audio.play().catch(err => console.log('Audio playback blocked or failed:', err));
         } catch (audioErr) {
           console.error('Audio play error:', audioErr);
