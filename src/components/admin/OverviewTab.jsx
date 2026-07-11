@@ -70,6 +70,48 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
   const [updateLink, setUpdateLink] = React.useState('');
   const [isUpdatingPool, setIsUpdatingPool] = React.useState(false);
 
+  const getYesterdayDateString = () => {
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const year = yesterday.getFullYear();
+    const month = String(yesterday.getMonth() + 1).padStart(2, '0');
+    const day = String(yesterday.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getTodayDateString = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getOneYearAgoDateString = () => {
+    const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+    const year = oneYearAgo.getFullYear();
+    const month = String(oneYearAgo.getMonth() + 1).padStart(2, '0');
+    const day = String(oneYearAgo.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const [lookupDate, setLookupDate] = React.useState(getYesterdayDateString());
+  const [lookupStats, setLookupStats] = React.useState({ totalIn: 0, totalOut: 0 });
+  const [lookupLoading, setLookupLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!lookupDate) return;
+    setLookupLoading(true);
+    fetch(`/api/admin/stats/by-date?date=${lookupDate}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setLookupStats({ totalIn: data.totalIn || 0, totalOut: data.totalOut || 0 });
+        }
+      })
+      .catch(err => console.error('Failed to load stats for date:', err))
+      .finally(() => setLookupLoading(false));
+  }, [lookupDate]);
+
   const triggerPoolUpdate = (game) => {
     setSelectedGame(game);
     setUpdateCoins(game.availableCoins || 0);
@@ -157,12 +199,42 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
           </div>
         </div>
 
-        <div className="stat-card" style={{ borderLeft: '4px solid #3498db' }}>
-          <div className="stat-icon-wrapper gold-bg"><i className="fa-solid fa-calendar-day"></i></div>
-          <div className="stat-info">
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>Yesterday Details:</span>
-            <span style={{ fontSize: '0.8rem', color: '#2ecc71', fontWeight: 'bold' }}>📥 In: ${stats.yesterdayDeposits.toFixed(2)}</span>
-            <span style={{ fontSize: '0.8rem', color: '#ef4444', fontWeight: 'bold', marginLeft: '0.5rem' }}>📤 Out: ${stats.yesterdayWithdrawals.toFixed(2)}</span>
+        <div className="stat-card" style={{ borderLeft: '4px solid #3498db', minWidth: '300px' }}>
+          <div className="stat-icon-wrapper gold-bg"><i className="fa-solid fa-calendar-days"></i></div>
+          <div className="stat-info" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Historical Records (1 Yr Max)</span>
+            <input 
+              type="date"
+              value={lookupDate}
+              onChange={(e) => setLookupDate(e.target.value)}
+              max={getTodayDateString()}
+              min={getOneYearAgoDateString()}
+              style={{
+                background: 'rgba(7,9,18,0.6)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                color: '#fff',
+                borderRadius: '6px',
+                fontSize: '0.75rem',
+                padding: '0.25rem 0.5rem',
+                outline: 'none',
+                width: '100%',
+                cursor: 'pointer'
+              }}
+            />
+            {lookupLoading ? (
+              <span style={{ fontSize: '0.725rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '0.15rem' }}>
+                <i className="fa-solid fa-spinner fa-spin" style={{ color: 'var(--gold-primary)' }}></i> Loading date stats...
+              </span>
+            ) : (
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.15rem' }}>
+                <span style={{ fontSize: '0.8rem', color: '#2ecc71', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                  📥 In: ${lookupStats.totalIn.toFixed(2)}
+                </span>
+                <span style={{ fontSize: '0.8rem', color: '#ef4444', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                  📤 Out: ${lookupStats.totalOut.toFixed(2)}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </section>
