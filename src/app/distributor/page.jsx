@@ -53,14 +53,14 @@ export default function DistributorPortal() {
 
   // Filter player queues to show only referred players' requests
   const players = statsData?.players || [];
-  const playerEmails = players.map(p => p.email.toLowerCase().trim());
+  const playerEmails = players.map(p => (p.email || '').toLowerCase().trim()).filter(Boolean);
 
   const referredRequests = (allRequestsData?.accountRequests || []).filter(req =>
-    playerEmails.includes(req.email.toLowerCase().trim())
+    req.email && playerEmails.includes(req.email.toLowerCase().trim())
   );
 
   const referredCoins = (allCoinsData?.coinsNotifications || []).filter(noti =>
-    playerEmails.includes(noti.email.toLowerCase().trim())
+    noti.email && playerEmails.includes(noti.email.toLowerCase().trim())
   );
 
   // Form states for creating Gateway (Type B)

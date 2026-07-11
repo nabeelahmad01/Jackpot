@@ -26,7 +26,7 @@ export async function GET(req) {
       { distributorId },
       { projection: { name: 1, email: 1, role: 1, coins: 1, isSubscribed: 1 } }
     ).toArray();
-    const playerEmails = players.map(p => p.email.toLowerCase().trim());
+    const playerEmails = players.map(p => (p.email || '').toLowerCase().trim()).filter(Boolean);
 
     // 2. Fetch transaction logs and compile totals
     let transactions = [];
