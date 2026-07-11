@@ -275,11 +275,17 @@ export default function AdminDashboard({
                 border: 'none',
                 cursor: 'pointer',
                 textAlign: 'left',
+                position: 'relative',
                 transition: 'all 0.2s ease'
               }}
             >
               <i className="fa-solid fa-business-time" style={{ width: '18px' }}></i>
               <span>Shift Dashboard</span>
+              {(pendingRequestsCount + pendingCoinsCount) > 0 && (
+                <span style={{ marginLeft: 'auto', background: '#ef4444', color: '#fff', fontSize: '0.65rem', padding: '0.15rem 0.45rem', borderRadius: '10px', fontWeight: 'bold' }}>
+                  {pendingRequestsCount + pendingCoinsCount}
+                </span>
+              )}
             </button>
           )}
 
