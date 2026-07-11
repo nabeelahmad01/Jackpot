@@ -309,16 +309,13 @@ export async function PUT(req) {
           if (refBonusPercent > 0) {
             const rewardCoins = amount * (refBonusPercent / 100);
             
-            // Insert referral reward notification for the Coins Manager (to allot to the Referrer)
-            await notificationsCollection.insertOne({
+            // Insert referral reward under pendingReferrals for user claim choice
+            await db.collection('pendingReferrals').insertOne({
               id: Date.now().toString() + Math.floor(Math.random() * 100 + 1).toString(),
-              userEmail: referrerEmail,
-              gameTitle: 'Referral Reward', // Clearly labels this as a referral reward allotment
-              depositAmount: amount, // The referred friend's deposit amount
-              bonusApplied: refBonusPercent, // The config %
-              totalCoins: Math.round(rewardCoins * 100) / 100, // Reward amount
+              referrerEmail,
+              refereeEmail: userEmail,
+              rewardCoins: Math.round(rewardCoins * 100) / 100,
               status: 'PENDING',
-              read: false,
               timestamp: new Date().toISOString()
             });
           }

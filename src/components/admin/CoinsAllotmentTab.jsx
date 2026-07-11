@@ -122,6 +122,8 @@ export default function CoinsAllotmentTab({
                   <td>
                     {noti.bonusApplied === -1 ? (
                       <span style={{ color: '#ff4d6d' }}>${parseFloat(noti.depositAmount).toFixed(2)} (Cashout)</span>
+                    ) : noti.bonusApplied === -2 ? (
+                      <span style={{ color: 'var(--gold-primary)', fontWeight: 'bold' }}>Referral Claim</span>
                     ) : (
                       `$${parseFloat(noti.depositAmount).toFixed(2)}`
                     )}
@@ -129,6 +131,8 @@ export default function CoinsAllotmentTab({
                   <td>
                     {noti.bonusApplied === -1 ? (
                       <span style={{ color: '#ff4d6d', fontWeight: 'bold' }}>DEDUCTION</span>
+                    ) : noti.bonusApplied === -2 ? (
+                      <span style={{ color: '#a855f7', fontWeight: 'bold' }}>100% REFERRAL</span>
                     ) : (
                       `${noti.bonusApplied}% Bonus`
                     )}

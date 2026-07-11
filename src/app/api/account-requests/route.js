@@ -104,7 +104,43 @@ export async function PUT(req) {
     const db = await getDb();
     const requestsCollection = db.collection('accountRequests');
 
+    const requestDoc = await requestsCollection.findOne({ id });
+    if (!requestDoc) {
+      return NextResponse.json({ success: false, message: 'Account request not found.' }, { status: 404 });
+    }
+
     await requestsCollection.updateOne({ id }, { $set: { status } });
+
+    // Handle automated referral reward coin allotment if the account was approved (status READY)
+    if (status === 'READY' && requestDoc.referralRewardId) {
+      try {
+        const pendingReferralsCollection = db.collection('pendingReferrals');
+        const refDoc = await pendingReferralsCollection.findOne({ id: requestDoc.referralRewardId });
+        
+        if (refDoc && refDoc.status !== 'CLAIMED') {
+          // Add the allotment notification task directly for the coins manager to fulfill
+          await db.collection('coinsNotifications').insertOne({
+            id: Date.now().toString() + Math.floor(Math.random() * 100 + 1).toString(),
+            userEmail: refDoc.referrerEmail,
+            gameTitle: requestDoc.gameTitle,
+            depositAmount: 0,
+            bonusApplied: -2, // -2 indicates Referral Reward
+            totalCoins: Number(refDoc.rewardCoins),
+            status: 'PENDING',
+            read: false,
+            timestamp: new Date().toISOString()
+          });
+
+          // Mark pendingReferrals doc as CLAIMED
+          await pendingReferralsCollection.updateOne(
+            { id: requestDoc.referralRewardId },
+            { $set: { status: 'CLAIMED', claimedAt: new Date().toISOString() } }
+          );
+        }
+      } catch (refErr) {
+        console.error('Failed to auto-allot referral bonus upon account request approval:', refErr);
+      }
+    }
     
     // Invalidate stats cache
     cache.del('admin_stats');

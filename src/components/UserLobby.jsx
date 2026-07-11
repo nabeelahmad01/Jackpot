@@ -40,6 +40,52 @@ export default function UserLobby({
   const [selectedWithdrawGateway, setSelectedWithdrawGateway] = useState(null);
   const [lobbySubView, setLobbySubView] = useState('main'); // 'main' | 'referrals'
   const [referralsList, setReferralsList] = useState([]);
+  const [pendingReferrals, setPendingReferrals] = useState([]);
+  const [selectedReferralToClaim, setSelectedReferralToClaim] = useState(null);
+  const [selectedGameForReferral, setSelectedGameForReferral] = useState('');
+  const [claimingReferralId, setClaimingReferralId] = useState(null);
+
+  const fetchPendingReferrals = () => {
+    if (!currentUserEmail) return;
+    fetch(`/api/referrals/pending?email=${encodeURIComponent(currentUserEmail)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setPendingReferrals(data.pending || []);
+        }
+      })
+      .catch(err => console.error('Failed to load pending referrals:', err));
+  };
+
+  const handleClaimReferral = async (referralId) => {
+    if (!selectedGameForReferral) {
+      showToast('Please select a game first!', 'error');
+      return;
+    }
+    setClaimingReferralId(referralId);
+    try {
+      const res = await fetch('/api/referrals/pending', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: referralId, gameTitle: selectedGameForReferral })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message, 'success');
+        setSelectedReferralToClaim(null);
+        setSelectedGameForReferral('');
+        fetchPendingReferrals();
+      } else {
+        showToast(data.message || 'Failed to claim referral reward.', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Connection error claiming referral.', 'error');
+    } finally {
+      setClaimingReferralId(null);
+    }
+  };
+
   const [claimBonus, setClaimBonus] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [activeTooltipId, setActiveTooltipId] = useState(null);
@@ -214,6 +260,8 @@ export default function UserLobby({
           }
         })
         .catch(err => console.error('Error fetching referrals list:', err));
+        
+      fetchPendingReferrals();
     }
   }, [currentUserEmail, lobbySubView]);
 
@@ -584,6 +632,132 @@ export default function UserLobby({
         </div>
       ) : !activeGame ? (
         <div className="lobby-content-container">
+          {/* Pending Referral Claims Alert Card */}
+          {pendingReferrals && pendingReferrals.length > 0 && (
+            <div style={{ marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {pendingReferrals.map(ref => {
+                const isSelected = selectedReferralToClaim === ref.id;
+                return (
+                  <div key={ref.id} className="admin-section-card" style={{
+                    padding: '1.25rem',
+                    border: '1.5px solid rgba(168, 85, 247, 0.4)',
+                    background: 'linear-gradient(135deg, rgba(8, 10, 17, 0.95) 0%, rgba(20, 5, 25, 0.95) 100%)',
+                    borderRadius: '16px',
+                    boxShadow: '0 8px 30px rgba(0, 0, 0, 0.4)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '1rem',
+                    animation: 'fade-in 0.3s ease-out'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      <div style={{
+                        width: '45px',
+                        height: '45px',
+                        borderRadius: '50%',
+                        background: 'rgba(168,85,247,0.1)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        border: '1px solid rgba(168,85,247,0.3)'
+                      }}>
+                        <i className="fa-solid fa-gift" style={{ fontSize: '1.25rem', color: '#c084fc' }}></i>
+                      </div>
+                      <div>
+                        <h4 style={{ fontSize: '0.9rem', color: '#fff', fontWeight: 'bold', margin: 0 }}>
+                          🎁 Referral Reward Unlocked!
+                        </h4>
+                        <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)', margin: '0.25rem 0' }}>
+                          You have an unclaimed reward of <strong style={{ color: 'var(--gold-primary)' }}>{ref.rewardCoins} Coins</strong> from inviting <strong>{ref.refereeEmail}</strong>!
+                        </p>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      {!isSelected ? (
+                        <button
+                          onClick={() => {
+                            setSelectedReferralToClaim(ref.id);
+                            setSelectedGameForReferral('');
+                          }}
+                          className="submit-btn"
+                          style={{
+                            background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)',
+                            color: '#fff',
+                            fontWeight: 'bold',
+                            padding: '0.6rem 1.25rem',
+                            borderRadius: '10px',
+                            fontSize: '0.75rem',
+                            width: 'auto',
+                            margin: 0,
+                            boxShadow: '0 4px 15px rgba(168,85,247,0.3)'
+                          }}
+                        >
+                          Claim Reward
+                        </button>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <select 
+                            value={selectedGameForReferral} 
+                            onChange={(e) => setSelectedGameForReferral(e.target.value)}
+                            style={{
+                              background: '#070912',
+                              border: '1px solid rgba(255,255,255,0.15)',
+                              color: '#fff',
+                              padding: '0.5rem 0.75rem',
+                              borderRadius: '8px',
+                              fontSize: '0.75rem',
+                              outline: 'none'
+                            }}
+                          >
+                            <option value="">-- Choose a Game --</option>
+                            {games.map(g => (
+                              <option key={g.id} value={g.title} style={{ background: '#070912', color: '#fff' }}>{g.title}</option>
+                            ))}
+                          </select>
+
+                          <button
+                            disabled={claimingReferralId === ref.id}
+                            onClick={() => handleClaimReferral(ref.id)}
+                            className="submit-btn"
+                            style={{
+                              background: 'var(--gold-primary)',
+                              color: '#000',
+                              fontWeight: 'bold',
+                              padding: '0.5rem 1rem',
+                              borderRadius: '8px',
+                              fontSize: '0.75rem',
+                              width: 'auto',
+                              margin: 0
+                            }}
+                          >
+                            {claimingReferralId === ref.id ? 'Claiming...' : 'Confirm'}
+                          </button>
+
+                          <button
+                            onClick={() => setSelectedReferralToClaim(null)}
+                            style={{
+                              background: 'rgba(255,255,255,0.05)',
+                              border: 'none',
+                              color: '#fff',
+                              padding: '0.5rem 1rem',
+                              borderRadius: '8px',
+                              fontSize: '0.75rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {/* Active Hold/Claim Notifications */}
           {coinsNotifications && coinsNotifications.filter(n => n.status === 'HOLD' || n.status === 'CLAIM_REQUESTED').length > 0 && (
             <div className="hold-notifications-wrapper" style={{ marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
