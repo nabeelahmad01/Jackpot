@@ -19,18 +19,10 @@ export async function GET(req) {
       query.userEmail = email.toLowerCase().trim();
     }
 
-    const adminRole = searchParams.get('adminRole');
     const adminDistributorId = searchParams.get('adminDistributorId');
 
-    if (adminRole && adminRole !== 'admin') {
-      if (adminDistributorId) {
-        query.distributorId = adminDistributorId;
-      } else {
-        const distributorsCollection = db.collection('distributors');
-        const typeADistributors = await distributorsCollection.find({ type: 'A' }).project({ id: 1 }).toArray();
-        const typeADistIds = typeADistributors.map(d => d.id);
-        query.distributorId = { $in: [null, '', ...typeADistIds] };
-      }
+    if (adminDistributorId) {
+      query.distributorId = adminDistributorId;
     }
 
     if (search) {
@@ -164,21 +156,9 @@ export async function PUT(req) {
           if (parentTx.type === 'WITHDRAW') {
             txUpdate.status = 'PENDING';
             if (originalNoti.isFreeplayWithdraw) {
-              const requestedAmount = parseFloat(parentTx.amount || 0);
-              if (requestedAmount > 30) {
-                txUpdate.amount = 30;
-                txUpdate.note = "Freeplay win capped at $30 max cashout.";
-                const refundAmount = requestedAmount - 30;
-                try {
-                  const usersCollection = db.collection('users');
-                  await usersCollection.updateOne(
-                    { email: originalNoti.userEmail.toLowerCase().trim() },
-                    { $inc: { coins: refundAmount } }
-                  );
-                } catch (userErr) {
-                  console.error('Failed to refund remaining coins on freeplay win capping:', userErr);
-                }
-              }
+              txUpdate.payoutAmount = 30;
+              txUpdate.isFreeplayWithdraw = true;
+              txUpdate.note = "Freeplay win capped at $30 max cashout.";
             }
           }
           await transactionsCollection.updateOne(

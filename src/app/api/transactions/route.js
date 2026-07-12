@@ -32,18 +32,10 @@ export async function GET(req) {
       query.userEmail = email.toLowerCase().trim();
     }
 
-    const adminRole = searchParams.get('adminRole');
     const adminDistributorId = searchParams.get('adminDistributorId');
 
-    if (adminRole && adminRole !== 'admin') {
-      if (adminDistributorId) {
-        query.distributorId = adminDistributorId;
-      } else {
-        const distributorsCollection = db.collection('distributors');
-        const typeADistributors = await distributorsCollection.find({ type: 'A' }).project({ id: 1 }).toArray();
-        const typeADistIds = typeADistributors.map(d => d.id);
-        query.distributorId = { $in: [null, '', ...typeADistIds] };
-      }
+    if (adminDistributorId) {
+      query.distributorId = adminDistributorId;
     }
     if (status) {
       const statuses = status.split(',').map(s => s.toUpperCase().trim());
@@ -198,6 +190,44 @@ export async function POST(req) {
 
     if (!newTx.type) {
       return NextResponse.json({ success: false, message: 'Missing transaction type.' }, { status: 400 });
+    }
+
+    if (newTx.type === 'COMMISSION_WITHDRAW') {
+      // 1. Fetch the distributor profile
+      const distDoc = await db.collection('distributors').findOne({ email: newTx.userEmail.toLowerCase().trim() });
+      if (!distDoc) {
+        return NextResponse.json({ success: false, message: 'Distributor profile not found.' }, { status: 404 });
+      }
+
+      // 2. Fetch all successful & pending commission withdrawal amounts
+      const withdrawals = await db.collection('transactions').find({
+        userEmail: newTx.userEmail.toLowerCase().trim(),
+        type: 'COMMISSION_WITHDRAW',
+        status: { $in: ['PENDING', 'SUCCESS'] }
+      }).toArray();
+      const totalWithdrawn = withdrawals.reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
+
+      // 3. Get total commission earned from referral stats
+      const referredPlayers = await db.collection('users').find({ distributorId: distDoc.id }).toArray();
+      const playerEmails = referredPlayers.map(p => p.email.toLowerCase().trim());
+      
+      let commissionEarned = 0;
+      if (playerEmails.length > 0) {
+        const playerDeposits = await db.collection('transactions').find({
+          userEmail: { $in: playerEmails },
+          type: 'DEPOSIT',
+          status: 'SUCCESS'
+        }).toArray();
+        const totalDeposits = playerDeposits.reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
+        commissionEarned = (totalDeposits * (distDoc.commissionRate || 0)) / 100;
+      }
+
+      const availableCommission = commissionEarned - totalWithdrawn;
+      const requestAmount = parseFloat(newTx.amount);
+
+      if (requestAmount > availableCommission) {
+        return NextResponse.json({ success: false, message: `Insufficient commission balance. Available: $${availableCommission.toFixed(2)}` }, { status: 400 });
+      }
     }
 
     const txObject = {

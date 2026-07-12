@@ -18,15 +18,8 @@ export async function GET(req) {
     const db = await getDb();
 
     let baseQuery = {};
-    if (adminRole && adminRole !== 'admin') {
-      if (adminDistributorId) {
-        baseQuery.distributorId = adminDistributorId;
-      } else {
-        const distributorsCollection = db.collection('distributors');
-        const typeADistributors = await distributorsCollection.find({ type: 'A' }).project({ id: 1 }).toArray();
-        const typeADistIds = typeADistributors.map(d => d.id);
-        baseQuery.distributorId = { $in: [null, '', ...typeADistIds] };
-      }
+    if (adminDistributorId) {
+      baseQuery.distributorId = adminDistributorId;
     }
 
     // Run pending queue counts in parallel

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import TxSearchTab from '../../components/admin/TxSearchTab';
+import SupportTab from '../../components/admin/SupportTab';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -57,6 +58,11 @@ export default function DistributorPortal() {
     { refreshInterval: 5000 }
   );
 
+  const { data: commTxData, mutate: mutateCommTx } = useSWR(
+    distSession ? `/api/transactions?email=${encodeURIComponent(distSession.email)}&type=COMMISSION_WITHDRAW` : null,
+    fetcher
+  );
+
   // Filter player queues to show only referred players' requests
   const players = statsData?.players || [];
   const playerEmails = players.map(p => (p.email || '').toLowerCase().trim()).filter(Boolean);
@@ -86,12 +92,70 @@ export default function DistributorPortal() {
   const [staffRole, setStaffRole] = useState('coins_admin');
   const [isSubmittingStaff, setIsSubmittingStaff] = useState(false);
 
+  // Commission Withdraw Form States
+  const [commAmount, setCommAmount] = useState('');
+  const [commGateway, setCommGateway] = useState('Chime');
+  const [commCode, setCommCode] = useState('');
+  const [isSubmittingComm, setIsSubmittingComm] = useState(false);
+  const [commMsg, setCommMsg] = useState('');
+
   // Invalidation reason modal (Type B allotments)
   const [invalidatingNoti, setInvalidatingNoti] = useState(null);
   const [holdReason, setHoldReason] = useState('');
 
   // Referral Link copy
   const [copiedLink, setCopiedLink] = useState(false);
+
+  const handleRequestCommWithdraw = async (e) => {
+    e.preventDefault();
+    if (!commAmount || !commCode) return;
+    const reqVal = parseFloat(commAmount);
+    if (isNaN(reqVal) || reqVal <= 0) {
+      alert('Please enter a valid amount.');
+      return;
+    }
+    
+    const commWithdrawals = commTxData?.transactions || [];
+    const totalWithdrawn = commWithdrawals.filter(tx => tx.status === 'SUCCESS' || tx.status === 'PENDING').reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
+    const availableCommission = Math.max(0, (stats.commissionEarned || 0) - totalWithdrawn);
+
+    if (reqVal > availableCommission) {
+      alert('Request amount exceeds available commission.');
+      return;
+    }
+
+    setIsSubmittingComm(true);
+    setCommMsg('');
+
+    try {
+      const res = await fetch('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userEmail: distSession.email,
+          amount: reqVal,
+          gateway: commGateway,
+          code: commCode,
+          type: 'COMMISSION_WITHDRAW',
+          gameTitle: 'Distributor Payout',
+          status: 'PENDING'
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCommAmount('');
+        setCommCode('');
+        setCommMsg('Commission payout request submitted successfully!');
+        mutateCommTx();
+      } else {
+        setCommMsg(data.message || 'Request failed.');
+      }
+    } catch (err) {
+      setCommMsg('Server error submitting request.');
+    } finally {
+      setIsSubmittingComm(false);
+    }
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -507,6 +571,28 @@ export default function DistributorPortal() {
                   </span>
                 )}
               </button>
+
+              <button
+                onClick={() => setActiveTab('support')}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  background: activeTab === 'support' ? 'var(--gold-primary)' : 'none',
+                  color: activeTab === 'support' ? '#000' : '#fff',
+                  border: 'none',
+                  padding: '0.75rem 1rem',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '0.8rem',
+                  textAlign: 'left'
+                }}
+              >
+                <i className="fa-solid fa-headset" style={{ width: '16px' }}></i>
+                Live Chat Support
+              </button>
             </>
           )}
         </div>
@@ -533,6 +619,17 @@ export default function DistributorPortal() {
               role: distSession?.role || 'distributor',
               distributorId: distId
             }} 
+          />
+        )}
+
+        {/* TAB: SUPPORT CHAT */}
+        {activeTab === 'support' && (
+          <SupportTab
+            adminUser={{
+              email: distSession?.email || '',
+              role: distSession?.role || 'distributor',
+              distributorId: distId
+            }}
           />
         )}
 
@@ -645,6 +742,118 @@ export default function DistributorPortal() {
                 </div>
               </div>
             </div>
+
+            {/* COMMISSION CASHOUT COMPONENT */}
+            {(() => {
+              const commWithdrawals = commTxData?.transactions || [];
+              const totalWithdrawn = commWithdrawals.filter(tx => tx.status === 'SUCCESS' || tx.status === 'PENDING').reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
+              const availableCommission = Math.max(0, (stats.commissionEarned || 0) - totalWithdrawn);
+
+              return (
+                <div style={{ marginTop: '2rem', display: 'grid', gridTemplateColumns: '320px 1fr', gap: '1.5rem' }}>
+                  <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', height: 'fit-content' }}>
+                    <h3 style={{ fontSize: '0.9rem', marginBottom: '0.25rem', fontWeight: 'bold' }}>Request Commission</h3>
+                    <p style={{ fontSize: '0.65rem', color: '#888', marginBottom: '1.25rem' }}>
+                      Available Balance: <strong style={{ color: 'var(--gold-primary)' }}>${availableCommission.toFixed(2)}</strong>
+                    </p>
+                    <form onSubmit={handleRequestCommWithdraw} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      <div className="input-group">
+                        <label style={{ fontSize: '0.7rem' }}>Amount ($)</label>
+                        <input
+                          type="number"
+                          placeholder="e.g. 50.00"
+                          step="0.01"
+                          value={commAmount}
+                          onChange={(e) => setCommAmount(e.target.value)}
+                          max={availableCommission}
+                          style={{ width: '100%', background: '#070912', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
+                          required
+                        />
+                      </div>
+                      <div className="input-group">
+                        <label style={{ fontSize: '0.7rem' }}>Gateway / Method</label>
+                        <select
+                          value={commGateway}
+                          onChange={(e) => setCommGateway(e.target.value)}
+                          style={{ width: '100%', background: '#070912', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
+                        >
+                          <option value="Chime">Chime</option>
+                          <option value="Zelle">Zelle</option>
+                          <option value="CashApp">CashApp</option>
+                          <option value="PayPal">PayPal</option>
+                          <option value="Venmo">Venmo</option>
+                        </select>
+                      </div>
+                      <div className="input-group">
+                        <label style={{ fontSize: '0.7rem' }}>Payment Address / Tag</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. $cashtag or email"
+                          value={commCode}
+                          onChange={(e) => setCommCode(e.target.value)}
+                          style={{ width: '100%', background: '#070912', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
+                          required
+                        />
+                      </div>
+                      {commMsg && (
+                        <p style={{ fontSize: '0.7rem', color: commMsg.includes('success') ? '#2ecc71' : '#ef4444', margin: '0.2rem 0' }}>{commMsg}</p>
+                      )}
+                      <button
+                        type="submit"
+                        disabled={isSubmittingComm || availableCommission <= 0}
+                        style={{ width: '100%', padding: '0.6rem', background: 'var(--gold-primary)', color: '#000', border: 'none', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', opacity: (isSubmittingComm || availableCommission <= 0) ? 0.5 : 1 }}
+                      >
+                        {isSubmittingComm ? 'Submitting...' : 'Request Cashout ➔'}
+                      </button>
+                    </form>
+                  </div>
+
+                  <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <h3 style={{ fontSize: '0.9rem', marginBottom: '1rem', fontWeight: 'bold' }}>Commission Withdrawal Logs</h3>
+                    <div style={{ maxHeight: '310px', overflowY: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+                        <thead>
+                          <tr style={{ textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#888' }}>
+                            <th style={{ padding: '0.5rem' }}>DATE</th>
+                            <th style={{ padding: '0.5rem' }}>GATEWAY</th>
+                            <th style={{ padding: '0.5rem' }}>ADDRESS</th>
+                            <th style={{ padding: '0.5rem' }}>AMOUNT</th>
+                            <th style={{ padding: '0.5rem' }}>STATUS</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {commWithdrawals.length === 0 ? (
+                            <tr>
+                              <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>No commission withdrawals requested.</td>
+                            </tr>
+                          ) : (
+                            commWithdrawals.map(tx => (
+                              <tr key={tx.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                                <td style={{ padding: '0.6rem 0.5rem' }}>{tx.date}</td>
+                                <td style={{ padding: '0.6rem 0.5rem' }}>{tx.gateway}</td>
+                                <td style={{ padding: '0.6rem 0.5rem' }}>{tx.code}</td>
+                                <td style={{ padding: '0.6rem 0.5rem', fontWeight: 'bold', color: 'var(--gold-primary)' }}>${parseFloat(tx.amount || 0).toFixed(2)}</td>
+                                <td style={{ padding: '0.6rem 0.5rem' }}>
+                                  <span style={{
+                                    padding: '0.15rem 0.35rem',
+                                    borderRadius: '4px',
+                                    fontSize: '0.6rem',
+                                    fontWeight: 'bold',
+                                    background: tx.status === 'SUCCESS' ? 'rgba(46,204,113,0.1)' : tx.status === 'FAILED' ? 'rgba(239,68,68,0.1)' : 'rgba(241,196,15,0.1)',
+                                    color: tx.status === 'SUCCESS' ? '#2ecc71' : tx.status === 'FAILED' ? '#ef4444' : '#f1c40f'
+                                  }}>{tx.status}</span>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
           </div>
         )}
 

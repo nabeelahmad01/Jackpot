@@ -217,14 +217,20 @@ export default function ShiftDashboardTab({ adminUser }) {
                       />
                     </td>
                     <td>
-                      <button
-                        onClick={() => handleSaveCredentials(req)}
-                        disabled={savingCredsId === req.id}
-                        className="submit-btn"
-                        style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold', margin: 0, padding: '0.35rem 1rem', width: 'auto', fontSize: '0.7rem' }}
-                      >
-                        {savingCredsId === req.id ? 'Saving...' : 'Save'}
-                      </button>
+                      {req.distributorType === 'B' ? (
+                        <span className="admin-badge-preview b-hold" style={{ fontSize: '0.65rem', background: '#3b82f6', color: '#fff', border: '1px solid rgba(59,130,246,0.3)', padding: '0.25rem 0.5rem', borderRadius: '4px' }}>
+                          Managed by {req.distributorName || 'Distributor'}
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleSaveCredentials(req)}
+                          disabled={savingCredsId === req.id}
+                          className="submit-btn"
+                          style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold', margin: 0, padding: '0.35rem 1rem', width: 'auto', fontSize: '0.7rem' }}
+                        >
+                          {savingCredsId === req.id ? 'Saving...' : 'Save'}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -279,31 +285,37 @@ export default function ShiftDashboardTab({ adminUser }) {
                       </strong>
                     </td>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <button
-                          onClick={() => handleCoinAllotmentSuccess(noti.id)}
-                          disabled={processingCoinId === noti.id}
-                          className="submit-btn"
-                          style={{ background: '#22c55e', color: '#fff', margin: 0, padding: '0.35rem 0.85rem', width: 'auto', fontSize: '0.7rem', fontWeight: 'bold' }}
-                        >
-                          Loaded
-                        </button>
-                        <input
-                          type="text"
-                          placeholder="Reason (required)"
-                          value={invalidReasons[noti.id] || ''}
-                          onChange={(e) => setInvalidReasons(prev => ({ ...prev, [noti.id]: e.target.value }))}
-                          style={{ background: '#070912', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.725rem', padding: '0.35rem 0.5rem', borderRadius: '6px', width: '140px' }}
-                        />
-                        <button
-                          onClick={() => handleCoinAllotmentInvalid(noti.id)}
-                          disabled={processingCoinId === noti.id}
-                          className="submit-btn"
-                          style={{ background: '#ef4444', color: '#fff', margin: 0, padding: '0.35rem 0.85rem', width: 'auto', fontSize: '0.7rem', fontWeight: 'bold' }}
-                        >
-                          Invalid
-                        </button>
-                      </div>
+                      {noti.distributorType === 'B' ? (
+                        <span className="admin-badge-preview b-hold" style={{ fontSize: '0.65rem', background: '#3b82f6', color: '#fff', border: '1px solid rgba(59,130,246,0.3)', padding: '0.25rem 0.5rem', borderRadius: '4px' }}>
+                          Managed by {noti.distributorName || 'Distributor'}
+                        </span>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <button
+                            onClick={() => handleCoinAllotmentSuccess(noti.id)}
+                            disabled={processingCoinId === noti.id}
+                            className="submit-btn"
+                            style={{ background: '#22c55e', color: '#fff', margin: 0, padding: '0.35rem 0.85rem', width: 'auto', fontSize: '0.7rem', fontWeight: 'bold' }}
+                          >
+                            Loaded
+                          </button>
+                          <input
+                            type="text"
+                            placeholder="Reason (required)"
+                            value={invalidReasons[noti.id] || ''}
+                            onChange={(e) => setInvalidReasons(prev => ({ ...prev, [noti.id]: e.target.value }))}
+                            style={{ background: '#070912', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.725rem', padding: '0.35rem 0.5rem', borderRadius: '6px', width: '140px' }}
+                          />
+                          <button
+                            onClick={() => handleCoinAllotmentInvalid(noti.id)}
+                            disabled={processingCoinId === noti.id}
+                            className="submit-btn"
+                            style={{ background: '#ef4444', color: '#fff', margin: 0, padding: '0.35rem 0.85rem', width: 'auto', fontSize: '0.7rem', fontWeight: 'bold' }}
+                          >
+                            Invalid
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -367,31 +379,37 @@ export default function ShiftDashboardTab({ adminUser }) {
                       </strong>
                     </td>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <button
-                          onClick={() => handleCoinAllotmentSuccess(noti.id)}
-                          disabled={processingCoinId === noti.id}
-                          className="submit-btn"
-                          style={{ background: '#e11d48', color: '#fff', margin: 0, padding: '0.35rem 0.85rem', width: 'auto', fontSize: '0.7rem', fontWeight: 'bold' }}
-                        >
-                          Withdrawal
-                        </button>
-                        <input
-                          type="text"
-                          placeholder="Reason (required)"
-                          value={invalidReasons[noti.id] || ''}
-                          onChange={(e) => setInvalidReasons(prev => ({ ...prev, [noti.id]: e.target.value }))}
-                          style={{ background: '#070912', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.725rem', padding: '0.35rem 0.5rem', borderRadius: '6px', width: '140px' }}
-                        />
-                        <button
-                          onClick={() => handleCoinAllotmentInvalid(noti.id)}
-                          disabled={processingCoinId === noti.id}
-                          className="submit-btn"
-                          style={{ background: '#ef4444', color: '#fff', margin: 0, padding: '0.35rem 0.85rem', width: 'auto', fontSize: '0.7rem', fontWeight: 'bold' }}
-                        >
-                          Invalid
-                        </button>
-                      </div>
+                      {noti.distributorType === 'B' ? (
+                        <span className="admin-badge-preview b-hold" style={{ fontSize: '0.65rem', background: '#3b82f6', color: '#fff', border: '1px solid rgba(59,130,246,0.3)', padding: '0.25rem 0.5rem', borderRadius: '4px' }}>
+                          Managed by {noti.distributorName || 'Distributor'}
+                        </span>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <button
+                            onClick={() => handleCoinAllotmentSuccess(noti.id)}
+                            disabled={processingCoinId === noti.id}
+                            className="submit-btn"
+                            style={{ background: '#e11d48', color: '#fff', margin: 0, padding: '0.35rem 0.85rem', width: 'auto', fontSize: '0.7rem', fontWeight: 'bold' }}
+                          >
+                            Withdrawal
+                          </button>
+                          <input
+                            type="text"
+                            placeholder="Reason (required)"
+                            value={invalidReasons[noti.id] || ''}
+                            onChange={(e) => setInvalidReasons(prev => ({ ...prev, [noti.id]: e.target.value }))}
+                            style={{ background: '#070912', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.725rem', padding: '0.35rem 0.5rem', borderRadius: '6px', width: '140px' }}
+                          />
+                          <button
+                            onClick={() => handleCoinAllotmentInvalid(noti.id)}
+                            disabled={processingCoinId === noti.id}
+                            className="submit-btn"
+                            style={{ background: '#ef4444', color: '#fff', margin: 0, padding: '0.35rem 0.85rem', width: 'auto', fontSize: '0.7rem', fontWeight: 'bold' }}
+                          >
+                            Invalid
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))

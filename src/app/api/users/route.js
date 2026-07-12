@@ -28,18 +28,10 @@ export async function GET(req) {
     // Prepare search query
     let query = {};
 
-    const adminRole = searchParams.get('adminRole');
     const adminDistributorId = searchParams.get('adminDistributorId');
 
-    if (adminRole && adminRole !== 'admin') {
-      if (adminDistributorId) {
-        query.distributorId = adminDistributorId;
-      } else {
-        const distributorsCollection = db.collection('distributors');
-        const typeADistributors = await distributorsCollection.find({ type: 'A' }).project({ id: 1 }).toArray();
-        const typeADistIds = typeADistributors.map(d => d.id);
-        query.distributorId = { $in: [null, '', ...typeADistIds] };
-      }
+    if (adminDistributorId) {
+      query.distributorId = adminDistributorId;
     }
     if (segment === 'subscribed') {
       query.isSubscribed = true;

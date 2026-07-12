@@ -60,7 +60,8 @@ export default function LedgerTab({
   const handleOpenPayoutModal = (tx) => {
     setSelectedPayoutTx(tx);
     setPayoutType('full');
-    setPayoutSentAmount(tx.amount.toString());
+    const targetAmount = tx.payoutAmount !== undefined ? tx.payoutAmount : tx.amount;
+    setPayoutSentAmount(targetAmount.toString());
     setPayoutHoldAmount('0');
     setPayoutGateway(tx.gateway || 'Chime');
     setPayoutCustomNote(`Full payout processed to ${tx.gateway || 'Chime'}`);
@@ -354,7 +355,14 @@ export default function LedgerTab({
                           {tx.type}
                         </span>
                       </td>
-                      <td><strong>${parseFloat(tx.amount).toFixed(2)}</strong></td>
+                      <td>
+                        <strong>${parseFloat(tx.amount).toFixed(2)}</strong>
+                        {tx.payoutAmount !== undefined && (
+                          <div style={{ fontSize: '0.65rem', color: '#ff4d6d', marginTop: '0.15rem', background: 'rgba(255, 77, 109, 0.1)', border: '1px solid rgba(255, 77, 109, 0.25)', padding: '0.15rem 0.35rem', borderRadius: '4px', fontWeight: 'bold' }}>
+                            ⚠️ PAYOUT CAP: ${parseFloat(tx.payoutAmount).toFixed(2)}
+                          </div>
+                        )}
+                      </td>
                       <td>
                         <span style={{ fontSize: '0.725rem', opacity: 0.9 }}>
                           {tx.gateway} ({tx.code})

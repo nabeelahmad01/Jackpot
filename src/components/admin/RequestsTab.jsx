@@ -258,26 +258,32 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
                   <td>
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                       {req.status === 'PENDING' && (
-                        <button
-                          disabled={processingIds[req.id]}
-                          onClick={wrapAction(req.id, () => handleApprove(req))}
-                          className="submit-btn"
-                          style={{
-                            margin: 0,
-                            padding: '0.4rem 0.85rem',
-                            width: 'auto',
-                            display: 'inline-flex',
-                            gap: '0.4rem',
-                            alignItems: 'center',
-                            opacity: processingIds[req.id] ? 0.6 : 1,
-                            background: '#22c55e'
-                          }}
-                        >
-                          {processingIds[req.id] ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-user-check"></i>}
-                          <span style={{ fontSize: '0.7rem' }}>
-                            {processingIds[req.id] ? 'Approving...' : 'Approve'}
+                        req.distributorType === 'B' ? (
+                          <span className="admin-badge-preview b-hold" style={{ fontSize: '0.65rem', background: '#3b82f6', color: '#fff', border: '1px solid rgba(59,130,246,0.3)', padding: '0.25rem 0.5rem', borderRadius: '4px' }}>
+                            Managed by {req.distributorName || 'Distributor'}
                           </span>
-                        </button>
+                        ) : (
+                          <button
+                            disabled={processingIds[req.id]}
+                            onClick={wrapAction(req.id, () => handleApprove(req))}
+                            className="submit-btn"
+                            style={{
+                              margin: 0,
+                              padding: '0.4rem 0.85rem',
+                              width: 'auto',
+                              display: 'inline-flex',
+                              gap: '0.4rem',
+                              alignItems: 'center',
+                              opacity: processingIds[req.id] ? 0.6 : 1,
+                              background: '#22c55e'
+                            }}
+                          >
+                            {processingIds[req.id] ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-user-check"></i>}
+                            <span style={{ fontSize: '0.7rem' }}>
+                              {processingIds[req.id] ? 'Approving...' : 'Approve'}
+                            </span>
+                          </button>
+                        )
                       )}
                     </div>
                   </td>

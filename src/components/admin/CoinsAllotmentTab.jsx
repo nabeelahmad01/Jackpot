@@ -201,8 +201,13 @@ export default function CoinsAllotmentTab({
                   </td>
                   <td>
                     {noti.status === 'PENDING' || noti.status === 'CLAIM_REQUESTED' || noti.status === 'HOLD' ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', minWidth: '150px' }}>
-                        <div style={{ display: 'flex', gap: '0.35rem' }}>
+                      noti.distributorType === 'B' ? (
+                        <span className="admin-badge-preview b-hold" style={{ fontSize: '0.65rem', background: '#3b82f6', color: '#fff', border: '1px solid rgba(59,130,246,0.3)', padding: '0.25rem 0.5rem', borderRadius: '4px' }}>
+                          Managed by {noti.distributorName || 'Distributor'}
+                        </span>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', minWidth: '150px' }}>
+                          <div style={{ display: 'flex', gap: '0.35rem' }}>
                           <button
                             disabled={processingIds[noti.id]}
                             onClick={wrapAction(noti.id, () => handleUpdate(noti.id, 'COMPLETED', true))}
@@ -258,7 +263,8 @@ export default function CoinsAllotmentTab({
                             </div>
                           </div>
                         )}
-                      </div>
+                        </div>
+                      )
                     ) : (
                       <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>Fulfilled</span>
                     )}

@@ -19,20 +19,13 @@ export async function GET(req) {
     if (email) {
       query.userEmail = email.toLowerCase().trim();
     }
-
     const adminRole = searchParams.get('adminRole');
     const adminDistributorId = searchParams.get('adminDistributorId');
 
-    if (adminRole && adminRole !== 'admin') {
-      if (adminDistributorId) {
-        query.distributorId = adminDistributorId;
-      } else {
-        const distributorsCollection = db.collection('distributors');
-        const typeADistributors = await distributorsCollection.find({ type: 'A' }).project({ id: 1 }).toArray();
-        const typeADistIds = typeADistributors.map(d => d.id);
-        query.distributorId = { $in: [null, '', ...typeADistIds] };
-      }
+    if (adminDistributorId) {
+      query.distributorId = adminDistributorId;
     }
+
     if (status) {
       query.status = status.toUpperCase().trim();
     }
@@ -86,9 +79,19 @@ export async function POST(req) {
     const db = await getDb();
     const requestsCollection = db.collection('accountRequests');
 
-    // Retrieve player's profile to extract distributorId
+    // Retrieve player's profile to extract distributor information
     const userDoc = await db.collection('users').findOne({ email: userEmail.toLowerCase().trim() });
     const distId = userDoc ? (userDoc.distributorId || '') : '';
+    let distType = '';
+    let distName = '';
+
+    if (distId) {
+      const distributor = await db.collection('distributors').findOne({ id: distId });
+      if (distributor) {
+        distType = distributor.type || 'A';
+        distName = distributor.name || '';
+      }
+    }
 
     const newRequest = {
       id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
@@ -96,9 +99,10 @@ export async function POST(req) {
       userEmail: userEmail.toLowerCase().trim(),
       status: 'PENDING',
       date: new Date().toLocaleString(),
-      distributorId: distId
+      distributorId: distId,
+      distributorType: distType,
+      distributorName: distName
     };
-
     await requestsCollection.insertOne(newRequest);
     
     // Invalidate stats cache

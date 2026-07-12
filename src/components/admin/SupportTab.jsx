@@ -332,54 +332,70 @@ export default function SupportTab({ adminUser }) {
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                {/* Paperclip Button */}
-                <label
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: '#0c0e17',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '8px',
-                    padding: '0.65rem 0.85rem',
-                    color: 'var(--gold-primary)',
-                    cursor: 'pointer',
-                    fontSize: '1rem',
-                    transition: 'all 0.2s'
-                  }}
-                  title="Attach Image Proof"
-                >
-                  <i className="fa-solid fa-paperclip"></i>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    style={{ display: 'none' }}
-                  />
-                </label>
+              {(() => {
+                const isTypeBSupportChat = activeChatMessages.some(m => m.distributorType === 'B');
+                const isGlobalAdminView = !adminUser?.distributorId;
+                const isReadOnlyChat = isTypeBSupportChat && isGlobalAdminView;
 
-                <input
-                  type="text"
-                  placeholder="Type reply to player..."
-                  value={adminReplyText}
-                  onChange={(e) => setAdminReplyText(e.target.value)}
-                  style={{
-                    flex: 1,
-                    background: '#0c0e17',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '8px',
-                    padding: '0.65rem 1rem',
-                    color: '#fff',
-                    fontSize: '0.8rem',
-                    outline: 'none'
-                  }}
-                  required={!adminAttachment}
-                />
-                <button type="submit" className="submit-btn" style={{ margin: 0, padding: '0.65rem 1.25rem', width: 'auto', background: 'linear-gradient(135deg, #ffd700 0%, #cca000 100%)', color: '#000', fontWeight: 'bold' }}>
-                  Reply
-                </button>
-              </div>
+                if (isReadOnlyChat) {
+                  return (
+                    <div style={{ padding: '0.75rem', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#f87171', borderRadius: '8px', fontSize: '0.75rem', textAlign: 'center', fontWeight: 'bold', margin: '0.5rem 0' }}>
+                      <i className="fa-solid fa-lock" style={{ marginRight: '5px' }}></i> Live chat is managed by distributor staff.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    {/* Paperclip Button */}
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: '#0c0e17',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: '8px',
+                        padding: '0.65rem 0.85rem',
+                        color: 'var(--gold-primary)',
+                        cursor: 'pointer',
+                        fontSize: '1rem',
+                        transition: 'all 0.2s'
+                      }}
+                      title="Attach Image Proof"
+                    >
+                      <i className="fa-solid fa-paperclip"></i>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        style={{ display: 'none' }}
+                      />
+                    </label>
+
+                    <input
+                      type="text"
+                      placeholder="Type reply to player..."
+                      value={adminReplyText}
+                      onChange={(e) => setAdminReplyText(e.target.value)}
+                      style={{
+                        flex: 1,
+                        background: '#0c0e17',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: '8px',
+                        padding: '0.65rem 1rem',
+                        color: '#fff',
+                        fontSize: '0.8rem',
+                        outline: 'none'
+                      }}
+                      required={!adminAttachment}
+                    />
+                    <button type="submit" className="submit-btn" style={{ margin: 0, padding: '0.65rem 1.25rem', width: 'auto', background: 'linear-gradient(135deg, #ffd700 0%, #cca000 100%)', color: '#000', fontWeight: 'bold' }}>
+                      Reply
+                    </button>
+                  </div>
+                );
+              })()}
             </form>
           </>
         ) : (
