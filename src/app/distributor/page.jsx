@@ -527,6 +527,38 @@ export default function DistributorPortal() {
             Transaction Logs
           </button>
 
+          <button
+            onClick={() => setActiveTab('referred_players')}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'referred_players' ? 'var(--gold-primary)' : 'none', color: activeTab === 'referred_players' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
+          >
+            <i className="fa-solid fa-users" style={{ width: '16px' }}></i>
+            Referred Players
+          </button>
+
+          <button
+            onClick={() => setActiveTab('comm_cashout')}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'comm_cashout' ? 'var(--gold-primary)' : 'none', color: activeTab === 'comm_cashout' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
+          >
+            <i className="fa-solid fa-hand-holding-dollar" style={{ width: '16px' }}></i>
+            Commission Cashout
+          </button>
+
+          <button
+            onClick={() => setActiveTab('promotions')}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'promotions' ? 'var(--gold-primary)' : 'none', color: activeTab === 'promotions' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
+          >
+            <i className="fa-solid fa-gift" style={{ width: '16px' }}></i>
+            Active Promotions
+          </button>
+
+          <button
+            onClick={() => setActiveTab('guidelines')}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'guidelines' ? 'var(--gold-primary)' : 'none', color: activeTab === 'guidelines' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
+          >
+            <i className="fa-solid fa-circle-info" style={{ width: '16px' }}></i>
+            Guidelines & Rules
+          </button>
+
           {distSession.type === 'B' && (
             <>
               <button
@@ -631,6 +663,251 @@ export default function DistributorPortal() {
               distributorId: distId
             }}
           />
+        )}
+
+        {/* TAB: REFERRED PLAYERS */}
+        {activeTab === 'referred_players' && (
+          <div>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#fff' }}>Referred Players</h1>
+            <p style={{ fontSize: '0.75rem', color: '#888', marginBottom: '2rem' }}>Detailed list of all players registered through your referral link.</p>
+
+            <div style={{ background: '#0b0d16', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', padding: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <i className="fa-solid fa-users gold-text"></i> My Players ({players.length})
+                </h3>
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#888' }}>
+                      <th style={{ padding: '0.75rem 0.5rem' }}>NAME</th>
+                      <th style={{ padding: '0.75rem 0.5rem' }}>EMAIL</th>
+                      <th style={{ padding: '0.75rem 0.5rem' }}>COINS</th>
+                      <th style={{ padding: '0.75rem 0.5rem' }}>STATUS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {players.length === 0 ? (
+                      <tr>
+                        <td colSpan="4" style={{ textAlign: 'center', padding: '3rem', color: '#666' }}>No players registered through your referral link yet.</td>
+                      </tr>
+                    ) : (
+                      players.map(p => (
+                        <tr key={p.email} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                          <td style={{ padding: '0.75rem 0.5rem', fontWeight: 'bold' }}>{p.name}</td>
+                          <td style={{ padding: '0.75rem 0.5rem' }}>{p.email}</td>
+                          <td style={{ padding: '0.75rem 0.5rem', color: 'var(--gold-primary)', fontWeight: 'bold' }}>{(p.coins || 0).toFixed(2)}</td>
+                          <td style={{ padding: '0.75rem 0.5rem' }}>
+                            <span style={{ fontSize: '0.65rem', background: 'rgba(46,204,113,0.1)', color: '#2ecc71', padding: '0.15rem 0.35rem', borderRadius: '4px', fontWeight: 'bold' }}>ACTIVE</span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB: COMMISSION CASHOUT */}
+        {activeTab === 'comm_cashout' && (
+          <div>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#fff' }}>Commission & Cashouts</h1>
+            <p style={{ fontSize: '0.75rem', color: '#888', marginBottom: '2rem' }}>Request payouts for your referral earnings and track processing history.</p>
+
+            {(() => {
+              const commWithdrawals = commTxData?.transactions || [];
+              const totalWithdrawn = commWithdrawals.filter(tx => tx.status === 'SUCCESS' || tx.status === 'PENDING').reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
+              const availableCommission = Math.max(0, (stats.commissionEarned || 0) - totalWithdrawn);
+
+              return (
+                <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '1.5rem' }}>
+                  <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', height: 'fit-content' }}>
+                    <h3 style={{ fontSize: '0.9rem', marginBottom: '0.25rem', fontWeight: 'bold' }}>Request Commission</h3>
+                    <p style={{ fontSize: '0.65rem', color: '#888', marginBottom: '1.25rem' }}>
+                      Available Balance: <strong style={{ color: 'var(--gold-primary)' }}>${availableCommission.toFixed(2)}</strong>
+                    </p>
+                    <form onSubmit={handleRequestCommWithdraw} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      <div className="input-group">
+                        <label style={{ fontSize: '0.7rem' }}>Amount ($)</label>
+                        <input
+                          type="number"
+                          placeholder="e.g. 50.00"
+                          step="0.01"
+                          value={commAmount}
+                          onChange={(e) => setCommAmount(e.target.value)}
+                          max={availableCommission}
+                          style={{ width: '100%', background: '#070912', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
+                          required
+                        />
+                      </div>
+                      <div className="input-group">
+                        <label style={{ fontSize: '0.7rem' }}>Gateway / Method</label>
+                        <select
+                          value={commGateway}
+                          onChange={(e) => setCommGateway(e.target.value)}
+                          style={{ width: '100%', background: '#070912', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
+                        >
+                          <option value="Chime">Chime</option>
+                          <option value="Zelle">Zelle</option>
+                          <option value="CashApp">CashApp</option>
+                          <option value="PayPal">PayPal</option>
+                          <option value="Venmo">Venmo</option>
+                        </select>
+                      </div>
+                      <div className="input-group">
+                        <label style={{ fontSize: '0.7rem' }}>Payment Address / Tag</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. $cashtag or email"
+                          value={commCode}
+                          onChange={(e) => setCommCode(e.target.value)}
+                          style={{ width: '100%', background: '#070912', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
+                          required
+                        />
+                      </div>
+                      {commMsg && (
+                        <p style={{ fontSize: '0.7rem', color: commMsg.includes('success') ? '#2ecc71' : '#ef4444', margin: '0.2rem 0' }}>{commMsg}</p>
+                      )}
+                      <button
+                        type="submit"
+                        disabled={isSubmittingComm || availableCommission <= 0}
+                        style={{ width: '100%', padding: '0.6rem', background: 'var(--gold-primary)', color: '#000', border: 'none', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', opacity: (isSubmittingComm || availableCommission <= 0) ? 0.5 : 1 }}
+                      >
+                        {isSubmittingComm ? 'Submitting...' : 'Request Cashout ➔'}
+                      </button>
+                    </form>
+                  </div>
+
+                  <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <h3 style={{ fontSize: '0.9rem', marginBottom: '1rem', fontWeight: 'bold' }}>Commission Withdrawal Logs</h3>
+                    <div style={{ maxHeight: '310px', overflowY: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+                        <thead>
+                          <tr style={{ textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#888' }}>
+                            <th style={{ padding: '0.5rem' }}>DATE</th>
+                            <th style={{ padding: '0.5rem' }}>GATEWAY</th>
+                            <th style={{ padding: '0.5rem' }}>ADDRESS</th>
+                            <th style={{ padding: '0.5rem' }}>AMOUNT</th>
+                            <th style={{ padding: '0.5rem' }}>STATUS</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {commWithdrawals.length === 0 ? (
+                            <tr>
+                              <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>No commission withdrawals requested.</td>
+                            </tr>
+                          ) : (
+                            commWithdrawals.map(tx => (
+                              <tr key={tx.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                                <td style={{ padding: '0.6rem 0.5rem' }}>{tx.date}</td>
+                                <td style={{ padding: '0.6rem 0.5rem' }}>{tx.gateway}</td>
+                                <td style={{ padding: '0.6rem 0.5rem' }}>{tx.code}</td>
+                                <td style={{ padding: '0.6rem 0.5rem', fontWeight: 'bold', color: 'var(--gold-primary)' }}>${parseFloat(tx.amount || 0).toFixed(2)}</td>
+                                <td style={{ padding: '0.6rem 0.5rem' }}>
+                                  <span style={{
+                                    padding: '0.15rem 0.35rem',
+                                    borderRadius: '4px',
+                                    fontSize: '0.6rem',
+                                    fontWeight: 'bold',
+                                    background: tx.status === 'SUCCESS' ? 'rgba(46,204,113,0.1)' : tx.status === 'FAILED' ? 'rgba(239,68,68,0.1)' : 'rgba(241,196,15,0.1)',
+                                    color: tx.status === 'SUCCESS' ? '#2ecc71' : tx.status === 'FAILED' ? '#ef4444' : '#f1c40f'
+                                  }}>{tx.status}</span>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* TAB: ACTIVE PROMOTIONS */}
+        {activeTab === 'promotions' && (
+          <div>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#fff' }}>Active Promotions</h1>
+            <p style={{ fontSize: '0.75rem', color: '#888', marginBottom: '2rem' }}>Share these active codes and welcome bonuses with players to drive referrals.</p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+              <div style={{ background: '#0b0d16', padding: '1.5rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <h3 style={{ fontSize: '0.9rem', marginBottom: '1.25rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <i className="fa-solid fa-gift gold-text"></i> $3 Signup Freeplay Code
+                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#040509', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid rgba(255,215,0,0.15)', marginBottom: '1rem' }}>
+                  <div>
+                    <span style={{ fontSize: '0.6rem', color: '#888', display: 'block', textTransform: 'uppercase' }}>Promo Code</span>
+                    <strong style={{ fontSize: '1.1rem', color: 'var(--gold-primary)', letterSpacing: '0.5px' }}>SIGNUP-FREE3</strong>
+                  </div>
+                  <span style={{ fontSize: '0.65rem', background: 'rgba(255,215,0,0.1)', color: 'var(--gold-primary)', padding: '0.25rem 0.5rem', borderRadius: '4px', fontWeight: 'bold' }}>ACTIVE</span>
+                </div>
+                <ul style={{ fontSize: '0.75rem', color: '#aaa', paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <li>Players get $3.00 instantly upon registration and verified email check.</li>
+                  <li>Max cashout on wins originating from freeplay is strictly capped at $30.00.</li>
+                  <li>No duplicate accounts or fake emails are permitted.</li>
+                </ul>
+              </div>
+
+              <div style={{ background: '#0b0d16', padding: '1.5rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <h3 style={{ fontSize: '0.9rem', marginBottom: '1.25rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <i className="fa-solid fa-percent gold-text"></i> 100% Signup Match Bonus
+                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#040509', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1rem' }}>
+                  <div>
+                    <span style={{ fontSize: '0.6rem', color: '#888', display: 'block', textTransform: 'uppercase' }}>Promo Offer</span>
+                    <strong style={{ fontSize: '1.1rem', color: '#2ecc71', letterSpacing: '0.5px' }}>100% FIRST DEPOSIT MATCH</strong>
+                  </div>
+                  <span style={{ fontSize: '0.65rem', background: 'rgba(46,204,113,0.1)', color: '#2ecc71', padding: '0.25rem 0.5rem', borderRadius: '4px', fontWeight: 'bold' }}>AUTOMATIC</span>
+                </div>
+                <ul style={{ fontSize: '0.75rem', color: '#aaa', paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <li>Applied automatically to a player's first wallet deposit load.</li>
+                  <li>Match bonus coin value goes directly into their game balance.</li>
+                  <li>Drives massive engagement and recurring loads!</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB: GUIDELINES & RULES */}
+        {activeTab === 'guidelines' && (
+          <div>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#fff' }}>Guidelines & Platform Rules</h1>
+            <p style={{ fontSize: '0.75rem', color: '#888', marginBottom: '2rem' }}>Frequently asked questions, deposit/withdrawal limits, and commission structures.</p>
+
+            <div style={{ background: '#0b0d16', padding: '1.5rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div>
+                <h4 style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--gold-primary)', marginBottom: '0.4rem' }}>1. What are the deposit and withdrawal limits?</h4>
+                <p style={{ fontSize: '0.75rem', color: '#aaa', lineHeight: '1.4' }}>
+                  To maintain system health, we enforce a minimum deposit threshold of <strong>$5.00</strong> and a minimum withdrawal threshold of <strong>$25.00</strong> per transaction for all standard user requests.
+                </p>
+              </div>
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '1.25rem' }}>
+                <h4 style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--gold-primary)', marginBottom: '0.4rem' }}>2. How is my distributor commission calculated?</h4>
+                <p style={{ fontSize: '0.75rem', color: '#aaa', lineHeight: '1.4' }}>
+                  Your commission is based on your unique rate (e.g. {stats.commissionRate || 10}%) applied directly to all successful deposits completed by your referred players. Earnings are calculated in real-time.
+                </p>
+              </div>
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '1.25rem' }}>
+                <h4 style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--gold-primary)', marginBottom: '0.4rem' }}>3. How can I withdraw my earned commission?</h4>
+                <p style={{ fontSize: '0.75rem', color: '#aaa', lineHeight: '1.4' }}>
+                  Navigate to the <strong>"Commission Cashout"</strong> tab, input your desired cashout value, choose a gateway (such as Chime or Zelle), and type your address/tag. The Super Admin ledger team will process and verify your payout.
+                </p>
+              </div>
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '1.25rem' }}>
+                <h4 style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--gold-primary)', marginBottom: '0.4rem' }}>4. What is the maximum cashout rule for Freeplay winnings?</h4>
+                <p style={{ fontSize: '0.75rem', color: '#aaa', lineHeight: '1.4' }}>
+                  If a player signs up using a freeplay promo code and wins, they can request a withdrawal. The maximum payout allowed on freeplay wins is capped at exactly <strong>$30.00</strong>. Winnings above this cap are discarded and cannot be claimed.
+                </p>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* TAB 1: OVERVIEW */}
@@ -742,118 +1019,6 @@ export default function DistributorPortal() {
                 </div>
               </div>
             </div>
-
-            {/* COMMISSION CASHOUT COMPONENT */}
-            {(() => {
-              const commWithdrawals = commTxData?.transactions || [];
-              const totalWithdrawn = commWithdrawals.filter(tx => tx.status === 'SUCCESS' || tx.status === 'PENDING').reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
-              const availableCommission = Math.max(0, (stats.commissionEarned || 0) - totalWithdrawn);
-
-              return (
-                <div style={{ marginTop: '2rem', display: 'grid', gridTemplateColumns: '320px 1fr', gap: '1.5rem' }}>
-                  <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', height: 'fit-content' }}>
-                    <h3 style={{ fontSize: '0.9rem', marginBottom: '0.25rem', fontWeight: 'bold' }}>Request Commission</h3>
-                    <p style={{ fontSize: '0.65rem', color: '#888', marginBottom: '1.25rem' }}>
-                      Available Balance: <strong style={{ color: 'var(--gold-primary)' }}>${availableCommission.toFixed(2)}</strong>
-                    </p>
-                    <form onSubmit={handleRequestCommWithdraw} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                      <div className="input-group">
-                        <label style={{ fontSize: '0.7rem' }}>Amount ($)</label>
-                        <input
-                          type="number"
-                          placeholder="e.g. 50.00"
-                          step="0.01"
-                          value={commAmount}
-                          onChange={(e) => setCommAmount(e.target.value)}
-                          max={availableCommission}
-                          style={{ width: '100%', background: '#070912', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
-                          required
-                        />
-                      </div>
-                      <div className="input-group">
-                        <label style={{ fontSize: '0.7rem' }}>Gateway / Method</label>
-                        <select
-                          value={commGateway}
-                          onChange={(e) => setCommGateway(e.target.value)}
-                          style={{ width: '100%', background: '#070912', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
-                        >
-                          <option value="Chime">Chime</option>
-                          <option value="Zelle">Zelle</option>
-                          <option value="CashApp">CashApp</option>
-                          <option value="PayPal">PayPal</option>
-                          <option value="Venmo">Venmo</option>
-                        </select>
-                      </div>
-                      <div className="input-group">
-                        <label style={{ fontSize: '0.7rem' }}>Payment Address / Tag</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. $cashtag or email"
-                          value={commCode}
-                          onChange={(e) => setCommCode(e.target.value)}
-                          style={{ width: '100%', background: '#070912', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
-                          required
-                        />
-                      </div>
-                      {commMsg && (
-                        <p style={{ fontSize: '0.7rem', color: commMsg.includes('success') ? '#2ecc71' : '#ef4444', margin: '0.2rem 0' }}>{commMsg}</p>
-                      )}
-                      <button
-                        type="submit"
-                        disabled={isSubmittingComm || availableCommission <= 0}
-                        style={{ width: '100%', padding: '0.6rem', background: 'var(--gold-primary)', color: '#000', border: 'none', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', opacity: (isSubmittingComm || availableCommission <= 0) ? 0.5 : 1 }}
-                      >
-                        {isSubmittingComm ? 'Submitting...' : 'Request Cashout ➔'}
-                      </button>
-                    </form>
-                  </div>
-
-                  <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <h3 style={{ fontSize: '0.9rem', marginBottom: '1rem', fontWeight: 'bold' }}>Commission Withdrawal Logs</h3>
-                    <div style={{ maxHeight: '310px', overflowY: 'auto' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
-                        <thead>
-                          <tr style={{ textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#888' }}>
-                            <th style={{ padding: '0.5rem' }}>DATE</th>
-                            <th style={{ padding: '0.5rem' }}>GATEWAY</th>
-                            <th style={{ padding: '0.5rem' }}>ADDRESS</th>
-                            <th style={{ padding: '0.5rem' }}>AMOUNT</th>
-                            <th style={{ padding: '0.5rem' }}>STATUS</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {commWithdrawals.length === 0 ? (
-                            <tr>
-                              <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>No commission withdrawals requested.</td>
-                            </tr>
-                          ) : (
-                            commWithdrawals.map(tx => (
-                              <tr key={tx.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                                <td style={{ padding: '0.6rem 0.5rem' }}>{tx.date}</td>
-                                <td style={{ padding: '0.6rem 0.5rem' }}>{tx.gateway}</td>
-                                <td style={{ padding: '0.6rem 0.5rem' }}>{tx.code}</td>
-                                <td style={{ padding: '0.6rem 0.5rem', fontWeight: 'bold', color: 'var(--gold-primary)' }}>${parseFloat(tx.amount || 0).toFixed(2)}</td>
-                                <td style={{ padding: '0.6rem 0.5rem' }}>
-                                  <span style={{
-                                    padding: '0.15rem 0.35rem',
-                                    borderRadius: '4px',
-                                    fontSize: '0.6rem',
-                                    fontWeight: 'bold',
-                                    background: tx.status === 'SUCCESS' ? 'rgba(46,204,113,0.1)' : tx.status === 'FAILED' ? 'rgba(239,68,68,0.1)' : 'rgba(241,196,15,0.1)',
-                                    color: tx.status === 'SUCCESS' ? '#2ecc71' : tx.status === 'FAILED' ? '#ef4444' : '#f1c40f'
-                                  }}>{tx.status}</span>
-                                </td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
           </div>
         )}
 

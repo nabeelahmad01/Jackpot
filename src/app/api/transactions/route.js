@@ -350,7 +350,7 @@ export async function PUT(req) {
           const currentCoins = parseFloat(game.availableCoins || 0);
           const newCoins = currentCoins + parseFloat(originalTx.amount || 0);
           const currentUsed = parseFloat(game.usedCoins || 0);
-          const newUsed = Math.max(0, currentUsed - parseFloat(originalTx.amount || 0));
+          const newUsed = originalTx.isFreeplayWithdraw ? currentUsed : Math.max(0, currentUsed - parseFloat(originalTx.amount || 0));
           await gamesCollection.updateOne({ id: game.id }, { $set: { availableCoins: newCoins, usedCoins: newUsed } });
           cache.del('games_all');
         }
