@@ -141,7 +141,27 @@ export async function PUT(req) {
         const refDoc = await pendingReferralsCollection.findOne({ id: requestDoc.referralRewardId });
         
         if (refDoc && refDoc.status !== 'CLAIMED') {
-          // Add the allotment notification task directly for the coins manager to fulfill
+          // 1. Fetch the referrer's profile to extract distributorId
+          const referrerUser = await db.collection('users').findOne({ email: refDoc.referrerEmail.toLowerCase().trim() });
+          const distId = referrerUser ? (referrerUser.distributorId || '') : '';
+
+          // 2. Insert transaction record for referral bonus
+          const txId = (Date.now() + Math.floor(Math.random() * 100)).toString();
+          await db.collection('transactions').insertOne({
+            id: txId,
+            userEmail: refDoc.referrerEmail.toLowerCase().trim(),
+            date: new Date().toLocaleString(),
+            type: 'BONUS',
+            amount: Number(refDoc.rewardCoins),
+            gateway: 'REFERRAL BONUS',
+            code: 'REFERRAL',
+            status: 'SUCCESS',
+            gameTitle: requestDoc.gameTitle || 'Lobby',
+            note: `Referral reward for inviting ${refDoc.refereeEmail}`,
+            distributorId: distId
+          });
+
+          // 3. Add the allotment notification task directly for the coins manager to fulfill
           await db.collection('coinsNotifications').insertOne({
             id: Date.now().toString() + Math.floor(Math.random() * 100 + 1).toString(),
             userEmail: refDoc.referrerEmail,
@@ -151,10 +171,12 @@ export async function PUT(req) {
             totalCoins: Number(refDoc.rewardCoins),
             status: 'PENDING',
             read: false,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            transactionId: txId,
+            distributorId: distId
           });
 
-          // Mark pendingReferrals doc as CLAIMED
+          // 4. Mark pendingReferrals doc as CLAIMED
           await pendingReferralsCollection.updateOne(
             { id: requestDoc.referralRewardId },
             { $set: { status: 'CLAIMED', claimedAt: new Date().toISOString() } }
