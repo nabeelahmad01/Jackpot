@@ -20,6 +20,7 @@ const ShiftDashboardTab = lazy(() => import('./admin/ShiftDashboardTab'));
 const PromotionsTab = lazy(() => import('./admin/PromotionsTab'));
 const TxSearchTab = lazy(() => import('./admin/TxSearchTab'));
 const DistributorsTab = lazy(() => import('./admin/DistributorsTab'));
+const DeletedPlayersTab = lazy(() => import('./admin/DeletedPlayersTab'));
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -639,6 +640,31 @@ export default function AdminDashboard({
             </button>
           )}
 
+          {!adminUser?.distributorId && adminUser?.role === 'admin' && (
+            <button
+              onClick={() => { setActiveTab('deleted_accounts'); setSidebarOpen(false); }}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                background: activeTab === 'deleted_accounts' ? 'var(--gold-primary)' : 'none',
+                color: activeTab === 'deleted_accounts' ? '#111' : '#fff',
+                fontSize: '0.8rem',
+                fontWeight: 'bold',
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <i className="fa-solid fa-trash-arrow-up" style={{ width: '18px' }}></i>
+              <span>Deleted Accounts</span>
+            </button>
+          )}
+
           {hasAccess('settings') && (
             <button
               onClick={() => { setActiveTab('settings'); setSidebarOpen(false); }}
@@ -755,6 +781,9 @@ export default function AdminDashboard({
           )}
           {activeTab === 'distributors' && hasAccess('distributors') && (
             <DistributorsTab />
+          )}
+          {activeTab === 'deleted_accounts' && !adminUser?.distributorId && adminUser?.role === 'admin' && (
+            <DeletedPlayersTab />
           )}
           {activeTab === 'settings' && hasAccess('settings') && (
             <SettingsTab onUpdateSettings={onUpdateSettings} />

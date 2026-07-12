@@ -75,6 +75,14 @@ export default function DistributorPortal() {
     noti.email && playerEmails.includes(noti.email.toLowerCase().trim())
   );
 
+  const { data: settingsData } = useSWR('/api/settings', fetcher);
+  const usdtAddress = settingsData?.settings?.usdtAddress || '';
+
+  const { data: webCommTxData, mutate: mutateWebCommTx } = useSWR(
+    distSession && distSession.type === 'B' ? `/api/transactions?email=${encodeURIComponent(distSession.email)}&type=WEBSITE_COMMISSION_PAYMENT` : null,
+    fetcher
+  );
+
   // Form states for creating Gateway (Type B)
   const [gwName, setGwName] = useState('');
   const [gwSubtitle, setGwSubtitle] = useState('');
@@ -98,6 +106,25 @@ export default function DistributorPortal() {
   const [commCode, setCommCode] = useState('');
   const [isSubmittingComm, setIsSubmittingComm] = useState(false);
   const [commMsg, setCommMsg] = useState('');
+
+  // Player management States
+  const [regModalOpen, setRegModalOpen] = useState(false);
+  const [regName, setRegName] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [isRegSubmitting, setIsRegSubmitting] = useState(false);
+
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetPassword, setResetPassword] = useState('');
+  const [isResetSubmitting, setIsResetSubmitting] = useState(false);
+
+  // Website Commission payment States (Type B)
+  const [webAmount, setWebAmount] = useState('');
+  const [webCode, setWebCode] = useState('');
+  const [webScreenshot, setWebScreenshot] = useState('');
+  const [isSubmittingWeb, setIsSubmittingWeb] = useState(false);
+  const [webMsg, setWebMsg] = useState('');
 
   // Invalidation reason modal (Type B allotments)
   const [invalidatingNoti, setInvalidatingNoti] = useState(null);
@@ -154,6 +181,145 @@ export default function DistributorPortal() {
       setCommMsg('Server error submitting request.');
     } finally {
       setIsSubmittingComm(false);
+    }
+  };
+
+  const handleRegSubmit = async (e) => {
+    e.preventDefault();
+    if (!regName.trim() || !regEmail.trim() || !regPassword.trim()) return;
+    setIsRegSubmitting(true);
+    try {
+      const res = await fetch('/api/distributors/players', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: regName, email: regEmail, password: regPassword, distributorId: distId })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Player account created successfully!');
+        setRegModalOpen(false);
+        setRegName('');
+        setRegEmail('');
+        setRegPassword('');
+        mutateStats();
+      } else {
+        alert(data.message || 'Failed to register player.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error registering player.');
+    } finally {
+      setIsRegSubmitting(false);
+    }
+  };
+
+  const handleResetSubmit = async (e) => {
+    e.preventDefault();
+    if (!resetPassword.trim()) return;
+    setIsResetSubmitting(true);
+    try {
+      const res = await fetch('/api/distributors/players', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetEmail, password: resetPassword, distributorId: distId })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Player password reset successfully!');
+        setResetModalOpen(false);
+        setResetPassword('');
+      } else {
+        alert(data.message || 'Failed to reset password.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error resetting password.');
+    } finally {
+      setIsResetSubmitting(false);
+    }
+  };
+
+  const handleDeletePlayer = async (email) => {
+    if (!window.confirm(`Are you sure you want to delete player account "${email}"? This player account will be soft-deleted.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/distributors/players?email=${encodeURIComponent(email)}&distributorId=${distId}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Player account deleted successfully.');
+        mutateStats();
+      } else {
+        alert(data.message || 'Failed to delete player.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error deleting player.');
+    }
+  };
+
+  const handleWebScreenshotChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Payment receipt screenshot must be less than 2MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setWebScreenshot(reader.result);
+      alert('USDT payment receipt screenshot loaded. Ready to submit!');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRequestWebPayment = async (e) => {
+    e.preventDefault();
+    if (!webAmount || !webCode || !webScreenshot) {
+      alert('Please fill in amount, TxID/Hash and attach payment screenshot proof.');
+      return;
+    }
+    const reqVal = parseFloat(webAmount);
+    if (isNaN(reqVal) || reqVal <= 0) {
+      alert('Please enter a valid amount.');
+      return;
+    }
+
+    setIsSubmittingWeb(true);
+    setWebMsg('');
+
+    try {
+      const res = await fetch('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userEmail: distSession.email,
+          amount: reqVal,
+          gateway: 'USDT',
+          code: webCode,
+          screenshot: webScreenshot,
+          type: 'WEBSITE_COMMISSION_PAYMENT',
+          gameTitle: 'Platform Fees',
+          status: 'PENDING'
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setWebAmount('');
+        setWebCode('');
+        setWebScreenshot('');
+        setWebMsg('Website commission payment proof submitted successfully!');
+        mutateWebCommTx();
+      } else {
+        setWebMsg(data.message || 'Submission failed.');
+      }
+    } catch (err) {
+      console.error(err);
+      setWebMsg('Server error submitting payment proof.');
+    } finally {
+      setIsSubmittingWeb(false);
     }
   };
 
@@ -496,6 +662,25 @@ export default function DistributorPortal() {
   const stats = statsData?.stats || {};
   const referredTransactions = statsData?.transactions || [];
 
+  const hasTabAccess = (tabName) => {
+    if (!distSession?.isStaff) return true;
+    const role = distSession.role;
+    if (role === 'coins_admin') {
+      return ['overview', 'referred_players', 'operations', 'guidelines'].includes(tabName);
+    }
+    if (role === 'support_admin') {
+      return ['overview', 'support', 'guidelines'].includes(tabName);
+    }
+    if (role === 'financial_admin') {
+      return ['overview', 'tx_logs', 'comm_cashout', 'guidelines'].includes(tabName);
+    }
+    return false;
+  };
+
+  const webPaymentsList = webCommTxData?.transactions || [];
+  const totalWebPaid = webPaymentsList.filter(tx => tx.status === 'SUCCESS').reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
+  const dueWebsiteCommission = Math.max(0, (stats.websiteCommissionEarned || 0) - totalWebPaid);
+
   return (
     <div style={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: '260px 1fr', background: '#060812', color: '#fff', fontFamily: "'Inter', sans-serif" }}>
       
@@ -511,120 +696,140 @@ export default function DistributorPortal() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
-          <button
-            onClick={() => setActiveTab('overview')}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'overview' ? 'var(--gold-primary)' : 'none', color: activeTab === 'overview' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
-          >
-            <i className="fa-solid fa-chart-line" style={{ width: '16px' }}></i>
-            Overview & Analytics
-          </button>
+          {hasTabAccess('overview') && (
+            <button
+              onClick={() => setActiveTab('overview')}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'overview' ? 'var(--gold-primary)' : 'none', color: activeTab === 'overview' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
+            >
+              <i className="fa-solid fa-chart-line" style={{ width: '16px' }}></i>
+              Overview & Analytics
+            </button>
+          )}
 
-          <button
-            onClick={() => setActiveTab('tx_logs')}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'tx_logs' ? 'var(--gold-primary)' : 'none', color: activeTab === 'tx_logs' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
-          >
-            <i className="fa-solid fa-clock-rotate-left" style={{ width: '16px' }}></i>
-            Transaction Logs
-          </button>
+          {hasTabAccess('tx_logs') && (
+            <button
+              onClick={() => setActiveTab('tx_logs')}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'tx_logs' ? 'var(--gold-primary)' : 'none', color: activeTab === 'tx_logs' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
+            >
+              <i className="fa-solid fa-clock-rotate-left" style={{ width: '16px' }}></i>
+              Transaction Logs
+            </button>
+          )}
 
-          <button
-            onClick={() => setActiveTab('referred_players')}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'referred_players' ? 'var(--gold-primary)' : 'none', color: activeTab === 'referred_players' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
-          >
-            <i className="fa-solid fa-users" style={{ width: '16px' }}></i>
-            Referred Players
-          </button>
+          {hasTabAccess('referred_players') && (
+            <button
+              onClick={() => setActiveTab('referred_players')}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'referred_players' ? 'var(--gold-primary)' : 'none', color: activeTab === 'referred_players' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
+            >
+              <i className="fa-solid fa-users" style={{ width: '16px' }}></i>
+              Referred Players
+            </button>
+          )}
 
-          <button
-            onClick={() => setActiveTab('comm_cashout')}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'comm_cashout' ? 'var(--gold-primary)' : 'none', color: activeTab === 'comm_cashout' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
-          >
-            <i className="fa-solid fa-hand-holding-dollar" style={{ width: '16px' }}></i>
-            Commission Cashout
-          </button>
+          {hasTabAccess('comm_cashout') && (
+            <button
+              onClick={() => setActiveTab('comm_cashout')}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'comm_cashout' ? 'var(--gold-primary)' : 'none', color: activeTab === 'comm_cashout' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
+            >
+              <i className="fa-solid fa-hand-holding-dollar" style={{ width: '16px' }}></i>
+              {distSession.type === 'B' ? 'Website Commission' : 'Commission Cashout'}
+            </button>
+          )}
 
-          <button
-            onClick={() => setActiveTab('promotions')}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'promotions' ? 'var(--gold-primary)' : 'none', color: activeTab === 'promotions' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
-          >
-            <i className="fa-solid fa-gift" style={{ width: '16px' }}></i>
-            Active Promotions
-          </button>
+          {hasTabAccess('promotions') && (
+            <button
+              onClick={() => setActiveTab('promotions')}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'promotions' ? 'var(--gold-primary)' : 'none', color: activeTab === 'promotions' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
+            >
+              <i className="fa-solid fa-gift" style={{ width: '16px' }}></i>
+              Active Promotions
+            </button>
+          )}
 
-          <button
-            onClick={() => setActiveTab('guidelines')}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'guidelines' ? 'var(--gold-primary)' : 'none', color: activeTab === 'guidelines' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
-          >
-            <i className="fa-solid fa-circle-info" style={{ width: '16px' }}></i>
-            Guidelines & Rules
-          </button>
+          {hasTabAccess('guidelines') && (
+            <button
+              onClick={() => setActiveTab('guidelines')}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'guidelines' ? 'var(--gold-primary)' : 'none', color: activeTab === 'guidelines' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
+            >
+              <i className="fa-solid fa-circle-info" style={{ width: '16px' }}></i>
+              Guidelines & Rules
+            </button>
+          )}
 
           {distSession.type === 'B' && (
             <>
-              <button
-                onClick={() => setActiveTab('gateways')}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'gateways' ? 'var(--gold-primary)' : 'none', color: activeTab === 'gateways' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
-              >
-                <i className="fa-solid fa-wallet" style={{ width: '16px' }}></i>
-                My Gateways
-              </button>
+              {hasTabAccess('gateways') && (
+                <button
+                  onClick={() => setActiveTab('gateways')}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'gateways' ? 'var(--gold-primary)' : 'none', color: activeTab === 'gateways' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
+                >
+                  <i className="fa-solid fa-wallet" style={{ width: '16px' }}></i>
+                  My Gateways
+                </button>
+              )}
 
-              <button
-                onClick={() => setActiveTab('staff')}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'staff' ? 'var(--gold-primary)' : 'none', color: activeTab === 'staff' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
-              >
-                <i className="fa-solid fa-user-shield" style={{ width: '16px' }}></i>
-                My Staff
-              </button>
+              {hasTabAccess('staff') && (
+                <button
+                  onClick={() => setActiveTab('staff')}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'staff' ? 'var(--gold-primary)' : 'none', color: activeTab === 'staff' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
+                >
+                  <i className="fa-solid fa-user-shield" style={{ width: '16px' }}></i>
+                  My Staff
+                </button>
+              )}
 
-              <button
-                onClick={() => setActiveTab('operations')}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  background: activeTab === 'operations' ? 'var(--gold-primary)' : 'none',
-                  color: activeTab === 'operations' ? '#000' : '#fff',
-                  border: 'none',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '0.8rem',
-                  textAlign: 'left'
-                }}
-              >
-                <i className="fa-solid fa-circle-play" style={{ width: '16px' }}></i>
-                Operations Queue
-                {(referredRequests.length + referredCoins.length) > 0 && (
-                  <span style={{ marginLeft: 'auto', background: '#ef4444', color: '#fff', fontSize: '0.625rem', padding: '0.15rem 0.35rem', borderRadius: '10px' }}>
-                    {referredRequests.length + referredCoins.length}
-                  </span>
-                )}
-              </button>
+              {hasTabAccess('operations') && (
+                <button
+                  onClick={() => setActiveTab('operations')}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    background: activeTab === 'operations' ? 'var(--gold-primary)' : 'none',
+                    color: activeTab === 'operations' ? '#000' : '#fff',
+                    border: 'none',
+                    padding: '0.75rem 1rem',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '0.8rem',
+                    textAlign: 'left'
+                  }}
+                >
+                  <i className="fa-solid fa-circle-play" style={{ width: '16px' }}></i>
+                  Operations Queue
+                  {(referredRequests.length + referredCoins.length) > 0 && (
+                    <span style={{ marginLeft: 'auto', background: '#ef4444', color: '#fff', fontSize: '0.625rem', padding: '0.15rem 0.35rem', borderRadius: '10px' }}>
+                      {referredRequests.length + referredCoins.length}
+                    </span>
+                  )}
+                </button>
+              )}
 
-              <button
-                onClick={() => setActiveTab('support')}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  background: activeTab === 'support' ? 'var(--gold-primary)' : 'none',
-                  color: activeTab === 'support' ? '#000' : '#fff',
-                  border: 'none',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '0.8rem',
-                  textAlign: 'left'
-                }}
-              >
-                <i className="fa-solid fa-headset" style={{ width: '16px' }}></i>
-                Live Chat Support
-              </button>
+              {hasTabAccess('support') && (
+                <button
+                  onClick={() => setActiveTab('support')}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    background: activeTab === 'support' ? 'var(--gold-primary)' : 'none',
+                    color: activeTab === 'support' ? '#000' : '#fff',
+                    border: 'none',
+                    padding: '0.75rem 1rem',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '0.8rem',
+                    textAlign: 'left'
+                  }}
+                >
+                  <i className="fa-solid fa-headset" style={{ width: '16px' }}></i>
+                  Live Chat Support
+                </button>
+              )}
             </>
           )}
         </div>
@@ -676,6 +881,24 @@ export default function DistributorPortal() {
                 <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <i className="fa-solid fa-users gold-text"></i> My Players ({players.length})
                 </h3>
+                <button
+                  onClick={() => setRegModalOpen(true)}
+                  style={{
+                    background: 'var(--gold-primary)',
+                    color: '#000',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '0.4rem 0.8rem',
+                    fontSize: '0.75rem',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem'
+                  }}
+                >
+                  <i className="fa-solid fa-user-plus"></i> Register Player
+                </button>
               </div>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
@@ -685,12 +908,13 @@ export default function DistributorPortal() {
                       <th style={{ padding: '0.75rem 0.5rem' }}>EMAIL</th>
                       <th style={{ padding: '0.75rem 0.5rem' }}>COINS</th>
                       <th style={{ padding: '0.75rem 0.5rem' }}>STATUS</th>
+                      <th style={{ padding: '0.75rem 0.5rem' }}>ACTIONS</th>
                     </tr>
                   </thead>
                   <tbody>
                     {players.length === 0 ? (
                       <tr>
-                        <td colSpan="4" style={{ textAlign: 'center', padding: '3rem', color: '#666' }}>No players registered through your referral link yet.</td>
+                        <td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: '#666' }}>No players registered through your referral link yet.</td>
                       </tr>
                     ) : (
                       players.map(p => (
@@ -700,6 +924,46 @@ export default function DistributorPortal() {
                           <td style={{ padding: '0.75rem 0.5rem', color: 'var(--gold-primary)', fontWeight: 'bold' }}>{(p.coins || 0).toFixed(2)}</td>
                           <td style={{ padding: '0.75rem 0.5rem' }}>
                             <span style={{ fontSize: '0.65rem', background: 'rgba(46,204,113,0.1)', color: '#2ecc71', padding: '0.15rem 0.35rem', borderRadius: '4px', fontWeight: 'bold' }}>ACTIVE</span>
+                          </td>
+                          <td style={{ padding: '0.75rem 0.5rem', display: 'flex', gap: '0.4rem' }}>
+                            <button
+                              onClick={() => { setResetEmail(p.email); setResetModalOpen(true); }}
+                              style={{
+                                background: 'rgba(255,215,0,0.1)',
+                                border: '1px solid rgba(255,215,0,0.3)',
+                                color: 'var(--gold-primary)',
+                                borderRadius: '4px',
+                                padding: '0.25rem 0.5rem',
+                                fontSize: '0.65rem',
+                                cursor: 'pointer',
+                                fontWeight: 'bold',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.2rem'
+                              }}
+                              title="Reset Password"
+                            >
+                              <i className="fa-solid fa-key"></i> Reset PW
+                            </button>
+                            <button
+                              onClick={() => handleDeletePlayer(p.email)}
+                              style={{
+                                background: 'rgba(239, 68, 68, 0.1)',
+                                border: '1px solid rgba(239, 68, 68, 0.3)',
+                                color: '#ef4444',
+                                borderRadius: '4px',
+                                padding: '0.25rem 0.5rem',
+                                fontSize: '0.65rem',
+                                cursor: 'pointer',
+                                fontWeight: 'bold',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.2rem'
+                              }}
+                              title="Delete Player Account"
+                            >
+                              <i className="fa-solid fa-trash"></i> Delete
+                            </button>
                           </td>
                         </tr>
                       ))
@@ -714,117 +978,247 @@ export default function DistributorPortal() {
         {/* TAB: COMMISSION CASHOUT */}
         {activeTab === 'comm_cashout' && (
           <div>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#fff' }}>Commission & Cashouts</h1>
-            <p style={{ fontSize: '0.75rem', color: '#888', marginBottom: '2rem' }}>Request payouts for your referral earnings and track processing history.</p>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#fff' }}>
+              {distSession.type === 'B' ? 'Website Commission & Payments' : 'Commission & Cashouts'}
+            </h1>
+            <p style={{ fontSize: '0.75rem', color: '#888', marginBottom: '2rem' }}>
+              {distSession.type === 'B' 
+                ? 'Submit screenshot proof of website commission payments to keep your account active.'
+                : 'Request payouts for your referral earnings and track processing history.'}
+            </p>
 
             {(() => {
-              const commWithdrawals = commTxData?.transactions || [];
-              const totalWithdrawn = commWithdrawals.filter(tx => tx.status === 'SUCCESS' || tx.status === 'PENDING').reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
-              const availableCommission = Math.max(0, (stats.commissionEarned || 0) - totalWithdrawn);
+              if (distSession.type === 'B') {
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: '1.5rem' }}>
+                    <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', height: 'fit-content' }}>
+                      <h3 style={{ fontSize: '0.9rem', marginBottom: '0.25rem', fontWeight: 'bold' }}>Pay Website Commission</h3>
+                      <p style={{ fontSize: '0.65rem', color: '#888', marginBottom: '1rem' }}>
+                        Due Commission Balance: <strong style={{ color: '#ff4d6d' }}>${dueWebsiteCommission.toFixed(2)}</strong>
+                      </p>
 
-              return (
-                <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '1.5rem' }}>
-                  <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', height: 'fit-content' }}>
-                    <h3 style={{ fontSize: '0.9rem', marginBottom: '0.25rem', fontWeight: 'bold' }}>Request Commission</h3>
-                    <p style={{ fontSize: '0.65rem', color: '#888', marginBottom: '1.25rem' }}>
-                      Available Balance: <strong style={{ color: 'var(--gold-primary)' }}>${availableCommission.toFixed(2)}</strong>
-                    </p>
-                    <form onSubmit={handleRequestCommWithdraw} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                      <div className="input-group">
-                        <label style={{ fontSize: '0.7rem' }}>Amount ($)</label>
-                        <input
-                          type="number"
-                          placeholder="e.g. 50.00"
-                          step="0.01"
-                          value={commAmount}
-                          onChange={(e) => setCommAmount(e.target.value)}
-                          max={availableCommission}
-                          style={{ width: '100%', background: '#070912', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
-                          required
-                        />
-                      </div>
-                      <div className="input-group">
-                        <label style={{ fontSize: '0.7rem' }}>Gateway / Method</label>
-                        <select
-                          value={commGateway}
-                          onChange={(e) => setCommGateway(e.target.value)}
-                          style={{ width: '100%', background: '#070912', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
-                        >
-                          <option value="Chime">Chime</option>
-                          <option value="Zelle">Zelle</option>
-                          <option value="CashApp">CashApp</option>
-                          <option value="PayPal">PayPal</option>
-                          <option value="Venmo">Venmo</option>
-                        </select>
-                      </div>
-                      <div className="input-group">
-                        <label style={{ fontSize: '0.7rem' }}>Payment Address / Tag</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. $cashtag or email"
-                          value={commCode}
-                          onChange={(e) => setCommCode(e.target.value)}
-                          style={{ width: '100%', background: '#070912', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
-                          required
-                        />
-                      </div>
-                      {commMsg && (
-                        <p style={{ fontSize: '0.7rem', color: commMsg.includes('success') ? '#2ecc71' : '#ef4444', margin: '0.2rem 0' }}>{commMsg}</p>
-                      )}
-                      <button
-                        type="submit"
-                        disabled={isSubmittingComm || availableCommission <= 0}
-                        style={{ width: '100%', padding: '0.6rem', background: 'var(--gold-primary)', color: '#000', border: 'none', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', opacity: (isSubmittingComm || availableCommission <= 0) ? 0.5 : 1 }}
-                      >
-                        {isSubmittingComm ? 'Submitting...' : 'Request Cashout ➔'}
-                      </button>
-                    </form>
-                  </div>
-
-                  <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <h3 style={{ fontSize: '0.9rem', marginBottom: '1rem', fontWeight: 'bold' }}>Commission Withdrawal Logs</h3>
-                    <div style={{ maxHeight: '310px', overflowY: 'auto' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
-                        <thead>
-                          <tr style={{ textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#888' }}>
-                            <th style={{ padding: '0.5rem' }}>DATE</th>
-                            <th style={{ padding: '0.5rem' }}>GATEWAY</th>
-                            <th style={{ padding: '0.5rem' }}>ADDRESS</th>
-                            <th style={{ padding: '0.5rem' }}>AMOUNT</th>
-                            <th style={{ padding: '0.5rem' }}>STATUS</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {commWithdrawals.length === 0 ? (
-                            <tr>
-                              <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>No commission withdrawals requested.</td>
-                            </tr>
-                          ) : (
-                            commWithdrawals.map(tx => (
-                              <tr key={tx.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                                <td style={{ padding: '0.6rem 0.5rem' }}>{tx.date}</td>
-                                <td style={{ padding: '0.6rem 0.5rem' }}>{tx.gateway}</td>
-                                <td style={{ padding: '0.6rem 0.5rem' }}>{tx.code}</td>
-                                <td style={{ padding: '0.6rem 0.5rem', fontWeight: 'bold', color: 'var(--gold-primary)' }}>${parseFloat(tx.amount || 0).toFixed(2)}</td>
-                                <td style={{ padding: '0.6rem 0.5rem' }}>
-                                  <span style={{
-                                    padding: '0.15rem 0.35rem',
-                                    borderRadius: '4px',
-                                    fontSize: '0.6rem',
-                                    fontWeight: 'bold',
-                                    background: tx.status === 'SUCCESS' ? 'rgba(46,204,113,0.1)' : tx.status === 'FAILED' ? 'rgba(239,68,68,0.1)' : 'rgba(241,196,15,0.1)',
-                                    color: tx.status === 'SUCCESS' ? '#2ecc71' : tx.status === 'FAILED' ? '#ef4444' : '#f1c40f'
-                                  }}>{tx.status}</span>
-                                </td>
-                              </tr>
-                            ))
+                      <div style={{ background: '#040509', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.02)', marginBottom: '1.25rem', fontSize: '0.7rem' }}>
+                        <span style={{ color: '#888', display: 'block', marginBottom: '0.2rem' }}>SEND USDT (TRC20) TO:</span>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                          <strong style={{ color: 'var(--gold-primary)', wordBreak: 'break-all', fontFamily: 'monospace' }}>
+                            {usdtAddress || 'No address configured by Admin'}
+                          </strong>
+                          {usdtAddress && (
+                            <button
+                              onClick={() => { navigator.clipboard.writeText(usdtAddress); alert('USDT Address copied!'); }}
+                              style={{ background: 'var(--gold-primary)', color: '#000', border: 'none', borderRadius: '4px', padding: '0.15rem 0.4rem', fontSize: '0.6rem', cursor: 'pointer', fontWeight: 'bold', whiteSpace: 'nowrap' }}
+                            >
+                              COPY
+                            </button>
                           )}
-                        </tbody>
-                      </table>
+                        </div>
+                      </div>
+
+                      <form onSubmit={handleRequestWebPayment} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <div className="input-group">
+                          <label style={{ fontSize: '0.7rem' }}>Payment Amount ($)</label>
+                          <input
+                            type="number"
+                            placeholder="e.g. 50.00"
+                            step="0.01"
+                            value={webAmount}
+                            onChange={(e) => setWebAmount(e.target.value)}
+                            style={{ width: '100%', background: '#070912', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
+                            required
+                          />
+                        </div>
+                        
+                        <div className="input-group">
+                          <label style={{ fontSize: '0.7rem' }}>TxID / Hash / Tag</label>
+                          <input
+                            type="text"
+                            placeholder="USDT Tx Hash or reference code"
+                            value={webCode}
+                            onChange={(e) => setWebCode(e.target.value)}
+                            style={{ width: '100%', background: '#070912', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
+                            required
+                          />
+                        </div>
+
+                        <div className="input-group">
+                          <label style={{ fontSize: '0.7rem' }}>Upload Payment Screenshot</label>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleWebScreenshotChange}
+                            style={{ width: '100%', color: '#888', fontSize: '0.7rem', padding: '0.2rem 0' }}
+                            required
+                          />
+                        </div>
+
+                        {webMsg && (
+                          <p style={{ fontSize: '0.7rem', color: webMsg.includes('success') ? '#2ecc71' : '#ef4444', margin: '0.2rem 0' }}>{webMsg}</p>
+                        )}
+
+                        <button
+                          type="submit"
+                          disabled={isSubmittingWeb}
+                          style={{ width: '100%', padding: '0.6rem', background: '#ff4d6d', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', opacity: isSubmittingWeb ? 0.5 : 1 }}
+                        >
+                          {isSubmittingWeb ? 'Submitting proof...' : 'Submit Payment Proof'}
+                        </button>
+                      </form>
+                    </div>
+
+                    <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <h3 style={{ fontSize: '0.9rem', marginBottom: '1rem', fontWeight: 'bold' }}>Website Commission Payment logs</h3>
+                      <div style={{ maxHeight: '420px', overflowY: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+                          <thead>
+                            <tr style={{ textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#888' }}>
+                              <th style={{ padding: '0.5rem' }}>DATE</th>
+                              <th style={{ padding: '0.5rem' }}>GATEWAY</th>
+                              <th style={{ padding: '0.5rem' }}>HASH/TAG</th>
+                              <th style={{ padding: '0.5rem' }}>AMOUNT</th>
+                              <th style={{ padding: '0.5rem' }}>STATUS</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {webPaymentsList.length === 0 ? (
+                              <tr>
+                                <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>No website commission payment history.</td>
+                              </tr>
+                            ) : (
+                              webPaymentsList.map(tx => (
+                                <tr key={tx.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                                  <td style={{ padding: '0.6rem 0.5rem' }}>{tx.date}</td>
+                                  <td style={{ padding: '0.6rem 0.5rem' }}>{tx.gateway}</td>
+                                  <td style={{ padding: '0.6rem 0.5rem', fontFamily: 'monospace' }}>{tx.code}</td>
+                                  <td style={{ padding: '0.6rem 0.5rem', fontWeight: 'bold', color: '#ff4d6d' }}>${parseFloat(tx.amount || 0).toFixed(2)}</td>
+                                  <td style={{ padding: '0.6rem 0.5rem' }}>
+                                    <span style={{
+                                      padding: '0.15rem 0.35rem',
+                                      borderRadius: '4px',
+                                      fontSize: '0.6rem',
+                                      fontWeight: 'bold',
+                                      background: tx.status === 'SUCCESS' ? 'rgba(46,204,113,0.1)' : tx.status === 'FAILED' ? 'rgba(239,68,68,0.1)' : 'rgba(241,196,15,0.1)',
+                                      color: tx.status === 'SUCCESS' ? '#2ecc71' : tx.status === 'FAILED' ? '#ef4444' : '#f1c40f'
+                                    }}>{tx.status}</span>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
+                );
+              } else {
+                const commWithdrawals = commTxData?.transactions || [];
+                const totalWithdrawn = commWithdrawals.filter(tx => tx.status === 'SUCCESS' || tx.status === 'PENDING').reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
+                const availableCommission = Math.max(0, (stats.commissionEarned || 0) - totalWithdrawn);
+
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '1.5rem' }}>
+                    <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', height: 'fit-content' }}>
+                      <h3 style={{ fontSize: '0.9rem', marginBottom: '0.25rem', fontWeight: 'bold' }}>Request Commission</h3>
+                      <p style={{ fontSize: '0.65rem', color: '#888', marginBottom: '1.25rem' }}>
+                        Available Balance: <strong style={{ color: 'var(--gold-primary)' }}>${availableCommission.toFixed(2)}</strong>
+                      </p>
+                      <form onSubmit={handleRequestCommWithdraw} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <div className="input-group">
+                          <label style={{ fontSize: '0.7rem' }}>Amount ($)</label>
+                          <input
+                            type="number"
+                            placeholder="e.g. 50.00"
+                            step="0.01"
+                            value={commAmount}
+                            onChange={(e) => setCommAmount(e.target.value)}
+                            max={availableCommission}
+                            style={{ width: '100%', background: '#070912', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
+                            required
+                          />
+                        </div>
+                        <div className="input-group">
+                          <label style={{ fontSize: '0.7rem' }}>Gateway / Method</label>
+                          <select
+                            value={commGateway}
+                            onChange={(e) => setCommGateway(e.target.value)}
+                            style={{ width: '100%', background: '#070912', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
+                          >
+                            <option value="Chime">Chime</option>
+                            <option value="Zelle">Zelle</option>
+                            <option value="CashApp">CashApp</option>
+                            <option value="PayPal">PayPal</option>
+                            <option value="Venmo">Venmo</option>
+                            <option value="USDT">USDT (Tether)</option>
+                          </select>
+                        </div>
+                        <div className="input-group">
+                          <label style={{ fontSize: '0.7rem' }}>Payment Address / Tag</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. $cashtag, email, or TRC20 wallet"
+                            value={commCode}
+                            onChange={(e) => setCommCode(e.target.value)}
+                            style={{ width: '100%', background: '#070912', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
+                            required
+                          />
+                        </div>
+                        {commMsg && (
+                          <p style={{ fontSize: '0.7rem', color: commMsg.includes('success') ? '#2ecc71' : '#ef4444', margin: '0.2rem 0' }}>{commMsg}</p>
+                        )}
+                        <button
+                          type="submit"
+                          disabled={isSubmittingComm || availableCommission <= 0}
+                          style={{ width: '100%', padding: '0.6rem', background: 'var(--gold-primary)', color: '#000', border: 'none', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', opacity: (isSubmittingComm || availableCommission <= 0) ? 0.5 : 1 }}
+                        >
+                          {isSubmittingComm ? 'Submitting...' : 'Request Cashout ➔'}
+                        </button>
+                      </form>
+                    </div>
+
+                    <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <h3 style={{ fontSize: '0.9rem', marginBottom: '1rem', fontWeight: 'bold' }}>Commission Withdrawal Logs</h3>
+                      <div style={{ maxHeight: '310px', overflowY: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+                          <thead>
+                            <tr style={{ textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#888' }}>
+                              <th style={{ padding: '0.5rem' }}>DATE</th>
+                              <th style={{ padding: '0.5rem' }}>GATEWAY</th>
+                              <th style={{ padding: '0.5rem' }}>ADDRESS</th>
+                              <th style={{ padding: '0.5rem' }}>AMOUNT</th>
+                              <th style={{ padding: '0.5rem' }}>STATUS</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {commWithdrawals.length === 0 ? (
+                              <tr>
+                                <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>No commission withdrawals requested.</td>
+                              </tr>
+                            ) : (
+                              commWithdrawals.map(tx => (
+                                <tr key={tx.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                                  <td style={{ padding: '0.6rem 0.5rem' }}>{tx.date}</td>
+                                  <td style={{ padding: '0.6rem 0.5rem' }}>{tx.gateway}</td>
+                                  <td style={{ padding: '0.6rem 0.5rem' }}>{tx.code}</td>
+                                  <td style={{ padding: '0.6rem 0.5rem', fontWeight: 'bold', color: 'var(--gold-primary)' }}>${parseFloat(tx.amount || 0).toFixed(2)}</td>
+                                  <td style={{ padding: '0.6rem 0.5rem' }}>
+                                    <span style={{
+                                      padding: '0.15rem 0.35rem',
+                                      borderRadius: '4px',
+                                      fontSize: '0.6rem',
+                                      fontWeight: 'bold',
+                                      background: tx.status === 'SUCCESS' ? 'rgba(46,204,113,0.1)' : tx.status === 'FAILED' ? 'rgba(239,68,68,0.1)' : 'rgba(241,196,15,0.1)',
+                                      color: tx.status === 'SUCCESS' ? '#2ecc71' : tx.status === 'FAILED' ? '#ef4444' : '#f1c40f'
+                                    }}>{tx.status}</span>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
             })()}
           </div>
         )}
@@ -943,10 +1337,17 @@ export default function DistributorPortal() {
                 <div style={{ color: '#888', fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Total Withdrawals</div>
                 <div style={{ fontSize: '1.75rem', fontWeight: '900', color: '#ef4444', marginTop: '0.25rem' }}>${(stats.totalWithdrawals || 0).toFixed(2)}</div>
               </div>
-              <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <div style={{ color: '#888', fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>My Commission ({stats.commissionRate || 0}%)</div>
-                <div style={{ fontSize: '1.75rem', fontWeight: '900', color: 'var(--gold-primary)', marginTop: '0.25rem' }}>${(stats.commissionEarned || 0).toFixed(2)}</div>
-              </div>
+              {distSession.type === 'B' ? (
+                <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ color: '#888', fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Website Commission ({stats.websiteCommissionRate || 0}%)</div>
+                  <div style={{ fontSize: '1.75rem', fontWeight: '900', color: '#ff4d6d', marginTop: '0.25rem' }}>${dueWebsiteCommission.toFixed(2)}</div>
+                </div>
+              ) : (
+                <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ color: '#888', fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>My Commission ({stats.commissionRate || 0}%)</div>
+                  <div style={{ fontSize: '1.75rem', fontWeight: '900', color: 'var(--gold-primary)', marginTop: '0.25rem' }}>${(stats.commissionEarned || 0).toFixed(2)}</div>
+                </div>
+              )}
             </div>
 
             {/* TWO COLUMN GRID FOR PLAYERS & LEDGER */}
@@ -1392,6 +1793,95 @@ export default function DistributorPortal() {
             >
               &times;
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: REGISTER PLAYER */}
+      {regModalOpen && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#0b0d16', padding: '2rem', borderRadius: '12px', border: '1px solid var(--gold-primary)', width: '380px', maxWidth: '90%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 'bold' }}><i className="fa-solid fa-user-plus gold-text"></i> Register New Player</h3>
+              <button onClick={() => setRegModalOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.5rem', cursor: 'pointer' }}>&times;</button>
+            </div>
+            <form onSubmit={handleRegSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="input-group">
+                <label style={{ fontSize: '0.7rem' }}>Full Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. John Doe"
+                  value={regName}
+                  onChange={(e) => setRegName(e.target.value)}
+                  style={{ width: '100%', background: '#070912', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
+                  required
+                />
+              </div>
+              <div className="input-group">
+                <label style={{ fontSize: '0.7rem' }}>Email Address</label>
+                <input
+                  type="email"
+                  placeholder="player@example.com"
+                  value={regEmail}
+                  onChange={(e) => setRegEmail(e.target.value)}
+                  style={{ width: '100%', background: '#070912', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
+                  required
+                />
+              </div>
+              <div className="input-group">
+                <label style={{ fontSize: '0.7rem' }}>Initial Password</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Pass123"
+                  value={regPassword}
+                  onChange={(e) => setRegPassword(e.target.value)}
+                  style={{ width: '100%', background: '#070912', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isRegSubmitting}
+                style={{ width: '100%', padding: '0.6rem', background: 'var(--gold-primary)', color: '#000', border: 'none', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', opacity: isRegSubmitting ? 0.5 : 1 }}
+              >
+                {isRegSubmitting ? 'Registering...' : 'Register Player'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: RESET PASSWORD */}
+      {resetModalOpen && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#0b0d16', padding: '2rem', borderRadius: '12px', border: '1px solid var(--gold-primary)', width: '380px', maxWidth: '90%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 'bold' }}><i className="fa-solid fa-key gold-text"></i> Reset Player Password</h3>
+              <button onClick={() => setResetModalOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.5rem', cursor: 'pointer' }}>&times;</button>
+            </div>
+            <form onSubmit={handleResetSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ fontSize: '0.75rem', color: '#aaa' }}>
+                Resetting password for: <strong style={{ color: '#fff' }}>{resetEmail}</strong>
+              </div>
+              <div className="input-group">
+                <label style={{ fontSize: '0.7rem' }}>New Password</label>
+                <input
+                  type="text"
+                  placeholder="Enter new password"
+                  value={resetPassword}
+                  onChange={(e) => setResetPassword(e.target.value)}
+                  style={{ width: '100%', background: '#070912', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isResetSubmitting}
+                style={{ width: '100%', padding: '0.6rem', background: 'var(--gold-primary)', color: '#000', border: 'none', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', opacity: isResetSubmitting ? 0.5 : 1 }}
+              >
+                {isResetSubmitting ? 'Updating...' : 'Update Password'}
+              </button>
+            </form>
           </div>
         </div>
       )}

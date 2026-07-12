@@ -17,11 +17,24 @@ export async function GET() {
     
     // Seed defaults if missing
     if (!settings) {
-      settings = { id: 'global_settings', firstDepositBonus: 300, regularDepositBonus: 20, referralBonus: 10 };
+      settings = { id: 'global_settings', firstDepositBonus: 300, regularDepositBonus: 20, referralBonus: 10, usdtAddress: '' };
       await settingsCollection.insertOne(settings);
-    } else if (settings.referralBonus === undefined) {
-      await settingsCollection.updateOne({ id: 'global_settings' }, { $set: { referralBonus: 10 } });
-      settings.referralBonus = 10;
+    } else {
+      let needsUpdate = false;
+      const updates = {};
+      if (settings.referralBonus === undefined) {
+        updates.referralBonus = 10;
+        settings.referralBonus = 10;
+        needsUpdate = true;
+      }
+      if (settings.usdtAddress === undefined) {
+        updates.usdtAddress = '';
+        settings.usdtAddress = '';
+        needsUpdate = true;
+      }
+      if (needsUpdate) {
+        await settingsCollection.updateOne({ id: 'global_settings' }, { $set: updates });
+      }
     }
     
     cache.set('settings_all', settings, 60);
@@ -35,7 +48,7 @@ export async function GET() {
 // PUT / POST update settings (Super Admin only)
 export async function PUT(req) {
   try {
-    const { firstDepositBonus, regularDepositBonus, referralBonus } = await req.json();
+    const { firstDepositBonus, regularDepositBonus, referralBonus, usdtAddress } = await req.json();
 
     const db = await getDb();
     const settingsCollection = db.collection('settings');
@@ -49,6 +62,9 @@ export async function PUT(req) {
     }
     if (referralBonus !== undefined) {
       updateFields.referralBonus = Number(referralBonus);
+    }
+    if (usdtAddress !== undefined) {
+      updateFields.usdtAddress = String(usdtAddress).trim();
     }
 
     await settingsCollection.updateOne(

@@ -172,8 +172,18 @@ export async function DELETE(req) {
 
     const db = await getDb();
     const usersCollection = db.collection('users');
+    const cleanEmail = email.toLowerCase().trim();
 
-    await usersCollection.deleteOne({ email: email.toLowerCase().trim() });
+    const userDoc = await usersCollection.findOne({ email: cleanEmail });
+    if (userDoc) {
+      const deletedCollection = db.collection('deletedUsers');
+      await deletedCollection.createIndex({ deletedAt: 1 }, { expireAfterSeconds: 2592000 }); // 30-day TTL
+      await deletedCollection.insertOne({
+        ...userDoc,
+        deletedAt: new Date().toISOString()
+      });
+      await usersCollection.deleteOne({ email: cleanEmail });
+    }
     
     // Invalidate caches
     cache.del('admin_stats');

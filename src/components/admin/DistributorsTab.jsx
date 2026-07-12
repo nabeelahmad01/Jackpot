@@ -15,6 +15,7 @@ export default function DistributorsTab() {
   const [password, setPassword] = useState('');
   const [type, setType] = useState('A');
   const [commissionRate, setCommissionRate] = useState(10);
+  const [websiteCommissionRate, setWebsiteCommissionRate] = useState(5);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Edit State
@@ -24,6 +25,7 @@ export default function DistributorsTab() {
   const [editPassword, setEditPassword] = useState('');
   const [editType, setEditType] = useState('A');
   const [editCommissionRate, setEditCommissionRate] = useState(0);
+  const [editWebsiteCommissionRate, setEditWebsiteCommissionRate] = useState(0);
 
   // Referred Players List View Modal
   const [viewingPlayersDist, setViewingPlayersDist] = useState(null);
@@ -55,7 +57,8 @@ export default function DistributorsTab() {
           email: email.toLowerCase().trim(),
           password: password.trim(),
           type,
-          commissionRate: Number(commissionRate)
+          commissionRate: Number(commissionRate),
+          websiteCommissionRate: Number(websiteCommissionRate)
         })
       });
       const resData = await response.json();
@@ -65,6 +68,7 @@ export default function DistributorsTab() {
         setPassword('');
         setType('A');
         setCommissionRate(10);
+        setWebsiteCommissionRate(5);
         mutate();
         alert('Distributor created successfully!');
       } else {
@@ -85,6 +89,7 @@ export default function DistributorsTab() {
     setEditPassword('');
     setEditType(dist.type || 'A');
     setEditCommissionRate(dist.commissionRate || 0);
+    setEditWebsiteCommissionRate(dist.websiteCommissionRate || 0);
   };
 
   const handleEditSubmit = async (e) => {
@@ -101,7 +106,8 @@ export default function DistributorsTab() {
         name: editName.trim(),
         email: editEmail.toLowerCase().trim(),
         type: editType,
-        commissionRate: Number(editCommissionRate)
+        commissionRate: Number(editCommissionRate),
+        websiteCommissionRate: Number(editWebsiteCommissionRate)
       };
       if (editPassword.trim()) {
         payload.password = editPassword.trim();
@@ -236,21 +242,29 @@ export default function DistributorsTab() {
           </div>
 
           <div className="input-group" style={{ marginBottom: '1.5rem' }}>
-            <label>Commission Rate (%)</label>
+            <label>{type === 'B' ? 'Website Commission Rate (%)' : 'Distributor Commission Rate (%)'}</label>
             <div className="input-wrapper">
               <i className="fa-solid fa-percent input-icon"></i>
               <input
                 type="number"
-                placeholder="10"
+                placeholder={type === 'B' ? '5' : '10'}
                 min="0"
                 max="100"
-                value={commissionRate}
-                onChange={(e) => setCommissionRate(e.target.value)}
+                value={type === 'B' ? websiteCommissionRate : commissionRate}
+                onChange={(e) => {
+                  if (type === 'B') {
+                    setWebsiteCommissionRate(e.target.value);
+                  } else {
+                    setCommissionRate(e.target.value);
+                  }
+                }}
                 required
               />
             </div>
             <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-              Percentage profit computed automatically from referred player successful deposits.
+              {type === 'B' 
+                ? 'Percentage of deposits Type B pays to the platform website owner.'
+                : 'Percentage profit Type A earns on their referred player successful deposits.'}
             </div>
           </div>
 
@@ -305,14 +319,22 @@ export default function DistributorsTab() {
                       </span>
                     </td>
                     <td>
-                      <strong style={{ fontSize: '0.85rem' }}>{dist.commissionRate}%</strong>
+                      <strong style={{ fontSize: '0.85rem' }}>
+                        {dist.type === 'B' ? `Website: ${dist.websiteCommissionRate || 0}%` : `Comm: ${dist.commissionRate}%`}
+                      </strong>
                     </td>
                     <td>
                       <div style={{ fontSize: '0.725rem', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                         <div>Players: <strong style={{ color: '#fff' }}>{dist.playersCount || 0}</strong></div>
                         <div>Deposits: <strong style={{ color: '#2ecc71' }}>${(dist.totalDeposits || 0).toFixed(2)}</strong></div>
                         <div>Withdrawals: <strong style={{ color: '#ef4444' }}>${(dist.totalWithdrawals || 0).toFixed(2)}</strong></div>
-                        <div>Commission: <strong style={{ color: 'var(--gold-primary)' }}>${(dist.commissionEarned || 0).toFixed(2)}</strong></div>
+                        <div>
+                          {dist.type === 'B' ? (
+                            <>Website Comm: <strong style={{ color: '#ff4d6d' }}>${(dist.websiteCommissionEarned || 0).toFixed(2)}</strong></>
+                          ) : (
+                            <>Commission: <strong style={{ color: 'var(--gold-primary)' }}>${(dist.commissionEarned || 0).toFixed(2)}</strong></>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td>
@@ -415,15 +437,21 @@ export default function DistributorsTab() {
                 </div>
 
                 <div className="input-group" style={{ marginBottom: '1.5rem' }}>
-                  <label>Commission Rate (%)</label>
+                  <label>{editType === 'B' ? 'Website Commission Rate (%)' : 'Distributor Commission Rate (%)'}</label>
                   <div className="input-wrapper">
                     <i className="fa-solid fa-percent input-icon"></i>
                     <input
                       type="number"
                       min="0"
                       max="100"
-                      value={editCommissionRate}
-                      onChange={(e) => setEditCommissionRate(e.target.value)}
+                      value={editType === 'B' ? editWebsiteCommissionRate : editCommissionRate}
+                      onChange={(e) => {
+                        if (editType === 'B') {
+                          setEditWebsiteCommissionRate(e.target.value);
+                        } else {
+                          setEditCommissionRate(e.target.value);
+                        }
+                      }}
                       required
                     />
                   </div>

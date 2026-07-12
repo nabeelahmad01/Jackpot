@@ -9,6 +9,7 @@ export default function SettingsTab({ onUpdateSettings }) {
   const [firstBonusInput, setFirstBonusInput] = useState(300);
   const [regularBonusInput, setRegularBonusInput] = useState(20);
   const [referralBonusInput, setReferralBonusInput] = useState(10);
+  const [usdtAddressInput, setUsdtAddressInput] = useState('');
 
   // Sync settings inputs when SWR loads data
   useEffect(() => {
@@ -16,12 +17,13 @@ export default function SettingsTab({ onUpdateSettings }) {
       setFirstBonusInput(settingsData.settings.firstDepositBonus);
       setRegularBonusInput(settingsData.settings.regularDepositBonus);
       setReferralBonusInput(settingsData.settings.referralBonus || 10);
+      setUsdtAddressInput(settingsData.settings.usdtAddress || '');
     }
   }, [settingsData]);
 
   const handleSettingsSubmit = async (e) => {
     e.preventDefault();
-    await onUpdateSettings(firstBonusInput, regularBonusInput, referralBonusInput);
+    await onUpdateSettings(firstBonusInput, regularBonusInput, referralBonusInput, usdtAddressInput);
     mutate(); // reload settings SWR cache
   };
 
@@ -93,6 +95,21 @@ export default function SettingsTab({ onUpdateSettings }) {
             <span style={{ paddingRight: '1rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>%</span>
           </div>
           <span className="game-tap-tip">Calculates reward coins allotted to the referrer when their referred friend makes a deposit (e.g. 10% sends 10% of deposit value to referrer).</span>
+        </div>
+
+        <div className="input-group" style={{ marginTop: '1.5rem' }}>
+          <label htmlFor="settings-usdt-address">Platform Owner USDT Address (Zelle/USDT Wallet)</label>
+          <div className="input-wrapper">
+            <i className="fa-solid fa-wallet input-icon" style={{ color: '#ffcc00' }}></i>
+            <input
+              type="text"
+              id="settings-usdt-address"
+              placeholder="e.g. TR7NHgoKwqTvF24F7545G... or cashapp tag"
+              value={usdtAddressInput}
+              onChange={(e) => setUsdtAddressInput(e.target.value)}
+            />
+          </div>
+          <span className="game-tap-tip">The wallet address independent Type B distributors will send their platform website commission payments to.</span>
         </div>
 
         <button type="submit" className="submit-btn" style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold', marginTop: '2rem' }}>

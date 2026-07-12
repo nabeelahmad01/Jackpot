@@ -57,6 +57,7 @@ export async function GET(req) {
     }
 
     const commissionEarned = totalDeposits * ((distributor.commissionRate || 0) / 100);
+    const websiteCommissionEarned = totalDeposits * ((distributor.websiteCommissionRate || 0) / 100);
 
     return NextResponse.json({
       success: true,
@@ -65,7 +66,9 @@ export async function GET(req) {
         totalDeposits,
         totalWithdrawals,
         commissionEarned,
-        commissionRate: distributor.commissionRate || 0
+        commissionRate: distributor.commissionRate || 0,
+        websiteCommissionEarned,
+        websiteCommissionRate: distributor.websiteCommissionRate || 0
       },
       players,
       transactions

@@ -40,13 +40,15 @@ export async function GET() {
       }
 
       const commissionEarned = totalDeposits * ((dist.commissionRate || 0) / 100);
+      const websiteCommissionEarned = totalDeposits * ((dist.websiteCommissionRate || 0) / 100);
 
       return {
         ...dist,
         playersCount: playerEmails.length,
         totalDeposits,
         totalWithdrawals,
-        commissionEarned
+        commissionEarned,
+        websiteCommissionEarned
       };
     }));
 
@@ -60,7 +62,7 @@ export async function GET() {
 // POST create a new distributor
 export async function POST(req) {
   try {
-    const { name, email, password, type, commissionRate } = await req.json();
+    const { name, email, password, type, commissionRate, websiteCommissionRate } = await req.json();
 
     if (!name || !email || !password || !type) {
       return NextResponse.json({ success: false, message: 'Missing required distributor fields.' }, { status: 400 });
@@ -86,6 +88,7 @@ export async function POST(req) {
       role: 'distributor',
       type: type, // 'A' or 'B'
       commissionRate: parseFloat(commissionRate || 0),
+      websiteCommissionRate: parseFloat(websiteCommissionRate || 0),
       createdAt: new Date().toISOString()
     };
 
@@ -102,7 +105,7 @@ export async function POST(req) {
 // PUT edit distributor details
 export async function PUT(req) {
   try {
-    const { id, name, email, password, type, commissionRate } = await req.json();
+    const { id, name, email, password, type, commissionRate, websiteCommissionRate } = await req.json();
 
     if (!id) {
       return NextResponse.json({ success: false, message: 'Distributor ID is required.' }, { status: 400 });
@@ -117,6 +120,7 @@ export async function PUT(req) {
     if (password !== undefined && password.trim() !== '') updateFields.password = password.trim();
     if (type !== undefined) updateFields.type = type;
     if (commissionRate !== undefined) updateFields.commissionRate = parseFloat(commissionRate || 0);
+    if (websiteCommissionRate !== undefined) updateFields.websiteCommissionRate = parseFloat(websiteCommissionRate || 0);
 
     const result = await distributorsCollection.updateOne({ id }, { $set: updateFields });
 
