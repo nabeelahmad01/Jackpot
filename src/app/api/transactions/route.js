@@ -14,6 +14,15 @@ export async function GET(req) {
       if (!tx) {
         return NextResponse.json({ success: false, message: 'Transaction not found.' }, { status: 404 });
       }
+      if (tx.type === 'WEBSITE_COMMISSION_PAYMENT') {
+        const adminRole = searchParams.get('adminRole') || '';
+        const userEmailParam = searchParams.get('email') || '';
+        const callerEmail = userEmailParam.toLowerCase().trim();
+        const txEmail = (tx.userEmail || '').toLowerCase().trim();
+        if (adminRole !== 'admin' && callerEmail !== txEmail) {
+          return NextResponse.json({ success: false, message: 'Access denied.' }, { status: 403 });
+        }
+      }
       return NextResponse.json({ success: true, transaction: tx });
     }
 
@@ -23,6 +32,7 @@ export async function GET(req) {
     const search = searchParams.get('search') || '';
     const page = parseInt(searchParams.get('page') || '1', 10);
     const limit = parseInt(searchParams.get('limit') || '25', 10);
+    const adminRole = searchParams.get('adminRole') || '';
 
     const db = await getDb();
     const transactionsCollection = db.collection('transactions');
@@ -75,6 +85,22 @@ export async function GET(req) {
         query = { $and: [query, searchCriteria] };
       } else {
         query = searchCriteria;
+      }
+    }
+
+    const isDistributorSelfQuery = query.userEmail && query.type === 'WEBSITE_COMMISSION_PAYMENT';
+    if (adminRole !== 'admin' && !isDistributorSelfQuery) {
+      if (query.$and) {
+        query.$and.push({ type: { $ne: 'WEBSITE_COMMISSION_PAYMENT' } });
+      } else if (query.$or) {
+        query = {
+          $and: [
+            query,
+            { type: { $ne: 'WEBSITE_COMMISSION_PAYMENT' } }
+          ]
+        };
+      } else {
+        query.type = { $ne: 'WEBSITE_COMMISSION_PAYMENT' };
       }
     }
 
