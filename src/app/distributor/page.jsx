@@ -1224,41 +1224,51 @@ export default function DistributorPortal() {
             </p>
 
             {/* DATE LOOKUP CALENDAR WIDGET */}
-            <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1.5rem' }}>
-              <h3 style={{ fontSize: '0.9rem', marginBottom: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <i className="fa-solid fa-calendar-days" style={{ color: 'var(--gold-primary)' }}></i> Daily Earnings & Commission Lookup by Date
-              </h3>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'center' }}>
-                <div>
-                  <label style={{ fontSize: '0.7rem', color: '#888', display: 'block', marginBottom: '0.25rem' }}>Select Date</label>
-                  <input
-                    type="date"
-                    value={commLookupDate}
-                    onChange={(e) => setCommLookupDate(e.target.value)}
-                    style={{ background: '#070912', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
-                  />
-                </div>
+            <div className="stat-card" style={{ borderLeft: '4px solid var(--gold-primary)', background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', display: 'flex', gap: '1rem', alignItems: 'center', width: '100%', maxWidth: '600px', marginBottom: '1.5rem' }}>
+              <div className="stat-icon-wrapper gold-bg" style={{ minWidth: '48px', height: '48px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,215,0,0.1)', color: 'var(--gold-primary)', fontSize: '1.25rem' }}>
+                <i className="fa-solid fa-calendar-days"></i>
+              </div>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 'bold' }}>
+                  HISTORICAL RECORDS (1 YR MAX)
+                </span>
+                <input 
+                  type="date"
+                  value={commLookupDate}
+                  onChange={(e) => setCommLookupDate(e.target.value)}
+                  style={{
+                    background: 'rgba(7,9,18,0.6)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    color: '#fff',
+                    borderRadius: '6px',
+                    fontSize: '0.75rem',
+                    padding: '0.25rem 0.5rem',
+                    outline: 'none',
+                    width: '100%',
+                    cursor: 'pointer'
+                  }}
+                />
                 {commLookupLoading ? (
-                  <div style={{ fontSize: '0.75rem', color: '#888' }}>
-                    <i className="fa-solid fa-spinner fa-spin" style={{ color: 'var(--gold-primary)', marginRight: '0.5rem' }}></i> Loading records for {commLookupDate}...
-                  </div>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '0.15rem' }}>
+                    <i className="fa-solid fa-spinner fa-spin" style={{ color: 'var(--gold-primary)' }}></i> Loading date stats...
+                  </span>
                 ) : (
-                  <div style={{ display: 'flex', gap: '2.5rem', flexWrap: 'wrap' }}>
-                    <div>
-                      <span style={{ fontSize: '0.65rem', color: '#888', display: 'block' }}>Referred Deposits</span>
-                      <strong style={{ color: '#2ecc71', fontSize: '1rem' }}>${(commLookupStats.deposits || 0).toFixed(2)}</strong>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.25rem' }}>
+                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.8rem', color: '#2ecc71', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        📥 In: ${(commLookupStats.deposits || 0).toFixed(2)}
+                      </span>
+                      <span style={{ fontSize: '0.8rem', color: '#ef4444', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        📤 Out: ${(commLookupStats.withdrawals || 0).toFixed(2)}
+                      </span>
                     </div>
-                    <div>
-                      <span style={{ fontSize: '0.65rem', color: '#888', display: 'block' }}>Referred Withdrawals</span>
-                      <strong style={{ color: '#ef4444', fontSize: '1rem' }}>${(commLookupStats.withdrawals || 0).toFixed(2)}</strong>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '0.65rem', color: '#888', display: 'block' }}>My Commission ({commLookupStats.commissionRate || 0}%)</span>
-                      <strong style={{ color: 'var(--gold-primary)', fontSize: '1rem' }}>${(commLookupStats.commission || 0).toFixed(2)}</strong>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '0.65rem', color: '#888', display: 'block' }}>Website Commission ({commLookupStats.websiteCommissionRate || 0}%)</span>
-                      <strong style={{ color: '#ff4d6d', fontSize: '1rem' }}>${(commLookupStats.websiteCommission || 0).toFixed(2)}</strong>
+                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.4rem' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--gold-primary)', fontWeight: 'bold' }}>
+                        My Comm ({commLookupStats.commissionRate || 0}%): ${(commLookupStats.commission || 0).toFixed(2)}
+                      </span>
+                      <span style={{ fontSize: '0.75rem', color: '#ff4d6d', fontWeight: 'bold' }}>
+                        Web Comm ({commLookupStats.websiteCommissionRate || 0}%): ${(commLookupStats.websiteCommission || 0).toFixed(2)}
+                      </span>
                     </div>
                   </div>
                 )}
@@ -1664,7 +1674,7 @@ export default function DistributorPortal() {
                 <div style={{ color: '#888', fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Total Withdrawals</div>
                 <div style={{ fontSize: '1.75rem', fontWeight: '900', color: '#ef4444', marginTop: '0.25rem' }}>${(stats.totalWithdrawals || 0).toFixed(2)}</div>
               </div>
-              {distSession.type === 'B' ? (
+              {distSession.type === 'B' && !distSession.isStaff ? (
                 <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                   <div style={{ color: '#888', fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Website Commission ({stats.websiteCommissionRate || 0}%)</div>
                   <div style={{ fontSize: '1.75rem', fontWeight: '900', color: '#ff4d6d', marginTop: '0.25rem' }}>${dueWebsiteCommission.toFixed(2)}</div>
