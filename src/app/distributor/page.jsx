@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import useSWR, { mutate } from 'swr';
 import TxSearchTab from '../../components/admin/TxSearchTab';
 import SupportTab from '../../components/admin/SupportTab';
@@ -22,7 +22,7 @@ export default function DistributorPortal() {
     } else if (txId) {
       setProofModalUrl('LOADING');
       try {
-        const res = await fetch(`/api/transactions?id=${txId}`);
+        const res = await fetch(`/api/transactions?id=${txId}&adminRole=distributor&email=${encodeURIComponent(distSession?.email || '')}`);
         const data = await res.json();
         if (data.success) {
           // If transaction has payoutProof (admin payout receipt) load it, otherwise fallback to user upload proof
@@ -92,6 +92,11 @@ export default function DistributorPortal() {
     fetcher
   );
 
+  const { data: gamesData, mutate: mutateGames } = useSWR(
+    distId ? `/api/games?distributorId=${distId}` : null,
+    fetcher
+  );
+
   // Filter player queues to show only referred players' requests
   const players = statsData?.players || [];
   const playerEmails = players.map(p => (p.email || '').toLowerCase().trim()).filter(Boolean);
@@ -132,7 +137,7 @@ export default function DistributorPortal() {
 
   // Commission Withdraw Form States
   const [commAmount, setCommAmount] = useState('');
-  const [commGateway, setCommGateway] = useState('Chime');
+  const [commGateway, setCommGateway] = useState('USDT');
   const [commCode, setCommCode] = useState('');
   const [isSubmittingComm, setIsSubmittingComm] = useState(false);
   const [commMsg, setCommMsg] = useState('');
@@ -162,6 +167,13 @@ export default function DistributorPortal() {
 
   // Referral Link copy
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // Distributor Game Pool Update States
+  const [poolUpdateModalOpen, setPoolUpdateModalOpen] = useState(false);
+  const [selectedPoolGame, setSelectedPoolGame] = useState(null);
+  const [updatePoolCoins, setUpdatePoolCoins] = useState('');
+  const [updatePoolLink, setUpdatePoolLink] = useState('');
+  const [isUpdatingPool, setIsUpdatingPool] = useState(false);
 
   const getTodayDateString = () => {
     const today = new Date();
@@ -196,6 +208,43 @@ export default function DistributorPortal() {
       .catch(err => console.error('Failed lookup by date:', err))
       .finally(() => setCommLookupLoading(false));
   }, [distId, commLookupDate]);
+
+  const prevCountsRef = useRef({ requests: 0, coins: 0 });
+
+  const playSynthesizedBackup = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const playTone = (freq, startTime, duration) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, startTime);
+        gain.gain.setValueAtTime(0.12, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+      const now = ctx.currentTime;
+      playTone(523.25, now, 0.12);
+      playTone(659.25, now + 0.08, 0.25);
+    } catch (e) {
+      console.log('Synthesized audio failed:', e);
+    }
+  };
+
+  useEffect(() => {
+    const counts = {
+      requests: referredRequests.length,
+      coins: referredCoins.length
+    };
+    const prev = prevCountsRef.current;
+    if (counts.requests > prev.requests || counts.coins > prev.coins) {
+      playSynthesizedBackup();
+    }
+    prevCountsRef.current = counts;
+  }, [referredRequests.length, referredCoins.length]);
 
   const handleRequestCommWithdraw = async (e) => {
     e.preventDefault();
@@ -245,6 +294,68 @@ export default function DistributorPortal() {
       setCommMsg('Server error submitting request.');
     } finally {
       setIsSubmittingComm(false);
+    }
+  };
+
+  const handleClaimDistributorRemainder = async (tx) => {
+    if (!window.confirm(`Do you want to submit a cashout request for the remaining $${parseFloat(tx.payoutHold).toFixed(2)} on Hold?`)) {
+      return;
+    }
+    try {
+      const response = await fetch('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userEmail: distSession.email,
+          type: 'COMMISSION_WITHDRAW',
+          amount: parseFloat(tx.payoutHold),
+          gateway: tx.gateway,
+          code: tx.code || '—',
+          isRemainderRequest: true,
+          parentTxId: tx.id
+        })
+      });
+      const resData = await response.json();
+      if (resData.success) {
+        alert('Remainder commission cashout request submitted successfully!');
+        mutateCommTx();
+      } else {
+        alert(resData.message || 'Failed to request remainder payout.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error requesting remainder payout.');
+    }
+  };
+
+  const handlePoolUpdateSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedPoolGame) return;
+    setIsUpdatingPool(true);
+    try {
+      const res = await fetch('/api/games', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedPoolGame.id,
+          distributorId: distId,
+          availableCoins: Number(updatePoolCoins),
+          openPanelLink: updatePoolLink
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Game coins pool updated successfully!');
+        setPoolUpdateModalOpen(false);
+        mutateGames();
+      } else {
+        alert(data.message || 'Failed to update pool.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error updating coins pool.');
+    } finally {
+      setIsUpdatingPool(false);
     }
   };
 
@@ -841,17 +952,20 @@ export default function DistributorPortal() {
   const dueWebsiteCommission = Math.max(0, (stats.websiteCommissionEarned || 0) - totalWebPaid);
 
   return (
-    <div style={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: '260px 1fr', background: '#060812', color: '#fff', fontFamily: "'Inter', sans-serif" }}>
+    <div className="admin-dashboard-layout" style={{ minHeight: '100vh', background: '#060812', color: '#fff', fontFamily: "'Inter', sans-serif" }}>
       
       {/* SIDEBAR NAVIGATION */}
-      <aside style={{ background: '#0b0d16', borderRight: '1px solid rgba(255,255,255,0.05)', padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ marginBottom: '2rem' }}>
-          <h3 style={{ color: 'var(--gold-primary)', fontWeight: '900', letterSpacing: '0.5px', fontSize: '1.25rem', textTransform: 'uppercase' }}>
-            Jackpot Royal
-          </h3>
-          <span style={{ fontSize: '0.6rem', background: 'rgba(255,215,0,0.1)', color: 'var(--gold-primary)', padding: '0.15rem 0.4rem', borderRadius: '4px', textTransform: 'uppercase', fontWeight: 'bold' }}>
-            Distributor Portal
-          </span>
+      <aside className="admin-sidebar-nav" style={{ display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '2rem', paddingBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+          <i className="fa-solid fa-crown gold-text" style={{ fontSize: '1.5rem', color: 'var(--gold-primary)' }}></i>
+          <div>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', fontFamily: 'var(--font-heading)', margin: 0 }}>
+              JACKPOT<span className="accent-red" style={{ color: '#ef4444' }}>ROYALS</span>
+            </h2>
+            <span style={{ fontSize: '0.55rem', background: 'rgba(255,215,0,0.1)', color: 'var(--gold-primary)', padding: '0.1rem 0.3rem', borderRadius: '3px', textTransform: 'uppercase', fontWeight: 'bold', display: 'inline-block', marginTop: '0.15rem' }}>
+              Distributor Portal
+            </span>
+          </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
@@ -1082,7 +1196,7 @@ export default function DistributorPortal() {
       </aside>
 
       {/* PORTAL BODY CONTAINER */}
-      <main style={{ padding: '2rem', overflowY: 'auto' }}>
+      <main className="admin-main-workspace" style={{ padding: '2rem', overflowY: 'auto' }}>
         
         {/* TAB: TRANSACTION LOGS */}
         {activeTab === 'tx_logs' && (
@@ -1518,7 +1632,17 @@ export default function DistributorPortal() {
                                   <td style={{ padding: '0.6rem 0.5rem' }}>{tx.date}</td>
                                   <td style={{ padding: '0.6rem 0.5rem' }}>{tx.gateway}</td>
                                   <td style={{ padding: '0.6rem 0.5rem' }}>{tx.code}</td>
-                                  <td style={{ padding: '0.6rem 0.5rem', fontWeight: 'bold', color: 'var(--gold-primary)' }}>${parseFloat(tx.amount || 0).toFixed(2)}</td>
+                                  <td style={{ padding: '0.6rem 0.5rem', fontWeight: 'bold', color: 'var(--gold-primary)' }}>
+                                    {tx.status === 'SUCCESS' && tx.payoutHold > 0 ? (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem', fontSize: '0.7rem' }}>
+                                        <span style={{ textDecoration: 'line-through', opacity: 0.6 }}>${parseFloat(tx.amount || 0).toFixed(2)}</span>
+                                        <span style={{ color: '#2ecc71' }}>Paid: ${parseFloat(tx.payoutSent || 0).toFixed(2)}</span>
+                                        <span style={{ color: '#f39c12' }}>Held: ${parseFloat(tx.payoutHold || 0).toFixed(2)}</span>
+                                      </div>
+                                    ) : (
+                                      `$${parseFloat(tx.amount || 0).toFixed(2)}`
+                                    )}
+                                  </td>
                                   <td style={{ padding: '0.6rem 0.5rem' }}>
                                     <span style={{
                                       padding: '0.15rem 0.35rem',
@@ -1530,16 +1654,32 @@ export default function DistributorPortal() {
                                     }}>{tx.status}</span>
                                   </td>
                                   <td style={{ padding: '0.6rem 0.5rem' }}>
-                                    {tx.payoutProof ? (
-                                      <button
-                                        onClick={() => handleInspectProof(null, tx.id)}
-                                        style={{ border: 'none', background: '#3498db', color: '#fff', borderRadius: '4px', padding: '0.2rem 0.4rem', fontSize: '0.6rem', cursor: 'pointer', fontWeight: 'bold', display: 'inline-flex', gap: '0.25rem', alignItems: 'center' }}
-                                      >
-                                        <i className="fa-solid fa-receipt"></i> View Receipt
-                                      </button>
-                                    ) : (
-                                      <span style={{ color: '#555' }}>No receipt</span>
-                                    )}
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center' }}>
+                                      {tx.status === 'SUCCESS' && tx.payoutHold > 0 && (
+                                        tx.remainderRequested ? (
+                                          <span style={{ fontSize: '0.6rem', color: 'var(--gold-primary)', fontWeight: 'bold', background: 'rgba(255,215,0,0.1)', padding: '0.15rem 0.35rem', borderRadius: '4px' }}>
+                                            [Remainder Requested]
+                                          </span>
+                                        ) : (
+                                          <button
+                                            onClick={() => handleClaimDistributorRemainder(tx)}
+                                            style={{ border: '1px solid var(--gold-primary)', background: 'rgba(255,215,0,0.08)', color: 'var(--gold-primary)', borderRadius: '4px', padding: '0.2rem 0.4rem', fontSize: '0.6rem', cursor: 'pointer', fontWeight: 'bold' }}
+                                          >
+                                            Claim Remainder (${parseFloat(tx.payoutHold).toFixed(2)})
+                                          </button>
+                                        )
+                                      )}
+                                      {tx.payoutProof ? (
+                                        <button
+                                          onClick={() => handleInspectProof(null, tx.id)}
+                                          style={{ border: 'none', background: '#3498db', color: '#fff', borderRadius: '4px', padding: '0.2rem 0.4rem', fontSize: '0.6rem', cursor: 'pointer', fontWeight: 'bold', display: 'inline-flex', gap: '0.25rem', alignItems: 'center' }}
+                                        >
+                                          <i className="fa-solid fa-receipt"></i> View Receipt
+                                        </button>
+                                      ) : (
+                                        <span style={{ color: '#555', fontSize: '0.65rem' }}>No receipt</span>
+                                      )}
+                                    </div>
                                     {tx.note && (
                                       <div style={{ fontSize: '0.65rem', color: '#aaa', marginTop: '0.25rem', maxWidth: '200px', whiteSpace: 'normal' }}>
                                         Note: {tx.note}
@@ -1757,6 +1897,79 @@ export default function DistributorPortal() {
                 </div>
               </div>
             </div>
+
+            {/* Game coins pool status (Only for Type B distributors) */}
+            {distSession.type === 'B' && (
+              <section className="admin-section-card" style={{ marginTop: '2rem', background: '#0b0d16', padding: '1.5rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div className="section-card-header" style={{ marginBottom: '1rem' }}>
+                  <div>
+                    <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                      <i className="fa-solid fa-coins gold-text"></i> Game Coins Remaining Pool
+                    </h3>
+                    <span className="game-tap-tip" style={{ fontSize: '0.65rem', color: '#888' }}>Allotment reserves of active game platforms</span>
+                  </div>
+                </div>
+
+                <div className="table-responsive">
+                  <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+                    <thead>
+                      <tr style={{ textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#888' }}>
+                        <th style={{ padding: '0.5rem' }}>Game Title</th>
+                        <th style={{ padding: '0.5rem' }}>Game Badge</th>
+                        <th style={{ padding: '0.5rem' }}>Remaining Coins Balance</th>
+                        <th style={{ padding: '0.5rem' }}>Used Coins</th>
+                        <th style={{ padding: '0.5rem' }}>Fulfillment Portal</th>
+                        <th style={{ padding: '0.5rem' }}>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {!gamesData?.games || gamesData.games.length === 0 ? (
+                        <tr>
+                          <td colSpan="6" className="text-center text-muted" style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>No games loaded in library.</td>
+                        </tr>
+                      ) : (
+                        gamesData.games.map((game) => (
+                          <tr key={game.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                            <td style={{ padding: '0.6rem 0.5rem' }}><strong>{game.title}</strong></td>
+                            <td style={{ padding: '0.6rem 0.5rem' }}><span className={`admin-badge-preview b-${game.badge}`} style={{ textTransform: 'uppercase', padding: '0.15rem 0.35rem', borderRadius: '4px', fontSize: '0.6rem', fontWeight: 'bold' }}>{game.badge}</span></td>
+                            <td style={{ padding: '0.6rem 0.5rem' }}>
+                              <strong style={{ fontSize: '0.85rem', color: (game.availableCoins || 0) < 5000 ? '#ef4444' : '#ffd700', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <i className="fa-solid fa-coins" style={{ color: '#ffd700' }}></i> {game.availableCoins || 0} Coins
+                              </strong>
+                            </td>
+                            <td style={{ padding: '0.6rem 0.5rem' }}>
+                              <strong style={{ fontSize: '0.85rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <i className="fa-solid fa-circle-dollar-to-slot" style={{ color: '#10b981' }}></i> {game.usedCoins || 0} Coins
+                              </strong>
+                            </td>
+                            <td style={{ padding: '0.6rem 0.5rem' }}>
+                              <a href={game.openPanelLink || game.link} target="_blank" rel="noopener noreferrer" className="gold-text" style={{ fontSize: '0.75rem', textDecoration: 'none', color: 'var(--gold-primary)', fontWeight: 'bold' }}>
+                                Open Panel &rarr;
+                              </a>
+                            </td>
+                            <td style={{ padding: '0.6rem 0.5rem' }}>
+                              <button
+                                onClick={() => {
+                                  setSelectedPoolGame(game);
+                                  setUpdatePoolCoins(game.availableCoins || 0);
+                                  setUpdatePoolLink(game.openPanelLink || '');
+                                  setPoolUpdateModalOpen(true);
+                                }}
+                                className="action-row-btn btn-edit"
+                                style={{ background: 'rgba(255,215,0,0.1)', border: '1px solid var(--gold-primary)', color: 'var(--gold-primary)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.65rem', cursor: 'pointer', fontWeight: 'bold', display: 'inline-flex', gap: '0.25rem', alignItems: 'center' }}
+                                title="Update Remaining Pool & Link"
+                              >
+                                <i className="fa-solid fa-pen-to-square"></i> Update Pool
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
           </div>
         )}
 
@@ -2154,6 +2367,56 @@ export default function DistributorPortal() {
               >
                 {isResetSubmitting ? 'Updating...' : 'Update Password'}
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: UPDATE POOL */}
+      {poolUpdateModalOpen && selectedPoolGame && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', animation: 'fade-in 0.2s ease-out' }}>
+          <div style={{ background: '#0a0d16', border: '1.5px solid var(--gold-primary)', borderRadius: '16px', maxWidth: '440px', width: '100%', padding: '1.5rem', boxShadow: '0 10px 30px rgba(0,0,0,0.5)', position: 'relative', margin: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 'bold', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <i className="fa-solid fa-pen-to-square text-gold" style={{ color: 'var(--gold-primary)' }}></i>
+                Update {selectedPoolGame.title} Pool
+              </h3>
+              <button onClick={() => setPoolUpdateModalOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.25rem', cursor: 'pointer', padding: 0 }}>&times;</button>
+            </div>
+            <form onSubmit={handlePoolUpdateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="input-group" style={{ margin: 0 }}>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.35rem' }}>Available/Remaining Coins</label>
+                <div className="input-wrapper" style={{ background: '#07090f' }}>
+                  <i className="fa-solid fa-coins input-icon" style={{ color: 'var(--gold-primary)' }}></i>
+                  <input
+                    type="number"
+                    value={updatePoolCoins}
+                    onChange={(e) => setUpdatePoolCoins(e.target.value)}
+                    placeholder="Enter coin balance"
+                    style={{ fontSize: '0.75rem' }}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="input-group" style={{ margin: 0 }}>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.35rem' }}>Fulfillment Portal URL</label>
+                <div className="input-wrapper" style={{ background: '#07090f' }}>
+                  <i className="fa-solid fa-link input-icon" style={{ color: 'var(--gold-primary)' }}></i>
+                  <input
+                    type="url"
+                    value={updatePoolLink}
+                    onChange={(e) => setUpdatePoolLink(e.target.value)}
+                    placeholder="https://example.com/panel"
+                    style={{ fontSize: '0.75rem' }}
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button type="submit" className="submit-btn" style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold', margin: 0, flex: 1 }} disabled={isUpdatingPool}>
+                  {isUpdatingPool ? 'SAVING...' : 'SAVE CHANGES'}
+                </button>
+                <button type="button" className="action-row-btn" onClick={() => setPoolUpdateModalOpen(false)} style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '8px', cursor: 'pointer', margin: 0 }}>Cancel</button>
+              </div>
             </form>
           </div>
         </div>

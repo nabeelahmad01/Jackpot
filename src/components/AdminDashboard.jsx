@@ -663,6 +663,11 @@ export default function AdminDashboard({
             >
               <i className="fa-solid fa-file-invoice-dollar" style={{ width: '18px' }}></i>
               <span>Website Payments</span>
+              {statsData?.stats?.pendingWebsitePaymentsCount > 0 && (
+                <span className="notification-badge" style={{ marginLeft: 'auto', background: '#ef4444', color: '#fff', fontSize: '0.65rem', padding: '0.15rem 0.35rem', borderRadius: '10px', fontWeight: 'bold' }}>
+                  {statsData.stats.pendingWebsitePaymentsCount}
+                </span>
+              )}
             </button>
           )}
 

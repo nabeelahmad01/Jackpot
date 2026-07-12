@@ -74,12 +74,16 @@ export async function POST(req) {
       referralCode = generateReferralCode();
     }
 
-    // Resolve the referrer: look up by referralCode, store their email
+    // Resolve the referrer: look up by referralCode, store their email and inherit distributorId
     let resolvedReferrer = '';
+    let inheritedDistributorId = '';
     if (referredBy) {
       const referrer = await usersCollection.findOne({ referralCode: referredBy.trim() });
       if (referrer) {
         resolvedReferrer = referrer.email;
+        if (referrer.distributorId) {
+          inheritedDistributorId = referrer.distributorId;
+        }
       }
     }
 
@@ -91,7 +95,7 @@ export async function POST(req) {
       coins: 100,
       referralCode,
       referredBy: resolvedReferrer,
-      distributorId: distributorId || ''
+      distributorId: distributorId || inheritedDistributorId || ''
     };
 
     const result = await usersCollection.insertOne(newUser);

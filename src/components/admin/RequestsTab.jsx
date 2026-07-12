@@ -109,7 +109,7 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
     if (addAccountModalOpen) {
       const controller = new AbortController();
       const delayDebounceFn = setTimeout(() => {
-        fetch(`/api/users?limit=50&search=${encodeURIComponent(playerSearchQuery)}`, { signal: controller.signal })
+        fetch(`/api/users?limit=50&search=${encodeURIComponent(playerSearchQuery)}&adminDistributorId=${adminUser?.distributorId || ''}`, { signal: controller.signal })
           .then(res => res.json())
           .then(data => {
             if (data.success) {

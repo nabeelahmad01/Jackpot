@@ -20,6 +20,8 @@ export default function WebsitePaymentsTab({
   const [payoutNote, setPayoutNote] = useState('');
   const [payoutProof, setPayoutProof] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [payoutSent, setPayoutSent] = useState(0);
+  const [payoutHold, setPayoutHold] = useState(0);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -112,6 +114,8 @@ export default function WebsitePaymentsTab({
     setSelectedTx(tx);
     setPayoutNote(`Distributor commission payout processed successfully`);
     setPayoutProof('');
+    setPayoutSent(tx.amount || 0);
+    setPayoutHold(0);
     setPayoutModalOpen(true);
   };
 
@@ -143,6 +147,8 @@ export default function WebsitePaymentsTab({
           status: 'SUCCESS',
           note: payoutNote.trim() || 'Distributor payout processed',
           payoutProof: payoutProof,
+          payoutSent: Number(payoutSent),
+          payoutHold: Number(payoutHold),
           processedBy: adminUser?.email || 'admin@jackpot.com'
         })
       });
@@ -538,6 +544,37 @@ export default function WebsitePaymentsTab({
               </div>
 
               <form onSubmit={handlePayoutSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="input-group">
+                    <label>Amount Sent ($)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={payoutSent}
+                      onChange={(e) => {
+                        const val = Math.max(0, Math.min(selectedTx.amount, parseFloat(e.target.value) || 0));
+                        setPayoutSent(val);
+                        setPayoutHold(Math.round((selectedTx.amount - val) * 100) / 100);
+                      }}
+                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.4rem 0.6rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none', width: '100%' }}
+                    />
+                  </div>
+                  <div className="input-group">
+                    <label>Amount Held ($)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={payoutHold}
+                      onChange={(e) => {
+                        const val = Math.max(0, Math.min(selectedTx.amount, parseFloat(e.target.value) || 0));
+                        setPayoutHold(val);
+                        setPayoutSent(Math.round((selectedTx.amount - val) * 100) / 100);
+                      }}
+                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.4rem 0.6rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none', width: '100%' }}
+                    />
+                  </div>
+                </div>
+
                 <div className="input-group">
                   <label htmlFor="payout-note">Payout Note</label>
                   <div className="input-wrapper">

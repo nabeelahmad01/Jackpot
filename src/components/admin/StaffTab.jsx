@@ -31,20 +31,40 @@ export default function StaffTab({ adminUser, onCreateAdmin, onDeleteUser }) {
   const users = usersData?.users || [];
   
   // Identify all users that have admin/staff roles
+  const { data: distsData } = useSWR('/api/distributors', fetcher);
+  const distributorsList = distsData?.distributors || [];
+
+  const [activeSubTab, setActiveSubTab] = useState('system'); // 'system' | 'distributor'
+
   const staffUsers = users.filter((u) => {
     if (!u.role) return false;
+    if (u.distributorId) return false; // Exclude distributor staff from standard list!
     const cleanRole = u.role.toLowerCase();
     return cleanRole.split(',').some(r => 
       ['admin', 'financial_admin', 'coins_admin', 'support_admin', 'operation_admin'].includes(r.trim())
     );
   });
 
-  const filteredStaff = staffUsers.filter(
+  const distributorStaffUsers = users.filter((u) => {
+    if (!u.role) return false;
+    if (!u.distributorId) return false; // Must belong to a distributor!
+    const cleanRole = u.role.toLowerCase();
+    return cleanRole.split(',').some(r => 
+      ['admin', 'financial_admin', 'coins_admin', 'support_admin', 'operation_admin', 'distributor_staff'].includes(r.trim())
+    );
+  });
+
+  const filteredStaff = (activeSubTab === 'system' ? staffUsers : distributorStaffUsers).filter(
     (s) =>
       s.name.toLowerCase().includes(staffSearch.toLowerCase()) ||
       s.email.toLowerCase().includes(staffSearch.toLowerCase()) ||
       s.role.toLowerCase().includes(staffSearch.toLowerCase())
   );
+
+  const getDistributorEmail = (distId) => {
+    const d = distributorsList.find(dist => dist.id === distId);
+    return d ? `${d.name} (${d.email})` : distId || 'Unknown';
+  };
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -254,6 +274,41 @@ export default function StaffTab({ adminUser, onCreateAdmin, onDeleteUser }) {
         <div className="section-card-header" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }}>
           <h3><i className="fa-solid fa-user-shield text-red"></i> Administrative Staff Registry</h3>
           
+          <div style={{ display: 'flex', gap: '0.5rem', background: '#070913', padding: '0.25rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)', width: 'fit-content', marginBottom: '0.25rem' }}>
+            <button
+              onClick={() => setActiveSubTab('system')}
+              style={{
+                border: 'none',
+                padding: '0.35rem 1rem',
+                borderRadius: '6px',
+                fontSize: '0.7rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                background: activeSubTab === 'system' ? 'var(--gold-primary)' : 'none',
+                color: activeSubTab === 'system' ? '#000' : '#fff',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              System Staff ({staffUsers.length})
+            </button>
+            <button
+              onClick={() => setActiveSubTab('distributor')}
+              style={{
+                border: 'none',
+                padding: '0.35rem 1rem',
+                borderRadius: '6px',
+                fontSize: '0.7rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                background: activeSubTab === 'distributor' ? 'var(--gold-primary)' : 'none',
+                color: activeSubTab === 'distributor' ? '#000' : '#fff',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              Distributor Staff ({distributorStaffUsers.length})
+            </button>
+          </div>
+
           <div className="input-wrapper search-wrapper" style={{ background: '#0b0d16', width: '100%' }}>
             <i className="fa-solid fa-magnifying-glass input-icon"></i>
             <input
@@ -272,12 +327,13 @@ export default function StaffTab({ adminUser, onCreateAdmin, onDeleteUser }) {
                 <th>Full Name</th>
                 <th>Email</th>
                 <th>Privilege Permissions</th>
+                {activeSubTab === 'distributor' && <th>Distributor</th>}
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredStaff.length === 0 ? (
-                <tr><td colSpan="4" className="text-center text-muted">No staff found.</td></tr>
+                <tr><td colSpan={activeSubTab === 'distributor' ? 5 : 4} className="text-center text-muted">No staff found.</td></tr>
               ) : (
                 filteredStaff.map((staff) => (
                   <tr key={staff.email}>
@@ -288,6 +344,11 @@ export default function StaffTab({ adminUser, onCreateAdmin, onDeleteUser }) {
                         {formatRoleName(staff.role)}
                       </span>
                     </td>
+                    {activeSubTab === 'distributor' && (
+                      <td style={{ color: 'var(--gold-primary)', fontWeight: 'bold' }}>
+                        {getDistributorEmail(staff.distributorId)}
+                      </td>
+                    )}
                     <td>
                       {staff.email.toLowerCase() === adminUser?.email.toLowerCase() ? (
                         <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>Active User</span>

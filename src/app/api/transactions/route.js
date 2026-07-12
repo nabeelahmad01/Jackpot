@@ -186,13 +186,16 @@ export async function POST(req) {
     const distId = userDoc ? (userDoc.distributorId || '') : '';
 
     if (newTx.isRemainderRequest) {
+      const parentTx = await transactionsCollection.findOne({ id: newTx.parentTxId });
+      const parentType = parentTx ? parentTx.type : 'WITHDRAW';
+
       // Create remainder payout request
       const txObject = {
         id: (Date.now() + Math.floor(Math.random() * 100)).toString(),
         userEmail: newTx.userEmail.toLowerCase().trim(),
         date: new Date().toLocaleString(),
-        status: 'PENDING', // Directly ready for payout ledger (no coins verification needed!)
-        type: 'WITHDRAW',
+        status: 'PENDING', // Directly ready for payout ledger
+        type: parentType,
         amount: parseFloat(newTx.amount),
         gateway: newTx.gateway || 'Chime',
         code: newTx.code || '—',
@@ -379,12 +382,26 @@ export async function PUT(req) {
         const gamesCollection = db.collection('games');
         const game = await gamesCollection.findOne({ title: { $regex: new RegExp(`^${originalTx.gameTitle}$`, 'i') } });
         if (game) {
-          const currentCoins = parseFloat(game.availableCoins || 0);
-          const newCoins = currentCoins + parseFloat(originalTx.amount || 0);
-          const currentUsed = parseFloat(game.usedCoins || 0);
-          const newUsed = originalTx.isFreeplayWithdraw ? currentUsed : Math.max(0, currentUsed - parseFloat(originalTx.amount || 0));
-          await gamesCollection.updateOne({ id: game.id }, { $set: { availableCoins: newCoins, usedCoins: newUsed } });
-          cache.del('games_all');
+          if (originalTx.distributorId) {
+            const distGamesColl = db.collection('distributorGames');
+            const dg = await distGamesColl.findOne({ distributorId: originalTx.distributorId, gameId: game.id });
+            const currentCoins = parseFloat(dg?.availableCoins || 0);
+            const newCoins = currentCoins + parseFloat(originalTx.amount || 0);
+            const currentUsed = parseFloat(dg?.usedCoins || 0);
+            const newUsed = originalTx.isFreeplayWithdraw ? currentUsed : Math.max(0, currentUsed - parseFloat(originalTx.amount || 0));
+            await distGamesColl.updateOne(
+              { distributorId: originalTx.distributorId, gameId: game.id },
+              { $set: { availableCoins: newCoins, usedCoins: newUsed, title: originalTx.gameTitle } },
+              { upsert: true }
+            );
+          } else {
+            const currentCoins = parseFloat(game.availableCoins || 0);
+            const newCoins = currentCoins + parseFloat(originalTx.amount || 0);
+            const currentUsed = parseFloat(game.usedCoins || 0);
+            const newUsed = originalTx.isFreeplayWithdraw ? currentUsed : Math.max(0, currentUsed - parseFloat(originalTx.amount || 0));
+            await gamesCollection.updateOne({ id: game.id }, { $set: { availableCoins: newCoins, usedCoins: newUsed } });
+            cache.del('games_all');
+          }
         }
       } catch (poolErr) {
         console.error('Failed to update game coin pool for withdrawal success:', poolErr);

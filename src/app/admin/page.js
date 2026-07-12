@@ -454,7 +454,7 @@ export default function AdminPage({ portalName, forcedRole }) {
       setProofImageUrl(''); // Set to empty to trigger loading spinner
       setProofModalOpen(true);
       try {
-        const res = await fetch(`/api/transactions?id=${txId}`);
+        const res = await fetch(`/api/transactions?id=${txId}&adminRole=admin`);
         const data = await res.json();
         if (data.success && data.transaction?.screenshot) {
           setProofImageUrl(data.transaction.screenshot);

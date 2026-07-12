@@ -3,17 +3,41 @@ import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
 
 // GET all games
-export async function GET() {
+export async function GET(req) {
   try {
-    const cachedGames = cache.get('games_all');
-    if (cachedGames) {
-      return NextResponse.json({ success: true, games: cachedGames });
+    const { searchParams } = new URL(req.url);
+    const distributorId = searchParams.get('distributorId');
+
+    if (!distributorId) {
+      const cachedGames = cache.get('games_all');
+      if (cachedGames) {
+        return NextResponse.json({ success: true, games: cachedGames });
+      }
     }
 
     const db = await getDb();
     const gamesCollection = db.collection('games');
     const games = await gamesCollection.find().toArray();
     
+    if (distributorId) {
+      const distGames = await db.collection('distributorGames').find({ distributorId }).toArray();
+      const distGamesMap = {};
+      distGames.forEach(dg => {
+        distGamesMap[dg.gameId] = dg;
+      });
+
+      const mappedGames = games.map(game => {
+        const dg = distGamesMap[game.id];
+        return {
+          ...game,
+          availableCoins: dg ? (dg.availableCoins || 0) : 0,
+          usedCoins: dg ? (dg.usedCoins || 0) : 0,
+          openPanelLink: dg ? (dg.openPanelLink || game.openPanelLink || game.link) : (game.openPanelLink || game.link)
+        };
+      });
+      return NextResponse.json({ success: true, games: mappedGames });
+    }
+
     cache.set('games_all', games, 60);
     return NextResponse.json({ success: true, games });
   } catch (err) {
@@ -66,6 +90,22 @@ export async function PUT(req) {
 
     const db = await getDb();
     const gamesCollection = db.collection('games');
+
+    if (game.distributorId) {
+      await db.collection('distributorGames').updateOne(
+        { distributorId: game.distributorId, gameId: game.id },
+        {
+          $set: {
+            distributorId: game.distributorId,
+            gameId: game.id,
+            availableCoins: game.availableCoins !== undefined ? Number(game.availableCoins) : 0,
+            openPanelLink: game.openPanelLink || ''
+          }
+        },
+        { upsert: true }
+      );
+      return NextResponse.json({ success: true, message: 'Distributor game pool updated successfully!' });
+    }
 
     const updateFields = {
       title: game.title,

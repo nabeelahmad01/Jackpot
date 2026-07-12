@@ -136,12 +136,26 @@ export async function PUT(req) {
           const gamesCollection = db.collection('games');
           const game = await gamesCollection.findOne({ title: { $regex: new RegExp(`^${gameTitle}$`, 'i') } });
           if (game) {
-            const currentCoins = parseFloat(game.availableCoins || 0);
-            const newCoins = Math.max(0, currentCoins - amountToDeduct);
-            const currentUsed = parseFloat(game.usedCoins || 0);
-            const newUsed = originalNoti.isFreeplayWithdraw ? currentUsed : (currentUsed + amountToDeduct);
-            await gamesCollection.updateOne({ id: game.id }, { $set: { availableCoins: newCoins, usedCoins: newUsed } });
-            cache.del('games_all');
+            if (originalNoti.distributorId) {
+              const distGamesColl = db.collection('distributorGames');
+              const dg = await distGamesColl.findOne({ distributorId: originalNoti.distributorId, gameId: game.id });
+              const currentCoins = parseFloat(dg?.availableCoins || 0);
+              const newCoins = Math.max(0, currentCoins - amountToDeduct);
+              const currentUsed = parseFloat(dg?.usedCoins || 0);
+              const newUsed = originalNoti.isFreeplayWithdraw ? currentUsed : (currentUsed + amountToDeduct);
+              await distGamesColl.updateOne(
+                { distributorId: originalNoti.distributorId, gameId: game.id },
+                { $set: { availableCoins: newCoins, usedCoins: newUsed, title: gameTitle } },
+                { upsert: true }
+              );
+            } else {
+              const currentCoins = parseFloat(game.availableCoins || 0);
+              const newCoins = Math.max(0, currentCoins - amountToDeduct);
+              const currentUsed = parseFloat(game.usedCoins || 0);
+              const newUsed = originalNoti.isFreeplayWithdraw ? currentUsed : (currentUsed + amountToDeduct);
+              await gamesCollection.updateOne({ id: game.id }, { $set: { availableCoins: newCoins, usedCoins: newUsed } });
+              cache.del('games_all');
+            }
           }
         } catch (poolErr) {
           console.error('Failed to deduct game coin pool for completed allotment:', poolErr);

@@ -27,12 +27,14 @@ export async function GET(req) {
       pendingRequestsCount,
       pendingTransactionsCount,
       pendingCoinsCount,
-      unreadChatUsers
+      unreadChatUsers,
+      pendingWebsitePaymentsCount
     ] = await Promise.all([
       db.collection('accountRequests').countDocuments({ ...baseQuery, status: 'PENDING' }),
       db.collection('transactions').countDocuments({ ...baseQuery, status: 'PENDING' }),
       db.collection('coinsNotifications').countDocuments({ ...baseQuery, status: { $in: ['PENDING', 'CLAIM_REQUESTED'] } }),
-      db.collection('supportMessages').distinct('userEmail', { senderType: 'player', read: false })
+      db.collection('supportMessages').distinct('userEmail', { senderType: 'player', read: false }),
+      db.collection('transactions').countDocuments({ type: { $in: ['WEBSITE_COMMISSION_PAYMENT', 'COMMISSION_WITHDRAW'] }, status: 'PENDING' })
     ]);
 
     const pendingChatsCount = unreadChatUsers.length;
@@ -78,7 +80,8 @@ export async function GET(req) {
       pendingRequestsCount,
       pendingTransactionsCount,
       pendingCoinsCount,
-      pendingChatsCount
+      pendingChatsCount,
+      pendingWebsitePaymentsCount
     };
 
     // Cache the statistics for 60 seconds
