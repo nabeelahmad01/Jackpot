@@ -241,30 +241,41 @@ export default function DistributorsTab() {
             </div>
           </div>
 
-          <div className="input-group" style={{ marginBottom: '1.5rem' }}>
-            <label>{type === 'B' ? 'Website Commission Rate (%)' : 'Distributor Commission Rate (%)'}</label>
+          <div className="input-group" style={{ marginBottom: '0.75rem' }}>
+            <label>Distributor Commission Rate (%)</label>
             <div className="input-wrapper">
               <i className="fa-solid fa-percent input-icon"></i>
               <input
                 type="number"
-                placeholder={type === 'B' ? '5' : '10'}
+                placeholder="30"
                 min="0"
                 max="100"
-                value={type === 'B' ? websiteCommissionRate : commissionRate}
-                onChange={(e) => {
-                  if (type === 'B') {
-                    setWebsiteCommissionRate(e.target.value);
-                  } else {
-                    setCommissionRate(e.target.value);
-                  }
-                }}
+                value={commissionRate}
+                onChange={(e) => setCommissionRate(e.target.value)}
                 required
               />
             </div>
             <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-              {type === 'B' 
-                ? 'Percentage of deposits Type B pays to the platform website owner.'
-                : 'Percentage profit Type A earns on their referred player successful deposits.'}
+              Percentage of deposits earned by the distributor.
+            </div>
+          </div>
+
+          <div className="input-group" style={{ marginBottom: '1.5rem' }}>
+            <label>Website Commission Rate (%)</label>
+            <div className="input-wrapper">
+              <i className="fa-solid fa-percent input-icon"></i>
+              <input
+                type="number"
+                placeholder="5"
+                min="0"
+                max="100"
+                value={websiteCommissionRate}
+                onChange={(e) => setWebsiteCommissionRate(e.target.value)}
+                required
+              />
+            </div>
+            <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+              Percentage of deposits paid to the platform owner.
             </div>
           </div>
 
@@ -319,21 +330,19 @@ export default function DistributorsTab() {
                       </span>
                     </td>
                     <td>
-                      <strong style={{ fontSize: '0.85rem' }}>
-                        {dist.type === 'B' ? `Website: ${dist.websiteCommissionRate || 0}%` : `Comm: ${dist.commissionRate}%`}
-                      </strong>
+                      <div style={{ fontSize: '0.725rem', display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                        <div>Distributor: <strong>{dist.commissionRate || 0}%</strong></div>
+                        <div>Website: <strong>{dist.websiteCommissionRate || 0}%</strong></div>
+                      </div>
                     </td>
                     <td>
                       <div style={{ fontSize: '0.725rem', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                         <div>Players: <strong style={{ color: '#fff' }}>{dist.playersCount || 0}</strong></div>
                         <div>Deposits: <strong style={{ color: '#2ecc71' }}>${(dist.totalDeposits || 0).toFixed(2)}</strong></div>
                         <div>Withdrawals: <strong style={{ color: '#ef4444' }}>${(dist.totalWithdrawals || 0).toFixed(2)}</strong></div>
-                        <div>
-                          {dist.type === 'B' ? (
-                            <>Website Comm: <strong style={{ color: '#ff4d6d' }}>${(dist.websiteCommissionEarned || 0).toFixed(2)}</strong></>
-                          ) : (
-                            <>Commission: <strong style={{ color: 'var(--gold-primary)' }}>${(dist.commissionEarned || 0).toFixed(2)}</strong></>
-                          )}
+                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.15rem', marginTop: '0.15rem' }}>
+                          <div>Dist Comm: <strong style={{ color: 'var(--gold-primary)' }}>${(dist.commissionEarned || 0).toFixed(2)}</strong></div>
+                          <div>Website Comm: <strong style={{ color: '#ff4d6d' }}>${(dist.websiteCommissionEarned || 0).toFixed(2)}</strong></div>
                         </div>
                       </div>
                     </td>
@@ -436,22 +445,31 @@ export default function DistributorsTab() {
                   </div>
                 </div>
 
-                <div className="input-group" style={{ marginBottom: '1.5rem' }}>
-                  <label>{editType === 'B' ? 'Website Commission Rate (%)' : 'Distributor Commission Rate (%)'}</label>
+                <div className="input-group" style={{ marginBottom: '0.75rem' }}>
+                  <label>Distributor Commission Rate (%)</label>
                   <div className="input-wrapper">
                     <i className="fa-solid fa-percent input-icon"></i>
                     <input
                       type="number"
                       min="0"
                       max="100"
-                      value={editType === 'B' ? editWebsiteCommissionRate : editCommissionRate}
-                      onChange={(e) => {
-                        if (editType === 'B') {
-                          setEditWebsiteCommissionRate(e.target.value);
-                        } else {
-                          setEditCommissionRate(e.target.value);
-                        }
-                      }}
+                      value={editCommissionRate}
+                      onChange={(e) => setEditCommissionRate(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="input-group" style={{ marginBottom: '1.5rem' }}>
+                  <label>Website Commission Rate (%)</label>
+                  <div className="input-wrapper">
+                    <i className="fa-solid fa-percent input-icon"></i>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={editWebsiteCommissionRate}
+                      onChange={(e) => setEditWebsiteCommissionRate(e.target.value)}
                       required
                     />
                   </div>
