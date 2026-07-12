@@ -289,7 +289,8 @@ export async function POST(req) {
         userEmail: txObject.userEmail,
         gameTitle: txObject.gameTitle || 'Lobby',
         depositAmount: 0,
-        bonusApplied: 100, // 100% bonus indicator for signup freeplay
+        bonusApplied: -3, // indicates signup freeplay
+        isFreeplay: true,
         totalCoins: parseFloat(txObject.amount),
         status: 'PENDING',
         read: false,

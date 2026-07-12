@@ -163,6 +163,8 @@ export default function CoinsAllotmentTab({
                       <span style={{ color: '#ff4d6d', fontWeight: 'bold' }}>DEDUCTION</span>
                     ) : noti.bonusApplied === -2 ? (
                       <span style={{ color: '#a855f7', fontWeight: 'bold' }}>100% REFERRAL</span>
+                    ) : noti.bonusApplied === -3 || noti.isFreeplay || (noti.bonusApplied === 100 && parseFloat(noti.depositAmount || 0) === 0) ? (
+                      <span style={{ color: '#00ff66', fontWeight: 'bold' }}>FREEPLAY</span>
                     ) : (
                       `${noti.bonusApplied}% Bonus`
                     )}

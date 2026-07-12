@@ -1664,7 +1664,7 @@ export default function UserLobby({
                                 <td>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                                     <span style={{ fontSize: '0.725rem', opacity: 0.8 }}>
-                                      {tx.note && tx.status !== 'FAILED' ? tx.note : `${tx.gateway} (${tx.code})`}
+                                      {tx.note && tx.status !== 'FAILED' ? tx.note : (tx.code === 'SIGNUP-FREE3' ? 'Freeplay (SIGNUP-FREE3)' : `${tx.gateway} (${tx.code})`)}
                                     </span>
                                     {tx.type === 'WITHDRAW' && tx.status === 'SUCCESS' && tx.payoutHold > 0 && !tx.remainderRequested && (
                                       <button
