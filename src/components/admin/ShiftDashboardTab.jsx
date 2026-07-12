@@ -7,11 +7,11 @@ const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
 export default function ShiftDashboardTab({ adminUser }) {
   // SWR endpoints polling every 10 seconds
-  const { data: reqData, mutate: mutateRequests } = useSWR('/api/account-requests?status=PENDING&limit=50', fetcher, {
+  const { data: reqData, mutate: mutateRequests } = useSWR(`/api/account-requests?status=PENDING&limit=50&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}`, fetcher, {
     refreshInterval: 10000
   });
 
-  const { data: coinData, mutate: mutateCoins } = useSWR('/api/coins-notifications?limit=50', fetcher, {
+  const { data: coinData, mutate: mutateCoins } = useSWR(`/api/coins-notifications?limit=50&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}`, fetcher, {
     refreshInterval: 10000
   });
 

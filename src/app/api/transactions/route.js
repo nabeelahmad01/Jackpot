@@ -31,6 +31,20 @@ export async function GET(req) {
     if (email) {
       query.userEmail = email.toLowerCase().trim();
     }
+
+    const adminRole = searchParams.get('adminRole');
+    const adminDistributorId = searchParams.get('adminDistributorId');
+
+    if (adminRole && adminRole !== 'admin') {
+      if (adminDistributorId) {
+        query.distributorId = adminDistributorId;
+      } else {
+        const distributorsCollection = db.collection('distributors');
+        const typeADistributors = await distributorsCollection.find({ type: 'A' }).project({ id: 1 }).toArray();
+        const typeADistIds = typeADistributors.map(d => d.id);
+        query.distributorId = { $in: [null, '', ...typeADistIds] };
+      }
+    }
     if (status) {
       const statuses = status.split(',').map(s => s.toUpperCase().trim());
       if (statuses.length > 1) {
@@ -141,13 +155,16 @@ export async function GET(req) {
 export async function POST(req) {
   try {
     const newTx = await req.json();
-
     if (!newTx.amount || !newTx.userEmail) {
       return NextResponse.json({ success: false, message: 'Missing transaction details.' }, { status: 400 });
     }
 
     const db = await getDb();
     const transactionsCollection = db.collection('transactions');
+
+    // Retrieve the player profile to extract distributorId
+    const userDoc = await db.collection('users').findOne({ email: newTx.userEmail.toLowerCase().trim() });
+    const distId = userDoc ? (userDoc.distributorId || '') : '';
 
     if (newTx.isRemainderRequest) {
       // Create remainder payout request
@@ -161,7 +178,8 @@ export async function POST(req) {
         gateway: newTx.gateway || 'Chime',
         code: newTx.code || '—',
         gameTitle: newTx.gameTitle || 'Lobby',
-        note: `Remaining payout request for Tx #${newTx.parentTxId}`
+        note: `Remaining payout request for Tx #${newTx.parentTxId}`,
+        distributorId: distId
       };
 
       await transactionsCollection.insertOne(txObject);
@@ -188,6 +206,7 @@ export async function POST(req) {
       date: new Date().toLocaleString(),
       status: newTx.type === 'WITHDRAW' ? 'PENDING_COINS' : newTx.type === 'BONUS' ? 'SUCCESS' : 'PENDING',
       note: '',
+      distributorId: distId,
       ...newTx
     };
 
@@ -230,7 +249,8 @@ export async function POST(req) {
         read: false,
         timestamp: new Date().toISOString(),
         transactionId: txObject.id,
-        isFreeplayWithdraw: Boolean(txObject.isFreeplayWithdraw)
+        isFreeplayWithdraw: Boolean(txObject.isFreeplayWithdraw),
+        distributorId: distId
       });
     } else if (txObject.type === 'BONUS' && txObject.code === 'SIGNUP-FREE3') {
       const notificationsCollection = db.collection('coinsNotifications');

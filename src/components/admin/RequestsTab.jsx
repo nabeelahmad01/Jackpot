@@ -132,7 +132,7 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
 
   // SWR automatically refreshes every 4s for requests tab (real-time lobby queue)
   const { data, error, mutate } = useSWR(
-    `/api/account-requests?status=PENDING&page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}`,
+    `/api/account-requests?status=PENDING&page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}`,
     fetcher,
     { refreshInterval: 4000 }
   );

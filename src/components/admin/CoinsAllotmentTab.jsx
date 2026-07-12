@@ -9,7 +9,8 @@ export default function CoinsAllotmentTab({
   onUpdateCoinsNotification,
   completedActionIds = {},
   processingIds,
-  wrapAction
+  wrapAction,
+  adminUser
 }) {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -29,7 +30,7 @@ export default function CoinsAllotmentTab({
 
   // SWR automatically polls every 4s for coin allotments
   const { data, error, mutate } = useSWR(
-    `/api/coins-notifications?page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}`,
+    `/api/coins-notifications?page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}`,
     fetcher,
     { refreshInterval: 4000 }
   );

@@ -143,7 +143,7 @@ export default function PlayerAccountsTab({ adminUser, onDeleteUser }) {
   }, [search]);
 
   const { data, error, mutate } = useSWR(
-    `/api/users?page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}`,
+    `/api/users?page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}`,
     fetcher
   );
 

@@ -114,6 +114,11 @@ export default function AdminPage({ portalName, forcedRole }) {
         const cleanRoles = (user.role || '').toLowerCase().split(',').map(r => r.trim());
 
         if (allowedRoles.some(r => cleanRoles.includes(r))) {
+          if (user.distributorId) {
+            setLoginError('Access Denied. Distributor staff must log in at the distributor portal.');
+            return;
+          }
+
           if (forcedRole && !cleanRoles.includes(forcedRole) && !cleanRoles.includes('admin')) {
             setLoginError(`Access Denied: This portal is strictly restricted to ${forcedRole.toUpperCase().replace('_', ' ')} accounts.`);
             return;

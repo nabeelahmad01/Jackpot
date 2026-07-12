@@ -19,6 +19,20 @@ export async function GET(req) {
       query.userEmail = email.toLowerCase().trim();
     }
 
+    const adminRole = searchParams.get('adminRole');
+    const adminDistributorId = searchParams.get('adminDistributorId');
+
+    if (adminRole && adminRole !== 'admin') {
+      if (adminDistributorId) {
+        query.distributorId = adminDistributorId;
+      } else {
+        const distributorsCollection = db.collection('distributors');
+        const typeADistributors = await distributorsCollection.find({ type: 'A' }).project({ id: 1 }).toArray();
+        const typeADistIds = typeADistributors.map(d => d.id);
+        query.distributorId = { $in: [null, '', ...typeADistIds] };
+      }
+    }
+
     if (search) {
       const cleanSearch = search.trim();
       const searchCriteria = {

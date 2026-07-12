@@ -5,7 +5,7 @@ import useSWR from 'swr';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
-export default function TxSearchTab({ onInspectProof }) {
+export default function TxSearchTab({ onInspectProof, adminUser }) {
   const [historySearch, setHistorySearch] = useState('');
   const [historyDebouncedSearch, setHistoryDebouncedSearch] = useState('');
   const [historyStatus, setHistoryStatus] = useState(''); // '' (All), 'SUCCESS', 'FAILED', 'HOLD'
@@ -21,7 +21,7 @@ export default function TxSearchTab({ onInspectProof }) {
     return () => clearTimeout(handler);
   }, [historySearch]);
 
-  const swrKey = `/api/transactions?page=${historyPage}&limit=${limit}&search=${encodeURIComponent(historyDebouncedSearch)}&status=${historyStatus}&type=${historyType}`;
+  const swrKey = `/api/transactions?page=${historyPage}&limit=${limit}&search=${encodeURIComponent(historyDebouncedSearch)}&status=${historyStatus}&type=${historyType}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}`;
 
   const { data, error, mutate } = useSWR(swrKey, fetcher, { refreshInterval: 5000 });
 

@@ -48,9 +48,13 @@ export default function AdminDashboard({
   const [processingIds, setProcessingIds] = useState({});
 
   // Use SWR to poll counts/stats for the sidebar badges
-  const { data: statsData } = useSWR('/api/admin/stats', fetcher, {
-    refreshInterval: 4000
-  });
+  const { data: statsData } = useSWR(
+    `/api/admin/stats?adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}`,
+    fetcher,
+    {
+      refreshInterval: 4000
+    }
+  );
 
   const { data: settingsData } = useSWR('/api/settings/frontend', fetcher);
 
@@ -740,6 +744,7 @@ export default function AdminDashboard({
               completedActionIds={completedActionIds}
               processingIds={processingIds}
               wrapAction={wrapAction}
+              adminUser={adminUser}
             />
           )}
           {activeTab === 'support' && hasAccess('support') && (
@@ -767,7 +772,7 @@ export default function AdminDashboard({
             <PromotionsTab adminUser={adminUser} />
           )}
           {activeTab === 'tx_search' && hasAccess('tx_search') && (
-            <TxSearchTab onInspectProof={onInspectProof} />
+            <TxSearchTab onInspectProof={onInspectProof} adminUser={adminUser} />
           )}
         </Suspense>
       </main>

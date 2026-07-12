@@ -4,12 +4,30 @@ import { cache } from '../../../../lib/cache';
 
 export async function GET(req) {
   try {
-    const cachedStats = cache.get('admin_stats');
+    const { searchParams } = new URL(req.url);
+    const adminRole = searchParams.get('adminRole');
+    const adminDistributorId = searchParams.get('adminDistributorId');
+
+    // Contextual cache key to prevent collision
+    const cacheKey = `admin_stats_${adminRole || 'anon'}_${adminDistributorId || 'global'}`;
+    const cachedStats = cache.get(cacheKey);
     if (cachedStats) {
       return NextResponse.json({ success: true, stats: cachedStats });
     }
 
     const db = await getDb();
+
+    let baseQuery = {};
+    if (adminRole && adminRole !== 'admin') {
+      if (adminDistributorId) {
+        baseQuery.distributorId = adminDistributorId;
+      } else {
+        const distributorsCollection = db.collection('distributors');
+        const typeADistributors = await distributorsCollection.find({ type: 'A' }).project({ id: 1 }).toArray();
+        const typeADistIds = typeADistributors.map(d => d.id);
+        baseQuery.distributorId = { $in: [null, '', ...typeADistIds] };
+      }
+    }
 
     // Run pending queue counts in parallel
     const [
@@ -18,9 +36,9 @@ export async function GET(req) {
       pendingCoinsCount,
       unreadChatUsers
     ] = await Promise.all([
-      db.collection('accountRequests').countDocuments({ status: 'PENDING' }),
-      db.collection('transactions').countDocuments({ status: 'PENDING' }),
-      db.collection('coinsNotifications').countDocuments({ status: { $in: ['PENDING', 'CLAIM_REQUESTED'] } }),
+      db.collection('accountRequests').countDocuments({ ...baseQuery, status: 'PENDING' }),
+      db.collection('transactions').countDocuments({ ...baseQuery, status: 'PENDING' }),
+      db.collection('coinsNotifications').countDocuments({ ...baseQuery, status: { $in: ['PENDING', 'CLAIM_REQUESTED'] } }),
       db.collection('supportMessages').distinct('userEmail', { senderType: 'player', read: false })
     ]);
 
@@ -29,7 +47,7 @@ export async function GET(req) {
     // Fetch successful transactions with projection to compute financial summaries
     const successfulTx = await db.collection('transactions')
       .find(
-        { status: 'SUCCESS' },
+        { ...baseQuery, status: 'SUCCESS' },
         { projection: { amount: 1, type: 1, date: 1 } }
       )
       .toArray();
@@ -71,7 +89,7 @@ export async function GET(req) {
     };
 
     // Cache the statistics for 60 seconds
-    cache.set('admin_stats', stats, 60);
+    cache.set(cacheKey, stats, 60);
 
     return NextResponse.json({ success: true, stats });
   } catch (err) {

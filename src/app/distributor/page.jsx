@@ -2,12 +2,18 @@
 
 import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
+import TxSearchTab from '../../components/admin/TxSearchTab';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
 export default function DistributorPortal() {
   const [mounted, setMounted] = useState(false);
   const [distSession, setDistSession] = useState(null);
+  const [proofModalUrl, setProofModalUrl] = useState('');
+
+  const handleInspectProof = (url) => {
+    if (url) setProofModalUrl(url);
+  };
 
   // Login credentials states
   const [email, setEmail] = useState('');
@@ -40,13 +46,13 @@ export default function DistributorPortal() {
 
   // Dynamic operations queues (Requests & Coins check for Type B players)
   const { data: allRequestsData, mutate: mutateAllRequests } = useSWR(
-    distId && distSession?.type === 'B' ? `/api/account-requests` : null,
+    distId && distSession?.type === 'B' ? `/api/account-requests?adminRole=distributor&adminDistributorId=${distId}` : null,
     fetcher,
     { refreshInterval: 5000 }
   );
 
   const { data: allCoinsData, mutate: mutateAllCoins } = useSWR(
-    distId && distSession?.type === 'B' ? `/api/coins-notifications` : null,
+    distId && distSession?.type === 'B' ? `/api/coins-notifications?adminRole=distributor&adminDistributorId=${distId}` : null,
     fetcher,
     { refreshInterval: 5000 }
   );
@@ -449,6 +455,14 @@ export default function DistributorPortal() {
             Overview & Analytics
           </button>
 
+          <button
+            onClick={() => setActiveTab('tx_logs')}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'tx_logs' ? 'var(--gold-primary)' : 'none', color: activeTab === 'tx_logs' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
+          >
+            <i className="fa-solid fa-clock-rotate-left" style={{ width: '16px' }}></i>
+            Transaction Logs
+          </button>
+
           {distSession.type === 'B' && (
             <>
               <button
@@ -511,6 +525,17 @@ export default function DistributorPortal() {
       {/* PORTAL BODY CONTAINER */}
       <main style={{ padding: '2rem', overflowY: 'auto' }}>
         
+        {/* TAB: TRANSACTION LOGS */}
+        {activeTab === 'tx_logs' && (
+          <TxSearchTab 
+            onInspectProof={handleInspectProof} 
+            adminUser={{
+              role: distSession?.role || 'distributor',
+              distributorId: distId
+            }} 
+          />
+        )}
+
         {/* TAB 1: OVERVIEW */}
         {activeTab === 'overview' && (
           <div>
@@ -958,6 +983,44 @@ export default function DistributorPortal() {
 
           </div>
         )}
+
+      {proofModalUrl && (
+        <div 
+          onClick={() => setProofModalUrl('')}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.85)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer'
+          }}
+        >
+          <div style={{ position: 'relative', maxWidth: '90%', maxHeight: '90%' }} onClick={(e) => e.stopPropagation()}>
+            <img src={proofModalUrl} alt="Deposit Proof" style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain', borderRadius: '8px', border: '2px solid var(--gold-primary)' }} />
+            <button 
+              onClick={() => setProofModalUrl('')}
+              style={{
+                position: 'absolute',
+                top: '-2rem',
+                right: 0,
+                background: 'none',
+                border: 'none',
+                color: '#fff',
+                fontSize: '1.5rem',
+                cursor: 'pointer'
+              }}
+            >
+              &times;
+            </button>
+          </div>
+        </div>
+      )}
 
       </main>
 
