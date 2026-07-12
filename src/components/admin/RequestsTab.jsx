@@ -24,7 +24,7 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
   const [isUpdatingCreds, setIsUpdatingCreds] = useState(false);
 
   const cleanRoles = (adminUser?.role || '').toLowerCase().split(',').map(r => r.trim());
-  const canUpdateCredentials = cleanRoles.some(r => ['admin', 'operation_admin', 'coins_admin'].includes(r));
+  const canUpdateCredentials = cleanRoles.some(r => ['admin', 'operation_admin', 'coins_admin', 'distributor'].includes(r));
 
   const handleSelectPlayer = (email) => {
     setSelectedPlayerEmail(email);

@@ -7,6 +7,7 @@ import SupportTab from '../../components/admin/SupportTab';
 import CoinsAllotmentTab from '../../components/admin/CoinsAllotmentTab';
 import RequestsTab from '../../components/admin/RequestsTab';
 import LedgerTab from '../../components/admin/LedgerTab';
+import ShiftDashboardTab from '../../components/admin/ShiftDashboardTab';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -161,6 +162,40 @@ export default function DistributorPortal() {
 
   // Referral Link copy
   const [copiedLink, setCopiedLink] = useState(false);
+
+  const getTodayDateString = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Commission Lookup Calendar States
+  const [commLookupDate, setCommLookupDate] = useState(getTodayDateString());
+  const [commLookupStats, setCommLookupStats] = useState({ deposits: 0, withdrawals: 0, commission: 0, websiteCommission: 0 });
+  const [commLookupLoading, setCommLookupLoading] = useState(false);
+
+  useEffect(() => {
+    if (!distId || !commLookupDate) return;
+    setCommLookupLoading(true);
+    fetch(`/api/distributors/stats/by-date?distributorId=${distId}&date=${commLookupDate}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setCommLookupStats({
+            deposits: data.totalDeposits || 0,
+            withdrawals: data.totalWithdrawals || 0,
+            commission: data.commissionEarned || 0,
+            websiteCommission: data.websiteCommissionEarned || 0,
+            commissionRate: data.commissionRate || 0,
+            websiteCommissionRate: data.websiteCommissionRate || 0
+          });
+        }
+      })
+      .catch(err => console.error('Failed lookup by date:', err))
+      .finally(() => setCommLookupLoading(false));
+  }, [distId, commLookupDate]);
 
   const handleRequestCommWithdraw = async (e) => {
     e.preventDefault();
@@ -790,13 +825,13 @@ export default function DistributorPortal() {
     if (!distSession?.isStaff) return true;
     const role = distSession.staffRole || distSession.role;
     if (role === 'coins_admin') {
-      return ['overview', 'referred_players', 'operations', 'requests', 'guidelines'].includes(tabName);
+      return ['overview', 'referred_players', 'operations', 'requests', 'shift_dashboard'].includes(tabName);
     }
     if (role === 'support_admin') {
-      return ['overview', 'support', 'guidelines'].includes(tabName);
+      return ['overview', 'support'].includes(tabName);
     }
     if (role === 'financial_admin') {
-      return ['overview', 'tx_logs', 'comm_cashout', 'gateways', 'ledger', 'guidelines'].includes(tabName);
+      return ['overview', 'tx_logs', 'gateways', 'ledger'].includes(tabName);
     }
     return false;
   };
@@ -957,6 +992,30 @@ export default function DistributorPortal() {
                       {referredRequests.length}
                     </span>
                   )}
+                </button>
+              )}
+
+              {hasTabAccess('shift_dashboard') && (
+                <button
+                  onClick={() => setActiveTab('shift_dashboard')}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    background: activeTab === 'shift_dashboard' ? 'var(--gold-primary)' : 'none',
+                    color: activeTab === 'shift_dashboard' ? '#000' : '#fff',
+                    border: 'none',
+                    padding: '0.75rem 1rem',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '0.8rem',
+                    textAlign: 'left'
+                  }}
+                >
+                  <i className="fa-solid fa-business-time" style={{ width: '16px' }}></i>
+                  Shift Dashboard
                 </button>
               )}
 
@@ -1158,11 +1217,53 @@ export default function DistributorPortal() {
             <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#fff' }}>
               {distSession.type === 'B' ? 'Website Commission & Payments' : 'Commission & Cashouts'}
             </h1>
-            <p style={{ fontSize: '0.75rem', color: '#888', marginBottom: '2rem' }}>
+            <p style={{ fontSize: '0.75rem', color: '#888', marginBottom: '1.5rem' }}>
               {distSession.type === 'B' 
                 ? 'Submit screenshot proof of website commission payments to keep your account active.'
                 : 'Request payouts for your referral earnings and track processing history.'}
             </p>
+
+            {/* DATE LOOKUP CALENDAR WIDGET */}
+            <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1.5rem' }}>
+              <h3 style={{ fontSize: '0.9rem', marginBottom: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <i className="fa-solid fa-calendar-days" style={{ color: 'var(--gold-primary)' }}></i> Daily Earnings & Commission Lookup by Date
+              </h3>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'center' }}>
+                <div>
+                  <label style={{ fontSize: '0.7rem', color: '#888', display: 'block', marginBottom: '0.25rem' }}>Select Date</label>
+                  <input
+                    type="date"
+                    value={commLookupDate}
+                    onChange={(e) => setCommLookupDate(e.target.value)}
+                    style={{ background: '#070912', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
+                  />
+                </div>
+                {commLookupLoading ? (
+                  <div style={{ fontSize: '0.75rem', color: '#888' }}>
+                    <i className="fa-solid fa-spinner fa-spin" style={{ color: 'var(--gold-primary)', marginRight: '0.5rem' }}></i> Loading records for {commLookupDate}...
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: '2.5rem', flexWrap: 'wrap' }}>
+                    <div>
+                      <span style={{ fontSize: '0.65rem', color: '#888', display: 'block' }}>Referred Deposits</span>
+                      <strong style={{ color: '#2ecc71', fontSize: '1rem' }}>${(commLookupStats.deposits || 0).toFixed(2)}</strong>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.65rem', color: '#888', display: 'block' }}>Referred Withdrawals</span>
+                      <strong style={{ color: '#ef4444', fontSize: '1rem' }}>${(commLookupStats.withdrawals || 0).toFixed(2)}</strong>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.65rem', color: '#888', display: 'block' }}>My Commission ({commLookupStats.commissionRate || 0}%)</span>
+                      <strong style={{ color: 'var(--gold-primary)', fontSize: '1rem' }}>${(commLookupStats.commission || 0).toFixed(2)}</strong>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.65rem', color: '#888', display: 'block' }}>Website Commission ({commLookupStats.websiteCommissionRate || 0}%)</span>
+                      <strong style={{ color: '#ff4d6d', fontSize: '1rem' }}>${(commLookupStats.websiteCommission || 0).toFixed(2)}</strong>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
 
             {(() => {
               if (distSession.type === 'B') {
@@ -1878,6 +1979,17 @@ export default function DistributorPortal() {
             completedActionIds={{}}
             processingIds={{}}
             wrapAction={(id, fn) => fn}
+            adminUser={{
+              role: distSession.staffRole || distSession.role,
+              distributorId: distId,
+              email: distSession.email
+            }}
+          />
+        )}
+
+        {/* TAB: SHIFT DASHBOARD */}
+        {activeTab === 'shift_dashboard' && distSession.type === 'B' && (
+          <ShiftDashboardTab
             adminUser={{
               role: distSession.staffRole || distSession.role,
               distributorId: distId,
