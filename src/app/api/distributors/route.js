@@ -15,7 +15,7 @@ export async function GET() {
     // Compute stats for each distributor
     const enrichedDistributors = await Promise.all(distributors.map(async (dist) => {
       // 1. Get referred players list
-      const players = await usersCollection.find({ distributorId: dist.id }).toArray();
+      const players = await usersCollection.find({ distributorId: dist.id, role: 'user' }).toArray();
       const playerEmails = players.map(p => p.email.toLowerCase().trim());
 
       let totalDeposits = 0;

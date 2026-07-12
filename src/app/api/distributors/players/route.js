@@ -14,7 +14,7 @@ export async function GET(req) {
 
     const db = await getDb();
     const usersCollection = db.collection('users');
-    const players = await usersCollection.find({ distributorId }).toArray();
+    const players = await usersCollection.find({ distributorId, role: 'user' }).toArray();
 
     return NextResponse.json({ success: true, players });
   } catch (err) {

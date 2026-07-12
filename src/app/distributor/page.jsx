@@ -1,9 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import useSWR from 'swr';
+import useSWR, { mutate } from 'swr';
 import TxSearchTab from '../../components/admin/TxSearchTab';
 import SupportTab from '../../components/admin/SupportTab';
+import CoinsAllotmentTab from '../../components/admin/CoinsAllotmentTab';
+import RequestsTab from '../../components/admin/RequestsTab';
+import LedgerTab from '../../components/admin/LedgerTab';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -547,6 +550,101 @@ export default function DistributorPortal() {
     }
   };
 
+  const handleUpdateCoinsNotificationDirect = async (notiId, status, read) => {
+    try {
+      const payload = { id: notiId };
+      if (status !== undefined) {
+        payload.status = status;
+        payload.processedBy = distSession?.name || 'Staff';
+      }
+      if (read !== undefined) payload.read = read;
+
+      const response = await fetch('/api/coins-notifications', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const resData = await response.json();
+      if (resData.success) {
+        mutateAllCoins();
+        mutateStats();
+        mutate((key) => typeof key === 'string' && key.startsWith('/api/coins-notifications'));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleUpdateAccountRequestDirect = async (reqId, status, username, password, rejectionReason) => {
+    try {
+      const payload = {
+        id: reqId,
+        status: status,
+        processedBy: distSession?.name || 'Staff'
+      };
+      if (username !== undefined) payload.gameAccountUsername = username;
+      if (password !== undefined) payload.gameAccountPassword = password;
+      if (rejectionReason !== undefined) payload.rejectionReason = rejectionReason;
+
+      const res = await fetch('/api/account-requests', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        mutateAllRequests();
+        mutate((key) => typeof key === 'string' && key.startsWith('/api/account-requests'));
+        alert('Credentials status updated successfully!');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleApproveTransactionDirect = async (txId) => {
+    try {
+      const response = await fetch('/api/transactions', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: txId, status: 'SUCCESS', processedBy: distSession?.name || 'Staff' })
+      });
+      const data = await response.json();
+      if (data.success) {
+        alert('Transaction approved successfully.');
+        mutateStats();
+        mutate((key) => typeof key === 'string' && key.startsWith('/api/transactions'));
+      } else {
+        alert(data.message || 'Failed to approve transaction.');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleFailTransactionDirect = async (txId) => {
+    const feedbackMsg = window.prompt('Enter reason for rejection/failure:', 'Payment not received');
+    if (feedbackMsg === null) return;
+
+    try {
+      const response = await fetch('/api/transactions', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: txId, status: 'FAILED', note: feedbackMsg || 'Declined by Admin', processedBy: distSession?.name || 'Staff' })
+      });
+      const data = await response.json();
+      if (data.success) {
+        alert('Transaction set to FAILED status.');
+        mutateStats();
+        mutate((key) => typeof key === 'string' && key.startsWith('/api/transactions'));
+      } else {
+        alert(data.message || 'Failed to decline transaction.');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   // Invalidate Coin Allotment / Loading (Type B)
   const handleInvalidateAllotment = async (e) => {
     e.preventDefault();
@@ -664,15 +762,15 @@ export default function DistributorPortal() {
 
   const hasTabAccess = (tabName) => {
     if (!distSession?.isStaff) return true;
-    const role = distSession.role;
+    const role = distSession.staffRole || distSession.role;
     if (role === 'coins_admin') {
-      return ['overview', 'referred_players', 'operations', 'guidelines'].includes(tabName);
+      return ['overview', 'referred_players', 'operations', 'requests', 'guidelines'].includes(tabName);
     }
     if (role === 'support_admin') {
       return ['overview', 'support', 'guidelines'].includes(tabName);
     }
     if (role === 'financial_admin') {
-      return ['overview', 'tx_logs', 'comm_cashout', 'guidelines'].includes(tabName);
+      return ['overview', 'tx_logs', 'comm_cashout', 'gateways', 'ledger', 'guidelines'].includes(tabName);
     }
     return false;
   };
@@ -804,6 +902,59 @@ export default function DistributorPortal() {
                       {referredRequests.length + referredCoins.length}
                     </span>
                   )}
+                </button>
+              )}
+
+              {hasTabAccess('requests') && (
+                <button
+                  onClick={() => setActiveTab('requests')}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    background: activeTab === 'requests' ? 'var(--gold-primary)' : 'none',
+                    color: activeTab === 'requests' ? '#000' : '#fff',
+                    border: 'none',
+                    padding: '0.75rem 1rem',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '0.8rem',
+                    textAlign: 'left'
+                  }}
+                >
+                  <i className="fa-solid fa-key" style={{ width: '16px' }}></i>
+                  Account Requests
+                  {referredRequests.length > 0 && (
+                    <span style={{ marginLeft: 'auto', background: '#ef4444', color: '#fff', fontSize: '0.625rem', padding: '0.15rem 0.35rem', borderRadius: '10px' }}>
+                      {referredRequests.length}
+                    </span>
+                  )}
+                </button>
+              )}
+
+              {hasTabAccess('ledger') && (
+                <button
+                  onClick={() => setActiveTab('ledger')}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    background: activeTab === 'ledger' ? 'var(--gold-primary)' : 'none',
+                    color: activeTab === 'ledger' ? '#000' : '#fff',
+                    border: 'none',
+                    padding: '0.75rem 1rem',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '0.8rem',
+                    textAlign: 'left'
+                  }}
+                >
+                  <i className="fa-solid fa-wallet" style={{ width: '16px' }}></i>
+                  Financial Ledger
                 </button>
               )}
 
@@ -1630,133 +1781,51 @@ export default function DistributorPortal() {
           </div>
         )}
 
-        {/* TAB 4: OPERATIONS QUEUE (TYPE B) */}
+        {/* TAB 4: OPERATIONS QUEUE (TYPE B) - Render CoinsAllotmentTab */}
         {activeTab === 'operations' && distSession.type === 'B' && (
-          <div>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>Operations Queue</h1>
-            <p style={{ fontSize: '0.75rem', color: '#888', marginBottom: '2rem' }}>Process game credentials and loading/withdrawal allotments for your users.</p>
+          <CoinsAllotmentTab
+            onUpdateCoinsNotification={handleUpdateCoinsNotificationDirect}
+            completedActionIds={{}}
+            processingIds={{}}
+            wrapAction={(id, fn) => fn}
+            adminUser={{
+              role: distSession.staffRole || distSession.role,
+              distributorId: distId,
+              email: distSession.email
+            }}
+          />
+        )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-              
-              {/* Credentials Requests */}
-              <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <h3 style={{ fontSize: '0.9rem', marginBottom: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <i className="fa-solid fa-key gold-text"></i> Player Credentials Requests ({referredRequests.length})
-                </h3>
-                <div style={{ maxHeight: '420px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {referredRequests.length === 0 ? (
-                    <div style={{ textAlign: 'center', color: '#666', fontSize: '0.75rem', padding: '2rem' }}>No credentials requests in queue.</div>
-                  ) : (
-                    referredRequests.map(req => (
-                      <div key={req.id} style={{ background: '#040509', border: '1px solid rgba(255,255,255,0.02)', padding: '0.75rem 1rem', borderRadius: '8px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                          <div>
-                            <strong style={{ fontSize: '0.8rem' }}>{req.gameTitle}</strong>
-                            <div style={{ fontSize: '0.65rem', color: '#888' }}>{req.email}</div>
-                          </div>
-                          <span style={{ background: 'rgba(241,196,15,0.1)', color: '#f1c40f', padding: '0.15rem 0.35rem', borderRadius: '4px', fontSize: '0.6rem', fontWeight: 'bold' }}>
-                            {req.status}
-                          </span>
-                        </div>
-                        <div style={{ fontSize: '0.65rem', color: '#aaa', marginBottom: '0.75rem' }}>
-                          Name requested: <strong>{req.nameOnGame}</strong>
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button onClick={() => handleApproveRequest(req.id, req.gameAccountUsername, req.gameAccountPassword)} style={{ background: '#2ecc71', color: '#000', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer' }}>
-                            Approve & Send
-                          </button>
-                          <button onClick={() => handleRejectRequest(req.id)} style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer' }}>
-                            Reject
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
+        {/* TAB: ACCOUNT CREDENTIALS REQUESTS - Render RequestsTab */}
+        {activeTab === 'requests' && distSession.type === 'B' && (
+          <RequestsTab
+            onApproveRequest={handleUpdateAccountRequestDirect}
+            completedActionIds={{}}
+            processingIds={{}}
+            wrapAction={(id, fn) => fn}
+            adminUser={{
+              role: distSession.staffRole || distSession.role,
+              distributorId: distId,
+              email: distSession.email
+            }}
+          />
+        )}
 
-              {/* Coins Allotments queue */}
-              <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <h3 style={{ fontSize: '0.9rem', marginBottom: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <i className="fa-solid fa-coins gold-text"></i> Load & Withdrawal Checks ({referredCoins.length})
-                </h3>
-                <div style={{ maxHeight: '420px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {referredCoins.length === 0 ? (
-                    <div style={{ textAlign: 'center', color: '#666', fontSize: '0.75rem', padding: '2rem' }}>No allotments requests in queue.</div>
-                  ) : (
-                    referredCoins.map(noti => (
-                      <div key={noti.id} style={{ background: '#040509', border: '1px solid rgba(255,255,255,0.02)', padding: '0.75rem 1rem', borderRadius: '8px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                          <div>
-                            <strong style={{ fontSize: '0.8rem' }}>{noti.gameTitle}</strong>
-                            <div style={{ fontSize: '0.65rem', color: '#888' }}>{noti.email}</div>
-                            {noti.isFreeplayWithdraw && (
-                              <div style={{ fontSize: '0.55rem', color: '#ff4d6d', fontWeight: 'bold', marginTop: '0.2rem' }}>
-                                ⚠️ FREEPLAY WIN: MAX PAYOUT $30
-                              </div>
-                            )}
-                          </div>
-                          <span style={{
-                            background: noti.totalCoins < 0 ? 'rgba(239,68,68,0.15)' : 'rgba(46,204,113,0.15)',
-                            color: noti.totalCoins < 0 ? '#f87171' : '#2ecc71',
-                            padding: '0.15rem 0.35rem',
-                            borderRadius: '4px',
-                            fontSize: '0.6rem',
-                            fontWeight: 'bold'
-                          }}>
-                            {noti.totalCoins < 0 ? 'WITHDRAWAL' : 'DEPOSIT'}
-                          </span>
-                        </div>
-                        <div style={{ fontSize: '0.65rem', color: '#aaa', marginBottom: '0.75rem' }}>
-                          Coins count: <strong style={{ color: '#fff' }}>{Math.abs(noti.totalCoins)}</strong>
-                          {noti.accountNameOnTag && <div>Account Tag: <strong>{noti.accountNameOnTag}</strong></div>}
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button onClick={() => handleCompleteAllotment(noti)} style={{ background: '#2ecc71', color: '#000', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer' }}>
-                            Load Complete
-                          </button>
-                          <button onClick={() => setInvalidatingNoti(noti)} style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer' }}>
-                            Mark Invalid
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-            </div>
-
-            {/* INVALIDATE ALLOTMENT MODAL */}
-            {invalidatingNoti && (
-              <div className="modal-backdrop-custom" onClick={() => setInvalidatingNoti(null)}>
-                <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-                  <div className="modal-header">
-                    <h3>Invalidate Transaction Check</h3>
-                    <button type="button" className="close-modal" onClick={() => setInvalidatingNoti(null)}>&times;</button>
-                  </div>
-                  <div className="modal-body">
-                    <form onSubmit={handleInvalidateAllotment}>
-                      <div className="input-group" style={{ marginBottom: '1.5rem' }}>
-                        <label>Reason for Invalidation</label>
-                        <textarea
-                          placeholder="e.g. Invalid payment proof details provided."
-                          value={holdReason}
-                          onChange={(e) => setHoldReason(e.target.value)}
-                          style={{ width: '100%', minHeight: '80px', background: '#0b0d16', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.8rem', outline: 'none' }}
-                          required
-                        />
-                      </div>
-                      <button type="submit" className="submit-btn" style={{ background: '#ef4444', color: '#fff', fontWeight: 'bold' }}>
-                        CONFIRM INVALID ➔
-                      </button>
-                    </form>
-                  </div>
-                </div>
-              </div>
-            )}
-
-          </div>
+        {/* TAB: FINANCIAL LEDGER - Render LedgerTab */}
+        {activeTab === 'ledger' && distSession.type === 'B' && (
+          <LedgerTab
+            onInspectProof={handleInspectProof}
+            onApproveTransaction={handleApproveTransactionDirect}
+            onFailTransaction={handleFailTransactionDirect}
+            completedActionIds={{}}
+            processingIds={{}}
+            wrapAction={(id, fn) => fn}
+            adminUser={{
+              role: distSession.staffRole || distSession.role,
+              distributorId: distId,
+              email: distSession.email
+            }}
+          />
         )}
 
       {proofModalUrl && (

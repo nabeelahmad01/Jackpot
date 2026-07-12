@@ -514,33 +514,69 @@ export default function UserLobby({
   };
 
   const handleFreeplayClaim = () => {
-    // 1. Check if user already claimed signup freeplay bonus
-    const hasClaimedFreeplay = (transactions || []).some(
-      (t) => t.type === 'BONUS' && t.code === 'SIGNUP-FREE3'
+    const sortedTxs = [...(transactions || [])].sort((a, b) => {
+      if (a.id && b.id) {
+        return parseFloat(b.id) - parseFloat(a.id);
+      }
+      return new Date(b.date || 0) - new Date(a.date || 0);
+    });
+
+    const freeplayClaims = sortedTxs.filter(
+      (t) => t.type === 'BONUS' && t.code === 'SIGNUP-FREE3' && t.status === 'SUCCESS'
     );
-    
-    // Evaluate eligibility for repeat freeplay after a successful $30+ cashout
-    const successfulWithdrawals30 = (transactions || []).filter(
-      (t) => t.type === 'WITHDRAW' && t.status === 'SUCCESS' && parseFloat(t.amount || 0) >= 30
-    );
-    const freeplayClaims = (transactions || []).filter(
-      (t) => t.type === 'BONUS' && t.code === 'SIGNUP-FREE3'
+    const successfulWithdrawals = sortedTxs.filter(
+      (t) => t.type === 'WITHDRAW' && t.status === 'SUCCESS'
     );
 
-    const mostRecentWithdrawal30 = successfulWithdrawals30[0];
-    const mostRecentFreeplay = freeplayClaims[0];
+    let isEligible = false;
+    let toastMessage = "";
 
-    let isEligibleForRepeatFreeplay = false;
-    if (mostRecentWithdrawal30 && mostRecentFreeplay) {
-      const withdrawalTime = new Date(mostRecentWithdrawal30.date).getTime();
-      const freeplayTime = new Date(mostRecentFreeplay.date).getTime();
-      if (withdrawalTime > freeplayTime || parseFloat(mostRecentWithdrawal30.id) > parseFloat(mostRecentFreeplay.id)) {
-        isEligibleForRepeatFreeplay = true;
+    if (freeplayClaims.length === 0) {
+      // Initial signup freeplay is immediately eligible
+      isEligible = true;
+    } else {
+      const mostRecentFreeplay = freeplayClaims[0];
+      const mostRecentWithdrawal = successfulWithdrawals[0];
+
+      // Anchor is whichever happened last (most recent)
+      let anchorTx = mostRecentFreeplay;
+      if (mostRecentWithdrawal) {
+        const freeplayTime = new Date(mostRecentFreeplay.date || 0).getTime();
+        const withdrawalTime = new Date(mostRecentWithdrawal.date || 0).getTime();
+        
+        const isWithdrawalMoreRecent = mostRecentWithdrawal.id && mostRecentFreeplay.id
+          ? parseFloat(mostRecentWithdrawal.id) > parseFloat(mostRecentFreeplay.id)
+          : withdrawalTime > freeplayTime;
+
+        if (isWithdrawalMoreRecent) {
+          anchorTx = mostRecentWithdrawal;
+        }
+      }
+
+      // Must find a successful deposit of at least $25.00 after the anchor event
+      const depositsAfterAnchor = sortedTxs.filter((t) => {
+        if (t.type !== 'DEPOSIT' || t.status !== 'SUCCESS' || parseFloat(t.amount || 0) < 25) {
+          return false;
+        }
+        if (t.id && anchorTx.id) {
+          return parseFloat(t.id) > parseFloat(anchorTx.id);
+        }
+        return new Date(t.date || 0).getTime() > new Date(anchorTx.date || 0).getTime();
+      });
+
+      if (depositsAfterAnchor.length > 0) {
+        isEligible = true;
+      } else {
+        if (anchorTx.type === 'WITHDRAW') {
+          toastMessage = "You have made a cashout! Deposit at least $25.00 to claim another Freeplay.";
+        } else {
+          toastMessage = "You have already claimed your Freeplay bonus! Deposit at least $25.00 to claim another.";
+        }
       }
     }
 
-    if (hasClaimedFreeplay && !isEligibleForRepeatFreeplay) {
-      showToast("You have already claimed your $3.00 Freeplay bonus! Complete a cashout of $30.00 or more to claim another.", "error");
+    if (!isEligible) {
+      showToast(toastMessage || "You are not eligible for Freeplay yet. Deposit at least $25.00 first.", "error");
       return;
     }
 

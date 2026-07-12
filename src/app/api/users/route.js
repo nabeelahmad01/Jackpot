@@ -32,6 +32,7 @@ export async function GET(req) {
 
     if (adminDistributorId) {
       query.distributorId = adminDistributorId;
+      query.role = 'user';
     }
     if (segment === 'subscribed') {
       query.isSubscribed = true;

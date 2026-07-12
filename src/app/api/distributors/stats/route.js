@@ -23,7 +23,7 @@ export async function GET(req) {
 
     // 1. Fetch referred users
     const players = await usersCollection.find(
-      { distributorId },
+      { distributorId, role: 'user' },
       { projection: { name: 1, email: 1, role: 1, coins: 1, isSubscribed: 1 } }
     ).toArray();
     const playerEmails = players.map(p => (p.email || '').toLowerCase().trim()).filter(Boolean);
