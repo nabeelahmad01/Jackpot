@@ -10,6 +10,7 @@ export default function SettingsTab({ onUpdateSettings }) {
   const [regularBonusInput, setRegularBonusInput] = useState(20);
   const [referralBonusInput, setReferralBonusInput] = useState(10);
   const [usdtAddressInput, setUsdtAddressInput] = useState('');
+  const [usdtQrCodeInput, setUsdtQrCodeInput] = useState('');
 
   // Sync settings inputs when SWR loads data
   useEffect(() => {
@@ -18,12 +19,25 @@ export default function SettingsTab({ onUpdateSettings }) {
       setRegularBonusInput(settingsData.settings.regularDepositBonus);
       setReferralBonusInput(settingsData.settings.referralBonus || 10);
       setUsdtAddressInput(settingsData.settings.usdtAddress || '');
+      setUsdtQrCodeInput(settingsData.settings.usdtQrCode || '');
     }
   }, [settingsData]);
 
+  const handleQrCodeChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setUsdtQrCodeInput(reader.result);
+      alert('TRC20 QR Code screenshot loaded. Click Save configurations to update!');
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSettingsSubmit = async (e) => {
     e.preventDefault();
-    await onUpdateSettings(firstBonusInput, regularBonusInput, referralBonusInput, usdtAddressInput);
+    await onUpdateSettings(firstBonusInput, regularBonusInput, referralBonusInput, usdtAddressInput, usdtQrCodeInput);
     mutate(); // reload settings SWR cache
   };
 
@@ -110,6 +124,35 @@ export default function SettingsTab({ onUpdateSettings }) {
             />
           </div>
           <span className="game-tap-tip">The wallet address independent Type B distributors will send their platform website commission payments to.</span>
+        </div>
+
+        <div className="input-group" style={{ marginTop: '1.5rem' }}>
+          <label>TRC20 QR Code Screenshot</label>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleQrCodeChange}
+              style={{ color: '#888', fontSize: '0.75rem' }}
+            />
+            {usdtQrCodeInput && (
+              <div style={{ position: 'relative' }}>
+                <img
+                  src={usdtQrCodeInput}
+                  alt="USDT QR Code"
+                  style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setUsdtQrCodeInput('')}
+                  style={{ position: 'absolute', top: '-5px', right: '-5px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', cursor: 'pointer' }}
+                >
+                  &times;
+                </button>
+              </div>
+            )}
+          </div>
+          <span className="game-tap-tip">Upload a QR Code screenshot so distributors can quickly scan and pay.</span>
         </div>
 
         <button type="submit" className="submit-btn" style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold', marginTop: '2rem' }}>

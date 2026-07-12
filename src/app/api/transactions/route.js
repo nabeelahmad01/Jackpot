@@ -111,6 +111,7 @@ export async function GET(req) {
     const transactions = await transactionsCollection.find(query)
       .project({
         screenshot: { $cond: { if: { $eq: [ { $ifNull: [ "$screenshot", "" ] }, "" ] }, then: false, else: true } },
+        payoutProof: { $cond: { if: { $eq: [ { $ifNull: [ "$payoutProof", "" ] }, "" ] }, then: false, else: true } },
         id: 1,
         userEmail: 1,
         date: 1,
@@ -338,7 +339,7 @@ export async function POST(req) {
 // PUT update transaction status (Admin action - approve/decline)
 export async function PUT(req) {
   try {
-    const { id, status, note, payoutSent, payoutHold, processedBy } = await req.json();
+    const { id, status, note, payoutSent, payoutHold, processedBy, payoutProof } = await req.json();
 
     if (!id || !status) {
       return NextResponse.json({ success: false, message: 'Transaction ID and status are required.' }, { status: 400 });
@@ -364,6 +365,9 @@ export async function PUT(req) {
     }
     if (processedBy !== undefined) {
       updateFields.approvedBy = processedBy;
+    }
+    if (payoutProof !== undefined) {
+      updateFields.payoutProof = payoutProof;
     }
 
     await transactionsCollection.updateOne({ id }, { $set: updateFields });

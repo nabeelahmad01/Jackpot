@@ -55,6 +55,7 @@ export default function LedgerTab({
   const [payoutHoldAmount, setPayoutHoldAmount] = useState('');
   const [payoutGateway, setPayoutGateway] = useState('');
   const [payoutCustomNote, setPayoutCustomNote] = useState('');
+  const [payoutProof, setPayoutProof] = useState('');
   const [isProcessingPayout, setIsProcessingPayout] = useState(false);
 
   const handleOpenPayoutModal = (tx) => {
@@ -65,6 +66,7 @@ export default function LedgerTab({
     setPayoutHoldAmount('0');
     setPayoutGateway(tx.gateway || 'Chime');
     setPayoutCustomNote(`Full payout processed to ${tx.gateway || 'Chime'}`);
+    setPayoutProof('');
     setPayoutModalOpen(true);
   };
 
@@ -122,7 +124,8 @@ export default function LedgerTab({
         note: payoutCustomNote.trim() || `Payout processed to ${payoutGateway}`,
         payoutSent: parseFloat(payoutSentAmount || 0),
         payoutHold: parseFloat(payoutHoldAmount || 0),
-        processedBy: adminUser?.email || 'admin@jackpot.com'
+        processedBy: adminUser?.email || 'admin@jackpot.com',
+        payoutProof: payoutProof
       };
 
       const response = await fetch('/api/transactions', {
@@ -143,6 +146,18 @@ export default function LedgerTab({
     } finally {
       setIsProcessingPayout(false);
     }
+  };
+
+  const handlePayoutProofChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPayoutProof(reader.result);
+      alert('Payout proof receipt screenshot loaded successfully!');
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleFail = async (txId) => {
@@ -584,7 +599,7 @@ export default function LedgerTab({
                 </div>
 
                 {/* Auto Payout Custom Note description */}
-                <div className="input-group" style={{ marginBottom: '1.5rem' }}>
+                <div className="input-group" style={{ marginBottom: '1rem' }}>
                   <label htmlFor="payout-note">Payout Note (Shown to Player)</label>
                   <div className="input-wrapper">
                     <i className="fa-solid fa-note-sticky input-icon"></i>
@@ -597,6 +612,22 @@ export default function LedgerTab({
                       required
                     />
                   </div>
+                </div>
+
+                {/* Payout receipt proof uploader */}
+                <div className="input-group" style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.75rem', marginBottom: '0.25rem' }}>Upload Payout Receipt Screenshot (Paid Proof)</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePayoutProofChange}
+                    style={{ color: '#888', fontSize: '0.7rem', display: 'block' }}
+                  />
+                  {payoutProof && (
+                    <div style={{ marginTop: '0.5rem', color: '#2ecc71', fontSize: '0.65rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <i className="fa-solid fa-circle-check"></i> Screenshot loaded successfully!
+                    </div>
+                  )}
                 </div>
 
                 <button type="submit" className="submit-btn" style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold' }} disabled={isProcessingPayout}>

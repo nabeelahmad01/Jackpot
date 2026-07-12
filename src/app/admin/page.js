@@ -206,12 +206,12 @@ export default function AdminPage({ portalName, forcedRole }) {
     }
   };
 
-  const handleUpdateSettings = async (firstDepositBonus, regularDepositBonus, referralBonus, usdtAddress) => {
+  const handleUpdateSettings = async (firstDepositBonus, regularDepositBonus, referralBonus, usdtAddress, usdtQrCode) => {
     try {
       const response = await fetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstDepositBonus, regularDepositBonus, referralBonus, usdtAddress })
+        body: JSON.stringify({ firstDepositBonus, regularDepositBonus, referralBonus, usdtAddress, usdtQrCode })
       });
       const data = await response.json();
       if (data.success) {

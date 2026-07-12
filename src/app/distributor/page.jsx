@@ -15,8 +15,33 @@ export default function DistributorPortal() {
   const [distSession, setDistSession] = useState(null);
   const [proofModalUrl, setProofModalUrl] = useState('');
 
-  const handleInspectProof = (url) => {
-    if (url) setProofModalUrl(url);
+  const handleInspectProof = async (url, txId) => {
+    if (url) {
+      setProofModalUrl(url);
+    } else if (txId) {
+      setProofModalUrl('LOADING');
+      try {
+        const res = await fetch(`/api/transactions?id=${txId}`);
+        const data = await res.json();
+        if (data.success) {
+          // If transaction has payoutProof (admin payout receipt) load it, otherwise fallback to user upload proof
+          const targetImage = data.transaction?.payoutProof || data.transaction?.screenshot || '';
+          if (targetImage) {
+            setProofModalUrl(targetImage);
+          } else {
+            alert('No screenshot proof found for this transaction.');
+            setProofModalUrl('');
+          }
+        } else {
+          alert('Failed to load transaction details.');
+          setProofModalUrl('');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Error loading receipt image.');
+        setProofModalUrl('');
+      }
+    }
   };
 
   // Login credentials states
@@ -80,6 +105,7 @@ export default function DistributorPortal() {
 
   const { data: settingsData } = useSWR('/api/settings', fetcher);
   const usdtAddress = settingsData?.settings?.usdtAddress || '';
+  const usdtQrCode = settingsData?.settings?.usdtQrCode || '';
 
   const { data: webCommTxData, mutate: mutateWebCommTx } = useSWR(
     distSession && distSession.type === 'B' ? `/api/transactions?email=${encodeURIComponent(distSession.email)}&type=WEBSITE_COMMISSION_PAYMENT` : null,
@@ -1165,6 +1191,19 @@ export default function DistributorPortal() {
                         </div>
                       </div>
 
+                      {usdtQrCode && (
+                        <div style={{ textAlign: 'center', marginBottom: '1.25rem', background: '#040509', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.02)' }}>
+                          <span style={{ color: '#888', display: 'block', fontSize: '0.65rem', marginBottom: '0.4rem' }}>TRC20 PAYMENT QR CODE:</span>
+                          <img
+                            src={usdtQrCode}
+                            alt="TRC20 QR Code"
+                            onClick={() => handleInspectProof(usdtQrCode)}
+                            style={{ width: '140px', height: '140px', objectFit: 'contain', margin: '0 auto', display: 'block', cursor: 'pointer', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}
+                            title="Click to view full-size QR Code"
+                          />
+                        </div>
+                      )}
+
                       <form onSubmit={handleRequestWebPayment} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                         <div className="input-group">
                           <label style={{ fontSize: '0.7rem' }}>Payment Amount ($)</label>
@@ -1227,12 +1266,13 @@ export default function DistributorPortal() {
                               <th style={{ padding: '0.5rem' }}>HASH/TAG</th>
                               <th style={{ padding: '0.5rem' }}>AMOUNT</th>
                               <th style={{ padding: '0.5rem' }}>STATUS</th>
+                              <th style={{ padding: '0.5rem' }}>RECEIPT / NOTES</th>
                             </tr>
                           </thead>
                           <tbody>
                             {webPaymentsList.length === 0 ? (
                               <tr>
-                                <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>No website commission payment history.</td>
+                                <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>No website commission payment history.</td>
                               </tr>
                             ) : (
                               webPaymentsList.map(tx => (
@@ -1250,6 +1290,23 @@ export default function DistributorPortal() {
                                       background: tx.status === 'SUCCESS' ? 'rgba(46,204,113,0.1)' : tx.status === 'FAILED' ? 'rgba(239,68,68,0.1)' : 'rgba(241,196,15,0.1)',
                                       color: tx.status === 'SUCCESS' ? '#2ecc71' : tx.status === 'FAILED' ? '#ef4444' : '#f1c40f'
                                     }}>{tx.status}</span>
+                                  </td>
+                                  <td style={{ padding: '0.6rem 0.5rem' }}>
+                                    {tx.payoutProof ? (
+                                      <button
+                                        onClick={() => handleInspectProof(null, tx.id)}
+                                        style={{ border: 'none', background: '#3498db', color: '#fff', borderRadius: '4px', padding: '0.2rem 0.4rem', fontSize: '0.6rem', cursor: 'pointer', fontWeight: 'bold', display: 'inline-flex', gap: '0.25rem', alignItems: 'center' }}
+                                      >
+                                        <i className="fa-solid fa-receipt"></i> View Receipt
+                                      </button>
+                                    ) : (
+                                      <span style={{ color: '#555' }}>No receipt</span>
+                                    )}
+                                    {tx.note && (
+                                      <div style={{ fontSize: '0.65rem', color: '#aaa', marginTop: '0.25rem', maxWidth: '200px', whiteSpace: 'normal' }}>
+                                        Note: {tx.note}
+                                      </div>
+                                    )}
                                   </td>
                                 </tr>
                               ))
@@ -1336,12 +1393,13 @@ export default function DistributorPortal() {
                               <th style={{ padding: '0.5rem' }}>ADDRESS</th>
                               <th style={{ padding: '0.5rem' }}>AMOUNT</th>
                               <th style={{ padding: '0.5rem' }}>STATUS</th>
+                              <th style={{ padding: '0.5rem' }}>RECEIPT / NOTES</th>
                             </tr>
                           </thead>
                           <tbody>
                             {commWithdrawals.length === 0 ? (
                               <tr>
-                                <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>No commission withdrawals requested.</td>
+                                <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>No commission withdrawals requested.</td>
                               </tr>
                             ) : (
                               commWithdrawals.map(tx => (
@@ -1359,6 +1417,23 @@ export default function DistributorPortal() {
                                       background: tx.status === 'SUCCESS' ? 'rgba(46,204,113,0.1)' : tx.status === 'FAILED' ? 'rgba(239,68,68,0.1)' : 'rgba(241,196,15,0.1)',
                                       color: tx.status === 'SUCCESS' ? '#2ecc71' : tx.status === 'FAILED' ? '#ef4444' : '#f1c40f'
                                     }}>{tx.status}</span>
+                                  </td>
+                                  <td style={{ padding: '0.6rem 0.5rem' }}>
+                                    {tx.payoutProof ? (
+                                      <button
+                                        onClick={() => handleInspectProof(null, tx.id)}
+                                        style={{ border: 'none', background: '#3498db', color: '#fff', borderRadius: '4px', padding: '0.2rem 0.4rem', fontSize: '0.6rem', cursor: 'pointer', fontWeight: 'bold', display: 'inline-flex', gap: '0.25rem', alignItems: 'center' }}
+                                      >
+                                        <i className="fa-solid fa-receipt"></i> View Receipt
+                                      </button>
+                                    ) : (
+                                      <span style={{ color: '#555' }}>No receipt</span>
+                                    )}
+                                    {tx.note && (
+                                      <div style={{ fontSize: '0.65rem', color: '#aaa', marginTop: '0.25rem', maxWidth: '200px', whiteSpace: 'normal' }}>
+                                        Note: {tx.note}
+                                      </div>
+                                    )}
                                   </td>
                                 </tr>
                               ))
@@ -1846,7 +1921,14 @@ export default function DistributorPortal() {
           }}
         >
           <div style={{ position: 'relative', maxWidth: '90%', maxHeight: '90%' }} onClick={(e) => e.stopPropagation()}>
-            <img src={proofModalUrl} alt="Deposit Proof" style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain', borderRadius: '8px', border: '2px solid var(--gold-primary)' }} />
+            {proofModalUrl === 'LOADING' ? (
+              <div style={{ padding: '3rem', textAlign: 'center', background: '#0e111d', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '2.5rem', color: 'var(--gold-primary)', marginBottom: '1rem', display: 'block' }}></i>
+                <p style={{ color: '#fff', fontSize: '0.8rem', margin: 0 }}>Fetching proof image from secure server...</p>
+              </div>
+            ) : (
+              <img src={proofModalUrl} alt="Deposit Proof" style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain', borderRadius: '8px', border: '2px solid var(--gold-primary)' }} />
+            )}
             <button 
               onClick={() => setProofModalUrl('')}
               style={{
