@@ -21,6 +21,7 @@ const PromotionsTab = lazy(() => import('./admin/PromotionsTab'));
 const TxSearchTab = lazy(() => import('./admin/TxSearchTab'));
 const DistributorsTab = lazy(() => import('./admin/DistributorsTab'));
 const DeletedPlayersTab = lazy(() => import('./admin/DeletedPlayersTab'));
+const WebsitePaymentsTab = lazy(() => import('./admin/WebsitePaymentsTab'));
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -642,6 +643,31 @@ export default function AdminDashboard({
 
           {!adminUser?.distributorId && adminUser?.role === 'admin' && (
             <button
+              onClick={() => { setActiveTab('website_payments'); setSidebarOpen(false); }}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                background: activeTab === 'website_payments' ? 'var(--gold-primary)' : 'none',
+                color: activeTab === 'website_payments' ? '#111' : '#fff',
+                fontSize: '0.8rem',
+                fontWeight: 'bold',
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <i className="fa-solid fa-file-invoice-dollar" style={{ width: '18px' }}></i>
+              <span>Website Payments</span>
+            </button>
+          )}
+
+          {!adminUser?.distributorId && adminUser?.role === 'admin' && (
+            <button
               onClick={() => { setActiveTab('deleted_accounts'); setSidebarOpen(false); }}
               style={{
                 width: '100%',
@@ -784,6 +810,13 @@ export default function AdminDashboard({
           )}
           {activeTab === 'deleted_accounts' && !adminUser?.distributorId && adminUser?.role === 'admin' && (
             <DeletedPlayersTab />
+          )}
+          {activeTab === 'website_payments' && !adminUser?.distributorId && adminUser?.role === 'admin' && (
+            <WebsitePaymentsTab
+              onInspectProof={onInspectProof}
+              completedActionIds={completedActionIds}
+              adminUser={adminUser}
+            />
           )}
           {activeTab === 'settings' && hasAccess('settings') && (
             <SettingsTab onUpdateSettings={onUpdateSettings} />
