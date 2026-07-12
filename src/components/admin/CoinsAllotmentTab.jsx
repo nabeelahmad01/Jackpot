@@ -203,18 +203,13 @@ export default function CoinsAllotmentTab({
                   </td>
                   <td>
                     {noti.status === 'PENDING' || noti.status === 'CLAIM_REQUESTED' || noti.status === 'HOLD' ? (
-                      noti.distributorType === 'B' ? (
-                        <span className="admin-badge-preview b-hold" style={{ fontSize: '0.65rem', background: '#3b82f6', color: '#fff', border: '1px solid rgba(59,130,246,0.3)', padding: '0.25rem 0.5rem', borderRadius: '4px' }}>
-                          Managed by {noti.distributorName || 'Distributor'}
-                        </span>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', minWidth: '150px' }}>
-                          <div style={{ display: 'flex', gap: '0.35rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', minWidth: '150px' }}>
+                        <div style={{ display: 'flex', gap: '0.35rem' }}>
                           <button
                             disabled={processingIds[noti.id]}
                             onClick={wrapAction(noti.id, () => handleUpdate(noti.id, 'COMPLETED', true))}
                             className="submit-btn"
-                            style={{ background: 'linear-gradient(135deg, #00ff66 0%, #00a844 100%)', color: '#000', margin: 0, padding: '0.35rem 0.5rem', width: 'auto', display: 'inline-flex', gap: '0.2rem', alignItems: 'center', fontWeight: 'bold', opacity: processingIds[noti.id] ? 0.6 : 1 }}
+                            style={{ background: 'linear-gradient(135deg, #00ff66 0%, #00a844 100%)', color: '#000', margin: 0, padding: '0.35rem 0.5rem', width: 'auto', display: 'inline-flex', gap: '0.25rem', alignItems: 'center', fontWeight: 'bold', opacity: processingIds[noti.id] ? 0.6 : 1 }}
                           >
                             {processingIds[noti.id] ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-circle-check"></i>}
                             <span style={{ fontSize: '0.65rem' }}>DONE</span>
@@ -227,7 +222,7 @@ export default function CoinsAllotmentTab({
                                 setHoldNoteText("");
                               }}
                               className="submit-btn"
-                              style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: '#000', margin: 0, padding: '0.35rem 0.5rem', width: 'auto', display: 'inline-flex', gap: '0.2rem', alignItems: 'center', fontWeight: 'bold' }}
+                              style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: '#000', margin: 0, padding: '0.35rem 0.5rem', width: 'auto', display: 'inline-flex', gap: '0.25rem', alignItems: 'center', fontWeight: 'bold' }}
                             >
                               <i className="fa-solid fa-pause"></i>
                               <span style={{ fontSize: '0.65rem' }}>HOLD</span>
@@ -243,7 +238,7 @@ export default function CoinsAllotmentTab({
                               style={{ width: '100%', minHeight: '60px', background: '#070913', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.7rem', padding: '0.35rem', borderRadius: '4px', resize: 'vertical' }}
                               placeholder="Type instructions manually..."
                             />
-                            <div style={{ display: 'flex', gap: '0.3.rem', justifyContent: 'flex-end' }}>
+                            <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'flex-end' }}>
                               <button
                                 onClick={() => setActiveHoldId(null)}
                                 className="action-row-btn"
@@ -265,8 +260,13 @@ export default function CoinsAllotmentTab({
                             </div>
                           </div>
                         )}
-                        </div>
-                      )
+
+                        {noti.distributorType === 'B' && (
+                          <span style={{ fontSize: '0.6rem', color: '#3b82f6', display: 'block' }}>
+                            Managed by {noti.distributorName || 'Distributor'}
+                          </span>
+                        )}
+                      </div>
                     ) : (
                       <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>Fulfilled</span>
                     )}

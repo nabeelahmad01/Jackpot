@@ -258,11 +258,7 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
                   <td>
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                       {req.status === 'PENDING' && (
-                        req.distributorType === 'B' ? (
-                          <span className="admin-badge-preview b-hold" style={{ fontSize: '0.65rem', background: '#3b82f6', color: '#fff', border: '1px solid rgba(59,130,246,0.3)', padding: '0.25rem 0.5rem', borderRadius: '4px' }}>
-                            Managed by {req.distributorName || 'Distributor'}
-                          </span>
-                        ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                           <button
                             disabled={processingIds[req.id]}
                             onClick={wrapAction(req.id, () => handleApprove(req))}
@@ -283,7 +279,12 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
                               {processingIds[req.id] ? 'Approving...' : 'Approve'}
                             </span>
                           </button>
-                        )
+                          {req.distributorType === 'B' && (
+                            <span style={{ fontSize: '0.6rem', color: '#3b82f6', display: 'block', textAlign: 'center' }}>
+                              Managed by {req.distributorName || 'Distributor'}
+                            </span>
+                          )}
+                        </div>
                       )}
                     </div>
                   </td>
