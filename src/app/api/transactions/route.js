@@ -322,7 +322,8 @@ export async function POST(req) {
         status: 'PENDING',
         read: false,
         timestamp: new Date().toISOString(),
-        transactionId: txObject.id
+        transactionId: txObject.id,
+        distributorId: distId
       });
     }
 
@@ -433,7 +434,8 @@ export async function PUT(req) {
           status: 'PENDING',
           read: false,
           timestamp: new Date().toISOString(),
-          transactionId: originalTx.id // Linked parent transaction!
+          transactionId: originalTx.id, // Linked parent transaction!
+          distributorId: originalTx.distributorId || ''
         });
 
         // 4. Referral System Bonus: Check if this depositor was referred by someone
