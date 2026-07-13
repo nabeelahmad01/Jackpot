@@ -153,6 +153,7 @@ export default function DistributorPortal() {
 
   // Form states for creating Gateway (Type B)
   const [gwName, setGwName] = useState('');
+  const [claimedRemainderIds, setClaimedRemainderIds] = useState([]);
   const [gwSubtitle, setGwSubtitle] = useState('');
   const [gwTag, setGwTag] = useState('');
   const [gwPhone, setGwPhone] = useState('');
@@ -355,6 +356,7 @@ export default function DistributorPortal() {
       return;
     }
     try {
+      setClaimedRemainderIds(prev => [...prev, tx.id]);
       const response = await fetch('/api/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1719,7 +1721,7 @@ export default function DistributorPortal() {
                                   <td style={{ padding: '0.6rem 0.5rem' }}>
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center' }}>
                                       {tx.status === 'SUCCESS' && tx.payoutHold > 0 && !tx.remainderPaid && (
-                                        tx.remainderRequested ? (
+                                        (tx.remainderRequested || claimedRemainderIds.includes(tx.id)) ? (
                                           <span style={{ fontSize: '0.6rem', color: 'var(--gold-primary)', fontWeight: 'bold', background: 'rgba(255,215,0,0.1)', padding: '0.15rem 0.35rem', borderRadius: '4px' }}>
                                             [Remainder Requested]
                                           </span>

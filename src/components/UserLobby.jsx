@@ -45,6 +45,7 @@ export default function UserLobby({
   const [selectedReferralToClaim, setSelectedReferralToClaim] = useState(null);
   const [selectedGameForReferral, setSelectedGameForReferral] = useState('');
   const [claimingReferralId, setClaimingReferralId] = useState(null);
+  const [claimedRemainderIds, setClaimedRemainderIds] = useState([]);
 
   // Sync state changes to browser URL pathnames
   useEffect(() => {
@@ -439,6 +440,7 @@ export default function UserLobby({
 
     setActionLoading(true);
     try {
+      setClaimedRemainderIds(prev => [...prev, tx.id]);
       onSubmitTransaction({
         isRemainderRequest: true,
         parentTxId: tx.id,
@@ -1768,7 +1770,7 @@ export default function UserLobby({
                                     <span style={{ fontSize: '0.725rem', opacity: 0.8 }}>
                                       {tx.note && tx.status !== 'FAILED' ? tx.note : (tx.code === 'SIGNUP-FREE3' ? 'Freeplay (SIGNUP-FREE3)' : `${tx.gateway} (${tx.code})`)}
                                     </span>
-                                    {tx.type === 'WITHDRAW' && tx.status === 'SUCCESS' && tx.payoutHold > 0 && !tx.remainderRequested && !tx.remainderPaid && (
+                                    {tx.type === 'WITHDRAW' && tx.status === 'SUCCESS' && tx.payoutHold > 0 && !tx.remainderRequested && !tx.remainderPaid && !claimedRemainderIds.includes(tx.id) && (
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -1800,7 +1802,7 @@ export default function UserLobby({
                                         Claim Remainder (${parseFloat(tx.payoutHold).toFixed(2)})
                                       </button>
                                     )}
-                                    {tx.type === 'WITHDRAW' && tx.status === 'SUCCESS' && tx.payoutHold > 0 && tx.remainderRequested && !tx.remainderPaid && (
+                                    {tx.type === 'WITHDRAW' && tx.status === 'SUCCESS' && tx.payoutHold > 0 && (tx.remainderRequested || claimedRemainderIds.includes(tx.id)) && !tx.remainderPaid && (
                                       <span style={{ fontSize: '0.625rem', color: '#888', fontStyle: 'italic' }}>
                                         Remainder Requested
                                       </span>
