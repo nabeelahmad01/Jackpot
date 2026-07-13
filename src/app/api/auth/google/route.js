@@ -8,7 +8,7 @@ function generateReferralCode() {
 
 export async function POST(req) {
   try {
-    const { email, name, referredBy, distributorId } = await req.json();
+    const { email, name, referredBy, distributorId, agentCode } = await req.json();
 
     if (!email || !name) {
       return NextResponse.json(
@@ -38,15 +38,19 @@ export async function POST(req) {
         referralCode = generateReferralCode();
       }
 
-      // Resolve the referrer by referralCode and inherit distributorId
+      // Resolve the referrer by referralCode and inherit distributorId/agentCode
       let resolvedReferrer = '';
       let inheritedDistributorId = '';
+      let inheritedAgentCode = '';
       if (referredBy && referredBy !== 'null' && referredBy !== 'undefined') {
         const referrer = await usersCollection.findOne({ referralCode: referredBy.trim() });
         if (referrer) {
           resolvedReferrer = referrer.email;
           if (referrer.distributorId) {
             inheritedDistributorId = referrer.distributorId;
+          }
+          if (referrer.agentCode) {
+            inheritedAgentCode = referrer.agentCode;
           }
         }
       }
@@ -60,7 +64,8 @@ export async function POST(req) {
         coins: 100,
         referralCode,
         referredBy: resolvedReferrer,
-        distributorId: (distributorId && distributorId !== 'null' && distributorId !== 'undefined') ? distributorId : (inheritedDistributorId || '')
+        distributorId: (distributorId && distributorId !== 'null' && distributorId !== 'undefined') ? distributorId : (inheritedDistributorId || ''),
+        agentCode: (agentCode && agentCode !== 'null' && agentCode !== 'undefined') ? agentCode : (inheritedAgentCode || '')
       };
       const result = await usersCollection.insertOne(matchedUser);
       matchedUser._id = result.insertedId;

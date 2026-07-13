@@ -87,6 +87,10 @@ export default function Home() {
       if (dist) {
         localStorage.setItem('jackpot_distributor_id', dist);
       }
+      const agentParam = params.get('agent');
+      if (agentParam) {
+        localStorage.setItem('jackpot_agent_code', agentParam);
+      }
     }
 
     const savedSession = JSON.parse(localStorage.getItem('jackpot_session') || 'null');

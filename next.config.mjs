@@ -42,6 +42,16 @@ const nextConfig = {
         source: '/distributor/:tab',
         destination: '/distributor',
       },
+      // Affiliate agent portal sub-routes rewrite to '/affiliate'
+      {
+        source: '/affiliate/:tab',
+        destination: '/affiliate',
+      },
+      // Agent player login landing
+      {
+        source: '/agent-player-login',
+        destination: '/',
+      },
       // Staff dashboards
       {
         source: '/boss/:tab',

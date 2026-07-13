@@ -48,7 +48,8 @@ export default function AuthPortal({
                 email: userEmail,
                 name: userName,
                 referredBy: localStorage.getItem('jackpot_ref_code') || '',
-                distributorId: localStorage.getItem('jackpot_distributor_id') || ''
+                distributorId: localStorage.getItem('jackpot_distributor_id') || '',
+                agentCode: localStorage.getItem('jackpot_agent_code') || ''
               })
             });
             const googleData = await googleRes.json();
@@ -99,7 +100,8 @@ export default function AuthPortal({
                 email: testUser.email,
                 name: testUser.name,
                 referredBy: localStorage.getItem('jackpot_ref_code') || '',
-                distributorId: localStorage.getItem('jackpot_distributor_id') || ''
+                distributorId: localStorage.getItem('jackpot_distributor_id') || '',
+                agentCode: localStorage.getItem('jackpot_agent_code') || ''
               })
             });
             const googleData = await googleRes.json();
@@ -361,7 +363,8 @@ export default function AuthPortal({
         password: regPassword,
         role: 'user',
         referredBy: localStorage.getItem('jackpot_ref_code') || '',
-        distributorId: localStorage.getItem('jackpot_distributor_id') || ''
+        distributorId: localStorage.getItem('jackpot_distributor_id') || '',
+        agentCode: localStorage.getItem('jackpot_agent_code') || ''
       };
 
       triggerLoading(1200, () => {

@@ -46,7 +46,7 @@ export async function GET(req) {
 // POST registers a new user
 export async function POST(req) {
   try {
-    const { email, password, name, role, referredBy, distributorId } = await req.json();
+    const { email, password, name, role, referredBy, distributorId, agentCode } = await req.json();
 
     if (!email || !password || !name) {
       return NextResponse.json(
@@ -74,15 +74,19 @@ export async function POST(req) {
       referralCode = generateReferralCode();
     }
 
-    // Resolve the referrer: look up by referralCode, store their email and inherit distributorId
+    // Resolve the referrer: look up by referralCode, store their email and inherit distributorId/agentCode
     let resolvedReferrer = '';
     let inheritedDistributorId = '';
+    let inheritedAgentCode = '';
     if (referredBy) {
       const referrer = await usersCollection.findOne({ referralCode: referredBy.trim() });
       if (referrer) {
         resolvedReferrer = referrer.email;
         if (referrer.distributorId) {
           inheritedDistributorId = referrer.distributorId;
+        }
+        if (referrer.agentCode) {
+          inheritedAgentCode = referrer.agentCode;
         }
       }
     }
@@ -95,7 +99,8 @@ export async function POST(req) {
       coins: 100,
       referralCode,
       referredBy: resolvedReferrer,
-      distributorId: distributorId || inheritedDistributorId || ''
+      distributorId: distributorId || inheritedDistributorId || '',
+      agentCode: agentCode || inheritedAgentCode || ''
     };
 
     const result = await usersCollection.insertOne(newUser);
