@@ -54,6 +54,11 @@ export async function POST(req) {
 
     const cleanReferrerEmail = referral.referrerEmail.toLowerCase().trim();
 
+    // Fetch referrer's profile to extract distributorId
+    const usersCollection = db.collection('users');
+    const referrerUser = await usersCollection.findOne({ email: cleanReferrerEmail });
+    const distId = referrerUser ? (referrerUser.distributorId || '') : '';
+
     // 2. Check if referrer has a game account for gameTitle
     const account = await gameAccountsCollection.findOne({
       userEmail: cleanReferrerEmail,
@@ -71,7 +76,8 @@ export async function POST(req) {
         totalCoins: Number(referral.rewardCoins),
         status: 'PENDING',
         read: false,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        distributorId: distId
       });
 
       // Mark as CLAIMED
@@ -102,7 +108,8 @@ export async function POST(req) {
           userEmail: cleanReferrerEmail,
           status: 'PENDING',
           date: new Date().toLocaleString(),
-          referralRewardId: id // Link to pending referral
+          referralRewardId: id, // Link to pending referral
+          distributorId: distId
         });
       } else {
         // Link the existing pending account request to this referral reward

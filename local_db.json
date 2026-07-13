@@ -4,7 +4,8 @@
       "name": "System Admin",
       "email": "admin@jackpot.com",
       "password": "admin123",
-      "role": "admin"
+      "role": "admin",
+      "lastActive": "2026-07-13T11:37:12.561Z"
     },
     {
       "name": "Demo Player",
@@ -145,6 +146,112 @@
       "firstDepositBonus": 100,
       "regularDepositBonus": 30,
       "_id": "6kk5lw99344"
+    },
+    {
+      "id": "frontend_settings",
+      "logoUrl": "/jackpot_lion_mascot.png?v=2",
+      "notificationSoundUrl": "https://raw.githubusercontent.com/AUTOMATIC1111/stable-diffusion-webui/master/notification.mp3",
+      "withdrawNotice": "Fastest Withdrawals inside 5 Minutes!",
+      "cashoutNotice": "Standard cashout processing hours: 9 AM - 11 PM EST",
+      "slides": [
+        "/slide1.jpg",
+        "/slide2.jpg",
+        "/slide3.jpg"
+      ],
+      "chimeActive": true,
+      "venmoActive": true,
+      "cashappActive": true,
+      "firstDepositBonus": 300,
+      "signupFreeplay": 3,
+      "minimumDepositLimit": 5,
+      "minimumWithdrawalLimit": 5,
+      "landingWelcome": "WELCOME TO JACKPOT ROYALS",
+      "landingGrab": "Grab amazing bonuses and win big!",
+      "landingQuickSignup": "Quick signup",
+      "landingSignupWithGoogle": "Sign up with Google",
+      "landingOrCreate": "or create account with email",
+      "landingMessengerWarning": "Google sign-in is not supported inside Messenger. Please open this page in Chrome or Safari.",
+      "lobbyHeroPromo": "GET 300% SIGNUP BONUS ON YOUR FIRST DEPOSIT",
+      "lobbyTrustBadge1": "Instant Withdrawals",
+      "lobbyTrustBadge2": "Secure & Safe",
+      "lobbyTrustBadge3": "Trusted by 1B+ Players",
+      "lobbyFreeplayValue": "$3",
+      "lobbyFreeplayLabel": "FREEPLAY",
+      "lobbyFreeplayCondition": "ON SIGNUP!",
+      "lobbyBullet1Title": "PLAY",
+      "lobbyBullet1Desc": "Explore exciting games",
+      "lobbyBullet2Title": "WIN",
+      "lobbyBullet2Desc": "Win real rewards",
+      "lobbyBullet3Title": "CASH OUT",
+      "lobbyBullet3Desc": "Fast withdrawals",
+      "lobbyFreeplayClaimBtn": "CLAIM FREEPLAY NOW",
+      "marqueePayouts": [
+        {
+          "name": "Elizabeth Audrey",
+          "amount": "$208.00",
+          "time": "1 hour ago",
+          "color": "av-purple",
+          "init": "EA"
+        },
+        {
+          "name": "Jamie",
+          "amount": "$30.00",
+          "time": "1 hour ago",
+          "color": "av-blue",
+          "init": "JM"
+        },
+        {
+          "name": "Angel",
+          "amount": "$90.00",
+          "time": "1 hour ago",
+          "color": "av-green",
+          "init": "AN"
+        },
+        {
+          "name": "Ashley",
+          "amount": "$45.00",
+          "time": "1 hour ago",
+          "color": "av-orange",
+          "init": "AS"
+        },
+        {
+          "name": "Ryan G.",
+          "amount": "$420.00",
+          "time": "2 hours ago",
+          "color": "av-red",
+          "init": "RG"
+        },
+        {
+          "name": "Michael S.",
+          "amount": "$150.00",
+          "time": "2 hours ago",
+          "color": "av-purple",
+          "init": "MS"
+        }
+      ],
+      "cashoutRules": [
+        {
+          "title": "1. Account Verification",
+          "description": "Before requesting your first cashout, your email must be verified. Go to customer support if you need assistance updating details."
+        },
+        {
+          "title": "2. Playthrough Requirements",
+          "description": "Sign-up bonuses and deposit match values carry a standard 1x playthrough requirement before funds are eligible for withdrawal requests."
+        },
+        {
+          "title": "3. Minimum & Maximum Cashouts",
+          "description": "The minimum cashout limit is $5. Daily maximum cashouts are capped at $5,000 for standard players. Support can raise limits for VIP accounts."
+        },
+        {
+          "title": "4. Payout Duration",
+          "description": "Withdrawal requests are processed instantly or within 10-15 minutes on average via digital wallets."
+        }
+      ],
+      "proofScreenshots": [],
+      "_id": "zyanmqd2326"
     }
-  ]
+  ],
+  "coinsNotifications": [],
+  "pendingReferrals": [],
+  "distributors": []
 }

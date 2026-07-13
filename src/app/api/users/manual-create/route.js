@@ -25,6 +25,27 @@ export async function POST(req) {
       );
     }
 
+    // Resolve referrer and inherit distributorId
+    let resolvedReferrer = '';
+    let inheritedDistributorId = '';
+    if (referredBy && referredBy.trim() !== '') {
+      const trimmedRef = referredBy.trim();
+      const referrer = await usersCollection.findOne({
+        $or: [
+          { email: trimmedRef.toLowerCase() },
+          { referralCode: trimmedRef.toUpperCase() }
+        ]
+      });
+      if (referrer) {
+        resolvedReferrer = referrer.email;
+        if (referrer.distributorId) {
+          inheritedDistributorId = referrer.distributorId;
+        }
+      } else {
+        resolvedReferrer = trimmedRef; // fallback
+      }
+    }
+
     // Generate secure temporary password and a unique referral code
     const tempPassword = password && password.trim() ? password.trim() : Math.random().toString(36).substring(2, 10);
     const uniqueReferral = Math.random().toString(36).substring(2, 7).toUpperCase();
@@ -36,7 +57,8 @@ export async function POST(req) {
       role: 'user', // default player role
       coins: 0,
       referralCode: uniqueReferral,
-      referredBy: referredBy ? referredBy.trim() : '',
+      referredBy: resolvedReferrer,
+      distributorId: inheritedDistributorId,
       createdAt: new Date().toISOString()
     };
 

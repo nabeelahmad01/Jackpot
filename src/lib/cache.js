@@ -19,7 +19,23 @@ export const cache = {
   },
   
   del(key) {
-    cacheStore.delete(key);
+    if (typeof key === 'string') {
+      const lowerKey = key.toLowerCase();
+      for (const k of cacheStore.keys()) {
+        if (typeof k === 'string') {
+          const lowerK = k.toLowerCase();
+          if (
+            lowerK === lowerKey || 
+            lowerK.startsWith(lowerKey + '_') || 
+            lowerK.startsWith(lowerKey.replace('_all', '') + '_')
+          ) {
+            cacheStore.delete(k);
+          }
+        }
+      }
+    } else {
+      cacheStore.delete(key);
+    }
   },
   
   clear() {
