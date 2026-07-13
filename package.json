@@ -12,6 +12,7 @@
     "@capacitor/cli": "^8.4.1",
     "@capacitor/core": "^8.4.1",
     "@react-oauth/google": "^0.13.5",
+    "framer-motion": "^12.42.2",
     "mongodb": "^7.4.0",
     "next": "16.2.10",
     "nodemailer": "^9.0.3",

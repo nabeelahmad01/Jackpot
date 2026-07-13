@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { PaymentMethodModal } from './Modals';
 import ReferralCenter from './ReferralCenter';
 
@@ -44,6 +45,49 @@ export default function UserLobby({
   const [selectedReferralToClaim, setSelectedReferralToClaim] = useState(null);
   const [selectedGameForReferral, setSelectedGameForReferral] = useState('');
   const [claimingReferralId, setClaimingReferralId] = useState(null);
+
+  // Sync state changes to browser URL pathnames
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let targetPath = '/lobby';
+    if (lobbySubView === 'referrals') {
+      targetPath = '/lobby/referrals';
+    } else if (activeGame) {
+      const slug = activeGame.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      targetPath = `/lobby/game/${slug}`;
+    }
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({}, '', targetPath);
+    }
+  }, [lobbySubView, activeGame]);
+
+  // Sync browser back/forward buttons (popstate) to local state
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = window.location.pathname;
+      if (path === '/lobby/referrals') {
+        setLobbySubView('referrals');
+        setActiveGame(null);
+      } else if (path.startsWith('/lobby/game/')) {
+        const slug = path.replace('/lobby/game/', '');
+        const matched = games.find(g => g.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') === slug);
+        if (matched) {
+          setActiveGame(matched);
+          setLobbySubView('main');
+        } else {
+          setActiveGame(null);
+          setLobbySubView('main');
+          window.history.replaceState({}, '', '/lobby');
+        }
+      } else {
+        setLobbySubView('main');
+        setActiveGame(null);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    handlePopState(); // Sync initial path on mount
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [games]);
 
   const fetchPendingReferrals = () => {
     if (!currentUserEmail) return;
@@ -704,8 +748,16 @@ export default function UserLobby({
       {/* ==============================================================
            VIEW A: MAIN PLAYER LOBBY
            ============================================================== */}
-      {lobbySubView === 'referrals' ? (
-        <div className="lobby-content-container">
+      <AnimatePresence mode="wait">
+        {lobbySubView === 'referrals' ? (
+          <motion.div
+            key="referrals"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.2 }}
+            className="lobby-content-container"
+          >
           <ReferralCenter
             currentUserEmail={currentUserEmail}
             referralCode={currentUser?.referralCode || ''}
@@ -714,9 +766,16 @@ export default function UserLobby({
             onOpenSupport={onOpenSupport}
             showToast={showToast}
           />
-        </div>
+        </motion.div>
       ) : !activeGame ? (
-        <div className="lobby-content-container">
+        <motion.div
+          key="main-lobby"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: 20 }}
+          transition={{ duration: 0.2 }}
+          className="lobby-content-container"
+        >
           {/* Pending Referral Claims Alert Card */}
           {pendingReferrals && pendingReferrals.length > 0 && (
             <div style={{ marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -1205,12 +1264,19 @@ export default function UserLobby({
               </div>
             </div>
           </section>
-        </div>
+        </motion.div>
       ) : (
         /* ==============================================================
              VIEW B: GAME ACCESS DRILL-DOWN PANEL
              ============================================================== */
-        <div className="lobby-content-container game-access-portal-view">
+        <motion.div
+          key="game-portal"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.25 }}
+          className="lobby-content-container game-access-portal-view"
+        >
 
           <div className="game-access-header">
             <div className="game-header-brand">
@@ -1781,8 +1847,9 @@ export default function UserLobby({
               )}
             </>
           )}
-        </div>
+        </motion.div>
       )}
+    </AnimatePresence>
 
       {/* Choose Payment Method Modal screen */}
       <PaymentMethodModal

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import useSWR, { mutate } from 'swr';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // Lazy load the sub-tab components to optimize bundle size and initial load speed
 const OverviewTab = lazy(() => import('./admin/OverviewTab'));
@@ -47,6 +48,34 @@ export default function AdminDashboard({
 }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Sync tab state changes to browser URL pathnames
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const path = window.location.pathname;
+    const parts = path.split('/').filter(Boolean);
+    const basePrefix = parts[0] || 'admin';
+    const targetPath = `/${basePrefix}/${activeTab}`;
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({}, '', targetPath);
+    }
+  }, [activeTab]);
+
+  // Sync browser back/forward buttons (popstate) to local state
+  useEffect(() => {
+    const handlePathChange = () => {
+      const path = window.location.pathname;
+      const parts = path.split('/').filter(Boolean);
+      if (parts.length > 1) {
+        setActiveTab(parts[1]);
+      } else {
+        setActiveTab('dashboard');
+      }
+    };
+    window.addEventListener('popstate', handlePathChange);
+    handlePathChange(); // Sync initial view on mount
+    return () => window.removeEventListener('popstate', handlePathChange);
+  }, []);
   const [processingIds, setProcessingIds] = useState({});
 
   // Use SWR to poll counts/stats for the sidebar badges
@@ -769,78 +798,89 @@ export default function AdminDashboard({
             <p>Loading tab content...</p>
           </div>
         }>
-          {activeTab === 'dashboard' && hasAccess('dashboard') && (
-            <OverviewTab adminUser={adminUser} onUpdateGameCoinsPool={onUpdateGameCoinsPool} />
-          )}
-          {activeTab === 'games' && hasAccess('games') && (
-            <GamesLibraryTab onAddGameClick={onAddGameClick} onEditGameClick={onEditGameClick} onDeleteGame={onDeleteGame} />
-          )}
-          {activeTab === 'users' && hasAccess('users') && (
-            <PlayerAccountsTab adminUser={adminUser} onDeleteUser={onDeleteUser} />
-          )}
-          {activeTab === 'requests' && hasAccess('requests') && (
-            <RequestsTab adminUser={adminUser} onApproveRequest={onApproveRequest} completedActionIds={completedActionIds} processingIds={processingIds} wrapAction={wrapAction} />
-          )}
-          {activeTab === 'ledger' && hasAccess('ledger') && (
-            <LedgerTab
-              onInspectProof={onInspectProof}
-              onApproveTransaction={onApproveTransaction}
-              onFailTransaction={onFailTransaction}
-              completedActionIds={completedActionIds}
-              processingIds={processingIds}
-              wrapAction={wrapAction}
-              adminUser={adminUser}
-            />
-          )}
-          {activeTab === 'gateways' && hasAccess('gateways') && (
-            <GatewaysTab onAddGatewayClick={onAddGatewayClick} onEditGatewayClick={onEditGatewayClick} onDeleteGateway={onDeleteGateway} />
-          )}
-          {activeTab === 'coins' && hasAccess('coins') && (
-            <CoinsAllotmentTab
-              onUpdateCoinsNotification={onUpdateCoinsNotification}
-              completedActionIds={completedActionIds}
-              processingIds={processingIds}
-              wrapAction={wrapAction}
-              adminUser={adminUser}
-            />
-          )}
-          {activeTab === 'support' && hasAccess('support') && (
-            <SupportTab adminUser={adminUser} />
-          )}
-          {activeTab === 'staff' && hasAccess('staff') && (
-            <StaffTab adminUser={adminUser} onCreateAdmin={onCreateAdmin} onDeleteUser={onDeleteUser} />
-          )}
-          {activeTab === 'distributors' && hasAccess('distributors') && (
-            <DistributorsTab />
-          )}
-          {activeTab === 'deleted_accounts' && !adminUser?.distributorId && adminUser?.role === 'admin' && (
-            <DeletedPlayersTab />
-          )}
-          {activeTab === 'website_payments' && !adminUser?.distributorId && adminUser?.role === 'admin' && (
-            <WebsitePaymentsTab
-              onInspectProof={onInspectProof}
-              completedActionIds={completedActionIds}
-              adminUser={adminUser}
-            />
-          )}
-          {activeTab === 'settings' && hasAccess('settings') && (
-            <SettingsTab onUpdateSettings={onUpdateSettings} />
-          )}
-          {activeTab === 'frontend_settings' && hasAccess('frontend_settings') && (
-            <FrontendSettingsTab adminUser={adminUser} />
-          )}
-          {activeTab === 'shift_reports' && hasAccess('shift_reports') && (
-            <ShiftReportsTab />
-          )}
-          {activeTab === 'shift_dashboard' && hasAccess('shift_dashboard') && (
-            <ShiftDashboardTab adminUser={adminUser} />
-          )}
-          {activeTab === 'promotions' && hasAccess('promotions') && (
-            <PromotionsTab adminUser={adminUser} />
-          )}
-          {activeTab === 'tx_search' && hasAccess('tx_search') && (
-            <TxSearchTab onInspectProof={onInspectProof} adminUser={adminUser} />
-          )}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.15, ease: 'easeOut' }}
+              style={{ width: '100%', height: '100%' }}
+            >
+              {activeTab === 'dashboard' && hasAccess('dashboard') && (
+                <OverviewTab adminUser={adminUser} onUpdateGameCoinsPool={onUpdateGameCoinsPool} />
+              )}
+              {activeTab === 'games' && hasAccess('games') && (
+                <GamesLibraryTab onAddGameClick={onAddGameClick} onEditGameClick={onEditGameClick} onDeleteGame={onDeleteGame} />
+              )}
+              {activeTab === 'users' && hasAccess('users') && (
+                <PlayerAccountsTab adminUser={adminUser} onDeleteUser={onDeleteUser} />
+              )}
+              {activeTab === 'requests' && hasAccess('requests') && (
+                <RequestsTab adminUser={adminUser} onApproveRequest={onApproveRequest} completedActionIds={completedActionIds} processingIds={processingIds} wrapAction={wrapAction} />
+              )}
+              {activeTab === 'ledger' && hasAccess('ledger') && (
+                <LedgerTab
+                  onInspectProof={onInspectProof}
+                  onApproveTransaction={onApproveTransaction}
+                  onFailTransaction={onFailTransaction}
+                  completedActionIds={completedActionIds}
+                  processingIds={processingIds}
+                  wrapAction={wrapAction}
+                  adminUser={adminUser}
+                />
+              )}
+              {activeTab === 'gateways' && hasAccess('gateways') && (
+                <GatewaysTab onAddGatewayClick={onAddGatewayClick} onEditGatewayClick={onEditGatewayClick} onDeleteGateway={onDeleteGateway} />
+              )}
+              {activeTab === 'coins' && hasAccess('coins') && (
+                <CoinsAllotmentTab
+                  onUpdateCoinsNotification={onUpdateCoinsNotification}
+                  completedActionIds={completedActionIds}
+                  processingIds={processingIds}
+                  wrapAction={wrapAction}
+                  adminUser={adminUser}
+                />
+              )}
+              {activeTab === 'support' && hasAccess('support') && (
+                <SupportTab adminUser={adminUser} />
+              )}
+              {activeTab === 'staff' && hasAccess('staff') && (
+                <StaffTab adminUser={adminUser} onCreateAdmin={onCreateAdmin} onDeleteUser={onDeleteUser} />
+              )}
+              {activeTab === 'distributors' && hasAccess('distributors') && (
+                <DistributorsTab />
+              )}
+              {activeTab === 'deleted_accounts' && !adminUser?.distributorId && adminUser?.role === 'admin' && (
+                <DeletedPlayersTab />
+              )}
+              {activeTab === 'website_payments' && !adminUser?.distributorId && adminUser?.role === 'admin' && (
+                <WebsitePaymentsTab
+                  onInspectProof={onInspectProof}
+                  completedActionIds={completedActionIds}
+                  adminUser={adminUser}
+                />
+              )}
+              {activeTab === 'settings' && hasAccess('settings') && (
+                <SettingsTab onUpdateSettings={onUpdateSettings} />
+              )}
+              {activeTab === 'frontend_settings' && hasAccess('frontend_settings') && (
+                <FrontendSettingsTab adminUser={adminUser} />
+              )}
+              {activeTab === 'shift_reports' && hasAccess('shift_reports') && (
+                <ShiftReportsTab />
+              )}
+              {activeTab === 'shift_dashboard' && hasAccess('shift_dashboard') && (
+                <ShiftDashboardTab adminUser={adminUser} />
+              )}
+              {activeTab === 'promotions' && hasAccess('promotions') && (
+                <PromotionsTab adminUser={adminUser} />
+              )}
+              {activeTab === 'tx_search' && hasAccess('tx_search') && (
+                <TxSearchTab onInspectProof={onInspectProof} adminUser={adminUser} />
+              )}
+            </motion.div>
+          </AnimatePresence>
         </Suspense>
       </main>
     </div>

@@ -90,6 +90,8 @@ export default function Home() {
     }
 
     const savedSession = JSON.parse(localStorage.getItem('jackpot_session') || 'null');
+    const path = typeof window !== 'undefined' ? window.location.pathname : '/';
+
     if (savedSession) {
       if (savedSession.role === 'admin') {
         window.location.href = '/admin';
@@ -97,9 +99,15 @@ export default function Home() {
       } else {
         setSession(savedSession);
         setView('lobby');
+        if (path === '/' || path === '/login' || path === '/register' || path === '/forgot') {
+          window.history.replaceState({}, '', '/lobby');
+        }
       }
     } else {
       setView('auth');
+      if (path.startsWith('/lobby') || path === '/') {
+        window.history.replaceState({}, '', '/login');
+      }
     }
     
     // Register PWA Service Worker
@@ -120,13 +128,20 @@ export default function Home() {
     const handleStorageChange = (e) => {
       if (e.key === 'jackpot_session') {
         const currentSess = localStorage.getItem('jackpot_session');
+        const path = typeof window !== 'undefined' ? window.location.pathname : '/';
         if (currentSess === 'null' || !currentSess) {
           setSession(null);
           setView('auth');
+          if (path.startsWith('/lobby')) {
+            window.history.replaceState({}, '', '/login');
+          }
         } else {
           const parsed = JSON.parse(currentSess);
           setSession(parsed);
           setView('lobby');
+          if (path === '/' || path === '/login' || path === '/register' || path === '/forgot') {
+            window.history.replaceState({}, '', '/lobby');
+          }
         }
       }
     };
@@ -283,6 +298,7 @@ export default function Home() {
   return (
     <GoogleOAuthProvider clientId={googleClientId}>
       <ParticlesBackground />
+      <div className="aurora-bg" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none', zIndex: 0 }} />
       <div className="ambient-glow glow-1"></div>
       <div className="ambient-glow glow-2"></div>
 

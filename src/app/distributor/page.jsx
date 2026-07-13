@@ -52,8 +52,32 @@ export default function DistributorPortal() {
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  // Sidebar navigation tab state
   const [activeTab, setActiveTab] = useState('overview');
+
+  // Sync tab state changes to browser URL pathnames
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const targetPath = `/distributor/${activeTab}`;
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({}, '', targetPath);
+    }
+  }, [activeTab]);
+
+  // Sync browser back/forward buttons (popstate) to local state
+  useEffect(() => {
+    const handlePathChange = () => {
+      const path = window.location.pathname;
+      const parts = path.split('/').filter(Boolean);
+      if (parts.length > 1) {
+        setActiveTab(parts[1]);
+      } else {
+        setActiveTab('overview');
+      }
+    };
+    window.addEventListener('popstate', handlePathChange);
+    handlePathChange(); // Sync initial view on mount
+    return () => window.removeEventListener('popstate', handlePathChange);
+  }, []);
 
   // Stats SWR
   const distId = distSession?.id;
