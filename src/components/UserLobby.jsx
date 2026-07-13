@@ -1692,8 +1692,8 @@ export default function UserLobby({
                                   {tx.status === 'FAILED' ? (
                                     renderFailedStatusWithTooltip(tx)
                                   ) : (
-                                    <span className={`admin-badge-preview b-${tx.status === 'PENDING_COINS' ? 'new' : (tx.status.toLowerCase() === 'success' ? 'ready' : tx.status.toLowerCase())}`}>
-                                      {tx.status === 'PENDING_COINS' ? 'VERIFYING COINS' : tx.status}
+                                    <span className={`admin-badge-preview b-${(tx.status === 'PENDING_COINS' || tx.status === 'COINS_LOADING') ? 'new' : (tx.status.toLowerCase() === 'success' ? 'ready' : tx.status.toLowerCase())}`}>
+                                      {tx.status === 'PENDING_COINS' ? 'VERIFYING COINS' : (tx.status === 'COINS_LOADING' ? 'COINS LOADING' : tx.status)}
                                     </span>
                                   )}
                                 </td>
@@ -1702,7 +1702,7 @@ export default function UserLobby({
                                     <span style={{ fontSize: '0.725rem', opacity: 0.8 }}>
                                       {tx.note && tx.status !== 'FAILED' ? tx.note : (tx.code === 'SIGNUP-FREE3' ? 'Freeplay (SIGNUP-FREE3)' : `${tx.gateway} (${tx.code})`)}
                                     </span>
-                                    {tx.type === 'WITHDRAW' && tx.status === 'SUCCESS' && tx.payoutHold > 0 && !tx.remainderRequested && (
+                                    {tx.type === 'WITHDRAW' && tx.status === 'SUCCESS' && tx.payoutHold > 0 && !tx.remainderRequested && !tx.remainderPaid && (
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -1734,7 +1734,7 @@ export default function UserLobby({
                                         Claim Remainder (${parseFloat(tx.payoutHold).toFixed(2)})
                                       </button>
                                     )}
-                                    {tx.type === 'WITHDRAW' && tx.status === 'SUCCESS' && tx.payoutHold > 0 && tx.remainderRequested && (
+                                    {tx.type === 'WITHDRAW' && tx.status === 'SUCCESS' && tx.payoutHold > 0 && tx.remainderRequested && !tx.remainderPaid && (
                                       <span style={{ fontSize: '0.625rem', color: '#888', fontStyle: 'italic' }}>
                                         Remainder Requested
                                       </span>

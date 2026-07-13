@@ -88,8 +88,7 @@ export async function GET(req) {
       }
     }
 
-    const isDistributorSelfQuery = query.userEmail && query.type === 'WEBSITE_COMMISSION_PAYMENT';
-    if (adminRole !== 'admin' && !isDistributorSelfQuery) {
+    if (type !== 'WEBSITE_COMMISSION_PAYMENT') {
       if (query.$and) {
         query.$and.push({ type: { $ne: 'WEBSITE_COMMISSION_PAYMENT' } });
       } else if (query.$or) {
@@ -357,7 +356,11 @@ export async function PUT(req) {
       return NextResponse.json({ success: false, message: 'Transaction not found.' }, { status: 404 });
     }
 
-    const updateFields = { status };
+    let finalStatus = status;
+    if (status === 'SUCCESS' && (originalTx.type === 'DEPOSIT' || originalTx.type === 'BONUS') && originalTx.status !== 'SUCCESS' && originalTx.status !== 'COINS_LOADING') {
+      finalStatus = 'COINS_LOADING';
+    }
+    const updateFields = { status: finalStatus };
     if (note !== undefined) {
       updateFields.note = note;
     }
@@ -375,6 +378,17 @@ export async function PUT(req) {
     }
 
     await transactionsCollection.updateOne({ id }, { $set: updateFields });
+
+    if (status === 'SUCCESS' && originalTx.parentTxId) {
+      try {
+        await transactionsCollection.updateOne(
+          { id: originalTx.parentTxId },
+          { $set: { remainderPaid: true, remainderStatus: 'SUCCESS' } }
+        );
+      } catch (err) {
+        console.error('Failed to update parent transaction remainder status:', err);
+      }
+    }
 
     // Deduct/refund coins from dynamic game pools on successful withdrawal processing
     if (status === 'SUCCESS' && originalTx.type === 'WITHDRAW' && originalTx.status !== 'SUCCESS') {

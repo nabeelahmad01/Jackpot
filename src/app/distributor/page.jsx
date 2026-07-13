@@ -17,7 +17,8 @@ export default function DistributorPortal() {
   const [proofModalUrl, setProofModalUrl] = useState('');
 
   const handleInspectProof = async (url, txId) => {
-    if (url) {
+    const isValidUrl = typeof url === 'string' && (url.startsWith('data:') || url.startsWith('http') || url.startsWith('/'));
+    if (isValidUrl) {
       setProofModalUrl(url);
     } else if (txId) {
       setProofModalUrl('LOADING');
@@ -234,6 +235,25 @@ export default function DistributorPortal() {
     }
   };
 
+  const playAlertSound = () => {
+    try {
+      const customSound = settingsData?.settings?.notificationSoundUrl;
+      if (customSound) {
+        const cleanUrl = customSound.replace(/^data:video\/[^;]+;/, 'data:audio/mpeg;');
+        const audio = new Audio(cleanUrl);
+        audio.play().catch(err => {
+          console.log('Autoplay blocked custom audio playing, trying synthesizer tone as backup:', err);
+          playSynthesizedBackup();
+        });
+      } else {
+        playSynthesizedBackup();
+      }
+    } catch (e) {
+      console.log('Audio playback failed:', e);
+      playSynthesizedBackup();
+    }
+  };
+
   useEffect(() => {
     const counts = {
       requests: referredRequests.length,
@@ -241,10 +261,10 @@ export default function DistributorPortal() {
     };
     const prev = prevCountsRef.current;
     if (counts.requests > prev.requests || counts.coins > prev.coins) {
-      playSynthesizedBackup();
+      playAlertSound();
     }
     prevCountsRef.current = counts;
-  }, [referredRequests.length, referredCoins.length]);
+  }, [referredRequests.length, referredCoins.length, settingsData]);
 
   const handleRequestCommWithdraw = async (e) => {
     e.preventDefault();
@@ -1637,7 +1657,7 @@ export default function DistributorPortal() {
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem', fontSize: '0.7rem' }}>
                                         <span style={{ textDecoration: 'line-through', opacity: 0.6 }}>${parseFloat(tx.amount || 0).toFixed(2)}</span>
                                         <span style={{ color: '#2ecc71' }}>Paid: ${parseFloat(tx.payoutSent || 0).toFixed(2)}</span>
-                                        <span style={{ color: '#f39c12' }}>Held: ${parseFloat(tx.payoutHold || 0).toFixed(2)}</span>
+                                        <span style={{ color: '#f39c12' }}>Hold: ${parseFloat(tx.payoutHold || 0).toFixed(2)}</span>
                                       </div>
                                     ) : (
                                       `$${parseFloat(tx.amount || 0).toFixed(2)}`
@@ -1655,7 +1675,7 @@ export default function DistributorPortal() {
                                   </td>
                                   <td style={{ padding: '0.6rem 0.5rem' }}>
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center' }}>
-                                      {tx.status === 'SUCCESS' && tx.payoutHold > 0 && (
+                                      {tx.status === 'SUCCESS' && tx.payoutHold > 0 && !tx.remainderPaid && (
                                         tx.remainderRequested ? (
                                           <span style={{ fontSize: '0.6rem', color: 'var(--gold-primary)', fontWeight: 'bold', background: 'rgba(255,215,0,0.1)', padding: '0.15rem 0.35rem', borderRadius: '4px' }}>
                                             [Remainder Requested]

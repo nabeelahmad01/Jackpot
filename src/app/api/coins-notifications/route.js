@@ -174,6 +174,8 @@ export async function PUT(req) {
               txUpdate.isFreeplayWithdraw = true;
               txUpdate.note = "Freeplay win capped at $30 max cashout.";
             }
+          } else if (parentTx.type === 'DEPOSIT' || parentTx.type === 'BONUS') {
+            txUpdate.status = 'SUCCESS';
           }
           await transactionsCollection.updateOne(
             { id: originalNoti.transactionId },

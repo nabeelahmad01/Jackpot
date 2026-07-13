@@ -560,7 +560,7 @@ export default function WebsitePaymentsTab({
                     />
                   </div>
                   <div className="input-group">
-                    <label>Amount Held ($)</label>
+                    <label>Amount Hold ($)</label>
                     <input
                       type="number"
                       step="0.01"

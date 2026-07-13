@@ -172,8 +172,8 @@ export default function TxSearchTab({ onInspectProof, adminUser }) {
                   </td>
                   <td style={{ fontSize: '0.7rem' }}>{tx.date}</td>
                   <td>
-                    <span className={`admin-badge-preview b-${tx.status === 'PENDING_COINS' ? 'new' : (tx.status.toLowerCase() === 'success' ? 'ready' : tx.status.toLowerCase())}`}>
-                      {tx.status === 'PENDING_COINS' ? 'VERIFYING COINS' : tx.status}
+                    <span className={`admin-badge-preview b-${(tx.status === 'PENDING_COINS' || tx.status === 'COINS_LOADING') ? 'new' : (tx.status.toLowerCase() === 'success' ? 'ready' : tx.status.toLowerCase())}`}>
+                      {tx.status === 'PENDING_COINS' ? 'VERIFYING COINS' : (tx.status === 'COINS_LOADING' ? 'COINS LOADING' : tx.status)}
                     </span>
                   </td>
                   <td>

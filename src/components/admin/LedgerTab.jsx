@@ -34,6 +34,15 @@ export default function LedgerTab({
     { refreshInterval: 4000 }
   );
 
+  // SWR for gateway revenue breakdown stats
+  const { data: gatewayStatsData, mutate: mutateGatewayStats } = useSWR(
+    `/api/transactions/gateway-stats?adminDistributorId=${adminUser?.distributorId || ''}`,
+    fetcher,
+    { refreshInterval: 4000 }
+  );
+
+  const gatewayStats = gatewayStatsData?.stats || [];
+
   const rawTransactions = data?.transactions || [];
   const transactions = rawTransactions.filter((t) => !completedActionIds[t.id]);
   const totalTransactions = data?.totalTransactions || 0;
@@ -190,6 +199,49 @@ export default function LedgerTab({
         <h3><i className="fa-solid fa-wallet text-red"></i> Financial Transaction Ledger</h3>
       </div>
 
+      {/* Gateway breakdown stats summary widget */}
+      <div style={{ marginBottom: '2rem', padding: '1.25rem', background: '#0b0d16', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+        <h4 style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 'bold', margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <i className="fa-solid fa-chart-pie" style={{ color: 'var(--gold-primary)' }}></i> GATEWAY REVENUE BREAKDOWN
+        </h4>
+        {gatewayStats.length === 0 ? (
+          <div style={{ color: '#666', fontSize: '0.75rem', fontStyle: 'italic', padding: '0.5rem 0' }}>
+            No successful gateway transaction history found.
+          </div>
+        ) : (
+          <div className="table-responsive">
+            <table className="admin-table" style={{ fontSize: '0.75rem', border: 'none', background: 'transparent' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#888' }}>
+                  <th style={{ padding: '0.5rem 0.75rem' }}>GATEWAY NAME</th>
+                  <th style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>TOTAL RECEIVED (DEPOSITS)</th>
+                  <th style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>TOTAL WITHDRAWN</th>
+                  <th style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>NET BALANCE</th>
+                </tr>
+              </thead>
+              <tbody>
+                {gatewayStats.map(item => (
+                  <tr key={item.gateway} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                    <td style={{ padding: '0.5rem 0.75rem', fontWeight: 'bold', color: '#fff' }}>
+                      <span className="admin-badge-preview b-new" style={{ textTransform: 'uppercase', padding: '0.15rem 0.35rem' }}>{item.gateway}</span>
+                    </td>
+                    <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', color: '#2ecc71', fontWeight: 'bold' }}>
+                      ${item.received.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', color: '#ef4444', fontWeight: 'bold' }}>
+                      ${item.withdrawn.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', color: item.net >= 0 ? '#2ecc71' : '#ef4444', fontWeight: 'bold' }}>
+                      ${item.net.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* Tab Switcher */}
       {isLoading ? (
         <div style={{ padding: '2rem', textAlign: 'center', opacity: 0.5 }}>
@@ -272,8 +324,8 @@ export default function LedgerTab({
                       </td>
                       <td style={{ fontSize: '0.7rem' }}>{tx.date}</td>
                       <td>
-                        <span className={`admin-badge-preview b-${tx.status.toLowerCase() === 'success' ? 'ready' : tx.status.toLowerCase()}`}>
-                          {tx.status}
+                        <span className={`admin-badge-preview b-${(tx.status === 'PENDING_COINS' || tx.status === 'COINS_LOADING') ? 'new' : (tx.status.toLowerCase() === 'success' ? 'ready' : tx.status.toLowerCase())}`}>
+                          {tx.status === 'PENDING_COINS' ? 'VERIFYING COINS' : (tx.status === 'COINS_LOADING' ? 'COINS LOADING' : tx.status)}
                         </span>
                       </td>
                       <td>
@@ -406,8 +458,8 @@ export default function LedgerTab({
                       </td>
                       <td style={{ fontSize: '0.7rem' }}>{tx.date}</td>
                       <td>
-                        <span className={`admin-badge-preview b-${tx.status === 'PENDING_COINS' ? 'new' : (tx.status.toLowerCase() === 'success' ? 'ready' : tx.status.toLowerCase())}`}>
-                          {tx.status === 'PENDING_COINS' ? 'VERIFYING COINS' : tx.status}
+                        <span className={`admin-badge-preview b-${(tx.status === 'PENDING_COINS' || tx.status === 'COINS_LOADING') ? 'new' : (tx.status.toLowerCase() === 'success' ? 'ready' : tx.status.toLowerCase())}`}>
+                          {tx.status === 'PENDING_COINS' ? 'VERIFYING COINS' : (tx.status === 'COINS_LOADING' ? 'COINS LOADING' : tx.status)}
                         </span>
                       </td>
                       <td>
