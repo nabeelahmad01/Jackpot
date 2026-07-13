@@ -33,6 +33,13 @@ export async function GET(req) {
     if (adminDistributorId) {
       query.distributorId = adminDistributorId;
       query.role = 'user';
+    } else {
+      // Exclude Type B distributor players and staff
+      const typeBDists = await db.collection('distributors').find({ type: 'B' }).project({ id: 1 }).toArray();
+      const typeBDistIds = typeBDists.map(d => d.id).filter(Boolean);
+      if (typeBDistIds.length > 0) {
+        query.distributorId = { $nin: typeBDistIds };
+      }
     }
     if (segment === 'subscribed') {
       query.isSubscribed = true;

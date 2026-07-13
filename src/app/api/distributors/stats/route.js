@@ -56,6 +56,24 @@ export async function GET(req) {
       .toArray();
     }
 
+    let pendingLedgerCount = 0;
+    let unreadChatsCount = 0;
+
+    if (playerEmails.length > 0) {
+      const [pLedger, unreadChats] = await Promise.all([
+        transactionsCollection.countDocuments({
+          userEmail: { $in: playerEmails },
+          status: { $in: ['PENDING', 'PENDING_COINS'] }
+        }),
+        db.collection('supportMessages').distinct('userEmail', { distributorId, senderType: 'player', read: false })
+      ]);
+      pendingLedgerCount = pLedger;
+      unreadChatsCount = unreadChats.length;
+    } else {
+      const unreadChats = await db.collection('supportMessages').distinct('userEmail', { distributorId, senderType: 'player', read: false });
+      unreadChatsCount = unreadChats.length;
+    }
+
     const commissionEarned = totalDeposits * ((distributor.commissionRate || 0) / 100);
     const websiteCommissionEarned = totalDeposits * ((distributor.websiteCommissionRate || 0) / 100);
 
@@ -68,7 +86,9 @@ export async function GET(req) {
         commissionEarned,
         commissionRate: distributor.commissionRate || 0,
         websiteCommissionEarned,
-        websiteCommissionRate: distributor.websiteCommissionRate || 0
+        websiteCommissionRate: distributor.websiteCommissionRate || 0,
+        pendingLedgerCount,
+        unreadChatsCount
       },
       players,
       transactions

@@ -20,6 +20,13 @@ export async function GET(req) {
     let baseQuery = {};
     if (adminDistributorId) {
       baseQuery.distributorId = adminDistributorId;
+    } else {
+      // Exclude Type B distributor data from general stats
+      const typeBDists = await db.collection('distributors').find({ type: 'B' }).project({ id: 1 }).toArray();
+      const typeBDistIds = typeBDists.map(d => d.id).filter(Boolean);
+      if (typeBDistIds.length > 0) {
+        baseQuery.distributorId = { $nin: typeBDistIds };
+      }
     }
 
     // Run pending queue counts in parallel
@@ -33,8 +40,8 @@ export async function GET(req) {
       db.collection('accountRequests').countDocuments({ ...baseQuery, status: 'PENDING' }),
       db.collection('transactions').countDocuments({ ...baseQuery, status: 'PENDING' }),
       db.collection('coinsNotifications').countDocuments({ ...baseQuery, status: { $in: ['PENDING', 'CLAIM_REQUESTED'] } }),
-      db.collection('supportMessages').distinct('userEmail', { senderType: 'player', read: false }),
-      db.collection('transactions').countDocuments({ type: { $in: ['WEBSITE_COMMISSION_PAYMENT', 'COMMISSION_WITHDRAW'] }, status: 'PENDING' })
+      db.collection('supportMessages').distinct('userEmail', adminDistributorId ? { distributorId: adminDistributorId, senderType: 'player', read: false } : { distributorType: { $ne: 'B' }, senderType: 'player', read: false }),
+      db.collection('transactions').countDocuments({ type: { $in: ['WEBSITE_COMMISSION_PAYMENT', 'COMMISSION_WITHDRAW'] }, distributorId: adminDistributorId || { $exists: true }, status: 'PENDING' })
     ]);
 
     const pendingChatsCount = unreadChatUsers.length;

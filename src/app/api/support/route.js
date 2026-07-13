@@ -18,6 +18,9 @@ export async function GET(req) {
     let baseQuery = {};
     if (adminDistributorId) {
       baseQuery.distributorId = adminDistributorId;
+    } else {
+      // Exclude chats belonging to Type B distributors
+      baseQuery.distributorType = { $ne: 'B' };
     }
 
     if (email) {

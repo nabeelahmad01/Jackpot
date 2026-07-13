@@ -98,6 +98,14 @@ export default function DistributorPortal() {
     fetcher
   );
 
+  const { data: gatewayStatsData } = useSWR(
+    distId ? `/api/transactions/gateway-stats?adminDistributorId=${distId}` : null,
+    fetcher,
+    { refreshInterval: 4000 }
+  );
+
+  const gatewayStats = gatewayStatsData?.stats || [];
+
   // Filter player queues to show only referred players' requests
   const players = statsData?.players || [];
   const playerEmails = players.map(p => (p.email || '').toLowerCase().trim()).filter(Boolean);
@@ -210,7 +218,7 @@ export default function DistributorPortal() {
       .finally(() => setCommLookupLoading(false));
   }, [distId, commLookupDate]);
 
-  const prevCountsRef = useRef({ requests: 0, coins: 0 });
+  const prevCountsRef = useRef({ requests: 0, coins: 0, ledger: 0 });
 
   const playSynthesizedBackup = () => {
     try {
@@ -257,14 +265,15 @@ export default function DistributorPortal() {
   useEffect(() => {
     const counts = {
       requests: referredRequests.length,
-      coins: referredCoins.length
+      coins: referredCoins.length,
+      ledger: statsData?.stats?.pendingLedgerCount || 0
     };
     const prev = prevCountsRef.current;
-    if (counts.requests > prev.requests || counts.coins > prev.coins) {
+    if (counts.requests > prev.requests || counts.coins > prev.coins || counts.ledger > prev.ledger) {
       playAlertSound();
     }
     prevCountsRef.current = counts;
-  }, [referredRequests.length, referredCoins.length, settingsData]);
+  }, [referredRequests.length, referredCoins.length, statsData?.stats?.pendingLedgerCount, settingsData]);
 
   const handleRequestCommWithdraw = async (e) => {
     e.preventDefault();
@@ -1174,6 +1183,11 @@ export default function DistributorPortal() {
                 >
                   <i className="fa-solid fa-wallet" style={{ width: '16px' }}></i>
                   Financial Ledger
+                  {statsData?.stats?.pendingLedgerCount > 0 && (
+                    <span style={{ marginLeft: 'auto', background: '#ef4444', color: '#fff', fontSize: '0.625rem', padding: '0.15rem 0.35rem', borderRadius: '10px' }}>
+                      {statsData.stats.pendingLedgerCount}
+                    </span>
+                  )}
                 </button>
               )}
 
@@ -1198,6 +1212,11 @@ export default function DistributorPortal() {
                 >
                   <i className="fa-solid fa-headset" style={{ width: '16px' }}></i>
                   Live Chat Support
+                  {statsData?.stats?.unreadChatsCount > 0 && (
+                    <span style={{ marginLeft: 'auto', background: '#ef4444', color: '#fff', fontSize: '0.625rem', padding: '0.15rem 0.35rem', borderRadius: '10px' }}>
+                      {statsData.stats.unreadChatsCount}
+                    </span>
+                  )}
                 </button>
               )}
             </>
@@ -1918,8 +1937,59 @@ export default function DistributorPortal() {
               </div>
             </div>
 
-            {/* Game coins pool status (Only for Type B distributors) */}
-            {distSession.type === 'B' && (
+            {/* Gateway revenue stats summary (Only for Type B distributors with finance access) */}
+            {distSession.type === 'B' && (distSession.staffRole || distSession.role) !== 'coins_admin' && (
+              <section className="admin-section-card" style={{ marginTop: '2rem', background: '#0b0d16', padding: '1.5rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div className="section-card-header" style={{ marginBottom: '1rem' }}>
+                  <div>
+                    <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                      <i className="fa-solid fa-chart-pie" style={{ color: 'var(--gold-primary)' }}></i> GATEWAY REVENUE BREAKDOWN
+                    </h3>
+                    <span className="game-tap-tip" style={{ fontSize: '0.65rem', color: '#888' }}>Total collections and payouts by payment gateway</span>
+                  </div>
+                </div>
+
+                {gatewayStats.length === 0 ? (
+                  <div style={{ color: '#666', fontSize: '0.75rem', fontStyle: 'italic', padding: '0.5rem 0' }}>
+                    No successful gateway transaction history found.
+                  </div>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+                      <thead>
+                        <tr style={{ textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#888' }}>
+                          <th style={{ padding: '0.5rem' }}>GATEWAY NAME</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'right' }}>TOTAL RECEIVED (DEPOSITS)</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'right' }}>TOTAL WITHDRAWN</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'right' }}>NET BALANCE</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {gatewayStats.map(item => (
+                          <tr key={item.gateway} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                            <td style={{ padding: '0.6rem 0.5rem', fontWeight: 'bold', color: '#fff' }}>
+                              <span className="admin-badge-preview b-new" style={{ textTransform: 'uppercase', padding: '0.15rem 0.35rem' }}>{item.gateway}</span>
+                            </td>
+                            <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', color: '#2ecc71', fontWeight: 'bold' }}>
+                              ${item.received.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                            <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', color: '#ef4444', fontWeight: 'bold' }}>
+                              ${item.withdrawn.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                            <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', color: item.net >= 0 ? '#2ecc71' : '#ef4444', fontWeight: 'bold' }}>
+                              ${item.net.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* Game coins pool status (Only for Type B distributors with coins access) */}
+            {distSession.type === 'B' && (distSession.staffRole || distSession.role) !== 'financial_admin' && (
               <section className="admin-section-card" style={{ marginTop: '2rem', background: '#0b0d16', padding: '1.5rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <div className="section-card-header" style={{ marginBottom: '1rem' }}>
                   <div>
@@ -1971,7 +2041,7 @@ export default function DistributorPortal() {
                               <button
                                 onClick={() => {
                                   setSelectedPoolGame(game);
-                                  setUpdatePoolCoins(game.availableCoins || 0);
+                                  setUpdatePoolCoins(game.availableCoins || '');
                                   setUpdatePoolLink(game.openPanelLink || '');
                                   setPoolUpdateModalOpen(true);
                                 }}
