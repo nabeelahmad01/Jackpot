@@ -71,14 +71,16 @@ export default function UserLobby({
         setActiveGame(null);
       } else if (path.startsWith('/lobby/game/')) {
         const slug = path.replace('/lobby/game/', '');
-        const matched = games.find(g => g.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') === slug);
-        if (matched) {
-          setActiveGame(matched);
-          setLobbySubView('main');
-        } else {
-          setActiveGame(null);
-          setLobbySubView('main');
-          window.history.replaceState({}, '', '/lobby');
+        if (games.length > 0) {
+          const matched = games.find(g => g.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') === slug);
+          if (matched) {
+            setActiveGame(matched);
+            setLobbySubView('main');
+          } else {
+            setActiveGame(null);
+            setLobbySubView('main');
+            window.history.replaceState({}, '', '/lobby');
+          }
         }
       } else {
         setLobbySubView('main');
@@ -1152,7 +1154,7 @@ export default function UserLobby({
                     {game.badge !== 'none' && <span className={`game-badge ${game.badge}`}>{game.badge.toUpperCase()}</span>}
                     <div className="game-image-wrapper" onClick={() => setActiveGame(game)} style={{ cursor: 'pointer' }}>
                       {game.image.startsWith('game_') || game.image.startsWith('data:') || game.image.startsWith('http') || game.image.startsWith('/') ? (
-                        <img src={game.image} alt={game.title} loading="lazy" />
+                        <img src={game.image.startsWith('/') || game.image.startsWith('http') || game.image.startsWith('data:') ? game.image : '/' + game.image} alt={game.title} loading="lazy" />
                       ) : (
                         <div className={`game-placeholder-card ${game.image === 'placeholder_2' ? 'pc-red' : game.image === 'placeholder_3' ? 'pc-blue' : 'pc-gold'}`}>
                           {game.title.slice(0, 2).toUpperCase()}
@@ -1283,19 +1285,35 @@ export default function UserLobby({
           <div className="game-access-header">
             <div className="game-header-brand">
               <div className="lobby-logo-box" style={{ width: '50px', height: '50px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000', border: '1px solid rgba(255,215,0,0.4)', borderRadius: '50%', boxShadow: '0 0 15px rgba(255,215,0,0.25)' }}>
-                <img
-                  src="/jackpot_lion_mascot.png?v=2"
-                  alt="Jackpot Lion Mascot"
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                    borderRadius: '50%',
-                    clipPath: 'circle(50%)',
-                    animation: 'pulse-lion 2s infinite ease-in-out',
-                    transform: 'scale(1.05)'
-                  }}
-                />
+                {activeGame.image && (activeGame.image.startsWith('game_') || activeGame.image.startsWith('data:') || activeGame.image.startsWith('http') || activeGame.image.startsWith('/')) ? (
+                  <img
+                    src={activeGame.image.startsWith('/') || activeGame.image.startsWith('http') || activeGame.image.startsWith('data:') ? activeGame.image : '/' + activeGame.image}
+                    alt={activeGame.title}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      borderRadius: '50%',
+                      clipPath: 'circle(50%)'
+                    }}
+                  />
+                ) : (
+                  <div 
+                    className={`game-placeholder-card ${(activeGame.image === 'placeholder_2' || !activeGame.image) ? 'pc-red' : activeGame.image === 'placeholder_3' ? 'pc-blue' : 'pc-gold'}`}
+                    style={{ 
+                      width: '100%', 
+                      height: '100%', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      borderRadius: '50%'
+                    }}
+                  >
+                    <span style={{ fontSize: '1.25rem', fontWeight: '900', color: '#fff', textTransform: 'uppercase' }}>
+                      {activeGame.title ? activeGame.title.charAt(0) : 'G'}
+                    </span>
+                  </div>
+                )}
               </div>
               <div className="game-header-titles">
                 <h3>
