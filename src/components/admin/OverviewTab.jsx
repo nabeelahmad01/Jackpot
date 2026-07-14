@@ -5,16 +5,11 @@ const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
 export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
   const [shiftName, setShiftName] = React.useState('Morning Shift (5 AM - 1 PM)');
-  const [totalLoaded, setTotalLoaded] = React.useState('');
   const [notes, setNotes] = React.useState('');
   const [isSubmittingReport, setIsSubmittingReport] = React.useState(false);
 
   const handleShiftReportSubmit = async (e) => {
     e.preventDefault();
-    if (!totalLoaded || isNaN(parseFloat(totalLoaded)) || parseFloat(totalLoaded) < 0) {
-      alert('Please enter a valid positive number for total loaded coins.');
-      return;
-    }
     
     setIsSubmittingReport(true);
     try {
@@ -24,13 +19,12 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
         body: JSON.stringify({
           staffEmail: adminUser.email,
           shiftName,
-          totalLoaded: parseFloat(totalLoaded),
+          totalLoaded: 0,
           notes
         })
       });
       const data = await response.json();
       if (data.success) {
-        setTotalLoaded('');
         setNotes('');
         alert('End of shift report submitted successfully!');
       } else {
@@ -307,21 +301,7 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
               </div>
             </div>
 
-            <div className="input-group" style={{ flex: '1 1 200px', margin: 0 }}>
-              <label style={{ fontSize: '0.7rem' }}>Total Coins Loaded during shift ($)</label>
-              <div className="input-wrapper" style={{ background: '#07090f' }}>
-                <i className="fa-solid fa-coins input-icon"></i>
-                <input
-                  type="number"
-                  placeholder="e.g. 1500.00"
-                  step="0.01"
-                  value={totalLoaded}
-                  onChange={(e) => setTotalLoaded(e.target.value)}
-                  style={{ fontSize: '0.775rem' }}
-                  required
-                />
-              </div>
-            </div>
+
 
             <div className="input-group" style={{ flex: '1 1 100%', margin: 0 }}>
               <label style={{ fontSize: '0.7rem' }}>Shift Notes & Hand-over Comments</label>

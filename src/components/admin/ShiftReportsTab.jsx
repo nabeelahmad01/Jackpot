@@ -48,20 +48,19 @@ export default function ShiftReportsTab() {
               <th>Timestamp</th>
               <th>Staff Email</th>
               <th>Shift Name</th>
-              <th>Total Coins Loaded</th>
               <th>Hand-over Notes & Comments</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan="5" className="text-center text-muted" style={{ padding: '2rem' }}>
+                <td colSpan="4" className="text-center text-muted" style={{ padding: '2rem' }}>
                   <i className="fa-solid fa-spinner fa-spin" style={{ color: 'var(--gold-primary)', marginRight: '6px' }}></i> Loading shift reports...
                 </td>
               </tr>
             ) : filteredReports.length === 0 ? (
               <tr>
-                <td colSpan="5" className="text-center text-muted" style={{ padding: '2rem' }}>
+                <td colSpan="4" className="text-center text-muted" style={{ padding: '2rem' }}>
                   No shift reports submitted yet.
                 </td>
               </tr>
@@ -74,11 +73,6 @@ export default function ShiftReportsTab() {
                     <span className="admin-badge-preview b-ready" style={{ fontSize: '0.7rem' }}>
                       {report.shiftName}
                     </span>
-                  </td>
-                  <td>
-                    <strong style={{ color: 'var(--gold-primary)', fontSize: '0.9rem' }}>
-                      ${parseFloat(report.totalLoaded || 0).toFixed(2)}
-                    </strong>
                   </td>
                   <td style={{ fontSize: '0.75rem', maxWidth: '300px', wordBreak: 'break-word', color: 'rgba(255,255,255,0.8)' }}>
                     {report.notes || <span style={{ opacity: 0.4 }}>— No Notes —</span>}

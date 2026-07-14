@@ -9,6 +9,7 @@ export default function FrontendSettingsTab({ adminUser }) {
   const { data, error, mutate } = useSWR('/api/settings/frontend', fetcher);
 
   const [logoUrl, setLogoUrl] = useState('');
+  const [loginBgUrl, setLoginBgUrl] = useState('');
   const [notificationSoundUrl, setNotificationSoundUrl] = useState('');
   const [withdrawNotice, setWithdrawNotice] = useState('');
   const [cashoutNotice, setCashoutNotice] = useState('');
@@ -64,6 +65,7 @@ export default function FrontendSettingsTab({ adminUser }) {
     if (data?.settings) {
       const s = data.settings;
       setLogoUrl(s.logoUrl || '/jackpot_lion_mascot.png?v=2');
+      setLoginBgUrl(s.loginBgUrl || '/jackpot_royals_bg.png');
       setNotificationSoundUrl(s.notificationSoundUrl || 'https://raw.githubusercontent.com/AUTOMATIC1111/stable-diffusion-webui/master/notification.mp3');
       setWithdrawNotice(s.withdrawNotice || 'Fastest Withdrawals inside 5 Minutes!');
       setCashoutNotice(s.cashoutNotice || 'Standard cashout processing hours: 9 AM - 11 PM EST');
@@ -164,6 +166,7 @@ export default function FrontendSettingsTab({ adminUser }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           logoUrl,
+          loginBgUrl,
           notificationSoundUrl,
           withdrawNotice,
           cashoutNotice,
@@ -666,6 +669,186 @@ export default function FrontendSettingsTab({ adminUser }) {
                   Upload any sound file under 5MB (MP3/WAV/etc). Audio will play on the Shift Dashboard and Coins Allotment pages when new queue items arrive.
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Visual Assets & Photos CMS */}
+          <div style={{ background: '#0b0d16', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1.5rem' }}>
+            <h4 style={{ fontSize: '0.8rem', color: '#fff', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
+              Visual Media Assets & CMS Photos
+            </h4>
+            <p className="game-tap-tip" style={{ marginBottom: '1.25rem' }}>
+              Upload custom image files (PNG/JPG) to change the background photo, brand logo, and sliding promotional banners.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              
+              {/* Login Left Background Photo */}
+              <div style={{ background: '#07090f', padding: '0.75rem', borderRadius: '8px', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ width: '80px', height: '80px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {loginBgUrl ? (
+                    <img src={loginBgUrl} alt="Login Background Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <i className="fa-solid fa-image" style={{ fontSize: '1.5rem', color: 'var(--text-muted)' }}></i>
+                  )}
+                </div>
+                <div style={{ flex: 1, minWidth: '220px' }}>
+                  <label style={{ fontSize: '0.725rem', color: 'var(--gold-primary)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>
+                    Login Portal Background Photo
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (file.size > 8 * 1024 * 1024) {
+                        alert('Image file size must be less than 8MB.');
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onloadend = () => setLoginBgUrl(reader.result);
+                      reader.readAsDataURL(file);
+                    }}
+                    style={{ fontSize: '0.75rem', color: '#fff' }}
+                  />
+                  <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                    Recommended size: 1920x1080 (Landscape). Replaces the roulette/casino image on the left.
+                  </div>
+                </div>
+              </div>
+
+              {/* Brand Logo Mascot */}
+              <div style={{ background: '#07090f', padding: '0.75rem', borderRadius: '8px', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ width: '80px', height: '80px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="Logo Preview" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                  ) : (
+                    <i className="fa-solid fa-crown" style={{ fontSize: '1.5rem', color: 'var(--text-muted)' }}></i>
+                  )}
+                </div>
+                <div style={{ flex: 1, minWidth: '220px' }}>
+                  <label style={{ fontSize: '0.725rem', color: 'var(--gold-primary)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>
+                    Lobby Brand Logo / Mascot Image
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (file.size > 8 * 1024 * 1024) {
+                        alert('Image file size must be less than 8MB.');
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onloadend = () => setLogoUrl(reader.result);
+                      reader.readAsDataURL(file);
+                    }}
+                    style={{ fontSize: '0.75rem', color: '#fff' }}
+                  />
+                  <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                    Recommended format: PNG transparent background logo shown on top banners.
+                  </div>
+                </div>
+              </div>
+
+              {/* Slider Slide Banner 1 */}
+              <div style={{ background: '#07090f', padding: '0.75rem', borderRadius: '8px', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ width: '80px', height: '80px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {slide1 ? (
+                    <img src={slide1} alt="Slide 1 Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <i className="fa-solid fa-images" style={{ fontSize: '1.5rem', color: 'var(--text-muted)' }}></i>
+                  )}
+                </div>
+                <div style={{ flex: 1, minWidth: '220px' }}>
+                  <label style={{ fontSize: '0.725rem', color: 'var(--gold-primary)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>
+                    Lobby Promo Slide 1
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (file.size > 8 * 1024 * 1024) {
+                        alert('Image file size must be less than 8MB.');
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onloadend = () => setSlide1(reader.result);
+                      reader.readAsDataURL(file);
+                    }}
+                    style={{ fontSize: '0.75rem', color: '#fff' }}
+                  />
+                </div>
+              </div>
+
+              {/* Slider Slide Banner 2 */}
+              <div style={{ background: '#07090f', padding: '0.75rem', borderRadius: '8px', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ width: '80px', height: '80px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {slide2 ? (
+                    <img src={slide2} alt="Slide 2 Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <i className="fa-solid fa-images" style={{ fontSize: '1.5rem', color: 'var(--text-muted)' }}></i>
+                  )}
+                </div>
+                <div style={{ flex: 1, minWidth: '220px' }}>
+                  <label style={{ fontSize: '0.725rem', color: 'var(--gold-primary)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>
+                    Lobby Promo Slide 2
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (file.size > 8 * 1024 * 1024) {
+                        alert('Image file size must be less than 8MB.');
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onloadend = () => setSlide2(reader.result);
+                      reader.readAsDataURL(file);
+                    }}
+                    style={{ fontSize: '0.75rem', color: '#fff' }}
+                  />
+                </div>
+              </div>
+
+              {/* Slider Slide Banner 3 */}
+              <div style={{ background: '#07090f', padding: '0.75rem', borderRadius: '8px', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ width: '80px', height: '80px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {slide3 ? (
+                    <img src={slide3} alt="Slide 3 Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <i className="fa-solid fa-images" style={{ fontSize: '1.5rem', color: 'var(--text-muted)' }}></i>
+                  )}
+                </div>
+                <div style={{ flex: 1, minWidth: '220px' }}>
+                  <label style={{ fontSize: '0.725rem', color: 'var(--gold-primary)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>
+                    Lobby Promo Slide 3
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (file.size > 8 * 1024 * 1024) {
+                        alert('Image file size must be less than 8MB.');
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onloadend = () => setSlide3(reader.result);
+                      reader.readAsDataURL(file);
+                    }}
+                    style={{ fontSize: '0.75rem', color: '#fff' }}
+                  />
+                </div>
+              </div>
+
             </div>
           </div>
 

@@ -520,7 +520,7 @@ export default function AuthPortal({
   return (
     <div className="auth-page-wrapper">
       {/* Left Graphic Panel (Desktop only) */}
-      <div className="auth-graphic-panel"></div>
+      <div className="auth-graphic-panel" style={{ backgroundImage: `url(${frontendSettings.loginBgUrl || '/jackpot_royals_bg.png'})` }}></div>
 
       {/* Right Form Panel */}
       <div className="auth-form-panel">
