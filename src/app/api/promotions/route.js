@@ -49,6 +49,8 @@ export async function GET(req) {
   }
 }
 
+import nodemailer from 'nodemailer';
+
 // POST create/broadcast a promotion
 export async function POST(req) {
   try {
@@ -72,6 +74,157 @@ export async function POST(req) {
     };
 
     await promotionsCollection.insertOne(promoObject);
+
+    // Get matching player emails based on the targetGroup
+    // Exclude staff/admin roles — only these roles are excluded, everyone else gets the email
+    const staffRoles = ['admin', 'operation_admin', 'financial_admin', 'coins_admin', 'support_admin', 'distributor_staff', 'distributor'];
+    let userQuery = { role: { $nin: staffRoles } }; // ALL players regardless of subscription or activity
+
+    if (targetGroup === 'subscribed') {
+      userQuery.isSubscribed = true;
+    } else if (targetGroup === 'unsubscribed') {
+      userQuery.isSubscribed = { $ne: true };
+    } else if (targetGroup === 'active') {
+      const txs = await db.collection('transactions').find({
+        type: 'DEPOSIT',
+        status: 'SUCCESS'
+      }).project({ userEmail: 1 }).toArray();
+      const activeEmails = Array.from(new Set(txs.map(t => t.userEmail.toLowerCase().trim())));
+      userQuery.email = { $in: activeEmails };
+    }
+    // When targetGroup === 'all' → NO extra filter → ALL registered players get the email
+
+    const targetUsers = await db.collection('users').find(userQuery).project({ email: 1 }).toArray();
+    const emails = targetUsers.map(u => u.email).filter(Boolean);
+
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+
+    if (emails.length > 0) {
+      if (smtpUser && smtpPass) {
+        const transporter = nodemailer.createTransport({
+          service: 'gmail',
+          auth: {
+            user: smtpUser,
+            pass: smtpPass
+          }
+        });
+
+        const htmlContent = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <title>${title}</title>
+            <style>
+              body {
+                background-color: #030409;
+                color: #ffffff;
+                font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                margin: 0;
+                padding: 0;
+              }
+              .email-container {
+                max-width: 600px;
+                margin: 40px auto;
+                background-color: #0b0c16;
+                border: 1px solid #ffd700;
+                border-radius: 16px;
+                overflow: hidden;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+              }
+              .email-header {
+                background: linear-gradient(135deg, #ffd700 0%, #b8860b 100%);
+                padding: 30px;
+                text-align: center;
+              }
+              .email-header h1 {
+                color: #000000;
+                margin: 0;
+                font-size: 24px;
+                font-weight: bold;
+                text-transform: uppercase;
+                letter-spacing: 2px;
+              }
+              .email-body {
+                padding: 40px 30px;
+                line-height: 1.6;
+                font-size: 16px;
+                color: #e2e8f0;
+              }
+              .promo-image {
+                width: 100%;
+                max-width: 100%;
+                border-radius: 8px;
+                margin-bottom: 25px;
+                border: 1px solid rgba(255,215,0,0.2);
+              }
+              .email-body p {
+                margin: 0 0 20px 0;
+              }
+              .cta-button {
+                display: inline-block;
+                background: linear-gradient(135deg, #ffd700 0%, #b8860b 100%);
+                color: #000000 !important;
+                font-weight: bold;
+                text-decoration: none;
+                padding: 14px 35px;
+                border-radius: 8px;
+                text-align: center;
+                font-size: 16px;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                margin: 20px 0;
+              }
+              .email-footer {
+                background-color: #05060b;
+                padding: 20px;
+                text-align: center;
+                font-size: 12px;
+                color: #718096;
+                border-top: 1px solid rgba(255,255,255,0.05);
+              }
+            </style>
+          </head>
+          <body>
+            <div class="email-container">
+              <div class="email-header">
+                <h1>JACKPOT ROYALS</h1>
+              </div>
+              <div class="email-body">
+                ${image ? `<img class="promo-image" src="${image}" alt="Special Promotion Flyer" />` : ''}
+                <p>Hello Player,</p>
+                <h2 style="color: #ffd700; margin-top: 0;">${title}</h2>
+                <p style="white-space: pre-wrap;">${message}</p>
+                <div style="text-align: center;">
+                  <a href="http://localhost:3000" class="cta-button">Play Now</a>
+                </div>
+              </div>
+              <div class="email-footer">
+                &copy; 2026 Jackpot Royals. All Rights Reserved.<br>
+                You received this email because you are a registered player.
+              </div>
+            </div>
+          </body>
+          </html>
+        `;
+
+        const mailOptions = {
+          from: `"Jackpot Royals" <${smtpUser}>`,
+          to: smtpUser, // Send to self
+          bcc: emails, // BCC target segment players
+          subject: `🔥 Special Offer: ${title}`,
+          html: htmlContent
+        };
+
+        transporter.sendMail(mailOptions).catch(err => {
+          console.error('Nodemailer promo broadcast error:', err);
+        });
+      } else {
+        console.log(`[SMTP SIMULATOR] Broadcasting promo "${title}" to ${emails.length} players:`, emails);
+      }
+    }
+
     return NextResponse.json({ success: true, promotion: promoObject });
   } catch (err) {
     console.error('Create promotion error:', err);
