@@ -2278,6 +2278,12 @@ select option {
   color: #22c55e;
 }
 
+.admin-badge-preview.b-pending {
+  background: rgba(234, 179, 8, 0.15);
+  border: 1px solid #eab308;
+  color: #eab308;
+}
+
 .border-gold {
   border: 1px solid rgba(255, 215, 0, 0.35);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(255, 215, 0, 0.15);

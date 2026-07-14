@@ -63,7 +63,9 @@ export async function GET(req) {
         query.status = statuses[0];
       }
     }
-    if (type) {
+    const isSpecifyingType = type && type.trim() !== '';
+
+    if (isSpecifyingType) {
       query.type = type.toUpperCase().trim();
     }
 
@@ -96,18 +98,19 @@ export async function GET(req) {
       }
     }
 
-    if (type !== 'WEBSITE_COMMISSION_PAYMENT') {
+    if (!isSpecifyingType) {
+      const excludedTypes = ['WEBSITE_COMMISSION_PAYMENT', 'COMMISSION_WITHDRAW'];
       if (query.$and) {
-        query.$and.push({ type: { $ne: 'WEBSITE_COMMISSION_PAYMENT' } });
+        query.$and.push({ type: { $nin: excludedTypes } });
       } else if (query.$or) {
         query = {
           $and: [
             query,
-            { type: { $ne: 'WEBSITE_COMMISSION_PAYMENT' } }
+            { type: { $nin: excludedTypes } }
           ]
         };
       } else {
-        query.type = { $ne: 'WEBSITE_COMMISSION_PAYMENT' };
+        query.type = { $nin: excludedTypes };
       }
     }
 

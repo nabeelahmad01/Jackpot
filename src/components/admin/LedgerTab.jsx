@@ -49,7 +49,7 @@ export default function LedgerTab({
   const totalPages = data?.totalPages || 1;
 
   const depositsLedger = transactions.filter((t) => t.type === 'DEPOSIT');
-  const withdrawalsLedger = transactions.filter((t) => t.type === 'WITHDRAW' || t.type === 'BONUS' || t.type === 'COMMISSION_WITHDRAW');
+  const withdrawalsLedger = transactions.filter((t) => t.type === 'WITHDRAW' || t.type === 'BONUS');
 
   // Double-click prevention for approve actions
   const [approvingIds, setApprovingIds] = useState({});

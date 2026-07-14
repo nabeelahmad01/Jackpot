@@ -15,58 +15,207 @@ export async function GET(req) {
     const db = await getDb();
     const requestsCollection = db.collection('accountRequests');
 
-    let query = {};
-    if (email) {
-      query.userEmail = email.toLowerCase().trim();
-    }
     const adminRole = searchParams.get('adminRole');
     const adminDistributorId = searchParams.get('adminDistributorId');
 
-    if (adminDistributorId) {
-      query.distributorId = adminDistributorId;
-    } else {
-      // Exclude Type B distributor account requests
-      const typeBDists = await db.collection('distributors').find({ type: 'B' }).project({ id: 1 }).toArray();
-      const typeBDistIds = typeBDists.map(d => d.id).filter(Boolean);
-      if (typeBDistIds.length > 0) {
-        query.distributorId = { $nin: typeBDistIds };
+    // 1. FAST PATH: No Search Active (Only fetch actual requests)
+    if (!search) {
+      let query = {};
+      if (email) {
+        query.userEmail = email.toLowerCase().trim();
       }
-    }
 
-    if (status) {
-      query.status = status.toUpperCase().trim();
-    }
-
-    if (search) {
-      const cleanSearch = search.trim();
-      const searchCriteria = {
-        $or: [
-          { userEmail: { $regex: cleanSearch, $options: 'i' } },
-          { gameTitle: { $regex: cleanSearch, $options: 'i' } }
-        ]
-      };
-      if (Object.keys(query).length > 0) {
-        query = { $and: [query, searchCriteria] };
+      if (adminDistributorId) {
+        query.distributorId = adminDistributorId;
       } else {
-        query = searchCriteria;
+        // Exclude Type B distributor account requests
+        const typeBDists = await db.collection('distributors').find({ type: 'B' }).project({ id: 1 }).toArray();
+        const typeBDistIds = typeBDists.map(d => d.id).filter(Boolean);
+        if (typeBDistIds.length > 0) {
+          query.distributorId = { $nin: typeBDistIds };
+        }
       }
+
+      if (status) {
+        query.status = status.toUpperCase().trim();
+      }
+
+      const totalRequests = await requestsCollection.countDocuments(query);
+      const skip = (page - 1) * limit;
+
+      const requests = await requestsCollection.find(query)
+        .sort({ id: -1 })
+        .skip(skip)
+        .limit(limit)
+        .toArray();
+
+      // Batch look up existing game accounts for the unique request emails
+      let enrichedRequests = [];
+      if (requests.length > 0) {
+        const uniqueEmails = Array.from(new Set(requests.map(r => r.userEmail.toLowerCase().trim())));
+        const gameAccounts = await db.collection('gameAccounts').find({ userEmail: { $in: uniqueEmails } }).toArray();
+        
+        const accountsByEmail = {};
+        gameAccounts.forEach(acc => {
+          const emailKey = acc.userEmail.toLowerCase().trim();
+          if (!accountsByEmail[emailKey]) {
+            accountsByEmail[emailKey] = [];
+          }
+          accountsByEmail[emailKey].push({ gameTitle: acc.gameTitle, username: acc.username });
+        });
+
+        enrichedRequests = requests.map(r => {
+          const emailKey = r.userEmail.toLowerCase().trim();
+          return {
+            ...r,
+            existingAccounts: accountsByEmail[emailKey] || []
+          };
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        accountRequests: enrichedRequests,
+        totalRequests,
+        totalPages: Math.ceil(totalRequests / limit),
+        currentPage: page
+      });
     }
 
-    const totalRequests = await requestsCollection.countDocuments(query);
+    // 2. SEARCH PATH: Deep Search across Users, gameAccounts and accountRequests
+    const cleanSearch = search.trim();
+
+    // Query matched users
+    const matchedUsers = await db.collection('users').find({
+      $or: [
+        { email: { $regex: cleanSearch, $options: 'i' } },
+        { name: { $regex: cleanSearch, $options: 'i' } }
+      ]
+    }).project({ email: 1, distributorId: 1 }).toArray();
+
+    // Query matched game accounts
+    const matchedAccounts = await db.collection('gameAccounts').find({
+      $or: [
+        { username: { $regex: cleanSearch, $options: 'i' } },
+        { userEmail: { $regex: cleanSearch, $options: 'i' } },
+        { gameTitle: { $regex: cleanSearch, $options: 'i' } }
+      ]
+    }).toArray();
+
+    // Query matched requests
+    const matchedRequests = await requestsCollection.find({
+      $or: [
+        { userEmail: { $regex: cleanSearch, $options: 'i' } },
+        { gameTitle: { $regex: cleanSearch, $options: 'i' } }
+      ]
+    }).toArray();
+
+    // Gather unique emails
+    const uniqueEmails = new Set();
+    matchedUsers.forEach(u => {
+      if (u.email) uniqueEmails.add(u.email.toLowerCase().trim());
+    });
+    matchedAccounts.forEach(acc => {
+      if (acc.userEmail) uniqueEmails.add(acc.userEmail.toLowerCase().trim());
+    });
+    matchedRequests.forEach(req => {
+      if (req.userEmail) uniqueEmails.add(req.userEmail.toLowerCase().trim());
+    });
+
+    const emailsArray = Array.from(uniqueEmails);
+    if (emailsArray.length === 0) {
+      return NextResponse.json({
+        success: true,
+        accountRequests: [],
+        totalRequests: 0,
+        totalPages: 0,
+        currentPage: page
+      });
+    }
+
+    // Resolve distributorId for all matching emails to check permissions
+    const usersForEmails = await db.collection('users').find({
+      email: { $in: emailsArray }
+    }).project({ email: 1, distributorId: 1 }).toArray();
+
+    const userDistMap = {};
+    usersForEmails.forEach(u => {
+      userDistMap[u.email.toLowerCase().trim()] = u.distributorId || '';
+    });
+
+    // Exclude Type B distributor players unless requested by that specific distributor
+    const typeBDists = await db.collection('distributors').find({ type: 'B' }).project({ id: 1 }).toArray();
+    const typeBDistIds = typeBDists.map(d => d.id).filter(Boolean);
+
+    const filteredEmails = [];
+    emailsArray.forEach(emailKey => {
+      const userDistId = userDistMap[emailKey] || '';
+      if (adminDistributorId) {
+        if (userDistId === adminDistributorId) {
+          filteredEmails.push(emailKey);
+        }
+      } else {
+        if (!typeBDistIds.includes(userDistId)) {
+          filteredEmails.push(emailKey);
+        }
+      }
+    });
+
+    if (filteredEmails.length === 0) {
+      return NextResponse.json({
+        success: true,
+        accountRequests: [],
+        totalRequests: 0,
+        totalPages: 0,
+        currentPage: page
+      });
+    }
+
+    // Retrieve real requests for these filtered user emails
+    const realRequests = await requestsCollection.find({
+      userEmail: { $in: filteredEmails }
+    }).toArray();
+
+    const emailsWithRequests = new Set(realRequests.map(r => r.userEmail.toLowerCase().trim()));
+
+    // Synthesize pseudo-requests for matching users who do not have any requests record
+    const syntheticRequests = [];
+    filteredEmails.forEach(emailKey => {
+      if (!emailsWithRequests.has(emailKey)) {
+        const userDoc = usersForEmails.find(u => u.email.toLowerCase().trim() === emailKey);
+        syntheticRequests.push({
+          id: 'synthetic-' + emailKey + '-' + Date.now(),
+          gameTitle: '—',
+          userEmail: emailKey,
+          status: 'READY',
+          date: '—',
+          createdAt: new Date().toISOString(),
+          distributorId: userDoc?.distributorId || '',
+          isSynthetic: true
+        });
+      }
+    });
+
+    // Combine and sort (PENDING statuses first, then rest)
+    const combined = [...realRequests, ...syntheticRequests];
+    combined.sort((a, b) => {
+      if (a.status === 'PENDING' && b.status !== 'PENDING') return -1;
+      if (a.status !== 'PENDING' && b.status === 'PENDING') return 1;
+      const dateA = a.createdAt || a.date || '';
+      const dateB = b.createdAt || b.date || '';
+      return dateB.localeCompare(dateA);
+    });
+
+    const totalRequests = combined.length;
     const skip = (page - 1) * limit;
+    const paginated = combined.slice(skip, skip + limit);
 
-    const requests = await requestsCollection.find(query)
-      .sort({ id: -1 })
-      .skip(skip)
-      .limit(limit)
-      .toArray();
-
-    // Batch look up existing game accounts for the unique request emails
+    // Fetch and enrich paginated users with existing game accounts
     let enrichedRequests = [];
-    if (requests.length > 0) {
-      const uniqueEmails = Array.from(new Set(requests.map(r => r.userEmail.toLowerCase().trim())));
-      const gameAccounts = await db.collection('gameAccounts').find({ userEmail: { $in: uniqueEmails } }).toArray();
-      
+    if (paginated.length > 0) {
+      const paginatedEmails = Array.from(new Set(paginated.map(r => r.userEmail.toLowerCase().trim())));
+      const gameAccounts = await db.collection('gameAccounts').find({ userEmail: { $in: paginatedEmails } }).toArray();
+
       const accountsByEmail = {};
       gameAccounts.forEach(acc => {
         const emailKey = acc.userEmail.toLowerCase().trim();
@@ -76,7 +225,7 @@ export async function GET(req) {
         accountsByEmail[emailKey].push({ gameTitle: acc.gameTitle, username: acc.username });
       });
 
-      enrichedRequests = requests.map(r => {
+      enrichedRequests = paginated.map(r => {
         const emailKey = r.userEmail.toLowerCase().trim();
         return {
           ...r,
