@@ -179,6 +179,7 @@ export async function PUT(req) {
             txUpdate.status = 'PENDING';
             if (originalNoti.isFreeplayWithdraw) {
               txUpdate.payoutAmount = 30;
+              txUpdate.amount = 30.0; // Cap the ledger/finance amount to $30 max cashout
               txUpdate.isFreeplayWithdraw = true;
               txUpdate.note = "Freeplay win capped at $30 max cashout.";
             }

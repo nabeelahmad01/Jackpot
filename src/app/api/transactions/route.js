@@ -137,7 +137,9 @@ export async function GET(req) {
         payoutSent: 1,
         payoutHold: 1,
         approvedBy: 1,
-        allottedBy: 1
+        allottedBy: 1,
+        isFreeplayWithdraw: 1,
+        gameAmount: 1
       })
       .sort({ id: -1 })
       .skip(skip)
@@ -213,7 +215,8 @@ export async function POST(req) {
         gameTitle: newTx.gameTitle || 'Lobby',
         note: `Remaining payout request for Tx #${newTx.parentTxId}`,
         parentTxId: newTx.parentTxId,
-        distributorId: distId
+        distributorId: distId,
+        isFreeplayWithdraw: parentTx ? Boolean(parentTx.isFreeplayWithdraw) : false
       };
 
       await transactionsCollection.insertOne(txObject);
@@ -277,40 +280,39 @@ export async function POST(req) {
       userEmail: newTx.userEmail.toLowerCase().trim(),
       date: new Date().toLocaleString(),
       createdAt: new Date().toISOString(),
-      status: newTx.type === 'WITHDRAW' ? 'PENDING_COINS' : newTx.type === 'BONUS' ? 'SUCCESS' : 'PENDING',
+      status: newTx.type === 'WITHDRAW' ? 'PENDING_COINS' : (newTx.type === 'BONUS' && newTx.code === 'SIGNUP-FREE3') ? 'PENDING' : newTx.type === 'BONUS' ? 'SUCCESS' : 'PENDING',
       note: '',
       distributorId: distId,
       ...newTx
     };
 
-    let isFreeplayWithdraw = false;
     if (txObject.type === 'WITHDRAW') {
-      try {
-        const lastFreeplay = await transactionsCollection.findOne(
-          { userEmail: txObject.userEmail, type: 'BONUS', code: 'SIGNUP-FREE3' },
-          { sort: { id: -1 } }
-        );
-        if (lastFreeplay) {
-          // Only flag as freeplay if the user has NEVER had a successful deposit
-          const hasSuccessDeposit = await transactionsCollection.findOne(
-            { userEmail: txObject.userEmail, type: 'DEPOSIT', status: 'SUCCESS' }
+      // Use client-sent isFreeplayWithdraw flag (set when user has active freeplay session)
+      // If not sent by client, fallback to server-side detection for legacy cases
+      if (!txObject.isFreeplayWithdraw) {
+        try {
+          const lastFreeplay = await transactionsCollection.findOne(
+            { userEmail: txObject.userEmail, type: 'BONUS', code: 'SIGNUP-FREE3', status: 'SUCCESS' },
+            { sort: { id: -1 } }
           );
-          if (!hasSuccessDeposit) {
-            const lastSuccessWithdraw = await transactionsCollection.findOne(
-              { userEmail: txObject.userEmail, type: 'WITHDRAW', status: 'SUCCESS' },
-              { sort: { id: -1 } }
-            );
-            if (!lastSuccessWithdraw || parseFloat(lastFreeplay.id) > parseFloat(lastSuccessWithdraw.id)) {
-              isFreeplayWithdraw = true;
+          if (lastFreeplay) {
+            // Check if there's already a freeplay withdrawal after this freeplay
+            const hasFreeplayWithdrawAfter = await transactionsCollection.findOne({
+              userEmail: txObject.userEmail,
+              type: 'WITHDRAW',
+              isFreeplayWithdraw: true,
+              id: { $gt: lastFreeplay.id }
+            });
+            if (!hasFreeplayWithdrawAfter) {
+              txObject.isFreeplayWithdraw = true;
             }
           }
+        } catch (checkErr) {
+          console.error('Error checking freeplay session state:', checkErr);
         }
-      } catch (checkErr) {
-        console.error('Error checking freeplay session state:', checkErr);
       }
-      if (isFreeplayWithdraw) {
-        txObject.isFreeplayWithdraw = true;
-      }
+      // Keep full amount on the transaction — coins admin needs the real amount to deduct
+      // The amount will be capped to $30 when the coins admin approves (in coins-notifications PUT)
     }
 
     await transactionsCollection.insertOne(txObject);
@@ -331,23 +333,10 @@ export async function POST(req) {
         isFreeplayWithdraw: Boolean(txObject.isFreeplayWithdraw),
         distributorId: distId
       });
-    } else if (txObject.type === 'BONUS' && txObject.code === 'SIGNUP-FREE3') {
-      const notificationsCollection = db.collection('coinsNotifications');
-      await notificationsCollection.insertOne({
-        id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
-        userEmail: txObject.userEmail,
-        gameTitle: txObject.gameTitle || 'Lobby',
-        depositAmount: 0,
-        bonusApplied: -3, // indicates signup freeplay
-        isFreeplay: true,
-        totalCoins: parseFloat(txObject.amount),
-        status: 'PENDING',
-        read: false,
-        timestamp: new Date().toISOString(),
-        transactionId: txObject.id,
-        distributorId: distId
-      });
     }
+    // Note: SIGNUP-FREE3 freeplay bonus does NOT create coins notification here.
+    // It starts as PENDING, finance approves it first (PUT handler sets COINS_LOADING),
+    // then the PUT handler creates the coins notification for the coins admin.
 
     // Invalidate stats cache
     cache.del('admin_stats');
@@ -489,19 +478,38 @@ export async function PUT(req) {
         const notificationsCollection = db.collection('coinsNotifications');
         const existingNoti = await notificationsCollection.findOne({ transactionId: originalTx.id });
         if (!existingNoti) {
-          await notificationsCollection.insertOne({
-            id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
-            userEmail,
-            gameTitle: originalTx.gameTitle || 'Lobby',
-            depositAmount: amount,
-            bonusApplied: bonusPercentage,
-            totalCoins: Math.round(totalCoins * 100) / 100,
-            status: 'PENDING',
-            read: false,
-            timestamp: new Date().toISOString(),
-            transactionId: originalTx.id, // Linked parent transaction!
-            distributorId: originalTx.distributorId || ''
-          });
+          if (originalTx.type === 'BONUS' && originalTx.code === 'SIGNUP-FREE3') {
+            // Freeplay bonus — special coins notification with isFreeplay flag
+            await notificationsCollection.insertOne({
+              id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
+              userEmail,
+              gameTitle: originalTx.gameTitle || 'Lobby',
+              depositAmount: 0,
+              bonusApplied: -3, // indicates signup freeplay
+              isFreeplay: true,
+              totalCoins: parseFloat(originalTx.amount),
+              status: 'PENDING',
+              read: false,
+              timestamp: new Date().toISOString(),
+              transactionId: originalTx.id,
+              distributorId: originalTx.distributorId || ''
+            });
+          } else {
+            // Regular deposit/bonus coins notification
+            await notificationsCollection.insertOne({
+              id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
+              userEmail,
+              gameTitle: originalTx.gameTitle || 'Lobby',
+              depositAmount: amount,
+              bonusApplied: bonusPercentage,
+              totalCoins: Math.round(totalCoins * 100) / 100,
+              status: 'PENDING',
+              read: false,
+              timestamp: new Date().toISOString(),
+              transactionId: originalTx.id, // Linked parent transaction!
+              distributorId: originalTx.distributorId || ''
+            });
+          }
         }
 
         // 4. Referral System Bonus: Check if this depositor was referred by someone

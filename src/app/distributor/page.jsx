@@ -169,13 +169,15 @@ export default function DistributorPortal() {
   const players = statsData?.players || [];
   const playerEmails = players.map(p => (p.email || '').toLowerCase().trim()).filter(Boolean);
 
-  const referredRequests = (allRequestsData?.accountRequests || []).filter(req =>
-    req.email && playerEmails.includes(req.email.toLowerCase().trim())
-  );
+  const referredRequests = (allRequestsData?.accountRequests || []).filter(req => {
+    const email = req.userEmail || req.email;
+    return email && playerEmails.includes(email.toLowerCase().trim());
+  });
 
-  const referredCoins = (allCoinsData?.coinsNotifications || []).filter(noti =>
-    noti.email && playerEmails.includes(noti.email.toLowerCase().trim())
-  );
+  const referredCoins = (allCoinsData?.coinsNotifications || []).filter(noti => {
+    const email = noti.userEmail || noti.email;
+    return email && playerEmails.includes(email.toLowerCase().trim());
+  });
 
   const { data: settingsData } = useSWR('/api/settings', fetcher);
   const usdtAddress = settingsData?.settings?.usdtAddress || '';
@@ -1984,7 +1986,9 @@ export default function DistributorPortal() {
                           <tr key={tx.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
                             <td style={{ padding: '0.6rem 0.5rem' }}>{tx.userEmail}</td>
                             <td style={{ padding: '0.6rem 0.5rem' }}>
-                              <span style={{ color: tx.type === 'DEPOSIT' ? '#2ecc71' : '#e74c3c', fontWeight: 'bold' }}>{tx.type}</span>
+                              <span style={{ color: tx.isFreeplayWithdraw ? '#9b59b6' : (tx.type === 'DEPOSIT' ? '#2ecc71' : '#e74c3c'), fontWeight: 'bold' }}>
+                                {tx.isFreeplayWithdraw ? 'FREEPLAY' : tx.type}
+                              </span>
                             </td>
                             <td style={{ padding: '0.6rem 0.5rem', fontWeight: 'bold' }}>${parseFloat(tx.amount || 0).toFixed(2)}</td>
                             <td style={{ padding: '0.6rem 0.5rem' }}>

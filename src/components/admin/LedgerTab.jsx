@@ -427,8 +427,8 @@ export default function LedgerTab({
                       </td>
                       <td><strong>{tx.gameTitle}</strong></td>
                       <td>
-                        <span className="admin-badge-preview b-new">
-                          {tx.type}
+                        <span className={`admin-badge-preview ${tx.isFreeplayWithdraw ? 'b-vip' : 'b-new'}`}>
+                          {tx.isFreeplayWithdraw ? 'FREEPLAY' : tx.type}
                         </span>
                       </td>
                       <td>

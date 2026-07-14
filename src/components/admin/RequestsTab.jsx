@@ -21,27 +21,52 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
   const [playerDropdownOpen, setPlayerDropdownOpen] = useState(false);
   const [playersList, setPlayersList] = useState([]);
   const [gamesList, setGamesList] = useState([]);
+  const [isExistingAccount, setIsExistingAccount] = useState(false);
   const [isUpdatingCreds, setIsUpdatingCreds] = useState(false);
 
   const cleanRoles = (adminUser?.role || '').toLowerCase().split(',').map(r => r.trim());
   const canUpdateCredentials = cleanRoles.some(r => ['admin', 'operation_admin', 'coins_admin', 'distributor'].includes(r));
 
+  // Check for existing game account and pre-fill credentials
+  useEffect(() => {
+    if (selectedPlayerEmail && selectedGameTitle) {
+      fetch(`/api/game-accounts?email=${encodeURIComponent(selectedPlayerEmail)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.gameAccounts) {
+            const match = data.gameAccounts.find(
+              acc => acc.gameTitle.toLowerCase() === selectedGameTitle.toLowerCase()
+            );
+            if (match) {
+              setCustomUsername(match.username || '');
+              setCustomPassword(match.password || '');
+              setIsExistingAccount(true);
+            } else {
+              setIsExistingAccount(false);
+              // Auto-generate username & password
+              const prefix = selectedPlayerEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+              const randomSuf = Math.floor(100 + Math.random() * 900);
+              setCustomUsername(`${prefix}${randomSuf}`);
+
+              const charSet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+              let randPass = '';
+              for (let i = 0; i < 8; i++) {
+                randPass += charSet.charAt(Math.floor(Math.random() * charSet.length));
+              }
+              setCustomPassword(randPass);
+            }
+          }
+        })
+        .catch(err => console.error('Error fetching game account details:', err));
+    } else {
+      setIsExistingAccount(false);
+    }
+  }, [selectedPlayerEmail, selectedGameTitle]);
+
   const handleSelectPlayer = (email) => {
     setSelectedPlayerEmail(email);
     setPlayerSearchQuery(email);
     setPlayerDropdownOpen(false);
-
-    // Auto-generate username & password
-    const prefix = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
-    const randomSuf = Math.floor(100 + Math.random() * 900);
-    setCustomUsername(`${prefix}${randomSuf}`);
-
-    const charSet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let randPass = '';
-    for (let i = 0; i < 8; i++) {
-      randPass += charSet.charAt(Math.floor(Math.random() * charSet.length));
-    }
-    setCustomPassword(randPass);
   };
 
   const handleAddAccountSubmit = async (e) => {
@@ -165,6 +190,34 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
     // Approve action wrapper handles state modifications
     await onApproveRequest(reqItem);
     mutate(); // instantly refresh list
+  };
+
+  const handleEditGameAccount = (email, gameTitle) => {
+    setSelectedPlayerEmail(email);
+    setSelectedGameTitle(gameTitle);
+    setPlayerSearchQuery(email);
+    setAddAccountModalOpen(true);
+  };
+
+  const handleDeleteGameAccount = async (email, gameTitle) => {
+    if (!window.confirm(`Are you sure you want to delete the game credentials for ${gameTitle} of player ${email}?`)) {
+      return;
+    }
+    try {
+      const response = await fetch(`/api/game-accounts?userEmail=${encodeURIComponent(email)}&gameTitle=${encodeURIComponent(gameTitle)}`, {
+        method: 'DELETE'
+      });
+      const resData = await response.json();
+      if (resData.success) {
+        alert('Game credentials deleted successfully!');
+        mutate(); // Refresh the list
+      } else {
+        alert(resData.message || 'Failed to delete game credentials.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error deleting game credentials.');
+    }
   };
 
   const handlePrevPage = () => {
@@ -303,6 +356,53 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
                               Managed by {req.distributorName || 'Distributor'}
                             </span>
                           )}
+                        </div>
+                      )}
+                      
+                      {req.status === 'READY' && req.gameTitle && req.gameTitle !== '—' && (
+                        <div style={{ display: 'flex', gap: '0.35rem' }}>
+                          <button
+                            onClick={() => handleEditGameAccount(req.userEmail, req.gameTitle)}
+                            className="action-row-btn btn-edit"
+                            style={{ background: '#3b82f6', color: '#fff', padding: '0.35rem 0.65rem', margin: 0, width: 'auto', fontSize: '0.65rem', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                            title="Edit Credentials"
+                          >
+                            <i className="fa-solid fa-pen-to-square"></i> Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteGameAccount(req.userEmail, req.gameTitle)}
+                            className="action-row-btn btn-delete"
+                            style={{ background: '#ef4444', color: '#fff', padding: '0.35rem 0.65rem', margin: 0, width: 'auto', fontSize: '0.65rem', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                            title="Delete Credentials"
+                          >
+                            <i className="fa-solid fa-trash"></i> Delete
+                          </button>
+                        </div>
+                      )}
+
+                      {req.status === 'READY' && (!req.gameTitle || req.gameTitle === '—') && req.existingAccounts && req.existingAccounts.length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', width: '100%', minWidth: '150px' }}>
+                          {req.existingAccounts.map((acc, idx) => (
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.25rem 0.5rem', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                              <span style={{ fontSize: '0.65rem', fontWeight: 'bold' }}>{acc.gameTitle}</span>
+                              <div style={{ display: 'flex', gap: '0.35rem' }}>
+                                <button
+                                  onClick={() => handleEditGameAccount(req.userEmail, acc.gameTitle)}
+                                  style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer', padding: '2px', fontSize: '0.75rem' }}
+                                  title="Edit"
+                                >
+                                  <i className="fa-solid fa-pen"></i>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteGameAccount(req.userEmail, acc.gameTitle)}
+                                  style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px', fontSize: '0.75rem' }}
+                                  title="Delete"
+                                >
+                                  <i className="fa-solid fa-trash-can"></i>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
@@ -451,7 +551,14 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
 
                 {/* Username */}
                 <div className="input-group">
-                  <label htmlFor="custom-username">Game Username</label>
+                  <label htmlFor="custom-username" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Game Username</span>
+                    {isExistingAccount && (
+                      <span style={{ fontSize: '0.625rem', color: '#10b981', background: 'rgba(16,185,129,0.1)', padding: '0.15rem 0.4rem', borderRadius: '4px', border: '1px solid rgba(16,185,129,0.2)' }}>
+                        Existing Account Found
+                      </span>
+                    )}
+                  </label>
                   <div className="input-wrapper">
                     <i className="fa-solid fa-user-tag input-icon"></i>
                     <input
@@ -484,10 +591,10 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
                 <button
                   type="submit"
                   className="submit-btn"
-                  style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold' }}
+                  style={{ background: isExistingAccount ? '#10b981' : 'var(--gold-primary)', color: '#000', fontWeight: 'bold' }}
                   disabled={isUpdatingCreds || !selectedPlayerEmail || !selectedGameTitle}
                 >
-                  {isUpdatingCreds ? 'CREATING...' : 'CREATE GAME ACCOUNT'}
+                  {isUpdatingCreds ? 'SAVING...' : isExistingAccount ? 'UPDATE GAME ACCOUNT' : 'CREATE GAME ACCOUNT'}
                 </button>
               </form>
             </div>

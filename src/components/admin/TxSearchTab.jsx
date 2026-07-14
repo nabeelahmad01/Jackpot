@@ -137,8 +137,8 @@ export default function TxSearchTab({ onInspectProof, adminUser }) {
                   </td>
                   <td><strong>{tx.gameTitle || 'Lobby'}</strong></td>
                   <td>
-                    <span className={`admin-badge-preview b-${tx.type === 'DEPOSIT' ? 'hot' : tx.type === 'WITHDRAW' ? 'new' : 'ready'}`}>
-                      {tx.type}
+                    <span className={`admin-badge-preview b-${tx.isFreeplayWithdraw ? 'vip' : (tx.type === 'DEPOSIT' ? 'hot' : tx.type === 'WITHDRAW' ? 'new' : 'ready')}`}>
+                      {tx.isFreeplayWithdraw ? 'FREEPLAY' : tx.type}
                     </span>
                   </td>
                   <td><strong>${parseFloat(tx.amount).toFixed(2)}</strong></td>

@@ -44,7 +44,7 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
     revalidateOnFocus: true
   });
   const { data: gamesData, error: gamesError, mutate: mutateGames } = useSWR('/api/games', fetcher);
-  const { data: activityData } = useSWR('/api/admin/activity', fetcher, {
+  const { data: activityData } = useSWR(`/api/admin/activity?adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}`, fetcher, {
     refreshInterval: 10000,
     revalidateOnFocus: true
   });
@@ -167,7 +167,26 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
           <p style={{ fontSize: '0.75rem', color: '#cbd5e1', margin: '0.5rem 0' }}>
             There are currently <strong style={{ color: '#ef4444' }}>{activityData?.activeStaffCount} active staff member(s)</strong> logged in, but one or more requests have been pending for **over 2 minutes** without a response!
           </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.5rem' }}>
+
+          <div style={{ margin: '0.75rem 0', padding: '0.75rem', background: 'rgba(0,0,0,0.2)', borderRadius: '10px', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <h5 style={{ color: '#ef4444', margin: '0 0 0.5rem 0', fontSize: '0.725rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Pending Tasks (&gt; 2 min):
+            </h5>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '150px', overflowY: 'auto' }}>
+              {activityData?.unrespondedRequests?.map((req, idx) => (
+                <div key={req.id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem', padding: '0.35rem 0.5rem', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.02)' }}>
+                  <span style={{ color: '#fff', fontWeight: 'bold', marginRight: '6px' }}>[{req.type}]</span>
+                  <span style={{ color: '#cbd5e1', flex: 1 }}>{req.detail}</span>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.625rem', marginLeft: '8px' }}>
+                    {new Date(req.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.5rem' }}>
+            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'block', width: '100%', marginBottom: '0.15rem' }}>Active Staff Online:</span>
             {activityData?.activeStaffList?.map((s) => (
               <span key={s.email} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', padding: '0.25rem 0.5rem', borderRadius: '6px', fontSize: '0.65rem', color: '#ffd700' }}>
                 👤 {s.name || s.email} ({s.role.replace('_', ' ')})

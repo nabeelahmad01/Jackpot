@@ -4,6 +4,9 @@ import { getDb } from '../../../../lib/mongodb';
 // GET gets all staff members (non-user roles) and their last active status
 export async function GET(req) {
   try {
+    const { searchParams } = new URL(req.url);
+    const adminDistributorId = searchParams.get('adminDistributorId');
+
     const db = await getDb();
     const usersCollection = db.collection('users');
 
@@ -19,6 +22,7 @@ export async function GET(req) {
 
     let hasUnrespondedRequest = false;
     let pendingCount = 0;
+    let unrespondedRequests = [];
 
     const parseDateSafe = (dateStr) => {
       if (!dateStr) return 0;
@@ -39,8 +43,28 @@ export async function GET(req) {
     if (activeStaff.length > 0) {
       const twoMinutesAgo = Date.now() - 2 * 60 * 1000;
 
+      // 1. Build queries based on distributor role
+      let accountReqQuery = { status: 'PENDING' };
+      let txQuery = { status: 'PENDING' };
+      let coinsNotiQuery = { status: { $in: ['PENDING', 'CLAIM_REQUESTED'] } };
+
+      if (adminDistributorId) {
+        accountReqQuery.distributorId = adminDistributorId;
+        txQuery.distributorId = adminDistributorId;
+        coinsNotiQuery.distributorId = adminDistributorId;
+      } else {
+        // Exclude Type B distributor account requests & transactions & coins notifications
+        const typeBDists = await db.collection('distributors').find({ type: 'B' }).project({ id: 1 }).toArray();
+        const typeBDistIds = typeBDists.map(d => d.id).filter(Boolean);
+        if (typeBDistIds.length > 0) {
+          accountReqQuery.distributorId = { $nin: typeBDistIds };
+          txQuery.distributorId = { $nin: typeBDistIds };
+          coinsNotiQuery.distributorId = { $nin: typeBDistIds };
+        }
+      }
+
       // Check accountRequests
-      const pendingAccounts = await db.collection('accountRequests').find({ status: 'PENDING' }).toArray();
+      const pendingAccounts = await db.collection('accountRequests').find(accountReqQuery).toArray();
       const unrespondedAccounts = pendingAccounts.filter(r => {
         const time = r.createdAt || r.timestamp || r.date;
         const parsedTime = parseDateSafe(time);
@@ -48,7 +72,7 @@ export async function GET(req) {
       });
 
       // Check transactions
-      const pendingTx = await db.collection('transactions').find({ status: 'PENDING' }).toArray();
+      const pendingTx = await db.collection('transactions').find(txQuery).toArray();
       const unrespondedTx = pendingTx.filter(t => {
         const time = t.createdAt || t.timestamp || t.date;
         const parsedTime = parseDateSafe(time);
@@ -56,14 +80,43 @@ export async function GET(req) {
       });
 
       // Check coinsNotifications
-      const pendingCoins = await db.collection('coinsNotifications').find({ status: { $in: ['PENDING', 'CLAIM_REQUESTED'] } }).toArray();
+      const pendingCoins = await db.collection('coinsNotifications').find(coinsNotiQuery).toArray();
       const unrespondedCoins = pendingCoins.filter(n => {
         const time = n.createdAt || n.timestamp || n.date;
         const parsedTime = parseDateSafe(time);
         return parsedTime > 0 && parsedTime < twoMinutesAgo;
       });
 
-      pendingCount = unrespondedAccounts.length + unrespondedTx.length + unrespondedCoins.length;
+      // Populate unresponded list
+      unrespondedAccounts.forEach(r => {
+        unrespondedRequests.push({
+          id: r.id,
+          type: 'Account Request',
+          detail: `Game account creation request for ${r.gameTitle} (${r.userEmail})`,
+          time: r.createdAt || r.timestamp || r.date
+        });
+      });
+
+      unrespondedTx.forEach(t => {
+        unrespondedRequests.push({
+          id: t.id,
+          type: `${t.type} Request`,
+          detail: `${t.type} of $${parseFloat(t.amount || 0).toFixed(2)} for ${t.userEmail} on ${t.gameTitle || 'Lobby'}`,
+          time: t.createdAt || t.timestamp || t.date
+        });
+      });
+
+      unrespondedCoins.forEach(n => {
+        const amt = parseFloat(n.totalCoins || 0);
+        unrespondedRequests.push({
+          id: n.id,
+          type: 'Coins Allotment',
+          detail: `${amt > 0 ? 'Add' : 'Deduct'} ${Math.abs(amt)} coins for ${n.userEmail} on ${n.gameTitle}`,
+          time: n.createdAt || n.timestamp || n.date
+        });
+      });
+
+      pendingCount = unrespondedRequests.length;
       if (pendingCount > 0) {
         hasUnrespondedRequest = true;
       }
@@ -75,7 +128,8 @@ export async function GET(req) {
       activeStaffCount: activeStaff.length,
       activeStaffList: activeStaff,
       hasUnrespondedRequest,
-      pendingCount
+      pendingCount,
+      unrespondedRequests
     });
   } catch (err) {
     console.error('Fetch Activity API Error:', err);

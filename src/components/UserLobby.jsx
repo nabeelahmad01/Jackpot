@@ -46,6 +46,7 @@ export default function UserLobby({
   const [selectedGameForReferral, setSelectedGameForReferral] = useState('');
   const [claimingReferralId, setClaimingReferralId] = useState(null);
   const [claimedRemainderIds, setClaimedRemainderIds] = useState([]);
+  const [isFreeplaySession, setIsFreeplaySession] = useState(false);
 
   // Sync state changes to browser URL pathnames
   useEffect(() => {
@@ -91,6 +92,36 @@ export default function UserLobby({
     handlePopState(); // Sync initial path on mount
     return () => window.removeEventListener('popstate', handlePopState);
   }, [games]);
+
+  // Detect if user has an active freeplay (claimed freeplay but hasn't done a freeplay withdrawal yet)
+  useEffect(() => {
+    const sorted = [...(transactions || [])].sort((a, b) => {
+      if (a.id && b.id) return parseFloat(b.id) - parseFloat(a.id);
+      return new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0);
+    });
+
+    // Find most recent SIGNUP-FREE3 freeplay bonus (SUCCESS)
+    const lastFreeplay = sorted.find(
+      (t) => t.type === 'BONUS' && t.code === 'SIGNUP-FREE3' && t.status === 'SUCCESS'
+    );
+
+    if (!lastFreeplay) {
+      setIsFreeplaySession(false);
+      return;
+    }
+
+    // Check if there's a freeplay withdrawal (isFreeplayWithdraw=true) AFTER this freeplay
+    const hasFreeplayWithdrawAfter = sorted.some((t) => {
+      if (t.type !== 'WITHDRAW' || !t.isFreeplayWithdraw) return false;
+      if (t.id && lastFreeplay.id) {
+        return parseFloat(t.id) > parseFloat(lastFreeplay.id);
+      }
+      return new Date(t.createdAt || t.date || 0) > new Date(lastFreeplay.createdAt || lastFreeplay.date || 0);
+    });
+
+    // Active freeplay = claimed freeplay but no freeplay withdrawal after it
+    setIsFreeplaySession(!hasFreeplayWithdrawAfter);
+  }, [transactions]);
 
   const fetchPendingReferrals = () => {
     if (!currentUserEmail) return;
@@ -530,6 +561,7 @@ export default function UserLobby({
       nameOnTag: shouldShowField('name') ? nameOnTag.trim() : '',
       phoneOnTag: shouldShowField('phone') ? phoneOnTag.trim() : '',
       emailOnTag: shouldShowField('email') ? withdrawEmail.trim() : '',
+      ...(isFreeplaySession ? { isFreeplayWithdraw: true } : {}),
       screenshot: withdrawScreenshot,
       gameUsername: gameUsername || ''
     });
@@ -575,9 +607,6 @@ export default function UserLobby({
     const freeplayClaims = sortedTxs.filter(
       (t) => t.type === 'BONUS' && t.code === 'SIGNUP-FREE3' && t.status === 'SUCCESS'
     );
-    const successfulWithdrawals = sortedTxs.filter(
-      (t) => t.type === 'WITHDRAW' && t.status === 'SUCCESS'
-    );
 
     let isEligible = false;
     let toastMessage = "";
@@ -587,53 +616,32 @@ export default function UserLobby({
       isEligible = true;
     } else {
       const mostRecentFreeplay = freeplayClaims[0];
-      const mostRecentWithdrawal = successfulWithdrawals[0];
 
-      // Anchor is whichever happened last (most recent)
-      let anchorTx = mostRecentFreeplay;
-      if (mostRecentWithdrawal) {
-        const freeplayTime = new Date(mostRecentFreeplay.date || 0).getTime();
-        const withdrawalTime = new Date(mostRecentWithdrawal.date || 0).getTime();
-        
-        const isWithdrawalMoreRecent = mostRecentWithdrawal.id && mostRecentFreeplay.id
-          ? parseFloat(mostRecentWithdrawal.id) > parseFloat(mostRecentFreeplay.id)
-          : withdrawalTime > freeplayTime;
-
-        if (isWithdrawalMoreRecent) {
-          anchorTx = mostRecentWithdrawal;
+      // Check if there's ANY deposit >= $25 or withdrawal >= $25 AFTER the last freeplay claim
+      const qualifyingTxAfterFreeplay = sortedTxs.filter((t) => {
+        const isDeposit = t.type === 'DEPOSIT' && t.status === 'SUCCESS' && parseFloat(t.amount || 0) >= 25;
+        const isWithdraw = t.type === 'WITHDRAW' && t.status === 'SUCCESS' && !t.parentTxId && parseFloat(t.amount || 0) >= 25;
+        if (!isDeposit && !isWithdraw) return false;
+        if (t.id && mostRecentFreeplay.id) {
+          return parseFloat(t.id) > parseFloat(mostRecentFreeplay.id);
         }
-      }
-
-      // Must find a successful deposit of at least $25.00 after the anchor event
-      const depositsAfterAnchor = sortedTxs.filter((t) => {
-        if (t.type !== 'DEPOSIT' || t.status !== 'SUCCESS' || parseFloat(t.amount || 0) < 25) {
-          return false;
-        }
-        if (t.id && anchorTx.id) {
-          return parseFloat(t.id) > parseFloat(anchorTx.id);
-        }
-        return new Date(t.date || 0).getTime() > new Date(anchorTx.date || 0).getTime();
+        return new Date(t.date || 0).getTime() > new Date(mostRecentFreeplay.date || 0).getTime();
       });
 
-      if (depositsAfterAnchor.length > 0) {
+      if (qualifyingTxAfterFreeplay.length > 0) {
         isEligible = true;
       } else {
-        if (anchorTx.type === 'WITHDRAW') {
-          toastMessage = "You have made a cashout! Deposit at least $25.00 to claim another Freeplay.";
-        } else {
-          toastMessage = "You have already claimed your Freeplay bonus! Deposit at least $25.00 to claim another.";
-        }
+        toastMessage = "Deposit or withdraw at least $25.00 to claim another Freeplay.";
       }
     }
 
     if (!isEligible) {
-      showToast(toastMessage || "You are not eligible for Freeplay yet. Deposit at least $25.00 first.", "error");
+      showToast(toastMessage || "You are not eligible for Freeplay yet. Deposit or withdraw at least $25.00 first.", "error");
       return;
     }
 
     // 2. Check if a game is active
     if (!activeGame) {
-      // If no active game, scroll to games section so they select a game first
       showToast("Please select a game first to request account and claim your Freeplay!", "info");
       document.getElementById('lobby-games-section')?.scrollIntoView({ behavior: 'smooth' });
       return;
@@ -644,7 +652,14 @@ export default function UserLobby({
       (acc) => acc.gameTitle.toLowerCase() === activeGame.title.toLowerCase()
     );
     if (!currentAccount) {
-      showToast(`Please request/create a game account for ${activeGame.title} first to claim Freeplay!`, "error");
+      // Auto-submit account request if they don't have one
+      const existingRequest = (accountRequests || []).find(
+        (r) => r.gameTitle && r.gameTitle.toLowerCase() === activeGame.title.toLowerCase() && r.status !== 'REJECTED'
+      );
+      if (!existingRequest) {
+        onRequestAccount(activeGame.title);
+      }
+      showToast(`Account request submitted for ${activeGame.title}! Once your account is created, come back to claim your Freeplay.`, "info");
       return;
     }
 
@@ -661,9 +676,11 @@ export default function UserLobby({
       code: 'SIGNUP-FREE3',
       nameOnTag: currentUser?.name || 'Player',
       phoneOnTag: '',
+      emailOnTag: currentUserEmail,
+      gameUsername: currentAccount.username,
       screenshot: ''
     });
-    showToast(`Freeplay request of $3.00 submitted for ${activeGame.title}! Awaiting manager allotment.`, "success");
+    showToast(`Freeplay request of $3.00 submitted for ${activeGame.title}! Awaiting approval.`, "success");
   };
 
   const handleRequestAccountWithBonus = () => {
@@ -1637,8 +1654,17 @@ export default function UserLobby({
                       <div className="wallet-side-box" style={{ background: 'rgba(239,68,68,0.02)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '14px', padding: '1.25rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                           <div>
-                            <h4 style={{ fontSize: '0.95rem', color: '#fff', fontWeight: '700' }}>WITHDRAW</h4>
-                            <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Request payout to your preferred tag.</p>
+                            <h4 style={{ fontSize: '0.95rem', color: '#fff', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              WITHDRAW
+                              {isFreeplaySession && (
+                                <span style={{ background: 'rgba(0, 255, 102, 0.1)', border: '1px solid rgba(0, 255, 102, 0.3)', color: '#00ff66', fontSize: '0.575rem', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 'bold' }}>
+                                  FREEPLAY CASHOUT
+                                </span>
+                              )}
+                            </h4>
+                            <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                              {isFreeplaySession ? 'Your freeplay cashout limit is $30.' : 'Request payout to your preferred tag.'}
+                            </p>
                           </div>
                           <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(239,68,68,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f87171' }}>
                             <i className="fa-solid fa-receipt"></i>
@@ -1647,13 +1673,23 @@ export default function UserLobby({
 
                         <form onSubmit={handleWithdrawInitiate}>
                           <div className="input-group" style={{ marginBottom: '1rem' }}>
-                            <div className="input-wrapper" style={{ background: '#0b0c16' }}>
+                            <div className="input-wrapper" style={{ background: '#0b0c16', position: 'relative' }}>
+                              {isFreeplaySession && (
+                                <span style={{
+                                  position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)',
+                                  background: 'linear-gradient(135deg, #00ff66, #10b981)', color: '#000', fontSize: '0.6rem',
+                                  padding: '0.15rem 0.5rem', borderRadius: '4px', fontWeight: 'bold', letterSpacing: '0.5px',
+                                  zIndex: 2, pointerEvents: 'none', userSelect: 'none'
+                                }}>
+                                  FREEPLAY
+                                </span>
+                              )}
                               <input
                                 type="number"
                                 placeholder="10"
                                 value={withdrawAmount}
                                 onChange={(e) => setWithdrawAmount(e.target.value)}
-                                style={{ padding: '0.75rem 1rem' }}
+                                style={{ padding: '0.75rem 1rem', paddingLeft: isFreeplaySession ? '5.5rem' : '1rem' }}
                                 required
                               />
                             </div>

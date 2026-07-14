@@ -87,3 +87,41 @@ export async function PUT(req) {
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
   }
 }
+
+// DELETE game credentials for a user
+export async function DELETE(req) {
+  try {
+    const { searchParams } = new URL(req.url);
+    let userEmail = searchParams.get('userEmail');
+    let gameTitle = searchParams.get('gameTitle');
+
+    if (!userEmail || !gameTitle) {
+      try {
+        const body = await req.json();
+        userEmail = body.userEmail;
+        gameTitle = body.gameTitle;
+      } catch (e) {}
+    }
+
+    if (!userEmail || !gameTitle) {
+      return NextResponse.json({ success: false, message: 'userEmail and gameTitle are required.' }, { status: 400 });
+    }
+
+    const db = await getDb();
+    const gameAccountsCollection = db.collection('gameAccounts');
+
+    const result = await gameAccountsCollection.deleteOne({
+      userEmail: userEmail.toLowerCase().trim(),
+      gameTitle: gameTitle
+    });
+
+    if (result.deletedCount === 0) {
+      return NextResponse.json({ success: false, message: 'No matching game credentials found.' }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, message: 'Game credentials deleted successfully!' });
+  } catch (err) {
+    console.error('Delete Game Account API Error:', err);
+    return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
+  }
+}
