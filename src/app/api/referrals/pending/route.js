@@ -108,6 +108,7 @@ export async function POST(req) {
           userEmail: cleanReferrerEmail,
           status: 'PENDING',
           date: new Date().toLocaleString(),
+          createdAt: new Date().toISOString(),
           referralRewardId: id, // Link to pending referral
           distributorId: distId
         });

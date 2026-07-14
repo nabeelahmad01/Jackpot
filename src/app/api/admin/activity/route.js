@@ -7,9 +7,9 @@ export async function GET(req) {
     const db = await getDb();
     const usersCollection = db.collection('users');
 
-    // Fetch staff (roles: support_admin, financial_admin, coins_admin)
+    // Fetch staff (roles: support_admin, financial_admin, coins_admin, operation_admin, admin, distributor_staff)
     const staff = await usersCollection.find(
-      { role: { $in: ['support_admin', 'financial_admin', 'coins_admin'] } },
+      { role: { $in: ['admin', 'operation_admin', 'financial_admin', 'coins_admin', 'support_admin', 'distributor_staff'] } },
       { projection: { name: 1, email: 1, role: 1, lastActive: 1 } }
     ).toArray();
 
@@ -20,28 +20,47 @@ export async function GET(req) {
     let hasUnrespondedRequest = false;
     let pendingCount = 0;
 
+    const parseDateSafe = (dateStr) => {
+      if (!dateStr) return 0;
+      const parsed = Date.parse(dateStr);
+      if (!isNaN(parsed)) return parsed;
+      // Fallback for localized string formats like "7/14/2026, 7:52:08 AM"
+      try {
+        const clean = dateStr.replace(/[^0-9a-zA-Z\s\/\:\,]/g, '');
+        const parts = clean.split(',');
+        if (parts.length > 0) {
+          const parsedClean = Date.parse(parts[0] + (parts[1] || ''));
+          if (!isNaN(parsedClean)) return parsedClean;
+        }
+      } catch (e) {}
+      return 0;
+    };
+
     if (activeStaff.length > 0) {
-      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+      const twoMinutesAgo = Date.now() - 2 * 60 * 1000;
 
       // Check accountRequests
       const pendingAccounts = await db.collection('accountRequests').find({ status: 'PENDING' }).toArray();
       const unrespondedAccounts = pendingAccounts.filter(r => {
-        const time = r.timestamp || r.date;
-        return time && new Date(time) < twoMinutesAgo;
+        const time = r.createdAt || r.timestamp || r.date;
+        const parsedTime = parseDateSafe(time);
+        return parsedTime > 0 && parsedTime < twoMinutesAgo;
       });
 
       // Check transactions
       const pendingTx = await db.collection('transactions').find({ status: 'PENDING' }).toArray();
       const unrespondedTx = pendingTx.filter(t => {
-        const time = t.date;
-        return time && new Date(time) < twoMinutesAgo;
+        const time = t.createdAt || t.timestamp || t.date;
+        const parsedTime = parseDateSafe(time);
+        return parsedTime > 0 && parsedTime < twoMinutesAgo;
       });
 
       // Check coinsNotifications
       const pendingCoins = await db.collection('coinsNotifications').find({ status: { $in: ['PENDING', 'CLAIM_REQUESTED'] } }).toArray();
       const unrespondedCoins = pendingCoins.filter(n => {
-        const time = n.timestamp || n.date;
-        return time && new Date(time) < twoMinutesAgo;
+        const time = n.createdAt || n.timestamp || n.date;
+        const parsedTime = parseDateSafe(time);
+        return parsedTime > 0 && parsedTime < twoMinutesAgo;
       });
 
       pendingCount = unrespondedAccounts.length + unrespondedTx.length + unrespondedCoins.length;

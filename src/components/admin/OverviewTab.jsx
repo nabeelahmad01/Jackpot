@@ -69,6 +69,7 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
   const [updateCoins, setUpdateCoins] = React.useState('');
   const [updateLink, setUpdateLink] = React.useState('');
   const [isUpdatingPool, setIsUpdatingPool] = React.useState(false);
+  const [resetUsedCoins, setResetUsedCoins] = React.useState(false);
 
   const getYesterdayDateString = () => {
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -116,6 +117,7 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
     setSelectedGame(game);
     setUpdateCoins(game.availableCoins || 0);
     setUpdateLink(game.openPanelLink || game.link || '');
+    setResetUsedCoins(false);
     setUpdateModalOpen(true);
   };
 
@@ -129,7 +131,7 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
     }
     setIsUpdatingPool(true);
     try {
-      await onUpdateGameCoinsPool(selectedGame.id, coinsVal, updateLink);
+      await onUpdateGameCoinsPool(selectedGame.id, coinsVal, updateLink, resetUsedCoins);
       mutateGames();
       setUpdateModalOpen(false);
     } catch (err) {
@@ -497,6 +499,18 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
                     style={{ fontSize: '0.75rem' }}
                   />
                 </div>
+              </div>
+
+              <div className="input-group" style={{ margin: '0.25rem 0 0 0' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.75rem', color: '#f59e0b' }}>
+                  <input
+                    type="checkbox"
+                    checked={resetUsedCoins}
+                    onChange={(e) => setResetUsedCoins(e.target.checked)}
+                    style={{ width: 'auto', cursor: 'pointer' }}
+                  />
+                  <span>Reset Used Coins counter to 0 (Daily reset)</span>
+                </label>
               </div>
 
               <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>

@@ -61,9 +61,33 @@ export async function GET(req) {
       .limit(limit)
       .toArray();
 
+    // Batch look up existing game accounts for the unique request emails
+    let enrichedRequests = [];
+    if (requests.length > 0) {
+      const uniqueEmails = Array.from(new Set(requests.map(r => r.userEmail.toLowerCase().trim())));
+      const gameAccounts = await db.collection('gameAccounts').find({ userEmail: { $in: uniqueEmails } }).toArray();
+      
+      const accountsByEmail = {};
+      gameAccounts.forEach(acc => {
+        const emailKey = acc.userEmail.toLowerCase().trim();
+        if (!accountsByEmail[emailKey]) {
+          accountsByEmail[emailKey] = [];
+        }
+        accountsByEmail[emailKey].push({ gameTitle: acc.gameTitle, username: acc.username });
+      });
+
+      enrichedRequests = requests.map(r => {
+        const emailKey = r.userEmail.toLowerCase().trim();
+        return {
+          ...r,
+          existingAccounts: accountsByEmail[emailKey] || []
+        };
+      });
+    }
+
     return NextResponse.json({
       success: true,
-      accountRequests: requests,
+      accountRequests: enrichedRequests,
       totalRequests,
       totalPages: Math.ceil(totalRequests / limit),
       currentPage: page
@@ -106,6 +130,7 @@ export async function POST(req) {
       userEmail: userEmail.toLowerCase().trim(),
       status: 'PENDING',
       date: new Date().toLocaleString(),
+      createdAt: new Date().toISOString(),
       distributorId: distId,
       distributorType: distType,
       distributorName: distName

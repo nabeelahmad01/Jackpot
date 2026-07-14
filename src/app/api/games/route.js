@@ -92,16 +92,18 @@ export async function PUT(req) {
     const gamesCollection = db.collection('games');
 
     if (game.distributorId) {
+      const updateDoc = {
+        distributorId: game.distributorId,
+        gameId: game.id,
+        availableCoins: game.availableCoins !== undefined ? Number(game.availableCoins) : 0,
+        openPanelLink: game.openPanelLink || ''
+      };
+      if (game.resetUsedCoins) {
+        updateDoc.usedCoins = 0;
+      }
       await db.collection('distributorGames').updateOne(
         { distributorId: game.distributorId, gameId: game.id },
-        {
-          $set: {
-            distributorId: game.distributorId,
-            gameId: game.id,
-            availableCoins: game.availableCoins !== undefined ? Number(game.availableCoins) : 0,
-            openPanelLink: game.openPanelLink || ''
-          }
-        },
+        { $set: updateDoc },
         { upsert: true }
       );
       return NextResponse.json({ success: true, message: 'Distributor game pool updated successfully!' });
@@ -115,6 +117,10 @@ export async function PUT(req) {
       openPanelLink: game.openPanelLink,
       availableCoins: game.availableCoins !== undefined ? Number(game.availableCoins) : undefined
     };
+
+    if (game.resetUsedCoins) {
+      updateFields.usedCoins = 0;
+    }
 
     // Clean undefined fields
     Object.keys(updateFields).forEach(key => updateFields[key] === undefined && delete updateFields[key]);

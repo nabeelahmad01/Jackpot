@@ -5,7 +5,7 @@ import { mutate } from 'swr';
 import ParticlesBackground from '../../components/ParticlesBackground';
 import AdminDashboard from '../../components/AdminDashboard';
 import LoadingOverlay from '../../components/LoadingOverlay';
-import { AdminGameModal, ApproveAccountModal, AdminGatewayModal, ViewProofModal } from '../../components/Modals';
+import { AdminGameModal, ApproveAccountModal, AdminGatewayModal, ViewProofModal, SupportModal } from '../../components/Modals';
 
 export default function AdminPage({ portalName, forcedRole }) {
   const [authenticated, setAuthenticated] = useState(false);
@@ -13,6 +13,7 @@ export default function AdminPage({ portalName, forcedRole }) {
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [supportOpen, setSupportOpen] = useState(false);
 
   // Overlay states
   const [loadingActive, setLoadingActive] = useState(false);
@@ -258,11 +259,12 @@ export default function AdminPage({ portalName, forcedRole }) {
     }
   };
 
-  const handleUpdateGameCoinsPool = async (gameId, coins, openPanelLink) => {
+  const handleUpdateGameCoinsPool = async (gameId, coins, openPanelLink, resetUsedCoins) => {
     try {
       const body = { id: gameId };
       if (coins !== undefined) body.availableCoins = Number(coins);
       if (openPanelLink !== undefined) body.openPanelLink = openPanelLink;
+      if (resetUsedCoins !== undefined) body.resetUsedCoins = Boolean(resetUsedCoins);
 
       const response = await fetch('/api/games', {
         method: 'PUT',
@@ -645,6 +647,47 @@ export default function AdminPage({ portalName, forcedRole }) {
         isOpen={proofModalOpen}
         onClose={() => setProofModalOpen(false)}
         proofUrl={proofImageUrl}
+      />
+
+      {authenticated && !supportOpen && (
+        <button
+          onClick={() => setSupportOpen(true)}
+          style={{
+            position: 'fixed',
+            bottom: '2rem',
+            right: '2rem',
+            zIndex: 99999,
+            width: '60px',
+            height: '60px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #ffd700 0%, #cca000 100%)',
+            color: '#000',
+            border: 'none',
+            boxShadow: '0 8px 30px rgba(255,215,0,0.35)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '1.5rem',
+            transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.05)';
+            e.currentTarget.style.boxShadow = '0 10px 35px rgba(255,215,0,0.5)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.boxShadow = '0 8px 30px rgba(255,215,0,0.35)';
+          }}
+        >
+          <i className="fa-solid fa-headset"></i>
+        </button>
+      )}
+
+      <SupportModal
+        isOpen={supportOpen}
+        onClose={() => setSupportOpen(false)}
+        currentUser={adminUser}
       />
 
       <LoadingOverlay active={loadingActive} />

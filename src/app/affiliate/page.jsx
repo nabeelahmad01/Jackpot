@@ -3,17 +3,71 @@
 import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
 
+import { SupportModal } from '../../components/Modals';
+
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
 export default function AffiliatePortal() {
   const [mounted, setMounted] = useState(false);
   const [agentSession, setAgentSession] = useState(null);
+  const [supportOpen, setSupportOpen] = useState(false);
 
-  // Login credentials
+  // Login & Registration credentials
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  // Registration states
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [regName, setRegName] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [regCode, setRegCode] = useState('');
+  const [regError, setRegError] = useState('');
+  const [isRegisteringSubmit, setIsRegisteringSubmit] = useState(false);
+
+  const handleRegisterSubmit = async (e) => {
+    e.preventDefault();
+    if (!regName.trim() || !regEmail.trim() || !regPassword.trim()) {
+      setRegError('Name, email and password are required.');
+      return;
+    }
+    setRegError('');
+    setIsRegisteringSubmit(true);
+    try {
+      const response = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: regName.trim(),
+          email: regEmail.toLowerCase().trim(),
+          password: regPassword.trim(),
+          commissionRate: 10, // default 10%
+          agentCode: regCode.trim()
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        // Auto login on successful register
+        localStorage.setItem('jackpot_agent_session', JSON.stringify(data.agent));
+        setAgentSession(data.agent);
+        setActiveTab('dashboard');
+        setRegName('');
+        setRegEmail('');
+        setRegPassword('');
+        setRegCode('');
+        setIsRegistering(false);
+      } else {
+        setRegError(data.message || 'Registration failed.');
+      }
+    } catch (err) {
+      console.error(err);
+      setRegError('Connection failure.');
+    } finally {
+      setIsRegisteringSubmit(false);
+    }
+  };
 
   // Active navigation tab
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -190,36 +244,102 @@ export default function AffiliatePortal() {
     return (
       <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #040509 0%, #0a0c1a 50%, #0d0f25 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', fontFamily: "var(--font-body), 'Inter', sans-serif" }}>
         <div className="aurora-bg"></div>
-        <div style={{ width: '100%', maxWidth: '420px', background: 'rgba(11, 13, 22, 0.8)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255, 215, 0, 0.15)', borderRadius: '20px', boxShadow: '0 8px 40px rgba(0, 0, 0, 0.5), 0 0 60px rgba(255, 215, 0, 0.05)', padding: '2.5rem 2rem', textAlign: 'center', position: 'relative', zIndex: 1 }}>
-          <div style={{ marginBottom: '1.5rem' }}>
-            <i className="fa-solid fa-user-tie" style={{ fontSize: '2.5rem', color: 'var(--gold-primary)', marginBottom: '0.75rem', display: 'block' }}></i>
-            <h2 style={{ color: 'var(--gold-primary)', fontWeight: '800', fontSize: '1.75rem', marginBottom: '0.3rem', textTransform: 'uppercase', letterSpacing: '1px', fontFamily: 'var(--font-heading)' }}>Affiliate Login</h2>
-            <p style={{ color: '#888', fontSize: '0.8rem' }}>Access your affiliate performance portal and analytics.</p>
-          </div>
-          <form onSubmit={handleLoginSubmit}>
-            {loginError && (
-              <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.25)', color: '#f87171', padding: '0.6rem', borderRadius: '8px', fontSize: '0.75rem', marginBottom: '1.25rem', textAlign: 'left' }}>
-                <i className="fa-solid fa-circle-exclamation" style={{ marginRight: '0.4rem' }}></i> {loginError}
+        <div style={{ width: '100%', maxWidth: '420px', background: 'rgba(11, 13, 22, 0.8)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255, 215, 0, 0.15)', borderRadius: '20px', boxShadow: '0 8px 40px rgba(0, 0, 0, 0.5), 0 0 60px rgba(255, 215, 0, 0.05)', padding: '2.5rem 2rem', position: 'relative', zIndex: 1 }}>
+          
+          {!isRegistering ? (
+            /* LOGIN VIEW */
+            <>
+              <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
+                <i className="fa-solid fa-user-tie" style={{ fontSize: '2.5rem', color: 'var(--gold-primary)', marginBottom: '0.75rem', display: 'block' }}></i>
+                <h2 style={{ color: 'var(--gold-primary)', fontWeight: '800', fontSize: '1.75rem', marginBottom: '0.3rem', textTransform: 'uppercase', letterSpacing: '1px', fontFamily: 'var(--font-heading)' }}>Affiliate Login</h2>
+                <p style={{ color: '#888', fontSize: '0.8rem' }}>Access your affiliate performance portal and analytics.</p>
               </div>
-            )}
-            <div style={{ marginBottom: '1.25rem', textAlign: 'left' }}>
-              <label style={{ fontSize: '0.7rem', color: '#aaa', fontWeight: 'bold', display: 'block', marginBottom: '0.4rem' }}>Email Address</label>
-              <div style={{ display: 'flex', alignItems: 'center', background: '#0b0d16', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '0.6rem 0.85rem' }}>
-                <i className="fa-solid fa-envelope" style={{ color: 'var(--gold-primary)', marginRight: '0.6rem', fontSize: '0.85rem' }}></i>
-                <input type="email" placeholder="name@affiliate.com" value={email} onChange={(e) => setEmail(e.target.value)} style={{ background: 'transparent', border: 'none', color: '#fff', width: '100%', outline: 'none', fontSize: '0.85rem' }} required />
+              <form onSubmit={handleLoginSubmit}>
+                {loginError && (
+                  <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.25)', color: '#f87171', padding: '0.6rem', borderRadius: '8px', fontSize: '0.75rem', marginBottom: '1.25rem', textAlign: 'left' }}>
+                    <i className="fa-solid fa-circle-exclamation" style={{ marginRight: '0.4rem' }}></i> {loginError}
+                  </div>
+                )}
+                <div style={{ marginBottom: '1.25rem', textAlign: 'left' }}>
+                  <label style={{ fontSize: '0.7rem', color: '#aaa', fontWeight: 'bold', display: 'block', marginBottom: '0.4rem' }}>Email Address</label>
+                  <div style={{ display: 'flex', alignItems: 'center', background: '#0b0d16', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '0.6rem 0.85rem' }}>
+                    <i className="fa-solid fa-envelope" style={{ color: 'var(--gold-primary)', marginRight: '0.6rem', fontSize: '0.85rem' }}></i>
+                    <input type="email" placeholder="name@affiliate.com" value={email} onChange={(e) => setEmail(e.target.value)} style={{ background: 'transparent', border: 'none', color: '#fff', width: '100%', outline: 'none', fontSize: '0.85rem' }} required />
+                  </div>
+                </div>
+                <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
+                  <label style={{ fontSize: '0.7rem', color: '#aaa', fontWeight: 'bold', display: 'block', marginBottom: '0.4rem' }}>Access Password</label>
+                  <div style={{ display: 'flex', alignItems: 'center', background: '#0b0d16', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '0.6rem 0.85rem' }}>
+                    <i className="fa-solid fa-lock" style={{ color: 'var(--gold-primary)', marginRight: '0.6rem', fontSize: '0.85rem' }}></i>
+                    <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} style={{ background: 'transparent', border: 'none', color: '#fff', width: '100%', outline: 'none', fontSize: '0.85rem' }} required />
+                  </div>
+                </div>
+                <button type="submit" disabled={isLoggingIn} style={{ width: '100%', padding: '0.85rem', background: 'linear-gradient(135deg, var(--gold-primary), #d4a017)', color: '#000', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '0.9rem', cursor: isLoggingIn ? 'wait' : 'pointer', boxShadow: '0 4px 20px rgba(255, 215, 0, 0.25)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                  {isLoggingIn ? 'Authenticating...' : 'Sign In'}
+                </button>
+              </form>
+              <div style={{ marginTop: '1.5rem', fontSize: '0.8rem', color: '#888', textAlign: 'center' }}>
+                Don't have an account?{' '}
+                <button onClick={() => { setIsRegistering(true); setLoginError(''); }} style={{ background: 'none', border: 'none', color: 'var(--gold-primary)', cursor: 'pointer', fontWeight: 'bold', padding: 0, fontSize: '0.8rem' }}>
+                  Register Here
+                </button>
               </div>
-            </div>
-            <div style={{ marginBottom: '2rem', textAlign: 'left' }}>
-              <label style={{ fontSize: '0.7rem', color: '#aaa', fontWeight: 'bold', display: 'block', marginBottom: '0.4rem' }}>Access Password</label>
-              <div style={{ display: 'flex', alignItems: 'center', background: '#0b0d16', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '0.6rem 0.85rem' }}>
-                <i className="fa-solid fa-lock" style={{ color: 'var(--gold-primary)', marginRight: '0.6rem', fontSize: '0.85rem' }}></i>
-                <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} style={{ background: 'transparent', border: 'none', color: '#fff', width: '100%', outline: 'none', fontSize: '0.85rem' }} required />
+            </>
+          ) : (
+            /* REGISTER VIEW */
+            <>
+              <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
+                <i className="fa-solid fa-user-plus" style={{ fontSize: '2.5rem', color: 'var(--gold-primary)', marginBottom: '0.75rem', display: 'block' }}></i>
+                <h2 style={{ color: 'var(--gold-primary)', fontWeight: '800', fontSize: '1.75rem', marginBottom: '0.3rem', textTransform: 'uppercase', letterSpacing: '1px', fontFamily: 'var(--font-heading)' }}>Affiliate Register</h2>
+                <p style={{ color: '#888', fontSize: '0.8rem' }}>Join our network and start earning commissions.</p>
               </div>
-            </div>
-            <button type="submit" disabled={isLoggingIn} style={{ width: '100%', padding: '0.85rem', background: 'linear-gradient(135deg, var(--gold-primary), #d4a017)', color: '#000', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '0.9rem', cursor: isLoggingIn ? 'wait' : 'pointer', boxShadow: '0 4px 20px rgba(255, 215, 0, 0.25)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-              {isLoggingIn ? 'Authenticating...' : 'Sign In'}
-            </button>
-          </form>
+              <form onSubmit={handleRegisterSubmit}>
+                {regError && (
+                  <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.25)', color: '#f87171', padding: '0.6rem', borderRadius: '8px', fontSize: '0.75rem', marginBottom: '1.25rem', textAlign: 'left' }}>
+                    <i className="fa-solid fa-circle-exclamation" style={{ marginRight: '0.4rem' }}></i> {regError}
+                  </div>
+                )}
+                <div style={{ marginBottom: '1.1rem', textAlign: 'left' }}>
+                  <label style={{ fontSize: '0.7rem', color: '#aaa', fontWeight: 'bold', display: 'block', marginBottom: '0.35rem' }}>Full Name</label>
+                  <div style={{ display: 'flex', alignItems: 'center', background: '#0b0d16', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '0.55rem 0.8rem' }}>
+                    <i className="fa-solid fa-user" style={{ color: 'var(--gold-primary)', marginRight: '0.6rem', fontSize: '0.85rem' }}></i>
+                    <input type="text" placeholder="John Doe" value={regName} onChange={(e) => setRegName(e.target.value)} style={{ background: 'transparent', border: 'none', color: '#fff', width: '100%', outline: 'none', fontSize: '0.85rem' }} required />
+                  </div>
+                </div>
+                <div style={{ marginBottom: '1.1rem', textAlign: 'left' }}>
+                  <label style={{ fontSize: '0.7rem', color: '#aaa', fontWeight: 'bold', display: 'block', marginBottom: '0.35rem' }}>Email Address</label>
+                  <div style={{ display: 'flex', alignItems: 'center', background: '#0b0d16', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '0.55rem 0.8rem' }}>
+                    <i className="fa-solid fa-envelope" style={{ color: 'var(--gold-primary)', marginRight: '0.6rem', fontSize: '0.85rem' }}></i>
+                    <input type="email" placeholder="name@affiliate.com" value={regEmail} onChange={(e) => setRegEmail(e.target.value)} style={{ background: 'transparent', border: 'none', color: '#fff', width: '100%', outline: 'none', fontSize: '0.85rem' }} required />
+                  </div>
+                </div>
+                <div style={{ marginBottom: '1.1rem', textAlign: 'left' }}>
+                  <label style={{ fontSize: '0.7rem', color: '#aaa', fontWeight: 'bold', display: 'block', marginBottom: '0.35rem' }}>Access Password</label>
+                  <div style={{ display: 'flex', alignItems: 'center', background: '#0b0d16', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '0.55rem 0.8rem' }}>
+                    <i className="fa-solid fa-lock" style={{ color: 'var(--gold-primary)', marginRight: '0.6rem', fontSize: '0.85rem' }}></i>
+                    <input type="password" placeholder="••••••••" value={regPassword} onChange={(e) => setRegPassword(e.target.value)} style={{ background: 'transparent', border: 'none', color: '#fff', width: '100%', outline: 'none', fontSize: '0.85rem' }} required />
+                  </div>
+                </div>
+                <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
+                  <label style={{ fontSize: '0.7rem', color: '#aaa', fontWeight: 'bold', display: 'block', marginBottom: '0.35rem' }}>Custom Promo Code (Optional)</label>
+                  <div style={{ display: 'flex', alignItems: 'center', background: '#0b0d16', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '0.55rem 0.8rem' }}>
+                    <i className="fa-solid fa-tag" style={{ color: 'var(--gold-primary)', marginRight: '0.6rem', fontSize: '0.85rem' }}></i>
+                    <input type="text" placeholder="e.g. MYCODE10" value={regCode} onChange={(e) => setRegCode(e.target.value)} style={{ background: 'transparent', border: 'none', color: '#fff', width: '100%', outline: 'none', fontSize: '0.85rem' }} />
+                  </div>
+                </div>
+                <button type="submit" disabled={isRegisteringSubmit} style={{ width: '100%', padding: '0.85rem', background: 'linear-gradient(135deg, var(--gold-primary), #d4a017)', color: '#000', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '0.9rem', cursor: isRegisteringSubmit ? 'wait' : 'pointer', boxShadow: '0 4px 20px rgba(255, 215, 0, 0.25)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                  {isRegisteringSubmit ? 'Creating Account...' : 'Register Now'}
+                </button>
+              </form>
+              <div style={{ marginTop: '1.5rem', fontSize: '0.8rem', color: '#888', textAlign: 'center' }}>
+                Already have an account?{' '}
+                <button onClick={() => { setIsRegistering(false); setRegError(''); }} style={{ background: 'none', border: 'none', color: 'var(--gold-primary)', cursor: 'pointer', fontWeight: 'bold', padding: 0, fontSize: '0.8rem' }}>
+                  Login Here
+                </button>
+              </div>
+            </>
+          )}
+
         </div>
       </div>
     );
@@ -809,6 +929,47 @@ export default function AffiliatePortal() {
             </div>
           </div>
         )}
+
+      {agentSession && !supportOpen && (
+        <button
+          onClick={() => setSupportOpen(true)}
+          style={{
+            position: 'fixed',
+            bottom: '2rem',
+            right: '2rem',
+            zIndex: 99999,
+            width: '60px',
+            height: '60px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #ffd700 0%, #cca000 100%)',
+            color: '#000',
+            border: 'none',
+            boxShadow: '0 8px 30px rgba(255,215,0,0.35)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '1.5rem',
+            transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.05)';
+            e.currentTarget.style.boxShadow = '0 10px 35px rgba(255,215,0,0.5)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.boxShadow = '0 8px 30px rgba(255,215,0,0.35)';
+          }}
+        >
+          <i className="fa-solid fa-headset"></i>
+        </button>
+      )}
+
+      <SupportModal
+        isOpen={supportOpen}
+        onClose={() => setSupportOpen(false)}
+        currentUser={agentSession}
+      />
 
       </main>
     </div>

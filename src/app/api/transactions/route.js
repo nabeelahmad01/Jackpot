@@ -201,6 +201,7 @@ export async function POST(req) {
         id: (Date.now() + Math.floor(Math.random() * 100)).toString(),
         userEmail: newTx.userEmail.toLowerCase().trim(),
         date: new Date().toLocaleString(),
+        createdAt: new Date().toISOString(),
         status: 'PENDING', // Directly ready for payout ledger
         type: parentType,
         amount: parseFloat(newTx.amount),
@@ -208,6 +209,7 @@ export async function POST(req) {
         code: newTx.code || '—',
         gameTitle: newTx.gameTitle || 'Lobby',
         note: `Remaining payout request for Tx #${newTx.parentTxId}`,
+        parentTxId: newTx.parentTxId,
         distributorId: distId
       };
 
@@ -271,6 +273,7 @@ export async function POST(req) {
       id: (Date.now() + Math.floor(Math.random() * 100)).toString(),
       userEmail: newTx.userEmail.toLowerCase().trim(),
       date: new Date().toLocaleString(),
+      createdAt: new Date().toISOString(),
       status: newTx.type === 'WITHDRAW' ? 'PENDING_COINS' : newTx.type === 'BONUS' ? 'SUCCESS' : 'PENDING',
       note: '',
       distributorId: distId,

@@ -8,13 +8,14 @@ import CoinsAllotmentTab from '../../components/admin/CoinsAllotmentTab';
 import RequestsTab from '../../components/admin/RequestsTab';
 import LedgerTab from '../../components/admin/LedgerTab';
 import ShiftDashboardTab from '../../components/admin/ShiftDashboardTab';
-
+import { SupportModal } from '../../components/Modals';
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
 export default function DistributorPortal() {
   const [mounted, setMounted] = useState(false);
   const [distSession, setDistSession] = useState(null);
   const [proofModalUrl, setProofModalUrl] = useState('');
+  const [supportOpen, setSupportOpen] = useState(false);
 
   const handleInspectProof = async (url, txId) => {
     const isValidUrl = typeof url === 'string' && (url.startsWith('data:') || url.startsWith('http') || url.startsWith('/'));
@@ -81,6 +82,40 @@ export default function DistributorPortal() {
 
   // Stats SWR
   const distId = distSession?.id;
+
+  // Heartbeat ping tracker for current active distributor staff/admin
+  useEffect(() => {
+    if (!distSession?.email) return;
+
+    let lastPing = 0;
+    const sendPing = async () => {
+      const now = Date.now();
+      if (now - lastPing < 30000) return; // limit to once every 30s
+      lastPing = now;
+      try {
+        await fetch('/api/admin/activity', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: distSession.email })
+        });
+      } catch (err) {
+        console.error('Heartbeat update failed:', err);
+      }
+    };
+
+    sendPing();
+    const triggerPing = () => sendPing();
+    window.addEventListener('mousemove', triggerPing);
+    window.addEventListener('keydown', triggerPing);
+    window.addEventListener('click', triggerPing);
+
+    return () => {
+      window.removeEventListener('mousemove', triggerPing);
+      window.removeEventListener('keydown', triggerPing);
+      window.removeEventListener('click', triggerPing);
+    };
+  }, [distSession]);
+
   const { data: statsData, mutate: mutateStats } = useSWR(
     distId ? `/api/distributors/stats?distributorId=${distId}` : null,
     fetcher,
@@ -213,6 +248,7 @@ export default function DistributorPortal() {
   const [updatePoolCoins, setUpdatePoolCoins] = useState('');
   const [updatePoolLink, setUpdatePoolLink] = useState('');
   const [isUpdatingPool, setIsUpdatingPool] = useState(false);
+  const [resetPoolUsedCoins, setResetPoolUsedCoins] = useState(false);
 
   const getTodayDateString = () => {
     const today = new Date();
@@ -400,7 +436,8 @@ export default function DistributorPortal() {
           id: selectedPoolGame.id,
           distributorId: distId,
           availableCoins: Number(updatePoolCoins),
-          openPanelLink: updatePoolLink
+          openPanelLink: updatePoolLink,
+          resetUsedCoins: resetPoolUsedCoins
         })
       });
       const data = await res.json();
@@ -2075,6 +2112,7 @@ export default function DistributorPortal() {
                                   setSelectedPoolGame(game);
                                   setUpdatePoolCoins(game.availableCoins || '');
                                   setUpdatePoolLink(game.openPanelLink || '');
+                                  setResetPoolUsedCoins(false);
                                   setPoolUpdateModalOpen(true);
                                 }}
                                 className="action-row-btn btn-edit"
@@ -2320,7 +2358,7 @@ export default function DistributorPortal() {
         {/* TAB: ACCOUNT CREDENTIALS REQUESTS - Render RequestsTab */}
         {activeTab === 'requests' && distSession.type === 'B' && (
           <RequestsTab
-            onApproveRequest={handleUpdateAccountRequestDirect}
+            onApproveRequest={(reqItem) => handleApproveRequest(reqItem.id, reqItem.gameAccountUsername, reqItem.gameAccountPassword)}
             completedActionIds={{}}
             processingIds={{}}
             wrapAction={(id, fn) => fn}
@@ -2533,6 +2571,17 @@ export default function DistributorPortal() {
                   />
                 </div>
               </div>
+              <div className="input-group" style={{ margin: '0.25rem 0 0 0' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.75rem', color: '#f59e0b' }}>
+                  <input
+                    type="checkbox"
+                    checked={resetPoolUsedCoins}
+                    onChange={(e) => setResetPoolUsedCoins(e.target.checked)}
+                    style={{ width: 'auto', cursor: 'pointer' }}
+                  />
+                  <span>Reset Used Coins counter to 0 (Daily reset)</span>
+                </label>
+              </div>
               <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
                 <button type="submit" className="submit-btn" style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold', margin: 0, flex: 1 }} disabled={isUpdatingPool}>
                   {isUpdatingPool ? 'SAVING...' : 'SAVE CHANGES'}
@@ -2544,8 +2593,48 @@ export default function DistributorPortal() {
         </div>
       )}
 
-      </main>
+      {distSession && !supportOpen && (
+        <button
+          onClick={() => setSupportOpen(true)}
+          style={{
+            position: 'fixed',
+            bottom: '2rem',
+            right: '2rem',
+            zIndex: 99999,
+            width: '60px',
+            height: '60px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #ffd700 0%, #cca000 100%)',
+            color: '#000',
+            border: 'none',
+            boxShadow: '0 8px 30px rgba(255,215,0,0.35)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '1.5rem',
+            transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.05)';
+            e.currentTarget.style.boxShadow = '0 10px 35px rgba(255,215,0,0.5)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.boxShadow = '0 8px 30px rgba(255,215,0,0.35)';
+          }}
+        >
+          <i className="fa-solid fa-headset"></i>
+        </button>
+      )}
 
+      <SupportModal
+        isOpen={supportOpen}
+        onClose={() => setSupportOpen(false)}
+        currentUser={distSession}
+      />
+
+      </main>
     </div>
   );
 }
