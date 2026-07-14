@@ -477,10 +477,13 @@ export default function UserLobby({
 
   const shouldShowField = (fieldName) => {
     if (!selectedWithdrawGateway) return true; // Legacy fallback
-    if (fieldName === 'name') return selectedWithdrawGateway.requireNameOnTag !== false;
-    if (fieldName === 'tag') return selectedWithdrawGateway.requireTag !== false;
-    if (fieldName === 'phone') return selectedWithdrawGateway.requirePhoneOnTag !== false;
-    if (fieldName === 'email') return selectedWithdrawGateway.requireEmailOnTag === true;
+    const gw = selectedWithdrawGateway;
+    // If the gateway has ALL detail fields disabled, force-show tag so the user always provides a payment destination
+    const noFieldsConfigured = gw.requireNameOnTag === false && gw.requireTag === false && gw.requirePhoneOnTag === false && gw.requireEmailOnTag !== true;
+    if (fieldName === 'tag') return noFieldsConfigured ? true : gw.requireTag !== false;
+    if (fieldName === 'name') return gw.requireNameOnTag !== false;
+    if (fieldName === 'phone') return gw.requirePhoneOnTag !== false;
+    if (fieldName === 'email') return gw.requireEmailOnTag === true;
     return false;
   };
 
@@ -1788,7 +1791,7 @@ export default function UserLobby({
                                     <span style={{ fontSize: '0.725rem', opacity: 0.8 }}>
                                       {tx.note && tx.status !== 'FAILED' ? tx.note : (tx.code === 'SIGNUP-FREE3' ? 'Freeplay (SIGNUP-FREE3)' : `${tx.gateway} (${tx.code})`)}
                                     </span>
-                                    {tx.type === 'WITHDRAW' && tx.status === 'SUCCESS' && tx.payoutHold > 0 && !tx.remainderRequested && !tx.remainderPaid && !claimedRemainderIds.includes(tx.id) && (
+                                    {tx.type === 'WITHDRAW' && tx.status === 'SUCCESS' && tx.payoutHold > 0 && !tx.remainderPaid && (!tx.remainderRequested || tx.remainderStatus === 'FAILED') && !claimedRemainderIds.includes(tx.id) && (
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -1820,7 +1823,7 @@ export default function UserLobby({
                                         Claim Remainder (${parseFloat(tx.payoutHold).toFixed(2)})
                                       </button>
                                     )}
-                                    {tx.type === 'WITHDRAW' && tx.status === 'SUCCESS' && tx.payoutHold > 0 && (tx.remainderRequested || claimedRemainderIds.includes(tx.id)) && !tx.remainderPaid && (
+                                    {tx.type === 'WITHDRAW' && tx.status === 'SUCCESS' && tx.payoutHold > 0 && tx.remainderRequested && tx.remainderStatus !== 'FAILED' && !tx.remainderPaid && (claimedRemainderIds.includes(tx.id) || tx.remainderRequested) && (
                                       <span style={{ fontSize: '0.625rem', color: '#888', fontStyle: 'italic' }}>
                                         Remainder Requested
                                       </span>

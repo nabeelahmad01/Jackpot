@@ -766,7 +766,7 @@ export default function DistributorPortal() {
       const res = await fetch('/api/account-requests', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: reqId, status: 'COMPLETED', gameAccountUsername: username, gameAccountPassword: password, processedBy: distSession.name })
+        body: JSON.stringify({ id: reqId, status: 'READY', gameAccountUsername: username, gameAccountPassword: password, processedBy: distSession.name })
       });
       const data = await res.json();
       if (data.success) {

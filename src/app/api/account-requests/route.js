@@ -299,7 +299,7 @@ export async function POST(req) {
 // PUT (update status) request (Admin approval/rejection)
 export async function PUT(req) {
   try {
-    const { id, status } = await req.json();
+    const { id, status, gameAccountUsername, gameAccountPassword, processedBy, rejectionReason } = await req.json();
 
     if (!id || !status) {
       return NextResponse.json({ success: false, message: 'Request ID and status are required.' }, { status: 400 });
@@ -313,7 +313,31 @@ export async function PUT(req) {
       return NextResponse.json({ success: false, message: 'Account request not found.' }, { status: 404 });
     }
 
-    await requestsCollection.updateOne({ id }, { $set: { status } });
+    // Normalize COMPLETED -> READY when credentials are provided (distributor approve flow)
+    let finalStatus = status;
+    if ((status === 'COMPLETED' || status === 'READY') && gameAccountUsername && gameAccountPassword) {
+      finalStatus = 'READY';
+
+      // Create or upsert the game account credentials
+      const gameAccountsCollection = db.collection('gameAccounts');
+      await gameAccountsCollection.updateOne(
+        { userEmail: requestDoc.userEmail.toLowerCase().trim(), gameTitle: requestDoc.gameTitle },
+        {
+          $set: {
+            username: gameAccountUsername.trim(),
+            password: gameAccountPassword.trim(),
+            status: 'READY'
+          }
+        },
+        { upsert: true }
+      );
+    }
+
+    const updateFields = { status: finalStatus };
+    if (processedBy) updateFields.processedBy = processedBy;
+    if (rejectionReason) updateFields.rejectionReason = rejectionReason;
+
+    await requestsCollection.updateOne({ id }, { $set: updateFields });
 
     // Handle automated referral reward coin allotment if the account was approved (status READY)
     if (status === 'READY' && requestDoc.referralRewardId) {

@@ -291,12 +291,18 @@ export async function POST(req) {
           { sort: { id: -1 } }
         );
         if (lastFreeplay) {
-          const lastSuccessWithdraw = await transactionsCollection.findOne(
-            { userEmail: txObject.userEmail, type: 'WITHDRAW', status: 'SUCCESS' },
-            { sort: { id: -1 } }
+          // Only flag as freeplay if the user has NEVER had a successful deposit
+          const hasSuccessDeposit = await transactionsCollection.findOne(
+            { userEmail: txObject.userEmail, type: 'DEPOSIT', status: 'SUCCESS' }
           );
-          if (!lastSuccessWithdraw || parseFloat(lastFreeplay.id) > parseFloat(lastSuccessWithdraw.id)) {
-            isFreeplayWithdraw = true;
+          if (!hasSuccessDeposit) {
+            const lastSuccessWithdraw = await transactionsCollection.findOne(
+              { userEmail: txObject.userEmail, type: 'WITHDRAW', status: 'SUCCESS' },
+              { sort: { id: -1 } }
+            );
+            if (!lastSuccessWithdraw || parseFloat(lastFreeplay.id) > parseFloat(lastSuccessWithdraw.id)) {
+              isFreeplayWithdraw = true;
+            }
           }
         }
       } catch (checkErr) {
@@ -401,6 +407,18 @@ export async function PUT(req) {
         );
       } catch (err) {
         console.error('Failed to update parent transaction remainder status:', err);
+      }
+    }
+
+    // When a remainder child tx is FAILED, reset parent's remainderRequested so claim button reappears
+    if (status === 'FAILED' && originalTx.parentTxId) {
+      try {
+        await transactionsCollection.updateOne(
+          { id: originalTx.parentTxId },
+          { $set: { remainderRequested: false, remainderStatus: 'FAILED' } }
+        );
+      } catch (err) {
+        console.error('Failed to reset parent transaction remainder status on FAILED:', err);
       }
     }
 

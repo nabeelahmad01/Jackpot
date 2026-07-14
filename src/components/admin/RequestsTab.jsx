@@ -249,15 +249,23 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
                   <td>{(page - 1) * limit + idx + 1}</td>
                   <td>
                     <strong>{req.userEmail}</strong>
-                    {req.existingAccounts && req.existingAccounts.length > 0 && (
-                      <div style={{ fontSize: '0.65rem', color: '#888', marginTop: '0.2rem', display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
-                        {req.existingAccounts.map((acc, idx) => (
-                          <span key={idx} style={{ background: 'rgba(255, 215, 0, 0.08)', border: '1px solid rgba(255, 215, 0, 0.15)', color: '#fff', padding: '0.05rem 0.3rem', borderRadius: '4px' }}>
-                            {acc.gameTitle}: <strong style={{ color: 'var(--gold-primary)' }}>{acc.username}</strong>
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                    {req.existingAccounts && req.existingAccounts.length > 0 && (() => {
+                      // For regular requests, only show the account for the requested game
+                      // For synthetic (search) results, show all accounts
+                      const accsToShow = req.isSynthetic
+                        ? req.existingAccounts
+                        : req.existingAccounts.filter(acc => acc.gameTitle === req.gameTitle);
+                      if (accsToShow.length === 0) return null;
+                      return (
+                        <div style={{ fontSize: '0.65rem', color: '#888', marginTop: '0.2rem', display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
+                          {accsToShow.map((acc, idx) => (
+                            <span key={idx} style={{ background: 'rgba(255, 215, 0, 0.08)', border: '1px solid rgba(255, 215, 0, 0.15)', color: '#fff', padding: '0.05rem 0.3rem', borderRadius: '4px' }}>
+                              {acc.gameTitle}: <strong style={{ color: 'var(--gold-primary)' }}>{acc.username}</strong>
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td><span className="admin-badge-preview b-hot">{req.gameTitle}</span></td>
                   <td>{req.date}</td>
