@@ -100,7 +100,9 @@ export async function POST(req) {
       referralCode,
       referredBy: resolvedReferrer,
       distributorId: distributorId || inheritedDistributorId || '',
-      agentCode: agentCode || inheritedAgentCode || ''
+      agentCode: agentCode || inheritedAgentCode || '',
+      campaign: campaign || 'organic',
+      createdAt: new Date().toISOString()
     };
 
     const result = await usersCollection.insertOne(newUser);

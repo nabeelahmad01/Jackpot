@@ -49,7 +49,8 @@ export default function AuthPortal({
                 name: userName,
                 referredBy: localStorage.getItem('jackpot_ref_code') || '',
                 distributorId: localStorage.getItem('jackpot_distributor_id') || '',
-                agentCode: localStorage.getItem('jackpot_agent_code') || ''
+                agentCode: localStorage.getItem('jackpot_agent_code') || '',
+                campaign: localStorage.getItem('jackpot_campaign') || ''
               })
             });
             const googleData = await googleRes.json();
@@ -364,7 +365,8 @@ export default function AuthPortal({
         role: 'user',
         referredBy: localStorage.getItem('jackpot_ref_code') || '',
         distributorId: localStorage.getItem('jackpot_distributor_id') || '',
-        agentCode: localStorage.getItem('jackpot_agent_code') || ''
+        agentCode: localStorage.getItem('jackpot_agent_code') || '',
+        campaign: localStorage.getItem('jackpot_campaign') || ''
       };
 
       triggerLoading(1200, () => {

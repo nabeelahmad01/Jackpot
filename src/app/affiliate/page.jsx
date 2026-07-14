@@ -89,8 +89,14 @@ export default function AffiliatePortal() {
   // Invite link copy
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // Ads Request form
-  const [adsMsg, setAdsMsg] = useState('');
+  // Ads Campaign Request form states
+  const [adsBudget, setAdsBudget] = useState('');
+  const [campaignName, setCampaignName] = useState('');
+  const [facebookLink, setFacebookLink] = useState('');
+  const [campaignStart, setCampaignStart] = useState('');
+  const [campaignEnd, setCampaignEnd] = useState('');
+  const [campaignNotes, setCampaignNotes] = useState('');
+  const [campaignProof, setCampaignProof] = useState('');
   const [adsLoading, setAdsLoading] = useState(false);
 
   // Daily Transactions date filter
@@ -101,13 +107,14 @@ export default function AffiliatePortal() {
 
   // Signup Report date range
   const [signupFromDate, setSignupFromDate] = useState(() => {
-    const d = new Date();
+    const d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   });
   const [signupToDate, setSignupToDate] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   });
+  const [ownershipFilter, setOwnershipFilter] = useState('All Players');
 
   // Sync tab to URL path
   useEffect(() => {
@@ -146,9 +153,27 @@ export default function AffiliatePortal() {
     { refreshInterval: 5000 }
   );
 
+  const { data: campaignsData, mutate: mutateCampaigns } = useSWR(
+    agentSession?.email ? `/api/campaign-requests?agentEmail=${encodeURIComponent(agentSession.email)}` : null,
+    fetcher,
+    { refreshInterval: 5000 }
+  );
+
+  const { data: signupReportData, mutate: mutateSignupReport } = useSWR(
+    agentCode ? `/api/agents/signup-report?agentCode=${encodeURIComponent(agentCode)}&fromDate=${signupFromDate}&toDate=${signupToDate}` : null,
+    fetcher,
+    { refreshInterval: 5000 }
+  );
+
   const stats = statsData?.stats || {};
   const players = statsData?.players || [];
   const commissionWithdrawals = statsData?.commissionWithdrawals || [];
+  const campaignsList = campaignsData?.campaigns || [];
+  const remainingLimit = campaignsData?.remainingLimit !== undefined ? campaignsData.remainingLimit : 6000.00;
+
+  const signupStats = signupReportData?.stats || {};
+  const campaignBreakdown = signupReportData?.campaignBreakdown || [];
+  const playersList = signupReportData?.playersList || [];
 
   // Login handler
   const handleLoginSubmit = async (e) => {
@@ -808,18 +833,18 @@ export default function AffiliatePortal() {
                 <label style={{ fontSize: '0.65rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold', display: 'block', marginBottom: '0.3rem' }}>TO DATE</label>
                 <input type="date" value={signupToDate} onChange={(e) => setSignupToDate(e.target.value)} style={inputStyle} />
               </div>
-              <button style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.5rem 1rem', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', alignSelf: 'flex-end' }}>
-                <i className="fa-solid fa-filter"></i> Filter
+              <button onClick={() => mutateSignupReport()} style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.5rem 1rem', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', alignSelf: 'flex-end' }}>
+                <i className="fa-solid fa-filter"></i> Apply Filters
               </button>
             </div>
 
             {/* Signup Stats - Row 1: Signups */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.85rem', marginBottom: '0.85rem' }}>
               {[
-                { icon: 'fa-solid fa-users', iconBg: 'rgba(168,85,247,0.12)', iconColor: '#a855f7', label: 'TOTAL SIGNUPS', value: stats.totalPlayers || 0 },
-                { icon: 'fa-solid fa-users', iconBg: 'rgba(168,85,247,0.08)', iconColor: '#a855f7', label: 'REFERRAL SIGNUPS', value: 0 },
-                { icon: 'fa-brands fa-facebook', iconBg: 'rgba(59,130,246,0.1)', iconColor: '#3b82f6', label: 'FACEBOOK SIGNUPS', value: 0 },
-                { icon: 'fa-solid fa-leaf', iconBg: 'rgba(46,204,113,0.1)', iconColor: '#2ecc71', label: 'ORGANIC SIGNUPS', value: 0, valueColor: '#eab308' },
+                { icon: 'fa-solid fa-users', iconBg: 'rgba(168,85,247,0.12)', iconColor: '#a855f7', label: 'TOTAL SIGNUPS', value: signupStats.totalPlayers || 0 },
+                { icon: 'fa-solid fa-link', iconBg: 'rgba(168,85,247,0.08)', iconColor: '#a855f7', label: 'REFERRAL SIGNUPS', value: signupStats.referralSignups || 0 },
+                { icon: 'fa-brands fa-facebook', iconBg: 'rgba(59,130,246,0.1)', iconColor: '#3b82f6', label: 'FACEBOOK SIGNUPS', value: signupStats.facebookSignups || 0 },
+                { icon: 'fa-solid fa-leaf', iconBg: 'rgba(46,204,113,0.1)', iconColor: '#2ecc71', label: 'ORGANIC SIGNUPS', value: signupStats.organicSignups || 0, valueColor: '#eab308' },
               ].map((c, i) => (
                 <div key={i} style={{ background: '#0b0d16', padding: '1.15rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
                   <div style={{ width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: c.iconBg, color: c.iconColor, fontSize: '0.95rem', marginBottom: '0.6rem' }}><i className={c.icon}></i></div>
@@ -832,10 +857,10 @@ export default function AffiliatePortal() {
             {/* Row 2: Verified */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.85rem', marginBottom: '0.85rem' }}>
               {[
-                { icon: 'fa-solid fa-shield-halved', iconBg: 'rgba(239,68,68,0.12)', iconColor: '#ef4444', label: 'TOTAL VERIFIED PLAYERS', value: stats.verifiedPlayers || 0, valueColor: '#ef4444' },
-                { icon: 'fa-solid fa-square-check', iconBg: 'rgba(46,204,113,0.12)', iconColor: '#2ecc71', label: 'REFERRAL VERIFIED', value: 0 },
-                { icon: 'fa-brands fa-facebook', iconBg: 'rgba(59,130,246,0.1)', iconColor: '#3b82f6', label: 'FACEBOOK VERIFIED', value: 0 },
-                { icon: 'fa-solid fa-leaf', iconBg: 'rgba(46,204,113,0.1)', iconColor: '#2ecc71', label: 'ORGANIC VERIFIED', value: 0 },
+                { icon: 'fa-solid fa-shield-halved', iconBg: 'rgba(239,68,68,0.12)', iconColor: '#ef4444', label: 'TOTAL VERIFIED PLAYERS', value: signupStats.totalVerified || 0, valueColor: '#ef4444' },
+                { icon: 'fa-solid fa-square-check', iconBg: 'rgba(46,204,113,0.12)', iconColor: '#2ecc71', label: 'REFERRAL VERIFIED', value: signupStats.referralVerified || 0 },
+                { icon: 'fa-brands fa-facebook', iconBg: 'rgba(59,130,246,0.1)', iconColor: '#3b82f6', label: 'FACEBOOK VERIFIED', value: signupStats.facebookVerified || 0 },
+                { icon: 'fa-solid fa-leaf', iconBg: 'rgba(46,204,113,0.1)', iconColor: '#2ecc71', label: 'ORGANIC VERIFIED', value: signupStats.organicVerified || 0 },
               ].map((c, i) => (
                 <div key={i} style={{ background: '#0b0d16', padding: '1.15rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
                   <div style={{ width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: c.iconBg, color: c.iconColor, fontSize: '0.95rem', marginBottom: '0.6rem' }}><i className={c.icon}></i></div>
@@ -846,13 +871,13 @@ export default function AffiliatePortal() {
             </div>
 
             {/* Row 3: Deposited */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.85rem', marginBottom: '0.85rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.85rem', marginBottom: '1.5rem' }}>
               {[
-                { icon: 'fa-solid fa-credit-card', iconBg: 'rgba(59,130,246,0.12)', iconColor: '#3b82f6', label: 'TOTAL DEPOSITED PLAYERS', value: stats.depositingPlayers || 0 },
-                { icon: 'fa-solid fa-users', iconBg: 'rgba(168,85,247,0.08)', iconColor: '#a855f7', label: 'REFERRAL DEPOSITED', value: 0 },
-                { icon: 'fa-brands fa-facebook', iconBg: 'rgba(59,130,246,0.1)', iconColor: '#3b82f6', label: 'FACEBOOK DEPOSITED', value: 0 },
-                { icon: 'fa-solid fa-leaf', iconBg: 'rgba(46,204,113,0.1)', iconColor: '#2ecc71', label: 'ORGANIC DEPOSITED', value: 0, valueColor: '#2ecc71' },
-                { icon: 'fa-solid fa-clock-rotate-left', iconBg: 'rgba(139,92,246,0.12)', iconColor: '#8b5cf6', label: 'OLD SIGNUP DEPOSITED', value: 0, valueColor: '#eab308' },
+                { icon: 'fa-solid fa-credit-card', iconBg: 'rgba(59,130,246,0.12)', iconColor: '#3b82f6', label: 'TOTAL DEPOSITED PLAYERS', value: signupStats.totalDeposited || 0 },
+                { icon: 'fa-solid fa-users', iconBg: 'rgba(168,85,247,0.08)', iconColor: '#a855f7', label: 'REFERRAL DEPOSITED', value: signupStats.referralDeposited || 0 },
+                { icon: 'fa-brands fa-facebook', iconBg: 'rgba(59,130,246,0.1)', iconColor: '#3b82f6', label: 'FACEBOOK DEPOSITED', value: signupStats.facebookDeposited || 0 },
+                { icon: 'fa-solid fa-leaf', iconBg: 'rgba(46,204,113,0.1)', iconColor: '#2ecc71', label: 'ORGANIC DEPOSITED', value: signupStats.organicDeposited || 0, valueColor: '#2ecc71' },
+                { icon: 'fa-solid fa-clock-rotate-left', iconBg: 'rgba(139,92,246,0.12)', iconColor: '#8b5cf6', label: 'OLD SIGNUP DEPOSITED', value: signupStats.oldSignupDeposited || 0, valueColor: '#eab308' },
               ].map((c, i) => (
                 <div key={i} style={{ background: '#0b0d16', padding: '1.15rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
                   <div style={{ width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: c.iconBg, color: c.iconColor, fontSize: '0.95rem', marginBottom: '0.6rem' }}><i className={c.icon}></i></div>
@@ -861,12 +886,151 @@ export default function AffiliatePortal() {
                 </div>
               ))}
             </div>
+
+            {/* Campaign Breakdown Table */}
+            <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)', marginBottom: '1.5rem' }}>
+              <h3 style={{ fontSize: '1rem', color: '#fff', fontWeight: 'bold', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <i className="fa-solid fa-chart-pie text-gold" style={{ color: 'var(--gold-primary)' }}></i> Campaign Breakdown
+              </h3>
+              <div className="table-responsive">
+                <table className="admin-table" style={{ width: '100%' }}>
+                  <thead>
+                    <tr>
+                      <th>CAMPAIGN</th>
+                      <th>TOTAL SIGNUPS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {campaignBreakdown.length === 0 ? (
+                      <tr>
+                        <td colSpan="2" className="text-center text-muted" style={{ padding: '1.5rem' }}>No campaign data found.</td>
+                      </tr>
+                    ) : (
+                      campaignBreakdown.map((row, idx) => (
+                        <tr key={idx}>
+                          <td><strong>{row.campaign}</strong></td>
+                          <td><strong>{row.totalSignups}</strong></td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Players List Table */}
+            <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)', marginBottom: '1rem' }}>
+              <h3 style={{ fontSize: '1rem', color: '#fff', fontWeight: 'bold', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <i className="fa-solid fa-users text-gold" style={{ color: 'var(--gold-primary)' }}></i> Players List
+              </h3>
+
+              {/* Ownership Filters */}
+              <div style={{ background: '#07090f', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.03)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
+                <div style={{ flex: 1, minWidth: '220px' }}>
+                  <span style={{ fontSize: '0.725rem', color: '#fff', fontWeight: 'bold', display: 'block', marginBottom: '0.2rem' }}>Ownership Source Filter</span>
+                  <span style={{ fontSize: '0.625rem', color: 'var(--text-muted)' }}>Filter players by distributor own link, direct agent, sub-distributor own link, or sub-distributor agent.</span>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <select
+                    value={ownershipFilter}
+                    onChange={(e) => setOwnershipFilter(e.target.value)}
+                    style={{ background: '#0b0d16', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: '#fff', padding: '0.45rem 1rem', fontSize: '0.75rem', outline: 'none' }}
+                  >
+                    <option value="All Players">All Players</option>
+                    <option value="Distributor Own Link">Distributor Own Link</option>
+                    <option value="Direct Agent">Direct Agent</option>
+                    <option value="Sub-Distributor Own Link">Sub-Distributor Own Link</option>
+                    <option value="Sub-Distributor Agent">Sub-Distributor Agent</option>
+                  </select>
+                  <button
+                    onClick={() => {
+                      const headers = ['ID', 'NAME', 'EMAIL', 'OWNER TYPE', 'OWNER NAME', 'OWNER CODE', 'DISTRIBUTOR', 'SUB-DISTRIBUTOR', 'AGENT', 'NETWORK PATH', 'SIGNUP DATE', 'FIRST DEPOSIT DATE', 'VERIFICATION'];
+                      const rows = playersList.map(p => [
+                        p.id, p.name, p.email, p.ownerType, p.ownerName, p.ownerCode, p.distributor, p.subDistributor, p.agent, p.networkPath, p.signupDate, p.firstDepositDate, p.verification
+                      ]);
+                      const csvContent = "data:text/csv;charset=utf-8," 
+                        + [headers.join(','), ...rows.map(e => e.map(val => `"${val}"`).join(","))].join("\n");
+                      const encodedUri = encodeURI(csvContent);
+                      const link = document.createElement("a");
+                      link.setAttribute("href", encodedUri);
+                      link.setAttribute("download", `signup_report_${new Date().toISOString().slice(0,10)}.csv`);
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                    }}
+                    style={{ background: 'rgba(255, 215, 0, 0.1)', border: '1px solid var(--gold-primary)', color: 'var(--gold-primary)', borderRadius: '6px', padding: '0.45rem 1rem', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                  >
+                    <i className="fa-solid fa-download"></i> Download CSV
+                  </button>
+                </div>
+              </div>
+
+              {/* Table */}
+              <div className="table-responsive">
+                <table className="admin-table" style={{ width: '100%' }}>
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>NAME</th>
+                      <th>OWNER TYPE</th>
+                      <th>OWNER NAME</th>
+                      <th>OWNER CODE</th>
+                      <th>DISTRIBUTOR</th>
+                      <th>SUB-DISTRIBUTOR</th>
+                      <th>AGENT</th>
+                      <th>NETWORK PATH</th>
+                      <th>SIGNUP DATE</th>
+                      <th>FIRST DEPOSIT DATE</th>
+                      <th>VERIFICATION</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {playersList.length === 0 ? (
+                      <tr>
+                        <td colSpan="12" className="text-center text-muted" style={{ padding: '2rem' }}>No players found.</td>
+                      </tr>
+                    ) : (
+                      playersList
+                        .filter(p => {
+                          if (ownershipFilter === 'Distributor Own Link') return p.campaign?.toLowerCase().includes('distributor');
+                          if (ownershipFilter === 'Direct Agent') return p.ownerType === 'Agent';
+                          if (ownershipFilter === 'Sub-Distributor Own Link') return p.campaign?.toLowerCase().includes('sub-distributor');
+                          if (ownershipFilter === 'Sub-Distributor Agent') return p.campaign?.toLowerCase().includes('sub-agent');
+                          return true;
+                        })
+                        .map((p, idx) => (
+                          <tr key={idx}>
+                            <td>#{p.id.slice(-6)}</td>
+                            <td><strong>{p.name}</strong><br/><span style={{ fontSize: '0.65rem', color: '#888' }}>{p.email}</span></td>
+                            <td>{p.ownerType}</td>
+                            <td>{p.ownerName}</td>
+                            <td><code>{p.ownerCode}</code></td>
+                            <td>{p.distributor}</td>
+                            <td>{p.subDistributor}</td>
+                            <td>{p.agent}</td>
+                            <td style={{ fontSize: '0.65rem', opacity: 0.8 }}>{p.networkPath}</td>
+                            <td style={{ fontSize: '0.725rem', whiteSpace: 'nowrap' }}>{p.signupDate}</td>
+                            <td style={{ fontSize: '0.725rem', whiteSpace: 'nowrap' }}>{p.firstDepositDate}</td>
+                            <td>
+                              <span className={`admin-badge-preview b-${p.verification === 'VERIFIED' ? 'ready' : 'unverified'}`}>
+                                {p.verification}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+            </div>
           </div>
         )}
 
         {/* ============== ADS REQUEST TAB ============== */}
         {activeTab === 'ads_request' && (
           <div>
+            {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(234,179,8,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -874,31 +1038,291 @@ export default function AffiliatePortal() {
                 </div>
                 <div>
                   <h1 style={{ fontSize: '1.75rem', fontWeight: 'bold', fontFamily: 'var(--font-heading)', margin: 0 }}>Ads Request</h1>
-                  <p style={{ fontSize: '0.75rem', color: '#888', margin: 0 }}>Submit marketing material or advertisement requests to admin.</p>
+                  <p style={{ fontSize: '0.75rem', color: '#888', margin: 0 }}>Submit Facebook advertisement campaigns and get your custom tracking links.</p>
                 </div>
               </div>
               <button onClick={() => setActiveTab('dashboard')} style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '0.45rem 0.85rem', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                 <i className="fa-solid fa-arrow-left"></i> Dashboard
               </button>
             </div>
-            <div style={{ background: '#0b0d16', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)', padding: '1.25rem', maxWidth: '550px' }}>
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                if (!adsMsg.trim()) { alert('Enter your request.'); return; }
-                setAdsLoading(true);
-                try {
-                  const res = await fetch('/api/support', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: agentSession.email, name: agentSession.name, message: `[ADS REQUEST from Agent ${agentSession.agentCode}]\n\n${adsMsg}`, subject: 'Affiliate Ads Request' }) });
-                  const data = await res.json();
-                  if (data.success) { alert('Request submitted!'); setAdsMsg(''); } else { alert(data.message || 'Failed.'); }
-                } catch (err) { console.error(err); alert('Error.'); } finally { setAdsLoading(false); }
-              }} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div>
-                  <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Request Details</label>
-                  <textarea placeholder="Describe the marketing material or ad campaign you need..." value={adsMsg} onChange={(e) => setAdsMsg(e.target.value)} rows={6} style={{ ...inputStyle, resize: 'vertical' }} required />
+
+            {/* Content Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '1.5rem', alignItems: 'start', marginBottom: '2rem' }}>
+              
+              {/* Left Column: Form & Payment */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                
+                {/* Form Card */}
+                <div style={{ background: '#0b0d16', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)', padding: '1.5rem' }}>
+                  <h3 style={{ fontSize: '1rem', color: '#fff', fontWeight: 'bold', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <i className="fa-solid fa-file-invoice-dollar text-gold" style={{ color: 'var(--gold-primary)' }}></i> Campaign Details
+                  </h3>
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!adsBudget || isNaN(parseFloat(adsBudget)) || parseFloat(adsBudget) <= 0) {
+                      alert('Please enter a valid campaign budget.');
+                      return;
+                    }
+                    if (parseFloat(adsBudget) > remainingLimit) {
+                      alert(`Budget exceeds your remaining limit of $${remainingLimit.toFixed(2)}`);
+                      return;
+                    }
+                    if (!campaignName.trim() || !facebookLink.trim() || !campaignStart || !campaignEnd) {
+                      alert('Please fill out all required campaign fields.');
+                      return;
+                    }
+
+                    setAdsLoading(true);
+                    try {
+                      const res = await fetch('/api/campaign-requests', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          agentEmail: agentSession.email,
+                          agentCode: agentSession.agentCode,
+                          budget: parseFloat(adsBudget),
+                          campaignName: campaignName.trim(),
+                          facebookPageLink: facebookLink.trim(),
+                          startDate: campaignStart,
+                          endDate: campaignEnd,
+                          notes: campaignNotes.trim(),
+                          paymentProof: campaignProof
+                        })
+                      });
+                      const data = await res.json();
+                      if (data.success) {
+                        alert('Campaign request submitted successfully!');
+                        setAdsBudget('');
+                        setCampaignName('');
+                        setFacebookLink('');
+                        setCampaignStart('');
+                        setCampaignEnd('');
+                        setCampaignNotes('');
+                        setCampaignProof('');
+                        mutateCampaigns();
+                      } else {
+                        alert(data.message || 'Submission failed.');
+                      }
+                    } catch (err) {
+                      console.error(err);
+                      alert('Connection error submitting campaign request.');
+                    } finally {
+                      setAdsLoading(false);
+                    }
+                  }} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    
+                    <div style={{ display: 'flex', gap: '0.75rem', width: '100%', flexWrap: 'wrap' }}>
+                      <div className="input-group" style={{ flex: '1 1 200px', margin: 0 }}>
+                        <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.35rem' }}>ADS BUDGET ($)</label>
+                        <div className="input-wrapper" style={{ background: '#07090f' }}>
+                          <i className="fa-solid fa-dollar-sign input-icon" style={{ color: 'var(--gold-primary)' }}></i>
+                          <input type="number" placeholder="Enter campaign budget" value={adsBudget} onChange={(e) => setAdsBudget(e.target.value)} required />
+                        </div>
+                      </div>
+                      <div className="input-group" style={{ flex: '1 1 200px', margin: 0 }}>
+                        <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.35rem' }}>CAMPAIGN NAME</label>
+                        <div className="input-wrapper" style={{ background: '#07090f' }}>
+                          <i className="fa-solid fa-bullhorn input-icon" style={{ color: 'var(--gold-primary)' }}></i>
+                          <input type="text" placeholder="Summer Promo, Casino Campaign..." value={campaignName} onChange={(e) => setCampaignName(e.target.value)} required />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="input-group" style={{ margin: 0 }}>
+                      <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.35rem' }}>FACEBOOK PAGE LINK</label>
+                      <div className="input-wrapper" style={{ background: '#07090f' }}>
+                        <i className="fa-brands fa-facebook input-icon" style={{ color: 'var(--gold-primary)' }}></i>
+                        <input type="url" placeholder="https://facebook.com/yourpage" value={facebookLink} onChange={(e) => setFacebookLink(e.target.value)} required />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.75rem', width: '100%', flexWrap: 'wrap' }}>
+                      <div className="input-group" style={{ flex: '1 1 200px', margin: 0 }}>
+                        <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.35rem' }}>START DATE & TIME</label>
+                        <input type="datetime-local" value={campaignStart} onChange={(e) => setCampaignStart(e.target.value)} style={inputStyle} required />
+                      </div>
+                      <div className="input-group" style={{ flex: '1 1 200px', margin: 0 }}>
+                        <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.35rem' }}>END DATE & TIME</label>
+                        <input type="datetime-local" value={campaignEnd} onChange={(e) => setCampaignEnd(e.target.value)} style={inputStyle} required />
+                      </div>
+                    </div>
+
+                    <div className="input-group" style={{ margin: 0 }}>
+                      <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.35rem' }}>NOTES (OPTIONAL)</label>
+                      <textarea placeholder="Target audience, states, interests, special instructions..." value={campaignNotes} onChange={(e) => setCampaignNotes(e.target.value)} style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }} />
+                    </div>
+
+                    {/* Payment proof file attachment input */}
+                    <div style={{ background: '#07090f', padding: '0.75rem', borderRadius: '8px', border: '1px dashed rgba(255,255,255,0.08)' }}>
+                      <label style={{ fontSize: '0.7rem', color: 'var(--gold-primary)', fontWeight: 'bold', display: 'block', marginBottom: '0.3rem' }}>
+                        Attach Payment Proof Screenshot (Required)
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          if (file.size > 8 * 1024 * 1024) {
+                            alert('Screenshot image must be under 8MB.');
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onloadend = () => setCampaignProof(reader.result);
+                          reader.readAsDataURL(file);
+                        }}
+                        style={{ fontSize: '0.75rem', color: '#fff' }}
+                        required={!campaignProof}
+                      />
+                      {campaignProof && (
+                        <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontSize: '0.65rem', color: '#2ecc71' }}>✓ Screenshot attached successfully!</span>
+                          <button type="button" onClick={() => setCampaignProof('')} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.65rem', cursor: 'pointer', padding: 0 }}>Remove</button>
+                        </div>
+                      )}
+                    </div>
+
+                    <button type="submit" disabled={adsLoading} style={{ width: '100%', padding: '0.85rem', background: 'linear-gradient(135deg, var(--gold-primary), #d4a017)', color: '#000', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.85rem', cursor: adsLoading ? 'wait' : 'pointer', boxShadow: '0 4px 15px rgba(255, 215, 0, 0.2)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '0.5rem' }}>
+                      {adsLoading ? 'Submitting Campaign...' : '🚀 Submit Ads Campaign Request'}
+                    </button>
+                  </form>
                 </div>
-                <button type="submit" disabled={adsLoading} style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold', padding: '0.65rem', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '0.8rem' }}>{adsLoading ? 'Submitting...' : 'Submit Ads Request'}</button>
-              </form>
+
+                {/* Payment Details Card */}
+                <div style={{ background: '#0b0d16', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)', padding: '1.5rem' }}>
+                  <h3 style={{ fontSize: '1rem', color: '#fff', fontWeight: 'bold', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <i className="fa-solid fa-wallet text-gold" style={{ color: 'var(--gold-primary)' }}></i> Payment Details
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.8rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '0.5rem' }}>
+                      <span style={{ color: '#888' }}>Network</span>
+                      <strong style={{ color: '#fff' }}>BNB Smart Chain (BEP20)</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '0.5rem' }}>
+                      <span style={{ color: '#888' }}>Remaining Limit</span>
+                      <strong style={{ color: 'var(--gold-primary)' }}>${remainingLimit.toFixed(2)}</strong>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '0.75rem' }}>
+                      <span style={{ color: '#888' }}>Wallet Address</span>
+                      <div style={{ display: 'flex', alignItems: 'center', background: '#07090f', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)', fontSize: '0.725rem', fontFamily: 'monospace', color: '#fff', wordBreak: 'break-all', gap: '0.5rem', marginTop: '0.2rem' }}>
+                        <span>0xbe912598c0f2a38365ac1f6838f943935326be74</span>
+                        <button onClick={() => {
+                          navigator.clipboard.writeText('0xbe912598c0f2a38365ac1f6838f943935326be74');
+                          alert('Wallet address copied to clipboard!');
+                        }} style={{ background: '#6366f1', border: 'none', borderRadius: '4px', color: '#fff', padding: '0.2rem 0.4rem', cursor: 'pointer', fontSize: '0.65rem', fontWeight: 'bold' }}>Copy</button>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem' }}>
+                      {/* BNB BEP20 QR Logo Mascot rendering */}
+                      <div style={{ background: '#fff', padding: '0.4rem', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '90px', height: '90px' }}>
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=0xbe912598c0f2a38365ac1f6838f943935326be74" alt="BSC BEP20 Wallet Address QR Code" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                      </div>
+                      <div style={{ fontSize: '0.675rem', color: 'var(--text-muted)' }}>
+                        <p style={{ margin: '0 0 0.25rem 0' }}>Scan this QR code to transfer your ad budget directly using BNB Smart Chain (BEP20).</p>
+                        <strong style={{ color: 'var(--gold-primary)' }}>Important:</strong> Send only USDT/BNB via BEP20. Transfers on other chains cannot be processed.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Right Column: Instructions */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                
+                {/* How It Works */}
+                <div style={{ background: 'rgba(99, 102, 241, 0.05)', border: '1px solid rgba(99, 102, 241, 0.15)', borderRadius: '14px', padding: '1.5rem', color: '#cbd5e1' }}>
+                  <h3 style={{ fontSize: '1rem', color: '#fff', fontWeight: 'bold', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <i className="fa-solid fa-circle-question" style={{ color: '#8b5cf6' }}></i> How It Works
+                  </h3>
+                  <p style={{ fontSize: '0.75rem', lineHeight: '1.5', margin: 0 }}>
+                    Submit your campaign request, send payment to the wallet provided, upload payment proof and our marketing team will start reviewing your campaign.
+                  </p>
+                </div>
+
+                {/* Process Steps */}
+                <div style={{ background: '#0b0d16', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)', padding: '1.5rem' }}>
+                  <h3 style={{ fontSize: '1rem', color: '#fff', fontWeight: 'bold', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <i className="fa-solid fa-list-ol text-gold" style={{ color: 'var(--gold-primary)' }}></i> Campaign Launch Process
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {[
+                      { step: 1, text: 'Submit campaign details.' },
+                      { step: 2, text: 'Send payment to the provided wallet.' },
+                      { step: 3, text: 'Upload payment proof.' },
+                      { step: 4, text: 'Our team verifies and launches the campaign.' }
+                    ].map((item) => (
+                      <div key={item.step} style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                        <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--gold-primary)', color: '#000', fontSize: '0.75rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          {item.step}
+                        </div>
+                        <span style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>{item.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+
             </div>
+
+            {/* Campaign History Log */}
+            <div style={{ background: '#0b0d16', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)', padding: '1.5rem' }}>
+              <h3 style={{ fontSize: '1rem', color: '#fff', fontWeight: 'bold', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
+                My Campaign Requests
+              </h3>
+              <div className="table-responsive">
+                <table className="admin-table" style={{ width: '100%' }}>
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Campaign</th>
+                      <th>Budget</th>
+                      <th>Status</th>
+                      <th>Tracking Link</th>
+                      <th>Created</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {campaignsList.length === 0 ? (
+                      <tr>
+                        <td colSpan="6" className="text-center text-muted" style={{ padding: '2rem' }}>
+                          No campaign requests found.
+                        </td>
+                      </tr>
+                    ) : (
+                      campaignsList.map((c) => (
+                        <tr key={c.id}>
+                          <td>#{c.id.slice(-6)}</td>
+                          <td><strong>{c.campaignName}</strong></td>
+                          <td><strong style={{ color: 'var(--gold-primary)' }}>${parseFloat(c.budget).toFixed(2)}</strong></td>
+                          <td>
+                            <span className={`admin-badge-preview b-${c.status.toLowerCase() === 'ready' ? 'ready' : c.status.toLowerCase()}`}>
+                              {c.status}
+                            </span>
+                          </td>
+                          <td style={{ fontSize: '0.725rem', fontFamily: 'monospace' }}>
+                            {c.status === 'APPROVED' ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <span style={{ color: '#2ecc71', wordBreak: 'break-all' }}>{c.trackingLink}</span>
+                                <button onClick={() => {
+                                  navigator.clipboard.writeText(c.trackingLink);
+                                  alert('Tracking link copied!');
+                                }} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '0.1rem 0.3rem', borderRadius: '4px', cursor: 'pointer', fontSize: '0.6rem' }}>Copy</button>
+                              </div>
+                            ) : (
+                              <span style={{ opacity: 0.4 }}>Pending Link Assignment</span>
+                            )}
+                          </td>
+                          <td style={{ fontSize: '0.725rem' }}>{new Date(c.createdAt).toLocaleDateString()}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
           </div>
         )}
 

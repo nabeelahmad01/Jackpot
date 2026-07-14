@@ -65,7 +65,9 @@ export async function POST(req) {
         referralCode,
         referredBy: resolvedReferrer,
         distributorId: (distributorId && distributorId !== 'null' && distributorId !== 'undefined') ? distributorId : (inheritedDistributorId || ''),
-        agentCode: (agentCode && agentCode !== 'null' && agentCode !== 'undefined') ? agentCode : (inheritedAgentCode || '')
+        agentCode: (agentCode && agentCode !== 'null' && agentCode !== 'undefined') ? agentCode : (inheritedAgentCode || ''),
+        campaign: campaign || 'organic',
+        createdAt: new Date().toISOString()
       };
       const result = await usersCollection.insertOne(matchedUser);
       matchedUser._id = result.insertedId;

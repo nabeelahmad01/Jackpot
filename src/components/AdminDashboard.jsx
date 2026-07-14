@@ -24,6 +24,7 @@ const DistributorsTab = lazy(() => import('./admin/DistributorsTab'));
 const AffiliatesTab = lazy(() => import('./admin/AffiliatesTab'));
 const DeletedPlayersTab = lazy(() => import('./admin/DeletedPlayersTab'));
 const WebsitePaymentsTab = lazy(() => import('./admin/WebsitePaymentsTab'));
+const CampaignRequestsTab = lazy(() => import('./admin/CampaignRequestsTab'));
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -729,6 +730,32 @@ export default function AdminDashboard({
 
           {!adminUser?.distributorId && adminUser?.role === 'admin' && (
             <button
+              onClick={() => { setActiveTab('campaign_requests'); setSidebarOpen(false); }}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                background: activeTab === 'campaign_requests' ? 'var(--gold-primary)' : 'none',
+                color: activeTab === 'campaign_requests' ? '#111' : '#fff',
+                fontSize: '0.8rem',
+                fontWeight: 'bold',
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'all 0.2s ease',
+                marginTop: '0.25rem'
+              }}
+            >
+              <i className="fa-solid fa-bullhorn" style={{ width: '18px' }}></i>
+              <span>Ads Campaigns</span>
+            </button>
+          )}
+
+          {!adminUser?.distributorId && adminUser?.role === 'admin' && (
+            <button
               onClick={() => { setActiveTab('deleted_accounts'); setSidebarOpen(false); }}
               style={{
                 width: '100%',
@@ -889,6 +916,12 @@ export default function AdminDashboard({
                   onInspectProof={onInspectProof}
                   completedActionIds={completedActionIds}
                   adminUser={adminUser}
+                />
+              )}
+              {activeTab === 'campaign_requests' && !adminUser?.distributorId && adminUser?.role === 'admin' && (
+                <CampaignRequestsTab
+                  adminUser={adminUser}
+                  onInspectProof={onInspectProof}
                 />
               )}
               {activeTab === 'settings' && hasAccess('settings') && (
