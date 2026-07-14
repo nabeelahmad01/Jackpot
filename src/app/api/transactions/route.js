@@ -46,8 +46,9 @@ export async function GET(req) {
 
     if (adminDistributorId) {
       query.distributorId = adminDistributorId;
-    } else {
-      // Exclude Type B distributor transactions from Super Admin/global views
+    } else if (!email) {
+      // Only exclude Type B distributor transactions from Super Admin/global views
+      // When email is set, the player is viewing their OWN transactions — don't exclude!
       const typeBDists = await db.collection('distributors').find({ type: 'B' }).project({ id: 1 }).toArray();
       const typeBDistIds = typeBDists.map(d => d.id).filter(Boolean);
       if (typeBDistIds.length > 0) {
@@ -241,7 +242,7 @@ export async function POST(req) {
         type: 'COMMISSION_WITHDRAW',
         status: { $in: ['PENDING', 'SUCCESS'] }
       }).toArray();
-      const totalWithdrawn = withdrawals.reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
+      const totalWithdrawn = withdrawals.reduce((sum, tx) => sum + parseFloat(tx.amount || 0) - parseFloat(tx.payoutHold || 0), 0);
 
       // 3. Get total commission earned from referral stats
       const referredPlayers = await db.collection('users').find({ distributorId: distDoc.id }).toArray();
@@ -460,21 +461,24 @@ export async function PUT(req) {
         const amount = parseFloat(originalTx.amount);
         const totalCoins = isBonus ? amount : (amount * (1 + bonusPercentage / 100));
 
-        // 3. Insert notification for the Coins Manager
+        // 3. Insert notification for the Coins Manager (with duplicate prevention)
         const notificationsCollection = db.collection('coinsNotifications');
-        await notificationsCollection.insertOne({
-          id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
-          userEmail,
-          gameTitle: originalTx.gameTitle || 'Lobby',
-          depositAmount: amount,
-          bonusApplied: bonusPercentage,
-          totalCoins: Math.round(totalCoins * 100) / 100,
-          status: 'PENDING',
-          read: false,
-          timestamp: new Date().toISOString(),
-          transactionId: originalTx.id, // Linked parent transaction!
-          distributorId: originalTx.distributorId || ''
-        });
+        const existingNoti = await notificationsCollection.findOne({ transactionId: originalTx.id });
+        if (!existingNoti) {
+          await notificationsCollection.insertOne({
+            id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
+            userEmail,
+            gameTitle: originalTx.gameTitle || 'Lobby',
+            depositAmount: amount,
+            bonusApplied: bonusPercentage,
+            totalCoins: Math.round(totalCoins * 100) / 100,
+            status: 'PENDING',
+            read: false,
+            timestamp: new Date().toISOString(),
+            transactionId: originalTx.id, // Linked parent transaction!
+            distributorId: originalTx.distributorId || ''
+          });
+        }
 
         // 4. Referral System Bonus: Check if this depositor was referred by someone
         const usersCollection = db.collection('users');

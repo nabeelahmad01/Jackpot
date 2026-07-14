@@ -146,6 +146,11 @@ export default function DistributorPortal() {
   const usdtAddress = settingsData?.settings?.usdtAddress || '';
   const usdtQrCode = settingsData?.settings?.usdtQrCode || '';
 
+  const { data: frontendSettingsData } = useSWR('/api/settings/frontend', fetcher);
+  const signupFreeplay = frontendSettingsData?.settings?.signupFreeplay !== undefined ? Number(frontendSettingsData.settings.signupFreeplay) : 3;
+  const firstDepositBonus = frontendSettingsData?.settings?.firstDepositBonus !== undefined ? Number(frontendSettingsData.settings.firstDepositBonus) : (settingsData?.settings?.firstDepositBonus !== undefined ? Number(settingsData.settings.firstDepositBonus) : 300);
+
+
   const { data: webCommTxData, mutate: mutateWebCommTx } = useSWR(
     distSession && distSession.type === 'B' ? `/api/transactions?email=${encodeURIComponent(distSession.email)}&type=WEBSITE_COMMISSION_PAYMENT` : null,
     fetcher
@@ -310,7 +315,7 @@ export default function DistributorPortal() {
     }
     
     const commWithdrawals = commTxData?.transactions || [];
-    const totalWithdrawn = commWithdrawals.filter(tx => tx.status === 'SUCCESS' || tx.status === 'PENDING').reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
+    const totalWithdrawn = commWithdrawals.filter(tx => tx.status === 'SUCCESS' || tx.status === 'PENDING').reduce((sum, tx) => sum + parseFloat(tx.amount || 0) - parseFloat(tx.payoutHold || 0), 0);
     const availableCommission = Math.max(0, (stats.commissionEarned || 0) - totalWithdrawn);
 
     if (reqVal > availableCommission) {
@@ -1609,7 +1614,7 @@ export default function DistributorPortal() {
                 );
               } else {
                 const commWithdrawals = commTxData?.transactions || [];
-                const totalWithdrawn = commWithdrawals.filter(tx => tx.status === 'SUCCESS' || tx.status === 'PENDING').reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
+                const totalWithdrawn = commWithdrawals.filter(tx => tx.status === 'SUCCESS' || tx.status === 'PENDING').reduce((sum, tx) => sum + parseFloat(tx.amount || 0) - parseFloat(tx.payoutHold || 0), 0);
                 const availableCommission = Math.max(0, (stats.commissionEarned || 0) - totalWithdrawn);
 
                 return (
@@ -1774,7 +1779,7 @@ export default function DistributorPortal() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
               <div style={{ background: '#0b0d16', padding: '1.5rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <h3 style={{ fontSize: '0.9rem', marginBottom: '1.25rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <i className="fa-solid fa-gift gold-text"></i> $3 Signup Freeplay Code
+                  <i className="fa-solid fa-gift gold-text"></i> ${signupFreeplay} Signup Freeplay Code
                 </h3>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#040509', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid rgba(255,215,0,0.15)', marginBottom: '1rem' }}>
                   <div>
@@ -1784,7 +1789,7 @@ export default function DistributorPortal() {
                   <span style={{ fontSize: '0.65rem', background: 'rgba(255,215,0,0.1)', color: 'var(--gold-primary)', padding: '0.25rem 0.5rem', borderRadius: '4px', fontWeight: 'bold' }}>ACTIVE</span>
                 </div>
                 <ul style={{ fontSize: '0.75rem', color: '#aaa', paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                  <li>Players get $3.00 instantly upon registration and verified email check.</li>
+                  <li>Players get ${signupFreeplay.toFixed(2)} instantly upon registration and verified email check.</li>
                   <li>Max cashout on wins originating from freeplay is strictly capped at $30.00.</li>
                   <li>No duplicate accounts or fake emails are permitted.</li>
                 </ul>
@@ -1792,12 +1797,12 @@ export default function DistributorPortal() {
 
               <div style={{ background: '#0b0d16', padding: '1.5rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <h3 style={{ fontSize: '0.9rem', marginBottom: '1.25rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <i className="fa-solid fa-percent gold-text"></i> 100% Signup Match Bonus
+                  <i className="fa-solid fa-percent gold-text"></i> {firstDepositBonus}% Signup Match Bonus
                 </h3>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#040509', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1rem' }}>
                   <div>
                     <span style={{ fontSize: '0.6rem', color: '#888', display: 'block', textTransform: 'uppercase' }}>Promo Offer</span>
-                    <strong style={{ fontSize: '1.1rem', color: '#2ecc71', letterSpacing: '0.5px' }}>100% FIRST DEPOSIT MATCH</strong>
+                    <strong style={{ fontSize: '1.1rem', color: '#2ecc71', letterSpacing: '0.5px' }}>{firstDepositBonus}% FIRST DEPOSIT MATCH</strong>
                   </div>
                   <span style={{ fontSize: '0.65rem', background: 'rgba(46,204,113,0.1)', color: '#2ecc71', padding: '0.25rem 0.5rem', borderRadius: '4px', fontWeight: 'bold' }}>AUTOMATIC</span>
                 </div>
@@ -1810,6 +1815,7 @@ export default function DistributorPortal() {
             </div>
           </div>
         )}
+
 
         {/* TAB: GUIDELINES & RULES */}
         {activeTab === 'guidelines' && (

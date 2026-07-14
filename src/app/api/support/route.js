@@ -18,8 +18,9 @@ export async function GET(req) {
     let baseQuery = {};
     if (adminDistributorId) {
       baseQuery.distributorId = adminDistributorId;
-    } else {
-      // Exclude chats belonging to Type B distributors
+    } else if (!email) {
+      // Exclude chats belonging to Type B distributors ONLY for generic admin views
+      // If email is present, player is querying their own chat, so don't exclude!
       baseQuery.distributorType = { $ne: 'B' };
     }
 

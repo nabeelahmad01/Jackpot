@@ -51,9 +51,18 @@ export default function LedgerTab({
   const depositsLedger = transactions.filter((t) => t.type === 'DEPOSIT');
   const withdrawalsLedger = transactions.filter((t) => t.type === 'WITHDRAW' || t.type === 'BONUS' || t.type === 'COMMISSION_WITHDRAW');
 
+  // Double-click prevention for approve actions
+  const [approvingIds, setApprovingIds] = useState({});
+
   const handleApprove = async (txId) => {
-    await onApproveTransaction(txId);
-    mutate();
+    if (approvingIds[txId]) return; // Prevent double-click
+    setApprovingIds(prev => ({ ...prev, [txId]: true }));
+    try {
+      await onApproveTransaction(txId);
+      mutate();
+    } finally {
+      setApprovingIds(prev => { const n = { ...prev }; delete n[txId]; return n; });
+    }
   };
 
   // Processing Withdrawal Payout State

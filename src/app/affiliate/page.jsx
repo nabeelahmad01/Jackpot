@@ -39,6 +39,22 @@ export default function AffiliatePortal() {
   const [adsMsg, setAdsMsg] = useState('');
   const [adsLoading, setAdsLoading] = useState(false);
 
+  // Daily Transactions date filter
+  const [txDate, setTxDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  });
+
+  // Signup Report date range
+  const [signupFromDate, setSignupFromDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  });
+  const [signupToDate, setSignupToDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  });
+
   // Sync tab to URL path
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -53,11 +69,8 @@ export default function AffiliatePortal() {
     const handlePathChange = () => {
       const path = window.location.pathname;
       const parts = path.split('/').filter(Boolean);
-      if (parts.length > 1) {
-        setActiveTab(parts[1]);
-      } else {
-        setActiveTab('dashboard');
-      }
+      if (parts.length > 1) setActiveTab(parts[1]);
+      else setActiveTab('dashboard');
     };
     window.addEventListener('popstate', handlePathChange);
     handlePathChange();
@@ -68,12 +81,10 @@ export default function AffiliatePortal() {
   useEffect(() => {
     setMounted(true);
     const saved = localStorage.getItem('jackpot_agent_session');
-    if (saved) {
-      setAgentSession(JSON.parse(saved));
-    }
+    if (saved) setAgentSession(JSON.parse(saved));
   }, []);
 
-  // Stats SWR (only when logged in)
+  // Stats SWR
   const agentCode = agentSession?.agentCode;
   const { data: statsData, mutate: mutateStats } = useSWR(
     agentCode ? `/api/agents/stats?agentCode=${encodeURIComponent(agentCode)}` : null,
@@ -88,13 +99,9 @@ export default function AffiliatePortal() {
   // Login handler
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
-    if (!email.trim() || !password.trim()) {
-      setLoginError('Please enter both email and password.');
-      return;
-    }
+    if (!email.trim() || !password.trim()) { setLoginError('Please enter both email and password.'); return; }
     setLoginError('');
     setIsLoggingIn(true);
-
     try {
       const response = await fetch('/api/agents/auth/login', {
         method: 'POST',
@@ -109,21 +116,12 @@ export default function AffiliatePortal() {
       } else {
         setLoginError(data.message || 'Invalid credentials.');
       }
-    } catch (err) {
-      console.error(err);
-      setLoginError('Connection failure.');
-    } finally {
-      setIsLoggingIn(false);
-    }
+    } catch (err) { console.error(err); setLoginError('Connection failure.'); }
+    finally { setIsLoggingIn(false); }
   };
 
-  // Logout handler
-  const handleLogout = () => {
-    localStorage.removeItem('jackpot_agent_session');
-    setAgentSession(null);
-  };
+  const handleLogout = () => { localStorage.removeItem('jackpot_agent_session'); setAgentSession(null); };
 
-  // Copy invite link
   const handleCopyInvite = () => {
     const link = `${window.location.origin}/agent-player-login?agent=${agentSession?.agentCode || ''}`;
     navigator.clipboard.writeText(link);
@@ -135,99 +133,54 @@ export default function AffiliatePortal() {
   const handleWithdrawRequest = async (e) => {
     e.preventDefault();
     const amount = parseFloat(withdrawAmount);
-    if (!amount || amount <= 0) {
-      alert('Please enter a valid amount.');
-      return;
-    }
-    if (amount > (stats.availableBalance || 0)) {
-      alert('Amount exceeds available balance.');
-      return;
-    }
+    if (!amount || amount <= 0) { alert('Please enter a valid amount.'); return; }
+    if (amount > (stats.availableBalance || 0)) { alert('Amount exceeds available balance.'); return; }
     setWithdrawLoading(true);
     try {
       const response = await fetch('/api/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userEmail: agentSession.email,
-          type: 'COMMISSION_WITHDRAW',
-          amount: amount,
+          userEmail: agentSession.email, type: 'COMMISSION_WITHDRAW', amount,
           gateway: withdrawBank || 'Bank Transfer',
-          code: `AGENT-COMM-${agentSession.agentCode}`,
-          status: 'PENDING',
+          code: `AGENT-COMM-${agentSession.agentCode}`, status: 'PENDING',
           note: `Agent Commission Cashout - ${withdrawName || agentSession.name} - Acc: ${withdrawAccount || 'N/A'}`,
           date: new Date().toISOString()
         })
       });
       const data = await response.json();
       if (data.success) {
-        alert('Withdrawal request submitted successfully! It will be processed shortly.');
-        setWithdrawAmount('');
-        setWithdrawName('');
-        setWithdrawAccount('');
-        setWithdrawBank('');
+        alert('Withdrawal request submitted!');
+        setWithdrawAmount(''); setWithdrawName(''); setWithdrawAccount(''); setWithdrawBank('');
         mutateStats();
-      } else {
-        alert(data.message || 'Failed to submit withdrawal request.');
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Connection error submitting request.');
-    } finally {
-      setWithdrawLoading(false);
-    }
+      } else { alert(data.message || 'Failed.'); }
+    } catch (err) { console.error(err); alert('Connection error.'); }
+    finally { setWithdrawLoading(false); }
   };
 
   // Change password handler
   const handleChangePassword = async (e) => {
     e.preventDefault();
-    if (!currentPw || !newPw || !confirmPw) {
-      alert('All password fields are required.');
-      return;
-    }
-    if (newPw !== confirmPw) {
-      alert('New password and confirm password do not match.');
-      return;
-    }
-    if (newPw.length < 6) {
-      alert('New password must be at least 6 characters.');
-      return;
-    }
+    if (!currentPw || !newPw || !confirmPw) { alert('All password fields are required.'); return; }
+    if (newPw !== confirmPw) { alert('Passwords do not match.'); return; }
+    if (newPw.length < 6) { alert('Min 6 characters.'); return; }
     setChangePwLoading(true);
     try {
-      // Verify current password by attempting login
       const verifyRes = await fetch('/api/agents/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: agentSession.email, password: currentPw })
       });
       const verifyData = await verifyRes.json();
-      if (!verifyData.success) {
-        alert('Current password is incorrect.');
-        setChangePwLoading(false);
-        return;
-      }
-      // Update password
+      if (!verifyData.success) { alert('Current password is incorrect.'); setChangePwLoading(false); return; }
       const updateRes = await fetch('/api/agents', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: agentSession.id, password: newPw })
       });
       const updateData = await updateRes.json();
-      if (updateData.success) {
-        alert('Password changed successfully!');
-        setCurrentPw('');
-        setNewPw('');
-        setConfirmPw('');
-      } else {
-        alert(updateData.message || 'Failed to change password.');
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Error changing password.');
-    } finally {
-      setChangePwLoading(false);
-    }
+      if (updateData.success) { alert('Password changed!'); setCurrentPw(''); setNewPw(''); setConfirmPw(''); }
+      else { alert(updateData.message || 'Failed.'); }
+    } catch (err) { console.error(err); alert('Error.'); }
+    finally { setChangePwLoading(false); }
   };
 
   if (!mounted) return null;
@@ -235,95 +188,35 @@ export default function AffiliatePortal() {
   /* ===================== LOGIN SCREEN ===================== */
   if (!agentSession) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #040509 0%, #0a0c1a 50%, #0d0f25 100%)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '1.5rem',
-        fontFamily: "var(--font-body), 'Inter', sans-serif"
-      }}>
+      <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #040509 0%, #0a0c1a 50%, #0d0f25 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', fontFamily: "var(--font-body), 'Inter', sans-serif" }}>
         <div className="aurora-bg"></div>
-        <div style={{
-          width: '100%',
-          maxWidth: '420px',
-          background: 'rgba(11, 13, 22, 0.8)',
-          backdropFilter: 'blur(24px)',
-          border: '1px solid rgba(255, 215, 0, 0.15)',
-          borderRadius: '20px',
-          boxShadow: '0 8px 40px rgba(0, 0, 0, 0.5), 0 0 60px rgba(255, 215, 0, 0.05)',
-          padding: '2.5rem 2rem',
-          textAlign: 'center',
-          position: 'relative',
-          zIndex: 1
-        }}>
+        <div style={{ width: '100%', maxWidth: '420px', background: 'rgba(11, 13, 22, 0.8)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255, 215, 0, 0.15)', borderRadius: '20px', boxShadow: '0 8px 40px rgba(0, 0, 0, 0.5), 0 0 60px rgba(255, 215, 0, 0.05)', padding: '2.5rem 2rem', textAlign: 'center', position: 'relative', zIndex: 1 }}>
           <div style={{ marginBottom: '1.5rem' }}>
             <i className="fa-solid fa-user-tie" style={{ fontSize: '2.5rem', color: 'var(--gold-primary)', marginBottom: '0.75rem', display: 'block' }}></i>
-            <h2 style={{ color: 'var(--gold-primary)', fontWeight: '800', fontSize: '1.75rem', marginBottom: '0.3rem', textTransform: 'uppercase', letterSpacing: '1px', fontFamily: 'var(--font-heading)' }}>
-              Affiliate Login
-            </h2>
-            <p style={{ color: '#888', fontSize: '0.8rem' }}>
-              Access your affiliate performance portal and referral analytics.
-            </p>
+            <h2 style={{ color: 'var(--gold-primary)', fontWeight: '800', fontSize: '1.75rem', marginBottom: '0.3rem', textTransform: 'uppercase', letterSpacing: '1px', fontFamily: 'var(--font-heading)' }}>Affiliate Login</h2>
+            <p style={{ color: '#888', fontSize: '0.8rem' }}>Access your affiliate performance portal and analytics.</p>
           </div>
-
           <form onSubmit={handleLoginSubmit}>
             {loginError && (
               <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.25)', color: '#f87171', padding: '0.6rem', borderRadius: '8px', fontSize: '0.75rem', marginBottom: '1.25rem', textAlign: 'left' }}>
                 <i className="fa-solid fa-circle-exclamation" style={{ marginRight: '0.4rem' }}></i> {loginError}
               </div>
             )}
-
             <div style={{ marginBottom: '1.25rem', textAlign: 'left' }}>
               <label style={{ fontSize: '0.7rem', color: '#aaa', fontWeight: 'bold', display: 'block', marginBottom: '0.4rem' }}>Email Address</label>
               <div style={{ display: 'flex', alignItems: 'center', background: '#0b0d16', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '0.6rem 0.85rem' }}>
                 <i className="fa-solid fa-envelope" style={{ color: 'var(--gold-primary)', marginRight: '0.6rem', fontSize: '0.85rem' }}></i>
-                <input
-                  type="email"
-                  placeholder="name@affiliate.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  style={{ background: 'transparent', border: 'none', color: '#fff', width: '100%', outline: 'none', fontSize: '0.85rem' }}
-                  required
-                />
+                <input type="email" placeholder="name@affiliate.com" value={email} onChange={(e) => setEmail(e.target.value)} style={{ background: 'transparent', border: 'none', color: '#fff', width: '100%', outline: 'none', fontSize: '0.85rem' }} required />
               </div>
             </div>
-
             <div style={{ marginBottom: '2rem', textAlign: 'left' }}>
               <label style={{ fontSize: '0.7rem', color: '#aaa', fontWeight: 'bold', display: 'block', marginBottom: '0.4rem' }}>Access Password</label>
               <div style={{ display: 'flex', alignItems: 'center', background: '#0b0d16', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '0.6rem 0.85rem' }}>
                 <i className="fa-solid fa-lock" style={{ color: 'var(--gold-primary)', marginRight: '0.6rem', fontSize: '0.85rem' }}></i>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  style={{ background: 'transparent', border: 'none', color: '#fff', width: '100%', outline: 'none', fontSize: '0.85rem' }}
-                  required
-                />
+                <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} style={{ background: 'transparent', border: 'none', color: '#fff', width: '100%', outline: 'none', fontSize: '0.85rem' }} required />
               </div>
             </div>
-
-            <button
-              type="submit"
-              disabled={isLoggingIn}
-              style={{
-                width: '100%',
-                padding: '0.85rem',
-                background: 'linear-gradient(135deg, var(--gold-primary), #d4a017)',
-                color: '#000',
-                border: 'none',
-                borderRadius: '10px',
-                fontWeight: 'bold',
-                fontSize: '0.9rem',
-                cursor: isLoggingIn ? 'wait' : 'pointer',
-                transition: 'all 0.3s ease',
-                boxShadow: '0 4px 20px rgba(255, 215, 0, 0.25)',
-                textTransform: 'uppercase',
-                letterSpacing: '1px'
-              }}
-            >
+            <button type="submit" disabled={isLoggingIn} style={{ width: '100%', padding: '0.85rem', background: 'linear-gradient(135deg, var(--gold-primary), #d4a017)', color: '#000', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '0.9rem', cursor: isLoggingIn ? 'wait' : 'pointer', boxShadow: '0 4px 20px rgba(255, 215, 0, 0.25)', textTransform: 'uppercase', letterSpacing: '1px' }}>
               {isLoggingIn ? 'Authenticating...' : 'Sign In'}
             </button>
           </form>
@@ -333,238 +226,257 @@ export default function AffiliatePortal() {
   }
 
   /* ===================== MAIN DASHBOARD ===================== */
+  const today = new Date();
+  const formatDisplayDate = (dateStr) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
 
-  // Helper: stat card renderer
-  const StatCard = ({ icon, iconBg, label, value, valueColor }) => (
-    <div className="stat-card" style={{ background: '#0b0d16', padding: '1rem 1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.04)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-        <div style={{ width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: iconBg || 'rgba(255,215,0,0.1)', color: 'var(--gold-primary)', fontSize: '0.9rem' }}>
-          <i className={icon}></i>
-        </div>
-      </div>
-      <div style={{ fontSize: '0.65rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px', marginBottom: '0.2rem' }}>{label}</div>
-      <div style={{ fontSize: '1.5rem', fontWeight: '900', color: valueColor || '#fff' }}>{value}</div>
-    </div>
-  );
+  const sidebarItems = [
+    { id: 'dashboard', icon: 'fa-solid fa-house', label: 'Dashboard' },
+    { id: 'team', icon: 'fa-solid fa-users', label: 'Team' },
+    { id: 'daily_transactions', icon: 'fa-solid fa-bolt', label: 'Daily Transactions' },
+    { id: 'signup_report', icon: 'fa-solid fa-clipboard-list', label: 'Signup Report' },
+    { id: 'ads_request', icon: 'fa-solid fa-bullhorn', label: 'Ads Request' },
+    { id: 'change_password', icon: 'fa-solid fa-key', label: 'Change Password' },
+  ];
+
+  const inputStyle = { width: '100%', background: '#0b0d16', border: '1px solid rgba(255,255,255,0.06)', color: '#fff', padding: '0.55rem 0.75rem', borderRadius: '8px', fontSize: '0.8rem', outline: 'none' };
 
   return (
     <div className="admin-dashboard-layout" style={{ minHeight: '100vh', background: '#060812', color: '#fff', fontFamily: "var(--font-body), 'Inter', sans-serif" }}>
-      
-      {/* MOBILE HAMBURGER */}
-      <button
-        className="admin-mobile-hamburger"
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        style={{ position: 'fixed', top: '1rem', left: '1rem', zIndex: 3000, background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(255,215,0,0.2)', borderRadius: '8px', color: 'var(--gold-primary)', padding: '0.5rem 0.65rem', cursor: 'pointer', fontSize: '1.1rem', display: 'none' }}
-      >
-        <i className={sidebarOpen ? 'fa-solid fa-xmark' : 'fa-solid fa-bars'}></i>
-      </button>
+
+      {/* MOBILE HEADER */}
+      <div className="admin-mobile-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <i className="fa-solid fa-user-tie" style={{ color: 'var(--gold-primary)', fontSize: '1.1rem' }}></i>
+          <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Affiliate Portal</span>
+        </div>
+        <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.25rem', cursor: 'pointer' }}>
+          <i className={sidebarOpen ? 'fa-solid fa-xmark' : 'fa-solid fa-bars'}></i>
+        </button>
+      </div>
 
       {/* SIDEBAR */}
-      <aside className={`admin-sidebar-nav ${sidebarOpen ? 'mobile-open' : ''}`} style={{ display: 'flex', flexDirection: 'column' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '2rem', paddingBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-          <i className="fa-solid fa-user-tie" style={{ fontSize: '1.5rem', color: 'var(--gold-primary)' }}></i>
-          <div>
-            <h2 style={{ fontSize: '1rem', fontWeight: 'bold', fontFamily: 'var(--font-heading)', margin: 0 }}>
-              Affiliate Portal
-            </h2>
-            <span style={{ fontSize: '0.55rem', background: 'rgba(255,215,0,0.1)', color: 'var(--gold-primary)', padding: '0.1rem 0.3rem', borderRadius: '3px', textTransform: 'uppercase', fontWeight: 'bold', display: 'inline-block', marginTop: '0.15rem' }}>
-              Agent Network
-            </span>
+      <aside className={`admin-sidebar ${sidebarOpen ? 'mobile-show' : ''}`}>
+        <div style={{ padding: '1.5rem 1.25rem', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {/* Brand Header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.75rem', paddingBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <i className="fa-solid fa-user-tie" style={{ color: 'var(--gold-primary)', fontSize: '1.1rem' }}></i>
+            </div>
+            <div>
+              <h2 style={{ fontSize: '0.95rem', fontWeight: 'bold', fontFamily: 'var(--font-heading)', margin: 0, lineHeight: 1.2 }}>Agent & Distributor<br/>Network</h2>
+              <span style={{ fontSize: '0.55rem', color: '#888' }}>Performance Control Room</span>
+            </div>
           </div>
-        </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: 1 }}>
-          {[
-            { id: 'dashboard', icon: 'fa-solid fa-chart-line', label: 'Dashboard' },
-            { id: 'team', icon: 'fa-solid fa-users', label: 'Team' },
-            { id: 'daily_transactions', icon: 'fa-solid fa-clock-rotate-left', label: 'Daily Transactions' },
-            { id: 'signup_report', icon: 'fa-solid fa-clipboard-list', label: 'Signup Report' },
-            { id: 'ads_request', icon: 'fa-solid fa-bullhorn', label: 'Ads Request' },
-            { id: 'change_password', icon: 'fa-solid fa-key', label: 'Change Password' },
-          ].map(item => (
+          {/* Nav Items */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flex: 1, overflowY: 'auto' }}>
+            {sidebarItems.map(item => (
+              <button
+                key={item.id}
+                onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem',
+                  background: activeTab === item.id ? 'linear-gradient(135deg, rgba(168,85,247,0.25), rgba(99,102,241,0.2))' : 'transparent',
+                  color: activeTab === item.id ? '#fff' : 'rgba(255,255,255,0.6)',
+                  border: activeTab === item.id ? '1px solid rgba(168,85,247,0.3)' : '1px solid transparent',
+                  padding: '0.7rem 0.85rem', borderRadius: '10px', cursor: 'pointer',
+                  fontWeight: activeTab === item.id ? 'bold' : '500', fontSize: '0.8rem', textAlign: 'left',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <i className={item.icon} style={{ width: '18px', fontSize: '0.85rem', color: activeTab === item.id ? '#a855f7' : 'rgba(255,255,255,0.4)' }}></i>
+                {item.label}
+              </button>
+            ))}
+
+            {/* Logout Button */}
             <button
-              key={item.id}
-              onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }}
+              onClick={handleLogout}
               style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                background: activeTab === item.id ? 'var(--gold-primary)' : 'none',
-                color: activeTab === item.id ? '#000' : '#fff',
-                border: 'none',
-                padding: '0.7rem 1rem',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                fontSize: '0.8rem',
-                textAlign: 'left',
-                transition: 'all 0.2s ease'
+                width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem',
+                background: 'transparent', color: '#f87171',
+                border: '1px solid transparent',
+                padding: '0.7rem 0.85rem', borderRadius: '10px', cursor: 'pointer',
+                fontWeight: '500', fontSize: '0.8rem', textAlign: 'left', marginTop: '0.25rem'
               }}
             >
-              <i className={item.icon} style={{ width: '16px' }}></i>
-              {item.label}
+              <i className="fa-solid fa-right-from-bracket" style={{ width: '18px', fontSize: '0.85rem' }}></i>
+              Logout
             </button>
-          ))}
-        </div>
-
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
-          <div style={{ marginBottom: '1rem' }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>{agentSession.name}</div>
-            <div style={{ fontSize: '0.6rem', color: '#888' }}>{agentSession.email}</div>
-            <div style={{ fontSize: '0.6rem', color: 'var(--gold-primary)', fontWeight: 'bold', marginTop: '0.15rem' }}>Code: {agentSession.agentCode}</div>
           </div>
-          <button onClick={handleLogout} style={{ width: '100%', background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', padding: '0.5rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
-            <i className="fa-solid fa-right-from-bracket"></i> Logout
-          </button>
+
+          {/* Footer Info Box */}
+          <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '10px', padding: '0.85rem', fontSize: '0.65rem', color: '#666', lineHeight: 1.5 }}>
+              Live reports, private owner link, withdrawals, ads requests, and player activity in one place.
+            </div>
+          </div>
         </div>
       </aside>
 
-      {/* MAIN CONTENT */}
+      {/* MAIN CONTENT AREA */}
       <main className="admin-main-workspace" style={{ padding: '2rem', overflowY: 'auto' }}>
 
-        {/* ============== TAB: DASHBOARD ============== */}
+        {/* ============== DASHBOARD TAB ============== */}
         {activeTab === 'dashboard' && (
           <div>
-            {/* Welcome Header */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--gold-primary)', fontWeight: 'bold' }}>AFFILIATE PERFORMANCE PORTAL</span>
-              <h1 style={{ fontSize: '2rem', fontWeight: '900', fontFamily: 'var(--font-heading)', margin: '0.25rem 0' }}>
-                Welcome back,<br />{agentSession.name}
-              </h1>
-              <p style={{ fontSize: '0.8rem', color: '#888' }}>
-                Agent account • Commission rate {agentSession.commissionRate || 0}%.
-                <br />Showing only your direct-link players.
-              </p>
-              <h2 style={{ fontSize: '2.5rem', fontWeight: '900', marginTop: '0.5rem' }}>
-                ${(stats.availableBalance || 0).toFixed(2)}
-              </h2>
-              <span style={{ fontSize: '0.7rem', color: '#888' }}>Available Balance</span>
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', flexWrap: 'wrap' }}>
-                <button onClick={() => setActiveTab('daily_transactions')} className="submit-btn" style={{ background: '#2ecc71', color: '#fff', padding: '0.45rem 0.85rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>
-                  <i className="fa-solid fa-money-bill-transfer" style={{ marginRight: '0.3rem' }}></i> Withdraw
-                </button>
-                <button onClick={() => setActiveTab('daily_transactions')} className="submit-btn" style={{ background: 'rgba(255,215,0,0.15)', color: 'var(--gold-primary)', padding: '0.45rem 0.85rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 'bold', border: '1px solid rgba(255,215,0,0.2)', cursor: 'pointer' }}>
-                  <i className="fa-solid fa-clock-rotate-left" style={{ marginRight: '0.3rem' }}></i> Daily Transactions
-                </button>
-                <button onClick={() => setActiveTab('team')} className="submit-btn" style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', padding: '0.45rem 0.85rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 'bold', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}>
-                  <i className="fa-solid fa-users" style={{ marginRight: '0.3rem' }}></i> Team
-                </button>
-                <button onClick={handleLogout} className="submit-btn" style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', padding: '0.45rem 0.85rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 'bold', border: '1px solid rgba(239,68,68,0.2)', cursor: 'pointer' }}>
-                  <i className="fa-solid fa-right-from-bracket" style={{ marginRight: '0.3rem' }}></i> Logout
-                </button>
-              </div>
-            </div>
+            {/* Top Row: Welcome + Invite Link */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '1.5rem', marginBottom: '1.5rem' }}>
+              {/* Welcome Section */}
+              <div>
+                <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '1.5px', color: '#a855f7', fontWeight: 'bold' }}>AFFILIATE PERFORMANCE PORTAL</span>
+                <h1 style={{ fontSize: '2.25rem', fontWeight: '900', fontFamily: 'var(--font-heading)', margin: '0.3rem 0 0.15rem', lineHeight: 1.15 }}>
+                  Welcome back,<br/>{agentSession.name}
+                </h1>
+                <p style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>
+                  Sub Distributor account • Commission rate {agentSession.commissionRate || 0}.00%
+                </p>
+                <p style={{ fontSize: '0.7rem', color: '#666' }}>Showing only your direct-link players and your agents.</p>
+                <h2 style={{ fontSize: '2.75rem', fontWeight: '900', margin: '0.75rem 0 0.15rem' }}>${(stats.availableBalance || 0).toFixed(2)}</h2>
+                <span style={{ fontSize: '0.7rem', color: '#888' }}>Available Balance</span>
 
-            {/* Invite Link Card */}
-            <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.04)', marginBottom: '1.5rem', maxWidth: '450px' }}>
-              <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '0.3rem' }}>Your Invite Link</h3>
-              <p style={{ fontSize: '0.65rem', color: '#888', marginBottom: '0.75rem' }}>Share this link with players. New signups will be tracked under your agent account.</p>
-              <div style={{ background: '#040509', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)', fontSize: '0.7rem', color: '#ccc', wordBreak: 'break-all', marginBottom: '0.75rem', fontFamily: 'monospace' }}>
-                {typeof window !== 'undefined' ? `${window.location.origin}/agent-player-login?agent=${agentSession.agentCode}` : ''}
-              </div>
-              <button
-                onClick={handleCopyInvite}
-                style={{ width: '100%', background: copiedLink ? '#2ecc71' : 'var(--gold-primary)', color: copiedLink ? '#fff' : '#000', border: 'none', borderRadius: '8px', padding: '0.55rem', fontWeight: 'bold', fontSize: '0.8rem', cursor: 'pointer', transition: 'all 0.3s ease' }}
-              >
-                {copiedLink ? '✓ Copied!' : 'Copy Invite Link'}
-              </button>
-
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-                <div style={{ flex: 1, background: '#040509', borderRadius: '8px', padding: '0.75rem', textAlign: 'center', border: '1px solid rgba(255,255,255,0.04)' }}>
-                  <div style={{ fontSize: '0.6rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold', marginBottom: '0.15rem' }}>DIRECT</div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: '900' }}>{stats.totalPlayers || 0}</div>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+                  <button onClick={() => setActiveTab('daily_transactions')} style={{ background: '#2ecc71', color: '#fff', padding: '0.5rem 1rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 'bold', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <i className="fa-solid fa-money-bill-transfer"></i> Withdraw
+                  </button>
+                  <button onClick={() => setActiveTab('daily_transactions')} style={{ background: 'rgba(255,215,0,0.12)', color: 'var(--gold-primary)', padding: '0.5rem 1rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 'bold', border: '1px solid rgba(255,215,0,0.2)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <i className="fa-solid fa-clock-rotate-left"></i> Daily Transactions
+                  </button>
+                  <button onClick={() => setActiveTab('team')} style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', padding: '0.5rem 1rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 'bold', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <i className="fa-solid fa-users"></i> Team
+                  </button>
+                  <button onClick={handleLogout} style={{ background: 'rgba(239,68,68,0.12)', color: '#f87171', padding: '0.5rem 1rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 'bold', border: '1px solid rgba(239,68,68,0.2)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <i className="fa-solid fa-right-from-bracket"></i> Logout
+                  </button>
                 </div>
-                <div style={{ flex: 1, background: '#040509', borderRadius: '8px', padding: '0.75rem', textAlign: 'center', border: '1px solid rgba(255,255,255,0.04)' }}>
-                  <div style={{ fontSize: '0.6rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold', marginBottom: '0.15rem' }}>REFERRAL</div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: '900' }}>0</div>
+              </div>
+
+              {/* Invite Link Card */}
+              <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)', height: 'fit-content' }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 'bold', marginBottom: '0.3rem' }}>Your Invite Link</h3>
+                <p style={{ fontSize: '0.65rem', color: '#888', marginBottom: '0.85rem' }}>Share this link with players. New signups will be tracked under your owner account.</p>
+                <div style={{ background: '#040509', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)', fontSize: '0.7rem', color: '#aaa', wordBreak: 'break-all', marginBottom: '0.75rem', fontFamily: 'monospace' }}>
+                  {typeof window !== 'undefined' ? `${window.location.origin}/agent-player-login?agent=${agentSession.agentCode}` : ''}
+                </div>
+                <button onClick={handleCopyInvite} style={{ width: '100%', background: copiedLink ? '#2ecc71' : 'linear-gradient(135deg, #2ecc71, #27ae60)', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.6rem', fontWeight: 'bold', fontSize: '0.8rem', cursor: 'pointer', transition: 'all 0.3s ease' }}>
+                  {copiedLink ? '✓ Copied!' : 'Copy Invite Link'}
+                </button>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.85rem' }}>
+                  <div style={{ flex: 1, background: '#040509', borderRadius: '10px', padding: '0.7rem', textAlign: 'center', border: '1px solid rgba(255,255,255,0.04)' }}>
+                    <div style={{ fontSize: '0.55rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px', marginBottom: '0.2rem' }}>DIRECT</div>
+                    <div style={{ fontSize: '1.75rem', fontWeight: '900' }}>{stats.totalPlayers || 0}</div>
+                  </div>
+                  <div style={{ flex: 1, background: '#040509', borderRadius: '10px', padding: '0.7rem', textAlign: 'center', border: '1px solid rgba(255,255,255,0.04)' }}>
+                    <div style={{ fontSize: '0.55rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px', marginBottom: '0.2rem' }}>REFERRAL</div>
+                    <div style={{ fontSize: '1.75rem', fontWeight: '900' }}>0</div>
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Info Banner */}
-            <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', padding: '0.7rem 1rem', fontSize: '0.75rem', color: '#f87171', marginBottom: '1.5rem' }}>
+            <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '10px', padding: '0.65rem 1rem', fontSize: '0.75rem', color: '#f87171', marginBottom: '1.5rem' }}>
               Dashboard totals below show your own direct-link players and all agents under you.
             </div>
 
-            {/* Stats Cards Grid - Row 1: Player Stats */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
-              <StatCard icon="fa-solid fa-users" iconBg="rgba(168,85,247,0.1)" label="TOTAL PLAYERS" value={stats.totalPlayers || 0} valueColor="#a855f7" />
-              <StatCard icon="fa-solid fa-user-check" iconBg="rgba(46,204,113,0.1)" label="VERIFIED PLAYERS" value={stats.verifiedPlayers || 0} valueColor="#2ecc71" />
-              <StatCard icon="fa-solid fa-triangle-exclamation" iconBg="rgba(239,68,68,0.1)" label="UNVERIFIED PLAYERS" value={stats.unverifiedPlayers || 0} valueColor="#ef4444" />
-              <StatCard icon="fa-solid fa-user-plus" iconBg="rgba(59,130,246,0.1)" label="DEPOSITING PLAYERS" value={stats.depositingPlayers || 0} valueColor="#3b82f6" />
+            {/* Stats Cards - Row 1: Player Stats */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.85rem', marginBottom: '0.85rem' }}>
+              {[
+                { icon: 'fa-solid fa-users', iconBg: 'rgba(168,85,247,0.12)', iconColor: '#a855f7', label: 'TOTAL PLAYERS', value: stats.totalPlayers || 0, valueColor: '#a855f7' },
+                { icon: 'fa-solid fa-user-check', iconBg: 'rgba(46,204,113,0.12)', iconColor: '#2ecc71', label: 'VERIFIED PLAYERS', value: stats.verifiedPlayers || 0, valueColor: '#2ecc71' },
+                { icon: 'fa-solid fa-triangle-exclamation', iconBg: 'rgba(239,68,68,0.12)', iconColor: '#ef4444', label: 'UNVERIFIED PLAYERS', value: stats.unverifiedPlayers || 0, valueColor: '#ef4444' },
+                { icon: 'fa-solid fa-user-plus', iconBg: 'rgba(59,130,246,0.12)', iconColor: '#3b82f6', label: 'DEPOSITING PLAYERS', value: stats.depositingPlayers || 0, valueColor: '#3b82f6' },
+              ].map((c, i) => (
+                <div key={i} style={{ background: '#0b0d16', padding: '1.15rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: c.iconBg, color: c.iconColor, fontSize: '0.95rem', marginBottom: '0.6rem' }}>
+                    <i className={c.icon}></i>
+                  </div>
+                  <div style={{ fontSize: '0.6rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px', marginBottom: '0.25rem' }}>{c.label}</div>
+                  <div style={{ fontSize: '1.75rem', fontWeight: '900', color: c.valueColor }}>{c.value}</div>
+                </div>
+              ))}
             </div>
 
-            {/* Stats Cards Grid - Row 2: Financial Stats */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
-              <StatCard icon="fa-solid fa-coins" iconBg="rgba(255,215,0,0.1)" label="TOTAL DEPOSIT" value={`$${(stats.totalDeposits || 0).toFixed(2)}`} valueColor="#2ecc71" />
-              <StatCard icon="fa-solid fa-money-bill-wave" iconBg="rgba(234,179,8,0.1)" label="TOTAL CASHOUT" value={`$${(stats.totalWithdrawals || 0).toFixed(2)}`} valueColor="#ef4444" />
-              <StatCard icon="fa-solid fa-chart-bar" iconBg="rgba(139,92,246,0.1)" label="NET PROFIT" value={`$${(stats.netProfit || 0).toFixed(2)}`} />
-              <StatCard icon="fa-solid fa-coins" iconBg="rgba(59,130,246,0.1)" label="TOTAL COINS USED" value="0.00" />
+            {/* Stats Cards - Row 2: Financial */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.85rem', marginBottom: '0.85rem' }}>
+              {[
+                { icon: 'fa-solid fa-coins', iconBg: 'rgba(255,215,0,0.12)', iconColor: 'var(--gold-primary)', label: 'TOTAL DEPOSIT', value: `$${(stats.totalDeposits||0).toFixed(2)}`, sub: 'Dashboard scope only', valueColor: '#2ecc71' },
+                { icon: 'fa-solid fa-money-bill-wave', iconBg: 'rgba(234,179,8,0.12)', iconColor: '#eab308', label: 'TOTAL CASHOUT', value: `$${(stats.totalWithdrawals||0).toFixed(2)}`, sub: 'Dashboard scope only', valueColor: '#ef4444' },
+                { icon: 'fa-solid fa-chart-bar', iconBg: 'rgba(139,92,246,0.12)', iconColor: '#8b5cf6', label: 'NET PROFIT', value: `$${(stats.netProfit||0).toFixed(2)}`, sub: 'Deposit minus cashout' },
+                { icon: 'fa-solid fa-coins', iconBg: 'rgba(59,130,246,0.12)', iconColor: '#3b82f6', label: 'TOTAL COINS USED', value: '0.00', sub: 'Deposit coins only' },
+              ].map((c, i) => (
+                <div key={i} style={{ background: '#0b0d16', padding: '1.15rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: c.iconBg, color: c.iconColor, fontSize: '0.95rem', marginBottom: '0.6rem' }}>
+                    <i className={c.icon}></i>
+                  </div>
+                  <div style={{ fontSize: '0.6rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px', marginBottom: '0.25rem' }}>{c.label}</div>
+                  <div style={{ fontSize: '1.75rem', fontWeight: '900', color: c.valueColor || '#fff' }}>{c.value}</div>
+                  {c.sub && <div style={{ fontSize: '0.6rem', color: '#555', marginTop: '0.15rem' }}>{c.sub}</div>}
+                </div>
+              ))}
             </div>
 
-            {/* Stats Cards Grid - Row 3: Today Stats */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
-              <StatCard icon="fa-solid fa-arrow-down" iconBg="rgba(46,204,113,0.1)" label="TODAY DEPOSIT" value={`$${(stats.todayDeposits || 0).toFixed(2)}`} valueColor="#2ecc71" />
-              <StatCard icon="fa-solid fa-arrow-up" iconBg="rgba(234,179,8,0.1)" label="TODAY CASHOUT" value={`$${(stats.todayWithdrawals || 0).toFixed(2)}`} valueColor="#ef4444" />
-              <StatCard icon="fa-solid fa-money-check-dollar" iconBg="rgba(139,92,246,0.1)" label="TOTAL WITHDRAWN" value={`$${(stats.totalWithdrawn || 0).toFixed(2)}`} />
-              <StatCard icon="fa-solid fa-hourglass-half" iconBg="rgba(59,130,246,0.1)" label="PENDING WITHDRAWALS" value={`$${(stats.pendingWithdrawals || 0).toFixed(2)}`} />
+            {/* Stats Cards - Row 3: Today + Withdrawn */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.85rem', marginBottom: '0.85rem' }}>
+              {[
+                { icon: 'fa-solid fa-arrow-down', iconBg: 'rgba(46,204,113,0.12)', iconColor: '#2ecc71', label: 'TODAY DEPOSIT', value: `$${(stats.todayDeposits||0).toFixed(2)}`, valueColor: '#2ecc71' },
+                { icon: 'fa-solid fa-arrow-up', iconBg: 'rgba(234,179,8,0.12)', iconColor: '#eab308', label: 'TODAY CASHOUT', value: `$${(stats.todayWithdrawals||0).toFixed(2)}`, valueColor: '#ef4444' },
+                { icon: 'fa-solid fa-money-check-dollar', iconBg: 'rgba(139,92,246,0.12)', iconColor: '#8b5cf6', label: 'TOTAL WITHDRAWN', value: `$${(stats.totalWithdrawn||0).toFixed(2)}` },
+                { icon: 'fa-solid fa-hourglass-half', iconBg: 'rgba(59,130,246,0.12)', iconColor: '#3b82f6', label: 'PENDING WITHDRAWALS', value: `$${(stats.pendingWithdrawals||0).toFixed(2)}` },
+              ].map((c, i) => (
+                <div key={i} style={{ background: '#0b0d16', padding: '1.15rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: c.iconBg, color: c.iconColor, fontSize: '0.95rem', marginBottom: '0.6rem' }}>
+                    <i className={c.icon}></i>
+                  </div>
+                  <div style={{ fontSize: '0.6rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px', marginBottom: '0.25rem' }}>{c.label}</div>
+                  <div style={{ fontSize: '1.75rem', fontWeight: '900', color: c.valueColor || '#fff' }}>{c.value}</div>
+                </div>
+              ))}
             </div>
 
-            {/* Stats Cards Grid - Row 4: Commissions */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
-              <StatCard icon="fa-solid fa-hand-holding-dollar" iconBg="rgba(255,215,0,0.1)" label="ACCOUNT SHARE" value={`$${(stats.commissionEarned || 0).toFixed(2)}`} valueColor="#2ecc71" />
-              <StatCard icon="fa-solid fa-wallet" iconBg="rgba(46,204,113,0.15)" label="AVAILABLE BALANCE" value={`$${(stats.availableBalance || 0).toFixed(2)}`} valueColor="#2ecc71" />
-              <StatCard icon="fa-solid fa-user" iconBg="rgba(59,130,246,0.1)" label="DIRECT PLAYERS" value={stats.totalPlayers || 0} />
+            {/* Stats Cards - Row 4: Account Summary */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.85rem', marginBottom: '1.5rem' }}>
+              {[
+                { icon: 'fa-solid fa-hand-holding-dollar', iconBg: 'rgba(255,215,0,0.12)', iconColor: 'var(--gold-primary)', label: 'ACCOUNT SHARE', value: `$${(stats.commissionEarned||0).toFixed(2)}`, sub: 'Based on account commission rules', valueColor: '#2ecc71' },
+                { icon: 'fa-solid fa-wallet', iconBg: 'rgba(46,204,113,0.15)', iconColor: '#2ecc71', label: 'AVAILABLE BALANCE', value: `$${(stats.availableBalance||0).toFixed(2)}`, sub: 'After paid and pending withdrawals', valueColor: '#2ecc71' },
+                { icon: 'fa-solid fa-user', iconBg: 'rgba(59,130,246,0.12)', iconColor: '#3b82f6', label: 'DIRECT PLAYERS', value: stats.totalPlayers || 0, sub: 'Players without player referral' },
+              ].map((c, i) => (
+                <div key={i} style={{ background: '#0b0d16', padding: '1.15rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: c.iconBg, color: c.iconColor, fontSize: '0.95rem', marginBottom: '0.6rem' }}>
+                    <i className={c.icon}></i>
+                  </div>
+                  <div style={{ fontSize: '0.6rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px', marginBottom: '0.25rem' }}>{c.label}</div>
+                  <div style={{ fontSize: '1.75rem', fontWeight: '900', color: c.valueColor || '#fff' }}>{c.value}</div>
+                  {c.sub && <div style={{ fontSize: '0.6rem', color: '#555', marginTop: '0.15rem' }}>{c.sub}</div>}
+                </div>
+              ))}
             </div>
 
             {/* Withdrawal History */}
-            <div style={{ marginTop: '1rem' }}>
+            <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>Withdrawal History</h2>
-                <button
-                  onClick={() => setActiveTab('daily_transactions')}
-                  style={{ background: 'var(--gold-primary)', color: '#000', border: 'none', borderRadius: '8px', padding: '0.4rem 0.85rem', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer' }}
-                >
-                  Request
-                </button>
+                <button onClick={() => setActiveTab('daily_transactions')} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.45rem 1rem', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer' }}>Request</button>
               </div>
-
               <div className="table-responsive">
                 <table className="admin-table" style={{ fontSize: '0.75rem' }}>
-                  <thead>
-                    <tr>
-                      <th>AMOUNT</th>
-                      <th>NAME</th>
-                      <th>ACCOUNT</th>
-                      <th>BANK</th>
-                      <th>STATUS</th>
-                      <th>DATE</th>
-                    </tr>
-                  </thead>
+                  <thead><tr><th>AMOUNT</th><th>NAME</th><th>ACCOUNT</th><th>BANK</th><th>STATUS</th><th>DATE</th></tr></thead>
                   <tbody>
                     {commissionWithdrawals.length === 0 ? (
-                      <tr>
-                        <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#888' }}>
-                          No withdrawal history found.
-                        </td>
+                      <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#888' }}>No withdrawal history found.</td></tr>
+                    ) : commissionWithdrawals.map((tx, idx) => (
+                      <tr key={idx}>
+                        <td style={{ fontWeight: 'bold' }}>${parseFloat(tx.amount||0).toFixed(2)}</td>
+                        <td>{agentSession.name}</td>
+                        <td>{tx.note?.match(/Acc: (.+)/)?.[1] || 'N/A'}</td>
+                        <td>{tx.gateway || 'N/A'}</td>
+                        <td><span className={`admin-badge-preview b-${tx.status?.toLowerCase()==='success'?'ready':tx.status?.toLowerCase()==='pending'?'hot':'none'}`}>{tx.status}</span></td>
+                        <td style={{ fontSize: '0.65rem', color: '#888' }}>{tx.date ? new Date(tx.date).toLocaleDateString() : 'N/A'}</td>
                       </tr>
-                    ) : (
-                      commissionWithdrawals.map((tx, idx) => (
-                        <tr key={idx}>
-                          <td style={{ fontWeight: 'bold' }}>${parseFloat(tx.amount || 0).toFixed(2)}</td>
-                          <td>{agentSession.name}</td>
-                          <td>{tx.note?.match(/Acc: (.+)/)?.[1] || 'N/A'}</td>
-                          <td>{tx.gateway || 'N/A'}</td>
-                          <td>
-                            <span className={`admin-badge-preview b-${tx.status?.toLowerCase() === 'success' ? 'ready' : tx.status?.toLowerCase() === 'pending' ? 'hot' : 'none'}`}>
-                              {tx.status}
-                            </span>
-                          </td>
-                          <td style={{ fontSize: '0.65rem', color: '#888' }}>{tx.date ? new Date(tx.date).toLocaleDateString() : 'N/A'}</td>
-                        </tr>
-                      ))
-                    )}
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -572,322 +484,327 @@ export default function AffiliatePortal() {
           </div>
         )}
 
-        {/* ============== TAB: TEAM ============== */}
+        {/* ============== TEAM TAB ============== */}
         {activeTab === 'team' && (
           <div>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Team Overview</h1>
-            <p style={{ fontSize: '0.75rem', color: '#888', marginBottom: '1.5rem' }}>All players registered through your invite link.</p>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(168,85,247,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <i className="fa-solid fa-users" style={{ fontSize: '1.25rem', color: '#a855f7' }}></i>
+                </div>
+                <div>
+                  <h1 style={{ fontSize: '1.75rem', fontWeight: 'bold', fontFamily: 'var(--font-heading)', margin: 0 }}>Team Management</h1>
+                  <p style={{ fontSize: '0.75rem', color: '#888', margin: 0 }}>Manage your sub-distributors and agents from one clean dashboard.</p>
+                </div>
+              </div>
+              <button onClick={() => setActiveTab('dashboard')} style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '0.45rem 0.85rem', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <i className="fa-solid fa-arrow-left"></i> Dashboard
+              </button>
+            </div>
 
-            <div className="table-responsive">
-              <table className="admin-table" style={{ fontSize: '0.75rem' }}>
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Player Name</th>
-                    <th>Email</th>
-                    <th>Status</th>
-                    <th>Total Deposits</th>
-                    <th>Total Cashouts</th>
-                    <th>Joined</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {players.length === 0 ? (
-                    <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '2.5rem', color: '#888' }}>
-                        No players registered under your affiliate code yet.
-                      </td>
-                    </tr>
-                  ) : (
-                    players.map((player, idx) => (
-                      <tr key={player.id || idx}>
-                        <td style={{ fontWeight: 'bold', color: 'var(--gold-primary)' }}>{idx + 1}</td>
-                        <td style={{ fontWeight: 'bold' }}>{player.name}</td>
-                        <td style={{ color: '#aaa', fontSize: '0.7rem' }}>{player.email}</td>
-                        <td>
-                          <span className={`admin-badge-preview b-${player.status?.toLowerCase() === 'active' ? 'ready' : 'none'}`}>
-                            {player.status || 'ACTIVE'}
-                          </span>
-                        </td>
-                        <td style={{ fontWeight: 'bold', color: '#2ecc71' }}>${parseFloat(player.totalDeposits || 0).toFixed(2)}</td>
-                        <td style={{ fontWeight: 'bold', color: '#ef4444' }}>${parseFloat(player.totalWithdrawals || 0).toFixed(2)}</td>
-                        <td style={{ fontSize: '0.65rem', color: '#888' }}>{player.createdAt ? new Date(player.createdAt).toLocaleDateString() : 'N/A'}</td>
+            {/* Referral Link */}
+            <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div>
+                  <h3 style={{ fontSize: '1rem', fontWeight: 'bold', marginBottom: '0.2rem' }}>Your Referral Link</h3>
+                  <p style={{ fontSize: '0.7rem', color: '#888', margin: 0 }}>Share this link to bring players directly under your account.</p>
+                </div>
+                <div style={{ display: 'flex', gap: '0.35rem' }}>
+                  <span style={{ background: 'rgba(168,85,247,0.12)', color: '#a855f7', padding: '0.25rem 0.55rem', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 'bold' }}>Type: Sub-Distributor</span>
+                  <span style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', padding: '0.25rem 0.55rem', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 'bold' }}>Code: {agentSession.agentCode}</span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <div style={{ flex: 1, background: '#040509', padding: '0.6rem 0.85rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)', fontSize: '0.75rem', color: '#aaa', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {typeof window !== 'undefined' ? `${window.location.origin}/agent-player-login?agent=${agentSession.agentCode}` : ''}
+                </div>
+                <button onClick={handleCopyInvite} style={{ background: copiedLink ? '#2ecc71' : '#6366f1', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.55rem 0.85rem', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  {copiedLink ? '✓ Copied' : 'Copy Link'}
+                </button>
+              </div>
+            </div>
+
+            {/* My Team Table */}
+            <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(46,204,113,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <i className="fa-solid fa-bolt" style={{ color: '#2ecc71', fontSize: '0.8rem' }}></i>
+                  </div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: 0 }}>My Team</h3>
+                </div>
+                <span style={{ background: 'rgba(255,255,255,0.06)', padding: '0.3rem 0.65rem', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 'bold' }}>{players.length} Accounts</span>
+              </div>
+              <div className="table-responsive">
+                <table className="admin-table" style={{ fontSize: '0.75rem' }}>
+                  <thead><tr><th>NAME</th><th>EMAIL</th><th>STATUS</th><th>TOTAL DEPOSITS</th><th>TOTAL CASHOUTS</th><th>JOINED</th></tr></thead>
+                  <tbody>
+                    {players.length === 0 ? (
+                      <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2.5rem', color: '#888' }}>No team accounts created yet.</td></tr>
+                    ) : players.map((p, i) => (
+                      <tr key={i}>
+                        <td style={{ fontWeight: 'bold' }}>{p.name}</td>
+                        <td style={{ color: '#aaa', fontSize: '0.7rem' }}>{p.email}</td>
+                        <td><span className={`admin-badge-preview b-${p.status?.toLowerCase()==='active'?'ready':'none'}`}>{p.status || 'ACTIVE'}</span></td>
+                        <td style={{ fontWeight: 'bold', color: '#2ecc71' }}>${parseFloat(p.totalDeposits||0).toFixed(2)}</td>
+                        <td style={{ fontWeight: 'bold', color: '#ef4444' }}>${parseFloat(p.totalWithdrawals||0).toFixed(2)}</td>
+                        <td style={{ fontSize: '0.65rem', color: '#888' }}>{p.createdAt ? new Date(p.createdAt).toLocaleDateString() : 'N/A'}</td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
 
-        {/* ============== TAB: DAILY TRANSACTIONS (Withdrawal Request) ============== */}
+        {/* ============== DAILY TRANSACTIONS TAB ============== */}
         {activeTab === 'daily_transactions' && (
           <div>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Daily Transactions & Withdraw</h1>
-            <p style={{ fontSize: '0.75rem', color: '#888', marginBottom: '1.5rem' }}>Request commission payouts and track withdrawal history.</p>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '350px 1fr', gap: '1.5rem' }}>
-              {/* Left: Request Form */}
-              <div className="section-card" style={{ height: 'fit-content' }}>
-                <h3 className="section-card-title">Request Withdrawal</h3>
-                <p style={{ fontSize: '0.65rem', color: '#888', marginBottom: '0.5rem' }}>
-                  Available Balance: <strong style={{ color: 'var(--gold-primary)' }}>${(stats.availableBalance || 0).toFixed(2)}</strong>
-                </p>
-
-                <form onSubmit={handleWithdrawRequest} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                  <div className="input-group">
-                    <label style={{ fontSize: '0.7rem' }}>Amount ($)</label>
-                    <input
-                      type="number"
-                      placeholder="e.g. 50.00"
-                      step="0.01"
-                      value={withdrawAmount}
-                      onChange={(e) => setWithdrawAmount(e.target.value)}
-                      max={stats.availableBalance || 0}
-                      style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
-                      required
-                    />
-                  </div>
-                  <div className="input-group">
-                    <label style={{ fontSize: '0.7rem' }}>Account Holder Name</label>
-                    <input
-                      type="text"
-                      placeholder="Full name"
-                      value={withdrawName}
-                      onChange={(e) => setWithdrawName(e.target.value)}
-                      style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
-                      required
-                    />
-                  </div>
-                  <div className="input-group">
-                    <label style={{ fontSize: '0.7rem' }}>Account Number / Tag</label>
-                    <input
-                      type="text"
-                      placeholder="Account number"
-                      value={withdrawAccount}
-                      onChange={(e) => setWithdrawAccount(e.target.value)}
-                      style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
-                      required
-                    />
-                  </div>
-                  <div className="input-group">
-                    <label style={{ fontSize: '0.7rem' }}>Bank / Payment Method</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. CashApp, Venmo"
-                      value={withdrawBank}
-                      onChange={(e) => setWithdrawBank(e.target.value)}
-                      style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
-                      required
-                    />
-                  </div>
-                  <button type="submit" className="submit-btn" disabled={withdrawLoading} style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold', padding: '0.6rem', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '0.8rem' }}>
-                    {withdrawLoading ? 'Submitting...' : 'Submit Request'}
-                  </button>
-                </form>
-              </div>
-
-              {/* Right: Withdrawal History */}
-              <div className="section-card">
-                <h3 className="section-card-title">Withdrawal History</h3>
-                <div className="table-responsive">
-                  <table className="admin-table" style={{ fontSize: '0.75rem' }}>
-                    <thead>
-                      <tr>
-                        <th>AMOUNT</th>
-                        <th>NAME</th>
-                        <th>ACCOUNT</th>
-                        <th>BANK</th>
-                        <th>STATUS</th>
-                        <th>DATE</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {commissionWithdrawals.length === 0 ? (
-                        <tr>
-                          <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#888' }}>
-                            No withdrawal history found.
-                          </td>
-                        </tr>
-                      ) : (
-                        commissionWithdrawals.map((tx, idx) => (
-                          <tr key={idx}>
-                            <td style={{ fontWeight: 'bold' }}>${parseFloat(tx.amount || 0).toFixed(2)}</td>
-                            <td>{agentSession.name}</td>
-                            <td>{tx.note?.match(/Acc: (.+)/)?.[1] || 'N/A'}</td>
-                            <td>{tx.gateway || 'N/A'}</td>
-                            <td>
-                              <span className={`admin-badge-preview b-${tx.status?.toLowerCase() === 'success' ? 'ready' : tx.status?.toLowerCase() === 'pending' ? 'hot' : 'none'}`}>
-                                {tx.status}
-                              </span>
-                            </td>
-                            <td style={{ fontSize: '0.65rem', color: '#888' }}>{tx.date ? new Date(tx.date).toLocaleDateString() : 'N/A'}</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(59,130,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <i className="fa-solid fa-calendar-days" style={{ fontSize: '1.25rem', color: '#3b82f6' }}></i>
+                </div>
+                <div>
+                  <h1 style={{ fontSize: '1.75rem', fontWeight: 'bold', fontFamily: 'var(--font-heading)', margin: 0 }}>Daily Transactions</h1>
+                  <p style={{ fontSize: '0.75rem', color: '#888', margin: 0 }}>
+                    <i className="fa-solid fa-calendar" style={{ marginRight: '0.3rem' }}></i>
+                    Gaming day: {formatDisplayDate(txDate)} 04:55 AM → {formatDisplayDate(new Date(new Date(txDate).getTime() + 86400000).toISOString().split('T')[0])} 04:54 AM
+                  </p>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* ============== TAB: SIGNUP REPORT ============== */}
-        {activeTab === 'signup_report' && (
-          <div>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Signup Report</h1>
-            <p style={{ fontSize: '0.75rem', color: '#888', marginBottom: '1.5rem' }}>All player registrations through your invite link.</p>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-              <StatCard icon="fa-solid fa-users" iconBg="rgba(168,85,247,0.1)" label="TOTAL SIGNUPS" value={stats.totalPlayers || 0} valueColor="#a855f7" />
-              <StatCard icon="fa-solid fa-user-check" iconBg="rgba(46,204,113,0.1)" label="VERIFIED" value={stats.verifiedPlayers || 0} valueColor="#2ecc71" />
-              <StatCard icon="fa-solid fa-user-plus" iconBg="rgba(59,130,246,0.1)" label="DEPOSITING" value={stats.depositingPlayers || 0} valueColor="#3b82f6" />
+              <button onClick={() => setActiveTab('dashboard')} style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '0.45rem 0.85rem', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <i className="fa-solid fa-arrow-left"></i> Dashboard
+              </button>
             </div>
 
-            <div className="table-responsive">
-              <table className="admin-table" style={{ fontSize: '0.75rem' }}>
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Player Name</th>
-                    <th>Email</th>
-                    <th>Status</th>
-                    <th>First Deposit</th>
-                    <th>Signup Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {players.length === 0 ? (
+            {/* Date Picker */}
+            <div style={{ background: '#0b0d16', padding: '1rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.7rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold' }}>SELECT DATE</span>
+              <input type="date" value={txDate} onChange={(e) => setTxDate(e.target.value)} style={{ ...inputStyle, maxWidth: '180px' }} />
+              <button style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.45rem 0.85rem', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <i className="fa-solid fa-filter"></i> Filter
+              </button>
+              <button onClick={() => setTxDate(new Date().toISOString().split('T')[0])} style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '0.45rem 0.85rem', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer' }}>Clear</button>
+            </div>
+
+            {/* Sub-Distributor Daily Transactions */}
+            <div style={{ background: '#0b0d16', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)', overflow: 'hidden', marginBottom: '1.5rem' }}>
+              <div style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', padding: '0.85rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 'bold', margin: 0 }}>Sub-Distributor Daily Transactions</h3>
+                <span style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>{formatDisplayDate(txDate)}</span>
+              </div>
+              <div className="table-responsive">
+                <table className="admin-table" style={{ fontSize: '0.75rem' }}>
+                  <thead><tr><th>OWNER TYPE</th><th>TOTAL DEPOSIT</th><th>TOTAL CASHOUT</th><th>NET PROFIT</th><th>TOTAL SIGNUP PLAYERS</th><th>TOTAL VERIFIED PLAYERS</th><th>FIRST TIME DEPOSITED</th><th>ACTION</th></tr></thead>
+                  <tbody>
                     <tr>
-                      <td colSpan="6" style={{ textAlign: 'center', padding: '2.5rem', color: '#888' }}>
-                        No signups found under your affiliate code.
-                      </td>
+                      <td><div style={{ fontWeight: 'bold' }}>Direct Player</div><div style={{ fontSize: '0.6rem', color: '#888' }}>Sub Distributor Direct</div></td>
+                      <td style={{ fontWeight: 'bold' }}>${(stats.todayDeposits||0).toFixed(2)}</td>
+                      <td style={{ fontWeight: 'bold' }}>${(stats.todayWithdrawals||0).toFixed(2)}</td>
+                      <td style={{ fontWeight: 'bold' }}>${Math.max(0, (stats.todayDeposits||0) - (stats.todayWithdrawals||0)).toFixed(2)}</td>
+                      <td>{stats.totalPlayers || 0}</td>
+                      <td>{stats.verifiedPlayers || 0}</td>
+                      <td>{stats.depositingPlayers || 0}</td>
+                      <td><button onClick={() => setActiveTab('team')} style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: '6px', padding: '0.3rem 0.65rem', fontWeight: 'bold', fontSize: '0.65rem', cursor: 'pointer' }}>View History</button></td>
                     </tr>
-                  ) : (
-                    players.map((player, idx) => (
-                      <tr key={player.id || idx}>
-                        <td style={{ fontWeight: 'bold', color: 'var(--gold-primary)' }}>{idx + 1}</td>
-                        <td style={{ fontWeight: 'bold' }}>{player.name}</td>
-                        <td style={{ color: '#aaa', fontSize: '0.7rem' }}>{player.email}</td>
-                        <td>
-                          <span className={`admin-badge-preview b-${(player.totalDeposits || 0) > 0 ? 'ready' : 'none'}`}>
-                            {(player.totalDeposits || 0) > 0 ? 'DEPOSITING' : 'REGISTERED'}
-                          </span>
-                        </td>
-                        <td style={{ fontWeight: 'bold', color: '#2ecc71' }}>${parseFloat(player.totalDeposits || 0).toFixed(2)}</td>
-                        <td style={{ fontSize: '0.65rem', color: '#888' }}>{player.createdAt ? new Date(player.createdAt).toLocaleDateString() : 'N/A'}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        )}
 
-        {/* ============== TAB: ADS REQUEST ============== */}
-        {activeTab === 'ads_request' && (
-          <div>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Ads Request</h1>
-            <p style={{ fontSize: '0.75rem', color: '#888', marginBottom: '1.5rem' }}>Submit marketing material or advertisement requests to admin.</p>
+            {/* Grand Total */}
+            <div style={{ background: '#0b0d16', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)', overflow: 'hidden', marginBottom: '1.5rem' }}>
+              <div style={{ background: 'linear-gradient(135deg, #1e293b, #334155)', padding: '0.85rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 'bold', margin: 0 }}>Grand Total</h3>
+                <span style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>{formatDisplayDate(txDate)}</span>
+              </div>
+              <div className="table-responsive">
+                <table className="admin-table" style={{ fontSize: '0.75rem' }}>
+                  <thead><tr><th>OWNER TYPE</th><th>TOTAL DEPOSIT</th><th>TOTAL CASHOUT</th><th>NET PROFIT</th><th>TOTAL SIGNUP PLAYERS</th><th>TOTAL VERIFIED PLAYERS</th></tr></thead>
+                  <tbody>
+                    <tr>
+                      <td><div style={{ fontWeight: 'bold' }}>Grand Total</div><div style={{ fontSize: '0.6rem', color: '#888' }}>All visible network data</div></td>
+                      <td style={{ fontWeight: 'bold' }}>${(stats.totalDeposits||0).toFixed(2)}</td>
+                      <td style={{ fontWeight: 'bold' }}>${(stats.totalWithdrawals||0).toFixed(2)}</td>
+                      <td style={{ fontWeight: 'bold' }}>${(stats.netProfit||0).toFixed(2)}</td>
+                      <td>{stats.totalPlayers || 0}</td>
+                      <td>{stats.verifiedPlayers || 0}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
-            <div className="section-card" style={{ maxWidth: '500px' }}>
-              <h3 className="section-card-title">Submit Request</h3>
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                if (!adsMsg.trim()) { alert('Please enter your request message.'); return; }
-                setAdsLoading(true);
-                try {
-                  // Using support tickets system for ads requests
-                  const res = await fetch('/api/support', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      email: agentSession.email,
-                      name: agentSession.name,
-                      message: `[ADS REQUEST from Agent ${agentSession.agentCode}]\n\n${adsMsg}`,
-                      subject: 'Affiliate Ads Request'
-                    })
-                  });
-                  const data = await res.json();
-                  if (data.success) {
-                    alert('Ads request submitted successfully! Admin will review it.');
-                    setAdsMsg('');
-                  } else {
-                    alert(data.message || 'Failed to submit request.');
-                  }
-                } catch (err) {
-                  console.error(err);
-                  alert('Error submitting request.');
-                } finally {
-                  setAdsLoading(false);
-                }
-              }} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div className="input-group">
-                  <label style={{ fontSize: '0.7rem' }}>Request Details</label>
-                  <textarea
-                    placeholder="Describe the marketing material or ad campaign you need..."
-                    value={adsMsg}
-                    onChange={(e) => setAdsMsg(e.target.value)}
-                    rows={6}
-                    style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.6rem', borderRadius: '8px', fontSize: '0.75rem', outline: 'none', resize: 'vertical' }}
-                    required
-                  />
+            {/* Withdrawal Request Form */}
+            <div style={{ background: '#0b0d16', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)', padding: '1.25rem' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 'bold', marginBottom: '0.3rem' }}>Request Commission Withdrawal</h3>
+              <p style={{ fontSize: '0.7rem', color: '#888', marginBottom: '1rem' }}>Available: <strong style={{ color: 'var(--gold-primary)' }}>${(stats.availableBalance||0).toFixed(2)}</strong></p>
+              <form onSubmit={handleWithdrawRequest} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+                <div><label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Amount ($)</label><input type="number" placeholder="50.00" step="0.01" value={withdrawAmount} onChange={(e)=>setWithdrawAmount(e.target.value)} max={stats.availableBalance||0} style={inputStyle} required /></div>
+                <div><label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Account Holder</label><input type="text" placeholder="Full name" value={withdrawName} onChange={(e)=>setWithdrawName(e.target.value)} style={inputStyle} required /></div>
+                <div><label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Account Number</label><input type="text" placeholder="Account number" value={withdrawAccount} onChange={(e)=>setWithdrawAccount(e.target.value)} style={inputStyle} required /></div>
+                <div><label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Bank / Method</label><input type="text" placeholder="CashApp, Venmo" value={withdrawBank} onChange={(e)=>setWithdrawBank(e.target.value)} style={inputStyle} required /></div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <button type="submit" disabled={withdrawLoading} style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold', padding: '0.65rem 1.5rem', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '0.8rem' }}>{withdrawLoading ? 'Submitting...' : 'Submit Request'}</button>
                 </div>
-                <button type="submit" className="submit-btn" disabled={adsLoading} style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold', padding: '0.6rem', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '0.8rem' }}>
-                  {adsLoading ? 'Submitting...' : 'Submit Ads Request'}
-                </button>
               </form>
             </div>
           </div>
         )}
 
-        {/* ============== TAB: CHANGE PASSWORD ============== */}
+        {/* ============== SIGNUP REPORT TAB ============== */}
+        {activeTab === 'signup_report' && (
+          <div>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(239,68,68,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <i className="fa-solid fa-clipboard-list" style={{ fontSize: '1.25rem', color: '#ef4444' }}></i>
+                </div>
+                <div>
+                  <h1 style={{ fontSize: '1.75rem', fontWeight: 'bold', fontFamily: 'var(--font-heading)', margin: 0 }}>Signup Report</h1>
+                  <p style={{ fontSize: '0.75rem', color: '#888', margin: 0 }}>
+                    <i className="fa-solid fa-calendar" style={{ marginRight: '0.3rem' }}></i>
+                    {formatDisplayDate(signupFromDate)} → {formatDisplayDate(signupToDate)}
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setActiveTab('dashboard')} style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '0.45rem 0.85rem', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <i className="fa-solid fa-arrow-left"></i> Dashboard
+              </button>
+            </div>
+
+            {/* Date Range Picker */}
+            <div style={{ background: '#0b0d16', padding: '1rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: '150px' }}>
+                <label style={{ fontSize: '0.65rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold', display: 'block', marginBottom: '0.3rem' }}>FROM DATE</label>
+                <input type="date" value={signupFromDate} onChange={(e) => setSignupFromDate(e.target.value)} style={inputStyle} />
+              </div>
+              <div style={{ flex: 1, minWidth: '150px' }}>
+                <label style={{ fontSize: '0.65rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold', display: 'block', marginBottom: '0.3rem' }}>TO DATE</label>
+                <input type="date" value={signupToDate} onChange={(e) => setSignupToDate(e.target.value)} style={inputStyle} />
+              </div>
+              <button style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.5rem 1rem', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', alignSelf: 'flex-end' }}>
+                <i className="fa-solid fa-filter"></i> Filter
+              </button>
+            </div>
+
+            {/* Signup Stats - Row 1: Signups */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.85rem', marginBottom: '0.85rem' }}>
+              {[
+                { icon: 'fa-solid fa-users', iconBg: 'rgba(168,85,247,0.12)', iconColor: '#a855f7', label: 'TOTAL SIGNUPS', value: stats.totalPlayers || 0 },
+                { icon: 'fa-solid fa-users', iconBg: 'rgba(168,85,247,0.08)', iconColor: '#a855f7', label: 'REFERRAL SIGNUPS', value: 0 },
+                { icon: 'fa-brands fa-facebook', iconBg: 'rgba(59,130,246,0.1)', iconColor: '#3b82f6', label: 'FACEBOOK SIGNUPS', value: 0 },
+                { icon: 'fa-solid fa-leaf', iconBg: 'rgba(46,204,113,0.1)', iconColor: '#2ecc71', label: 'ORGANIC SIGNUPS', value: 0, valueColor: '#eab308' },
+              ].map((c, i) => (
+                <div key={i} style={{ background: '#0b0d16', padding: '1.15rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: c.iconBg, color: c.iconColor, fontSize: '0.95rem', marginBottom: '0.6rem' }}><i className={c.icon}></i></div>
+                  <div style={{ fontSize: '0.6rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px', marginBottom: '0.25rem' }}>{c.label}</div>
+                  <div style={{ fontSize: '1.75rem', fontWeight: '900', color: c.valueColor || '#fff' }}>{c.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Row 2: Verified */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.85rem', marginBottom: '0.85rem' }}>
+              {[
+                { icon: 'fa-solid fa-shield-halved', iconBg: 'rgba(239,68,68,0.12)', iconColor: '#ef4444', label: 'TOTAL VERIFIED PLAYERS', value: stats.verifiedPlayers || 0, valueColor: '#ef4444' },
+                { icon: 'fa-solid fa-square-check', iconBg: 'rgba(46,204,113,0.12)', iconColor: '#2ecc71', label: 'REFERRAL VERIFIED', value: 0 },
+                { icon: 'fa-brands fa-facebook', iconBg: 'rgba(59,130,246,0.1)', iconColor: '#3b82f6', label: 'FACEBOOK VERIFIED', value: 0 },
+                { icon: 'fa-solid fa-leaf', iconBg: 'rgba(46,204,113,0.1)', iconColor: '#2ecc71', label: 'ORGANIC VERIFIED', value: 0 },
+              ].map((c, i) => (
+                <div key={i} style={{ background: '#0b0d16', padding: '1.15rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: c.iconBg, color: c.iconColor, fontSize: '0.95rem', marginBottom: '0.6rem' }}><i className={c.icon}></i></div>
+                  <div style={{ fontSize: '0.6rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px', marginBottom: '0.25rem' }}>{c.label}</div>
+                  <div style={{ fontSize: '1.75rem', fontWeight: '900', color: c.valueColor || '#fff' }}>{c.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Row 3: Deposited */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.85rem', marginBottom: '0.85rem' }}>
+              {[
+                { icon: 'fa-solid fa-credit-card', iconBg: 'rgba(59,130,246,0.12)', iconColor: '#3b82f6', label: 'TOTAL DEPOSITED PLAYERS', value: stats.depositingPlayers || 0 },
+                { icon: 'fa-solid fa-users', iconBg: 'rgba(168,85,247,0.08)', iconColor: '#a855f7', label: 'REFERRAL DEPOSITED', value: 0 },
+                { icon: 'fa-brands fa-facebook', iconBg: 'rgba(59,130,246,0.1)', iconColor: '#3b82f6', label: 'FACEBOOK DEPOSITED', value: 0 },
+                { icon: 'fa-solid fa-leaf', iconBg: 'rgba(46,204,113,0.1)', iconColor: '#2ecc71', label: 'ORGANIC DEPOSITED', value: 0, valueColor: '#2ecc71' },
+                { icon: 'fa-solid fa-clock-rotate-left', iconBg: 'rgba(139,92,246,0.12)', iconColor: '#8b5cf6', label: 'OLD SIGNUP DEPOSITED', value: 0, valueColor: '#eab308' },
+              ].map((c, i) => (
+                <div key={i} style={{ background: '#0b0d16', padding: '1.15rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: c.iconBg, color: c.iconColor, fontSize: '0.95rem', marginBottom: '0.6rem' }}><i className={c.icon}></i></div>
+                  <div style={{ fontSize: '0.6rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px', marginBottom: '0.25rem' }}>{c.label}</div>
+                  <div style={{ fontSize: '1.75rem', fontWeight: '900', color: c.valueColor || '#fff' }}>{c.value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ============== ADS REQUEST TAB ============== */}
+        {activeTab === 'ads_request' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(234,179,8,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <i className="fa-solid fa-bullhorn" style={{ fontSize: '1.25rem', color: '#eab308' }}></i>
+                </div>
+                <div>
+                  <h1 style={{ fontSize: '1.75rem', fontWeight: 'bold', fontFamily: 'var(--font-heading)', margin: 0 }}>Ads Request</h1>
+                  <p style={{ fontSize: '0.75rem', color: '#888', margin: 0 }}>Submit marketing material or advertisement requests to admin.</p>
+                </div>
+              </div>
+              <button onClick={() => setActiveTab('dashboard')} style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '0.45rem 0.85rem', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <i className="fa-solid fa-arrow-left"></i> Dashboard
+              </button>
+            </div>
+            <div style={{ background: '#0b0d16', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)', padding: '1.25rem', maxWidth: '550px' }}>
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                if (!adsMsg.trim()) { alert('Enter your request.'); return; }
+                setAdsLoading(true);
+                try {
+                  const res = await fetch('/api/support', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: agentSession.email, name: agentSession.name, message: `[ADS REQUEST from Agent ${agentSession.agentCode}]\n\n${adsMsg}`, subject: 'Affiliate Ads Request' }) });
+                  const data = await res.json();
+                  if (data.success) { alert('Request submitted!'); setAdsMsg(''); } else { alert(data.message || 'Failed.'); }
+                } catch (err) { console.error(err); alert('Error.'); } finally { setAdsLoading(false); }
+              }} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Request Details</label>
+                  <textarea placeholder="Describe the marketing material or ad campaign you need..." value={adsMsg} onChange={(e) => setAdsMsg(e.target.value)} rows={6} style={{ ...inputStyle, resize: 'vertical' }} required />
+                </div>
+                <button type="submit" disabled={adsLoading} style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold', padding: '0.65rem', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '0.8rem' }}>{adsLoading ? 'Submitting...' : 'Submit Ads Request'}</button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ============== CHANGE PASSWORD TAB ============== */}
         {activeTab === 'change_password' && (
           <div>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Change Password</h1>
-            <p style={{ fontSize: '0.75rem', color: '#888', marginBottom: '1.5rem' }}>Update your affiliate portal access credentials.</p>
-
-            <div className="section-card" style={{ maxWidth: '420px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(139,92,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <i className="fa-solid fa-key" style={{ fontSize: '1.25rem', color: '#8b5cf6' }}></i>
+                </div>
+                <div>
+                  <h1 style={{ fontSize: '1.75rem', fontWeight: 'bold', fontFamily: 'var(--font-heading)', margin: 0 }}>Change Password</h1>
+                  <p style={{ fontSize: '0.75rem', color: '#888', margin: 0 }}>Update your affiliate portal access credentials.</p>
+                </div>
+              </div>
+              <button onClick={() => setActiveTab('dashboard')} style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '0.45rem 0.85rem', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <i className="fa-solid fa-arrow-left"></i> Dashboard
+              </button>
+            </div>
+            <div style={{ background: '#0b0d16', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)', padding: '1.25rem', maxWidth: '450px' }}>
               <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div className="input-group">
-                  <label style={{ fontSize: '0.7rem' }}>Current Password</label>
-                  <input
-                    type="password"
-                    placeholder="Enter current password"
-                    value={currentPw}
-                    onChange={(e) => setCurrentPw(e.target.value)}
-                    style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
-                    required
-                  />
-                </div>
-                <div className="input-group">
-                  <label style={{ fontSize: '0.7rem' }}>New Password</label>
-                  <input
-                    type="password"
-                    placeholder="Enter new password"
-                    value={newPw}
-                    onChange={(e) => setNewPw(e.target.value)}
-                    style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
-                    required
-                  />
-                </div>
-                <div className="input-group">
-                  <label style={{ fontSize: '0.7rem' }}>Confirm New Password</label>
-                  <input
-                    type="password"
-                    placeholder="Re-enter new password"
-                    value={confirmPw}
-                    onChange={(e) => setConfirmPw(e.target.value)}
-                    style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
-                    required
-                  />
-                </div>
-                <button type="submit" className="submit-btn" disabled={changePwLoading} style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold', padding: '0.6rem', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '0.8rem' }}>
-                  {changePwLoading ? 'Updating...' : 'Update Password'}
-                </button>
+                <div><label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Current Password</label><input type="password" placeholder="Enter current password" value={currentPw} onChange={(e)=>setCurrentPw(e.target.value)} style={inputStyle} required /></div>
+                <div><label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>New Password</label><input type="password" placeholder="Enter new password" value={newPw} onChange={(e)=>setNewPw(e.target.value)} style={inputStyle} required /></div>
+                <div><label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Confirm New Password</label><input type="password" placeholder="Re-enter new password" value={confirmPw} onChange={(e)=>setConfirmPw(e.target.value)} style={inputStyle} required /></div>
+                <button type="submit" disabled={changePwLoading} style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold', padding: '0.65rem', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '0.8rem' }}>{changePwLoading ? 'Updating...' : 'Update Password'}</button>
               </form>
             </div>
           </div>

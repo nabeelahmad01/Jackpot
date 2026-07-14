@@ -33,18 +33,25 @@ export async function GET(req) {
     if (adminDistributorId) {
       query.distributorId = adminDistributorId;
       query.role = 'user';
-    } else {
-      // Exclude Type B distributor players and staff
+    } else if (segment !== 'staff') {
+      // Exclude Type B distributor PLAYERS from Super Admin player views
+      // But DON'T exclude staff users (they need to be visible in StaffTab)
       const typeBDists = await db.collection('distributors').find({ type: 'B' }).project({ id: 1 }).toArray();
       const typeBDistIds = typeBDists.map(d => d.id).filter(Boolean);
       if (typeBDistIds.length > 0) {
-        query.distributorId = { $nin: typeBDistIds };
+        // Only exclude players (role='user'), not staff
+        query.$or = [
+          { distributorId: { $nin: typeBDistIds } },
+          { distributorId: { $in: typeBDistIds }, role: { $ne: 'user' } }
+        ];
       }
     }
     if (segment === 'subscribed') {
       query.isSubscribed = true;
     } else if (segment === 'unsubscribed') {
       query.isSubscribed = { $ne: true };
+    } else if (segment === 'staff') {
+      query.role = { $nin: ['user', '', null] };
     } else if (segment === 'active') {
       const txs = await db.collection('transactions').find({
         type: 'DEPOSIT',

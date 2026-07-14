@@ -12,7 +12,7 @@ const AVAILABLE_ROLES = [
 ];
 
 export default function StaffTab({ adminUser, onCreateAdmin, onDeleteUser }) {
-  const { data: usersData, mutate } = useSWR('/api/users?limit=200', fetcher);
+  const { data: usersData, mutate } = useSWR('/api/users?limit=200&segment=staff', fetcher);
   const [staffSearch, setStaffSearch] = useState('');
 
   // Admin Creation Form State

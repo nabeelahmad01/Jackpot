@@ -23,8 +23,9 @@ export async function GET(req) {
 
     if (adminDistributorId) {
       query.distributorId = adminDistributorId;
-    } else {
-      // Exclude Type B distributor coin notifications
+    } else if (!email) {
+      // Only exclude Type B distributor coin notifications from Super Admin/global views
+      // When email is set, the player is viewing their OWN notifications — don't exclude!
       const typeBDists = await db.collection('distributors').find({ type: 'B' }).project({ id: 1 }).toArray();
       const typeBDistIds = typeBDists.map(d => d.id).filter(Boolean);
       if (typeBDistIds.length > 0) {
