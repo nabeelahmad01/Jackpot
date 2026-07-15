@@ -93,16 +93,20 @@ export default function UserLobby({
     return () => window.removeEventListener('popstate', handlePopState);
   }, [games]);
 
-  // Detect if user has an active freeplay (claimed freeplay but hasn't done a freeplay withdrawal yet)
+  // Active freeplay session: last action was a successful freeplay claim, with no deposit or freeplay cashout after it
   useEffect(() => {
+    const isAfter = (tx, ref) => {
+      if (tx.id && ref.id) return parseFloat(tx.id) > parseFloat(ref.id);
+      return new Date(tx.createdAt || tx.date || 0) > new Date(ref.createdAt || ref.date || 0);
+    };
+
     const sorted = [...(transactions || [])].sort((a, b) => {
       if (a.id && b.id) return parseFloat(b.id) - parseFloat(a.id);
       return new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0);
     });
 
-    // Find most recent SIGNUP-FREE3 freeplay bonus (SUCCESS)
     const lastFreeplay = sorted.find(
-      (t) => t.type === 'BONUS' && t.code === 'SIGNUP-FREE3' && t.status === 'SUCCESS'
+      (t) => t.type === 'BONUS' && (t.code === 'SIGNUP-FREE3' || t.code === 'FREEPLAY') && t.status === 'SUCCESS'
     );
 
     if (!lastFreeplay) {
@@ -110,17 +114,15 @@ export default function UserLobby({
       return;
     }
 
-    // Check if there's a freeplay withdrawal (isFreeplayWithdraw=true) AFTER this freeplay
-    const hasFreeplayWithdrawAfter = sorted.some((t) => {
-      if (t.type !== 'WITHDRAW' || !t.isFreeplayWithdraw) return false;
-      if (t.id && lastFreeplay.id) {
-        return parseFloat(t.id) > parseFloat(lastFreeplay.id);
-      }
-      return new Date(t.createdAt || t.date || 0) > new Date(lastFreeplay.createdAt || lastFreeplay.date || 0);
-    });
+    const hasDepositAfterFreeplay = sorted.some(
+      (t) => t.type === 'DEPOSIT' && t.status === 'SUCCESS' && isAfter(t, lastFreeplay)
+    );
 
-    // Active freeplay = claimed freeplay but no freeplay withdrawal after it
-    setIsFreeplaySession(!hasFreeplayWithdrawAfter);
+    const hasFreeplayWithdrawAfter = sorted.some(
+      (t) => t.type === 'WITHDRAW' && t.isFreeplayWithdraw && isAfter(t, lastFreeplay)
+    );
+
+    setIsFreeplaySession(!hasDepositAfterFreeplay && !hasFreeplayWithdrawAfter);
   }, [transactions]);
 
   const fetchPendingReferrals = () => {
@@ -605,7 +607,7 @@ export default function UserLobby({
     });
 
     const freeplayClaims = sortedTxs.filter(
-      (t) => t.type === 'BONUS' && t.code === 'SIGNUP-FREE3' && t.status === 'SUCCESS'
+      (t) => t.type === 'BONUS' && (t.code === 'SIGNUP-FREE3' || t.code === 'FREEPLAY') && t.status === 'SUCCESS'
     );
 
     let isEligible = false;
@@ -668,12 +670,14 @@ export default function UserLobby({
     setTimeout(() => setActionLoading(false), 2500);
 
     // 4. Submit the Freeplay request directly!
+    // First-time signup freeplay vs deposit-based freeplay
+    const isFirstFreeplay = freeplayClaims.length === 0;
     onSubmitTransaction({
       gameTitle: activeGame.title,
       type: 'BONUS',
       amount: 3.00,
-      gateway: 'Signup Bonus',
-      code: 'SIGNUP-FREE3',
+      gateway: isFirstFreeplay ? 'Signup Bonus' : 'Freeplay',
+      code: isFirstFreeplay ? 'SIGNUP-FREE3' : 'FREEPLAY',
       nameOnTag: currentUser?.name || 'Player',
       phoneOnTag: '',
       emailOnTag: currentUserEmail,
@@ -714,7 +718,7 @@ export default function UserLobby({
   const paginatedTransactions = filteredTransactions.slice((txPage - 1) * txLimit, txPage * txLimit);
 
   const isFirstAccount = gameAccounts.length === 0 && !accountRequests.some(r => r.userEmail === currentUserEmail);
-  const hasClaimedBonus = (transactions || []).some(t => t.type === 'BONUS' && t.userEmail === currentUserEmail && t.code === 'SIGNUP-FREE3');
+  const hasClaimedBonus = (transactions || []).some(t => t.type === 'BONUS' && t.userEmail === currentUserEmail && (t.code === 'SIGNUP-FREE3' || t.code === 'FREEPLAY'));
   const eligibleForSignupBonus = isFirstAccount && !hasClaimedBonus;
 
   return (
@@ -1825,7 +1829,7 @@ export default function UserLobby({
                                 <td>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                                     <span style={{ fontSize: '0.725rem', opacity: 0.8 }}>
-                                      {tx.note && tx.status !== 'FAILED' ? tx.note : (tx.code === 'SIGNUP-FREE3' ? 'Freeplay (SIGNUP-FREE3)' : `${tx.gateway} (${tx.code})`)}
+                                      {tx.note && tx.status !== 'FAILED' ? tx.note : (tx.code === 'SIGNUP-FREE3' ? 'Freeplay (SIGNUP-FREE3)' : tx.code === 'FREEPLAY' ? 'Freeplay' : `${tx.gateway} (${tx.code})`)}
                                     </span>
                                     {tx.type === 'WITHDRAW' && tx.status === 'SUCCESS' && tx.payoutHold > 0 && !tx.remainderPaid && (!tx.remainderRequested || tx.remainderStatus === 'FAILED') && !claimedRemainderIds.includes(tx.id) && (
                                       <button
