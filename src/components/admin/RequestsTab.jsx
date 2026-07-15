@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import usePollingSWR from '../../hooks/usePollingSWR';
 import useSWR from 'swr';
+import { POLL } from '../../lib/pollingConfig';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -156,10 +158,9 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
   }, [playerSearchQuery, addAccountModalOpen]);
 
   // SWR automatically refreshes every 4s for requests tab (real-time lobby queue)
-  const { data, error, mutate } = useSWR(
+  const { data, error, mutate } = usePollingSWR(
     `/api/account-requests?status=PENDING&page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
-    fetcher,
-    { refreshInterval: 4000 }
+    POLL.QUEUES
   );
 
   const requests = (data?.accountRequests || []).filter((r) => !completedActionIds[r.id]);

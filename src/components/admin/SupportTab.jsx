@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import useSWR from 'swr';
-
-const fetcher = (...args) => fetch(...args).then((res) => res.json());
+import usePollingSWR from '../../hooks/usePollingSWR';
+import { POLL } from '../../lib/pollingConfig';
 
 export default function SupportTab({ adminUser }) {
   const [chatSearch, setChatSearch] = useState('');
@@ -12,15 +11,11 @@ export default function SupportTab({ adminUser }) {
   const distQueryParam = adminUser?.distributorId ? `&adminDistributorId=${adminUser.distributorId}` : '';
 
   // Poll conversation list every 3s
-  const { data: convData, mutate: mutateConversations } = useSWR(`/api/support?limit=100${distQueryParam}`, fetcher, {
-    refreshInterval: 3000
-  });
+  const { data: convData, mutate: mutateConversations } = usePollingSWR(`/api/support?limit=100${distQueryParam}`, POLL.SUPPORT);
 
-  // Poll active chat messages every 1.5s if one is selected
-  const { data: activeChatData, mutate: mutateActiveChat } = useSWR(
+  const { data: activeChatData, mutate: mutateActiveChat } = usePollingSWR(
     activeChatEmail ? `/api/support?email=${encodeURIComponent(activeChatEmail)}${distQueryParam}` : null,
-    fetcher,
-    { refreshInterval: 1500 }
+    POLL.CHAT
   );
 
   const allMessages = convData?.messages || [];

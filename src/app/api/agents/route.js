@@ -1,84 +1,26 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
-import { calcCommissionFromProfit, calcNetProfit } from '../../../lib/commission';
+import { enrichAgentsWithStats } from '../../../lib/entityStats';
+import { jsonOk } from '../../../lib/apiResponse';
 
 // GET all agents with dynamic statistics
 export async function GET() {
   try {
+    const cached = cache.get('agents_enriched');
+    if (cached) {
+      return jsonOk({ success: true, agents: cached }, { cacheSeconds: 45 });
+    }
+
     const db = await getDb();
-    const agentsCollection = db.collection('agents');
-    const usersCollection = db.collection('users');
-    const transactionsCollection = db.collection('transactions');
+    const agents = await db.collection('agents').find({}, {
+      projection: { password: 0 }
+    }).toArray();
 
-    const agents = await agentsCollection.find().toArray();
-    const agentCodeMap = {};
-    agents.forEach((a) => { agentCodeMap[a.agentCode] = a; });
+    const enrichedAgents = await enrichAgentsWithStats(db, agents);
+    cache.set('agents_enriched', enrichedAgents, 45);
 
-    // Enrich each agent with statistics
-    const enrichedAgents = await Promise.all(agents.map(async (agent) => {
-      // 1. Get referred players count
-      const players = await usersCollection.find({ agentCode: agent.agentCode, role: 'user' }).toArray();
-      const playerEmails = players.map(p => p.email.toLowerCase().trim());
-
-      let totalDeposits = 0;
-      let totalWithdrawals = 0;
-
-      if (playerEmails.length > 0) {
-        // 2. Aggregate successful deposits
-        const depositDocs = await transactionsCollection.find({
-          userEmail: { $in: playerEmails },
-          type: 'DEPOSIT',
-          status: 'SUCCESS'
-        }).toArray();
-        totalDeposits = depositDocs.reduce((acc, curr) => acc + parseFloat(curr.amount || 0), 0);
-
-        // 3. Aggregate successful withdrawals
-        const withdrawDocs = await transactionsCollection.find({
-          userEmail: { $in: playerEmails },
-          type: 'WITHDRAW',
-          status: 'SUCCESS'
-        }).toArray();
-        totalWithdrawals = withdrawDocs.reduce((acc, curr) => acc + parseFloat(curr.amount || 0), 0);
-      }
-
-      const netProfit = calcNetProfit(totalDeposits, totalWithdrawals);
-      const commissionEarned = calcCommissionFromProfit(totalDeposits, totalWithdrawals, agent.commissionRate);
-
-      // 5. Calculate total withdrawn/pending commission withdrawals by this agent
-      const agentWithdrawDocs = await transactionsCollection.find({
-        userEmail: agent.email.toLowerCase().trim(),
-        type: 'AFFILIATE_COMMISSION_WITHDRAW',
-        status: { $in: ['SUCCESS', 'PENDING'] }
-      }).toArray();
-      const totalWithdrawn = agentWithdrawDocs.reduce((acc, curr) => acc + parseFloat(curr.amount || 0), 0);
-
-      const availableBalance = Math.max(0, commissionEarned - totalWithdrawn);
-
-      const teamMembersCount = agents.filter(
-        (a) => (a.parentAgentCode || '').toUpperCase() === (agent.agentCode || '').toUpperCase()
-      ).length;
-
-      const parentAgent = agent.parentAgentCode ? agentCodeMap[agent.parentAgentCode] : null;
-
-      return {
-        ...agent,
-        accountType: agent.accountType || (agent.agentCode?.startsWith('SUB') ? 'sub-distributor' : 'agent'),
-        role: agent.role || (agent.agentCode?.startsWith('SUB') ? 'Sub-Distributor' : 'Agent'),
-        status: agent.status || 'ACTIVE',
-        playersCount: playerEmails.length,
-        teamMembersCount,
-        parentAgentName: parentAgent ? parentAgent.name : '—',
-        totalDeposits,
-        totalWithdrawals,
-        netProfit,
-        commissionEarned,
-        totalWithdrawn,
-        availableBalance
-      };
-    }));
-
-    return NextResponse.json({ success: true, agents: enrichedAgents });
+    return jsonOk({ success: true, agents: enrichedAgents }, { cacheSeconds: 45 });
   } catch (err) {
     console.error('GET Agents API Error:', err);
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
@@ -138,6 +80,7 @@ export async function POST(req) {
 
     await agentsCollection.insertOne(newAgent);
     cache.del('admin_stats');
+    cache.del('agents_enriched');
 
     return NextResponse.json({ success: true, agent: newAgent, message: 'Team account created successfully!' });
   } catch (err) {
@@ -181,6 +124,7 @@ export async function PUT(req) {
 
     await agentsCollection.updateOne({ id }, { $set: updateFields });
     cache.del('admin_stats');
+    cache.del('agents_enriched');
 
     return NextResponse.json({ success: true, message: 'Agent details updated successfully!' });
   } catch (err) {
@@ -202,6 +146,7 @@ export async function DELETE(req) {
     const db = await getDb();
     await db.collection('agents').deleteOne({ id });
     cache.del('admin_stats');
+    cache.del('agents_enriched');
 
     return NextResponse.json({ success: true, message: 'Agent successfully deleted.' });
   } catch (err) {

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import useSWR from 'swr';
-
-const fetcher = (...args) => fetch(...args).then((res) => res.json());
+import usePollingSWR from '../../hooks/usePollingSWR';
+import { POLL } from '../../lib/pollingConfig';
 
 export default function WebsitePaymentsTab({
   onInspectProof,
@@ -43,7 +42,7 @@ export default function WebsitePaymentsTab({
 
   const targetType = subTab === 'received' ? 'WEBSITE_COMMISSION_PAYMENT' : 'COMMISSION_WITHDRAW';
   const swrKey = `/api/transactions?type=${targetType}&page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || 'admin'}`;
-  const { data, error, mutate } = useSWR(swrKey, fetcher, { refreshInterval: 4000 });
+  const { data, error, mutate } = usePollingSWR(swrKey, POLL.QUEUES);
 
   const rawTransactions = data?.transactions || [];
   const transactions = rawTransactions.filter((t) => !completedActionIds[t.id]);

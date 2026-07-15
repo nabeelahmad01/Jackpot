@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import useSWR, { mutate } from 'swr';
+import usePollingSWR from '../../hooks/usePollingSWR';
+import { POLL } from '../../lib/pollingConfig';
 import TxSearchTab from '../../components/admin/TxSearchTab';
 import SupportTab from '../../components/admin/SupportTab';
 import CoinsAllotmentTab from '../../components/admin/CoinsAllotmentTab';
@@ -56,36 +58,30 @@ export default function DistributorPortal() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const [activeTab, setActiveTab] = useState('overview');
-  const skipUrlPushRef = useRef(true);
+  const suppressUrlSyncRef = useRef(true);
 
-  // Sync tab state changes to browser URL pathnames
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (skipUrlPushRef.current) {
-      skipUrlPushRef.current = false;
-      return;
-    }
-    const targetPath = `/distributor/${activeTab}`;
-    if (window.location.pathname !== targetPath) {
-      window.history.pushState({}, '', targetPath);
-    }
-  }, [activeTab]);
-
-  // Sync browser back/forward buttons (popstate) to local state
-  useEffect(() => {
-    const handlePathChange = () => {
-      const path = window.location.pathname;
-      const parts = path.split('/').filter(Boolean);
-      if (parts.length > 1) {
+    const syncFromPath = () => {
+      const parts = window.location.pathname.split('/').filter(Boolean);
+      if (parts[0] === 'distributor' && parts[1]) {
         setActiveTab(parts[1]);
-      } else {
+      } else if (parts[0] === 'distributor') {
         setActiveTab('overview');
       }
+      suppressUrlSyncRef.current = false;
     };
-    window.addEventListener('popstate', handlePathChange);
-    handlePathChange();
-    return () => window.removeEventListener('popstate', handlePathChange);
+    window.addEventListener('popstate', syncFromPath);
+    syncFromPath();
+    return () => window.removeEventListener('popstate', syncFromPath);
   }, []);
+
+  useEffect(() => {
+    if (suppressUrlSyncRef.current) return;
+    const targetPath = `/distributor/${activeTab}`;
+    if (window.location.pathname !== targetPath) {
+      window.history.replaceState({}, '', targetPath);
+    }
+  }, [activeTab]);
 
   // Stats SWR
   const distId = distSession?.id;
@@ -124,10 +120,9 @@ export default function DistributorPortal() {
     };
   }, [distSession]);
 
-  const { data: statsData, mutate: mutateStats } = useSWR(
+  const { data: statsData, mutate: mutateStats } = usePollingSWR(
     distId ? `/api/distributors/stats?distributorId=${distId}` : null,
-    fetcher,
-    { refreshInterval: 5000 }
+    POLL.STATS
   );
 
   // Gateways SWR (For Type B)
@@ -143,16 +138,14 @@ export default function DistributorPortal() {
   );
 
   // Pending queue counts for sidebar badges (status-filtered, use total from API)
-  const { data: pendingRequestsData, mutate: mutatePendingRequests } = useSWR(
+  const { data: pendingRequestsData, mutate: mutatePendingRequests } = usePollingSWR(
     distId && distSession?.type === 'B' ? `/api/account-requests?status=PENDING&page=1&limit=1&adminRole=distributor&adminDistributorId=${distId}&adminEmail=${encodeURIComponent(staffAdminEmail)}` : null,
-    fetcher,
-    { refreshInterval: 5000 }
+    POLL.QUEUES
   );
 
-  const { data: pendingCoinsData, mutate: mutatePendingCoins } = useSWR(
+  const { data: pendingCoinsData, mutate: mutatePendingCoins } = usePollingSWR(
     distId && distSession?.type === 'B' ? `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED&page=1&limit=1&adminRole=distributor&adminDistributorId=${distId}&adminEmail=${encodeURIComponent(staffAdminEmail)}` : null,
-    fetcher,
-    { refreshInterval: 5000 }
+    POLL.QUEUES
   );
 
   const pendingAccountRequestsCount = pendingRequestsData?.totalRequests || 0;
@@ -168,10 +161,9 @@ export default function DistributorPortal() {
     fetcher
   );
 
-  const { data: gatewayStatsData } = useSWR(
+  const { data: gatewayStatsData } = usePollingSWR(
     distId ? `/api/transactions/gateway-stats?adminDistributorId=${distId}` : null,
-    fetcher,
-    { refreshInterval: 4000 }
+    POLL.LISTS
   );
 
   const gatewayStats = gatewayStatsData?.stats || [];

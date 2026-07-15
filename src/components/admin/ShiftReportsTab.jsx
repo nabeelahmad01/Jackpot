@@ -1,17 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
-import useSWR from 'swr';
-
-const fetcher = (...args) => fetch(...args).then((res) => res.json());
+import usePollingSWR from '../../hooks/usePollingSWR';
+import { POLL } from '../../lib/pollingConfig';
 
 export default function ShiftReportsTab() {
   const [search, setSearch] = useState('');
   
   // Fetch shift reports from database
-  const { data, error, mutate } = useSWR('/api/admin/shift-reports', fetcher, {
-    refreshInterval: 5000 // Poll every 5 seconds for live handovers
-  });
+  const { data, error, mutate } = usePollingSWR('/api/admin/shift-reports', POLL.LISTS);
 
   const reports = data?.reports || [];
   const isLoading = !data && !error;

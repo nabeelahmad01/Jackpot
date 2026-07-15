@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
+import { jsonOk } from '../../../lib/apiResponse';
 
 // GET all games
 export async function GET(req) {
@@ -11,13 +12,13 @@ export async function GET(req) {
     if (!distributorId) {
       const cachedGames = cache.get('games_all');
       if (cachedGames) {
-        return NextResponse.json({ success: true, games: cachedGames });
+        return jsonOk({ success: true, games: cachedGames }, { cacheSeconds: 60 });
       }
     }
 
     const db = await getDb();
     const gamesCollection = db.collection('games');
-    const games = await gamesCollection.find().toArray();
+    const games = await gamesCollection.find({}, { projection: { _id: 0 } }).toArray();
     
     if (distributorId) {
       const distGames = await db.collection('distributorGames').find({ distributorId }).toArray();
@@ -38,8 +39,8 @@ export async function GET(req) {
       return NextResponse.json({ success: true, games: mappedGames });
     }
 
-    cache.set('games_all', games, 60);
-    return NextResponse.json({ success: true, games });
+    cache.set('games_all', games, 120);
+    return jsonOk({ success: true, games }, { cacheSeconds: 60 });
   } catch (err) {
     console.error('Fetch Games API Error:', err);
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });

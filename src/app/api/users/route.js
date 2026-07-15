@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
 import { isCoinsAdminRole } from '../../../lib/staffGameAccess';
+import { getTypeBDistributorIds } from '../../../lib/typeBDistributors';
 
 // GET users (Admin listing, or referrals query)
 export async function GET(req) {
@@ -35,12 +36,8 @@ export async function GET(req) {
       query.distributorId = adminDistributorId;
       query.role = 'user';
     } else if (segment !== 'staff') {
-      // Exclude Type B distributor PLAYERS from Super Admin player views
-      // But DON'T exclude staff users (they need to be visible in StaffTab)
-      const typeBDists = await db.collection('distributors').find({ type: 'B' }).project({ id: 1 }).toArray();
-      const typeBDistIds = typeBDists.map(d => d.id).filter(Boolean);
+      const typeBDistIds = await getTypeBDistributorIds(db);
       if (typeBDistIds.length > 0) {
-        // Only exclude players (role='user'), not staff
         query.$or = [
           { distributorId: { $nin: typeBDistIds } },
           { distributorId: { $in: typeBDistIds }, role: { $ne: 'user' } }
@@ -54,12 +51,11 @@ export async function GET(req) {
     } else if (segment === 'staff') {
       query.role = { $nin: ['user', '', null] };
     } else if (segment === 'active') {
-      const txs = await db.collection('transactions').find({
+      const activeEmails = await db.collection('transactions').distinct('userEmail', {
         type: 'DEPOSIT',
         status: 'SUCCESS'
-      }).project({ userEmail: 1 }).toArray();
-      const activeEmails = Array.from(new Set(txs.map(t => t.userEmail.toLowerCase().trim())));
-      query.email = { $in: activeEmails };
+      });
+      query.email = { $in: activeEmails.map((e) => e.toLowerCase().trim()) };
     }
 
     if (search) {

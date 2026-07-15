@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import useSWR, { mutate } from 'swr';
+import usePollingSWR from '../hooks/usePollingSWR';
+import { POLL } from '../lib/pollingConfig';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import ParticlesBackground from '../components/ParticlesBackground';
 import AuthPortal from '../components/AuthPortal';
@@ -26,10 +28,10 @@ export default function Home() {
   const [googleWarnOpen, setGoogleWarnOpen] = useState(false);
 
   // Fetch static data (games and gateways catalog) with SWR (cached, no automatic polling)
-  const { data: gamesData } = useSWR('/api/games', fetcher);
+  const { data: gamesData } = useSWR('/api/games', fetcher, { revalidateOnFocus: false, dedupingInterval: 60000 });
   const gatewaysQuery = session?.distributorId ? `/api/gateways?distributorId=${session.distributorId}` : '/api/gateways';
-  const { data: gatewaysData } = useSWR(gatewaysQuery, fetcher);
-  const { data: frontendSettingsData } = useSWR('/api/settings/frontend', fetcher);
+  const { data: gatewaysData } = useSWR(gatewaysQuery, fetcher, { revalidateOnFocus: false, dedupingInterval: 60000 });
+  const { data: frontendSettingsData } = useSWR('/api/settings/frontend', fetcher, { revalidateOnFocus: false, dedupingInterval: 60000 });
 
   const games = gamesData?.games || [];
   const gateways = gatewaysData?.gateways || [];
@@ -38,28 +40,24 @@ export default function Home() {
   // Fetch user-specific queues (only when player is logged in) with SWR polling every 5s
   const emailQuery = session?.email ? encodeURIComponent(session.email) : null;
   
-  const { data: requestsData } = useSWR(
+  const { data: requestsData } = usePollingSWR(
     emailQuery ? `/api/account-requests?email=${emailQuery}` : null,
-    fetcher,
-    { refreshInterval: 5000 }
+    POLL.PLAYER
   );
 
-  const { data: credentialsData } = useSWR(
+  const { data: credentialsData } = usePollingSWR(
     emailQuery ? `/api/game-accounts?email=${emailQuery}` : null,
-    fetcher,
-    { refreshInterval: 5000 }
+    POLL.PLAYER
   );
 
-  const { data: transactionsData } = useSWR(
+  const { data: transactionsData } = usePollingSWR(
     emailQuery ? `/api/transactions?email=${emailQuery}&limit=100` : null,
-    fetcher,
-    { refreshInterval: 5000 }
+    POLL.PLAYER
   );
 
-  const { data: notificationsData } = useSWR(
+  const { data: notificationsData } = usePollingSWR(
     emailQuery ? `/api/coins-notifications?email=${emailQuery}` : null,
-    fetcher,
-    { refreshInterval: 5000 }
+    POLL.PLAYER
   );
 
   const accountRequests = requestsData?.accountRequests || [];

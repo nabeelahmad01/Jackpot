@@ -9,9 +9,14 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
 
-  // Bypass service worker interceptor for API and Admin dashboard routes
-  if (url.pathname.startsWith('/api') || url.pathname.startsWith('/admin')) {
-    return; // Browser handles this directly via normal network pipeline
+  // Never intercept page navigations — let the server/Next.js handle refreshes directly
+  if (e.request.mode === 'navigate') {
+    return;
+  }
+
+  // API routes always go to network
+  if (url.pathname.startsWith('/api')) {
+    return;
   }
 
   e.respondWith(

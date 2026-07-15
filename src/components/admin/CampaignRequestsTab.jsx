@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import useSWR, { mutate as globalMutate } from 'swr';
+import usePollingSWR from '../../hooks/usePollingSWR';
+import { POLL } from '../../lib/pollingConfig';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -12,9 +14,7 @@ export default function CampaignRequestsTab({ adminUser, onInspectProof }) {
   const [actionLoading, setActionLoading] = useState(false);
   const [prevPendingCount, setPrevPendingCount] = useState(null);
 
-  const { data, error, mutate } = useSWR('/api/campaign-requests', fetcher, {
-    refreshInterval: 5000
-  });
+  const { data, error, mutate } = usePollingSWR('/api/campaign-requests', POLL.LISTS);
 
   const { data: settingsData } = useSWR('/api/settings/frontend', fetcher);
 

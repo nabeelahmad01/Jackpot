@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import useSWR from 'swr';
-import { parseAffiliatePayoutFields } from '../../lib/affiliatePayout';
-
-const fetcher = (...args) => fetch(...args).then((res) => res.json());
+import usePollingSWR from '../../hooks/usePollingSWR';
+import { POLL } from '../../lib/pollingConfig';
 
 export default function AffiliateCommissionTab({
   onInspectProof,
@@ -33,7 +31,7 @@ export default function AffiliateCommissionTab({
   }, [search]);
 
   const swrKey = `/api/transactions?type=AFFILIATE_COMMISSION_WITHDRAW&page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || 'admin'}`;
-  const { data, error, mutate } = useSWR(swrKey, fetcher, { refreshInterval: 4000 });
+  const { data, error, mutate } = usePollingSWR(swrKey, POLL.QUEUES);
 
   const rawTransactions = data?.transactions || [];
   const transactions = rawTransactions.filter((t) => !completedActionIds[t.id]);

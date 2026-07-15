@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import useSWR from 'swr';
+import usePollingSWR from '../../hooks/usePollingSWR';
+import { POLL } from '../../lib/pollingConfig';
 import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 
 import { SupportModal, GoogleWarningModal } from '../../components/Modals';
@@ -235,30 +237,16 @@ function AffiliatePortal() {
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   });
   const [ownershipFilter, setOwnershipFilter] = useState('All Players');
+  const suppressUrlSyncRef = useRef(true);
 
-  // Sync tab to URL path
+  // Sync tab from URL on mount and browser back/forward
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (activeTab === 'team' && teamView === 'create') {
-      const createPath = '/affiliate/team/create';
-      if (window.location.pathname !== createPath) {
-        window.history.pushState({}, '', createPath);
-      }
-      return;
-    }
-    const targetPath = `/affiliate/${activeTab}`;
-    if (window.location.pathname !== targetPath) {
-      window.history.pushState({}, '', targetPath);
-    }
-  }, [activeTab, teamView]);
-
-  // Sync popstate to tab
-  useEffect(() => {
-    const handlePathChange = () => {
+    const syncFromPath = () => {
       const path = window.location.pathname;
       if (path.includes('/team/create')) {
         setActiveTab('team');
         setTeamView('create');
+        suppressUrlSyncRef.current = false;
         return;
       }
       setTeamView('list');
@@ -268,11 +256,28 @@ function AffiliatePortal() {
       } else {
         setActiveTab('dashboard');
       }
+      suppressUrlSyncRef.current = false;
     };
-    window.addEventListener('popstate', handlePathChange);
-    handlePathChange();
-    return () => window.removeEventListener('popstate', handlePathChange);
+    window.addEventListener('popstate', syncFromPath);
+    syncFromPath();
+    return () => window.removeEventListener('popstate', syncFromPath);
   }, []);
+
+  // Keep URL in sync when user switches tabs
+  useEffect(() => {
+    if (suppressUrlSyncRef.current) return;
+    if (activeTab === 'team' && teamView === 'create') {
+      const createPath = '/affiliate/team/create';
+      if (window.location.pathname !== createPath) {
+        window.history.replaceState({}, '', createPath);
+      }
+      return;
+    }
+    const targetPath = `/affiliate/${activeTab}`;
+    if (window.location.pathname !== targetPath) {
+      window.history.replaceState({}, '', targetPath);
+    }
+  }, [activeTab, teamView]);
 
   // Mount and session restore
   useEffect(() => {
@@ -283,25 +288,22 @@ function AffiliatePortal() {
 
   // Stats SWR
   const agentCode = agentSession?.agentCode;
-  const { data: statsData, mutate: mutateStats } = useSWR(
+  const { data: statsData, mutate: mutateStats } = usePollingSWR(
     agentCode ? `/api/agents/stats?agentCode=${encodeURIComponent(agentCode)}` : null,
-    fetcher,
-    { refreshInterval: 5000 }
+    POLL.STATS
   );
 
-  const { data: campaignsData, mutate: mutateCampaigns } = useSWR(
+  const { data: campaignsData, mutate: mutateCampaigns } = usePollingSWR(
     agentSession?.email ? `/api/campaign-requests?agentEmail=${encodeURIComponent(agentSession.email)}` : null,
-    fetcher,
-    { refreshInterval: 5000 }
+    POLL.LISTS
   );
 
-  const { data: signupReportData, mutate: mutateSignupReport } = useSWR(
+  const { data: signupReportData, mutate: mutateSignupReport } = usePollingSWR(
     agentCode ? `/api/agents/signup-report?agentCode=${encodeURIComponent(agentCode)}&fromDate=${signupFromDate}&toDate=${signupToDate}` : null,
-    fetcher,
-    { refreshInterval: 5000 }
+    POLL.LISTS
   );
 
-  const { data: settingsData } = useSWR('/api/settings', fetcher, { refreshInterval: 30000 });
+  const { data: settingsData } = useSWR('/api/settings', fetcher, { revalidateOnFocus: false, dedupingInterval: 60000 });
   const globalSettings = settingsData?.settings || {};
 
   const stats = statsData?.stats || {};
@@ -363,7 +365,7 @@ function AffiliatePortal() {
   const openTeamCreate = () => {
     setTeamView('create');
     if (typeof window !== 'undefined') {
-      window.history.pushState({}, '', '/affiliate/team/create');
+      window.history.replaceState({}, '', '/affiliate/team/create');
     }
   };
 
@@ -375,7 +377,7 @@ function AffiliatePortal() {
     setTeamConfirmPassword('');
     setTeamStatus('ACTIVE');
     if (typeof window !== 'undefined') {
-      window.history.pushState({}, '', '/affiliate/team');
+      window.history.replaceState({}, '', '/affiliate/team');
     }
   };
 

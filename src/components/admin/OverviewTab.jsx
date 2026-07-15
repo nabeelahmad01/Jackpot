@@ -1,5 +1,7 @@
 import React from 'react';
 import useSWR from 'swr';
+import usePollingSWR from '../../hooks/usePollingSWR';
+import { POLL } from '../../lib/pollingConfig';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -39,15 +41,15 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
   };
 
   // Use SWR to poll stats every 4s and games list
-  const { data: statsData, error: statsError } = useSWR('/api/admin/stats', fetcher, {
-    refreshInterval: 4000,
-    revalidateOnFocus: true
-  });
-  const { data: gamesData, error: gamesError, mutate: mutateGames } = useSWR('/api/games', fetcher);
-  const { data: activityData } = useSWR(`/api/admin/activity?adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}`, fetcher, {
-    refreshInterval: 10000,
-    revalidateOnFocus: true
-  });
+  const { data: statsData, error: statsError } = usePollingSWR(
+    `/api/admin/stats?adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
+    POLL.STATS
+  );
+  const { data: gamesData, error: gamesError, mutate: mutateGames } = useSWR('/api/games', fetcher, { revalidateOnFocus: false, dedupingInterval: 60000 });
+  const { data: activityData } = usePollingSWR(
+    `/api/admin/activity?adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}`,
+    POLL.LISTS
+  );
 
   const stats = statsData?.stats || {
     todayDeposits: 0,

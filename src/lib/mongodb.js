@@ -104,6 +104,25 @@ async function seedRealMongo(db) {
     await db.collection('transactions').createIndex({ status: 1 });
     await db.collection('transactions').createIndex({ type: 1 });
     await db.collection('transactions').createIndex({ userEmail: 1, type: 1, status: 1 });
+    await db.collection('transactions').createIndex({ distributorId: 1, status: 1, type: 1 });
+    await db.collection('transactions').createIndex({ status: 1, type: 1, date: -1 });
+    await db.collection('transactions').createIndex({ date: -1 });
+
+    await db.collection('users').createIndex({ distributorId: 1, role: 1 });
+    await db.collection('users').createIndex({ agentCode: 1, role: 1 });
+
+    await db.collection('distributors').createIndex({ id: 1 }, { unique: true });
+    await db.collection('distributors').createIndex({ type: 1 });
+    await db.collection('distributors').createIndex({ email: 1 });
+
+    await db.collection('agents').createIndex({ agentCode: 1 });
+    await db.collection('agents').createIndex({ parentAgentCode: 1 });
+    await db.collection('agents').createIndex({ email: 1 });
+
+    await db.collection('accountRequests').createIndex({ distributorId: 1, status: 1 });
+    await db.collection('coinsNotifications').createIndex({ distributorId: 1, status: 1 });
+    await db.collection('campaignRequests').createIndex({ status: 1, createdAt: -1 });
+    await db.collection('supportMessages').createIndex({ distributorId: 1, read: 1, senderType: 1 });
 
     await db.collection('coinsNotifications').createIndex({ id: 1 }, { unique: true });
     await db.collection('coinsNotifications').createIndex({ userEmail: 1 });

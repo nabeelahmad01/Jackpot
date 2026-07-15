@@ -1,9 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import useSWR from 'swr';
-
-const fetcher = (...args) => fetch(...args).then((res) => res.json());
+import usePollingSWR from '../../hooks/usePollingSWR';
+import { POLL } from '../../lib/pollingConfig';
 
 export default function TxSearchTab({ onInspectProof, adminUser }) {
   const [historySearch, setHistorySearch] = useState('');
@@ -23,7 +22,7 @@ export default function TxSearchTab({ onInspectProof, adminUser }) {
 
   const swrKey = `/api/transactions?page=${historyPage}&limit=${limit}&search=${encodeURIComponent(historyDebouncedSearch)}&status=${historyStatus}&type=${historyType}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}`;
 
-  const { data, error, mutate } = useSWR(swrKey, fetcher, { refreshInterval: 5000 });
+  const { data, error, mutate } = usePollingSWR(swrKey, POLL.LISTS);
 
   const transactions = data?.transactions || [];
   const totalTransactions = data?.totalTransactions || 0;

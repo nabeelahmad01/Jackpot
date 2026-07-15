@@ -3,6 +3,7 @@ import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
 import { buildRemainderClaimAvailableAt } from '../../../lib/claimWait';
 import { calcCommissionFromProfit } from '../../../lib/commission';
+import { getTypeBDistributorIds } from '../../../lib/typeBDistributors';
 
 // GET transactions (supports filtering by email for users, or returning all for admins)
 export async function GET(req) {
@@ -49,10 +50,7 @@ export async function GET(req) {
     if (adminDistributorId) {
       query.distributorId = adminDistributorId;
     } else if (!email) {
-      // Only exclude Type B distributor transactions from Super Admin/global views
-      // When email is set, the player is viewing their OWN transactions — don't exclude!
-      const typeBDists = await db.collection('distributors').find({ type: 'B' }).project({ id: 1 }).toArray();
-      const typeBDistIds = typeBDists.map(d => d.id).filter(Boolean);
+      const typeBDistIds = await getTypeBDistributorIds(db);
       if (typeBDistIds.length > 0) {
         query.distributorId = { $nin: typeBDistIds };
       }

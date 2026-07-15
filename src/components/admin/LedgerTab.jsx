@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import usePollingSWR from '../../hooks/usePollingSWR';
 import useSWR from 'swr';
-
-const fetcher = (...args) => fetch(...args).then((res) => res.json());
+import { POLL } from '../../lib/pollingConfig';
 
 export default function LedgerTab({
   onInspectProof,
@@ -28,17 +28,11 @@ export default function LedgerTab({
   const swrKey = `/api/transactions?status=PENDING,PENDING_COINS&page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}`;
 
   // SWR automatically polls every 4s for ledger transactions
-  const { data, error, mutate } = useSWR(
-    swrKey,
-    fetcher,
-    { refreshInterval: 4000 }
-  );
+  const { data, error, mutate } = usePollingSWR(swrKey, POLL.QUEUES);
 
-  // SWR for gateway revenue breakdown stats
-  const { data: gatewayStatsData, mutate: mutateGatewayStats } = useSWR(
+  const { data: gatewayStatsData, mutate: mutateGatewayStats } = usePollingSWR(
     `/api/transactions/gateway-stats?adminDistributorId=${adminUser?.distributorId || ''}`,
-    fetcher,
-    { refreshInterval: 4000 }
+    POLL.LISTS
   );
 
   const gatewayStats = gatewayStatsData?.stats || [];

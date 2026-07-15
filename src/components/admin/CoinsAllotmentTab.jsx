@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import usePollingSWR from '../../hooks/usePollingSWR';
 import useSWR from 'swr';
-
-const fetcher = (...args) => fetch(...args).then((res) => res.json());
+import { POLL } from '../../lib/pollingConfig';
 
 export default function CoinsAllotmentTab({
   onUpdateCoinsNotification,
@@ -29,10 +29,9 @@ export default function CoinsAllotmentTab({
   }, [search]);
 
   // SWR automatically polls every 4s for coin allotments
-  const { data, error, mutate } = useSWR(
+  const { data, error, mutate } = usePollingSWR(
     `/api/coins-notifications?page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
-    fetcher,
-    { refreshInterval: 4000 }
+    POLL.QUEUES
   );
 
   const notifications = (data?.coinsNotifications || []).filter((n) => !completedActionIds[n.id]);

@@ -3,6 +3,8 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import useSWR, { mutate } from 'swr';
 import { motion, AnimatePresence } from 'framer-motion';
+import usePollingSWR from '../hooks/usePollingSWR';
+import { POLL } from '../lib/pollingConfig';
 
 // Lazy load the sub-tab components to optimize bundle size and initial load speed
 const OverviewTab = lazy(() => import('./admin/OverviewTab'));
@@ -50,53 +52,41 @@ export default function AdminDashboard({
 }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const skipUrlPushRef = React.useRef(true);
-  const urlSyncedRef = React.useRef(false);
+  const suppressUrlSyncRef = React.useRef(true);
 
-  // Sync tab state changes to browser URL pathnames
+  // Sync tab from URL on mount and browser back/forward
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (skipUrlPushRef.current) {
-      skipUrlPushRef.current = false;
-      return;
-    }
-    const path = window.location.pathname;
-    const parts = path.split('/').filter(Boolean);
-    const basePrefix = parts[0] || 'admin';
-    const targetPath = `/${basePrefix}/${activeTab}`;
-    if (window.location.pathname !== targetPath) {
-      window.history.pushState({}, '', targetPath);
-    }
-  }, [activeTab]);
-
-  // Sync browser back/forward buttons (popstate) to local state
-  useEffect(() => {
-    const handlePathChange = () => {
-      const path = window.location.pathname;
-      const parts = path.split('/').filter(Boolean);
-      if (parts.length > 1) {
+    const syncFromPath = () => {
+      const parts = window.location.pathname.split('/').filter(Boolean);
+      if (parts[0] === 'admin' && parts[1]) {
         setActiveTab(parts[1]);
-      } else {
+      } else if (parts[0] === 'admin') {
         setActiveTab('dashboard');
       }
-      urlSyncedRef.current = true;
+      suppressUrlSyncRef.current = false;
     };
-    window.addEventListener('popstate', handlePathChange);
-    handlePathChange();
-    return () => window.removeEventListener('popstate', handlePathChange);
+    window.addEventListener('popstate', syncFromPath);
+    syncFromPath();
+    return () => window.removeEventListener('popstate', syncFromPath);
   }, []);
+
+  // Keep URL in sync when user switches tabs (replaceState avoids history spam & refresh races)
+  useEffect(() => {
+    if (suppressUrlSyncRef.current) return;
+    const targetPath = `/admin/${activeTab}`;
+    if (window.location.pathname !== targetPath) {
+      window.history.replaceState({}, '', targetPath);
+    }
+  }, [activeTab]);
   const [processingIds, setProcessingIds] = useState({});
 
   // Use SWR to poll counts/stats for the sidebar badges
-  const { data: statsData } = useSWR(
+  const { data: statsData } = usePollingSWR(
     `/api/admin/stats?adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
-    fetcher,
-    {
-      refreshInterval: 4000
-    }
+    POLL.STATS
   );
 
-  const { data: settingsData } = useSWR('/api/settings/frontend', fetcher);
+  const { data: settingsData } = useSWR('/api/settings/frontend', fetcher, { revalidateOnFocus: false, dedupingInterval: 60000 });
 
   const pendingRequestsCount = statsData?.stats?.pendingRequestsCount || 0;
   const pendingTransactionsCount = statsData?.stats?.pendingTransactionsCount || 0;
@@ -157,20 +147,14 @@ export default function AdminDashboard({
     const hasNewCoin = pendingCoinsCount > prev.coins;
     const hasNewChat = pendingChatsCount > prev.chats;
     const hasNewCampaign = pendingCampaignRequestsCount > prev.campaigns;
-    
-    const countChanged =
-      pendingRequestsCount !== prev.requests ||
-      pendingTransactionsCount !== prev.transactions ||
-      pendingCoinsCount !== prev.coins ||
-      pendingChatsCount !== prev.chats ||
-      pendingCampaignRequestsCount !== prev.campaigns;
 
     if (hasNewRequest || hasNewTx || hasNewCoin || hasNewChat || hasNewCampaign) {
       playAlertSound();
-    }
-
-    if (countChanged) {
-      mutate((key) => true);
+      if (hasNewRequest) mutate((key) => typeof key === 'string' && key.includes('/api/account-requests'));
+      if (hasNewTx) mutate((key) => typeof key === 'string' && key.includes('/api/transactions') && !key.includes('AFFILIATE_COMMISSION'));
+      if (hasNewCoin) mutate((key) => typeof key === 'string' && key.includes('/api/coins-notifications'));
+      if (hasNewChat) mutate((key) => typeof key === 'string' && key.includes('/api/support'));
+      if (hasNewCampaign) mutate((key) => typeof key === 'string' && key.includes('/api/campaign-requests'));
     }
     
     prevCountsRef.current = {

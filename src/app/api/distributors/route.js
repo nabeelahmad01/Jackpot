@@ -1,61 +1,27 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
-import { calcCommissionFromProfit, calcNetProfit } from '../../../lib/commission';
+import { enrichDistributorsWithStats } from '../../../lib/entityStats';
+import { invalidateTypeBDistributorCache } from '../../../lib/typeBDistributors';
+import { jsonOk } from '../../../lib/apiResponse';
 
 // GET list of distributors (with dynamic statistics)
 export async function GET() {
   try {
+    const cached = cache.get('distributors_enriched');
+    if (cached) {
+      return jsonOk({ success: true, distributors: cached }, { cacheSeconds: 45 });
+    }
+
     const db = await getDb();
-    const distributorsCollection = db.collection('distributors');
-    const usersCollection = db.collection('users');
-    const transactionsCollection = db.collection('transactions');
+    const distributors = await db.collection('distributors').find({}, {
+      projection: { password: 0 }
+    }).toArray();
 
-    const distributors = await distributorsCollection.find().toArray();
+    const enrichedDistributors = await enrichDistributorsWithStats(db, distributors);
+    cache.set('distributors_enriched', enrichedDistributors, 45);
 
-    // Compute stats for each distributor
-    const enrichedDistributors = await Promise.all(distributors.map(async (dist) => {
-      // 1. Get referred players list
-      const players = await usersCollection.find({ distributorId: dist.id, role: 'user' }).toArray();
-      const playerEmails = players.map(p => p.email.toLowerCase().trim());
-
-      let totalDeposits = 0;
-      let totalWithdrawals = 0;
-
-      if (playerEmails.length > 0) {
-        // 2. Aggregate successful deposits
-        const depositDocs = await transactionsCollection.find({
-          userEmail: { $in: playerEmails },
-          type: 'DEPOSIT',
-          status: 'SUCCESS'
-        }).toArray();
-        totalDeposits = depositDocs.reduce((acc, curr) => acc + parseFloat(curr.amount || 0), 0);
-
-        // 3. Aggregate successful withdrawals
-        const withdrawDocs = await transactionsCollection.find({
-          userEmail: { $in: playerEmails },
-          type: 'WITHDRAW',
-          status: 'SUCCESS'
-        }).toArray();
-        totalWithdrawals = withdrawDocs.reduce((acc, curr) => acc + parseFloat(curr.amount || 0), 0);
-      }
-
-      const netProfit = calcNetProfit(totalDeposits, totalWithdrawals);
-      const commissionEarned = calcCommissionFromProfit(totalDeposits, totalWithdrawals, dist.commissionRate);
-      const websiteCommissionEarned = calcCommissionFromProfit(totalDeposits, totalWithdrawals, dist.websiteCommissionRate);
-
-      return {
-        ...dist,
-        playersCount: playerEmails.length,
-        totalDeposits,
-        totalWithdrawals,
-        netProfit,
-        commissionEarned,
-        websiteCommissionEarned
-      };
-    }));
-
-    return NextResponse.json({ success: true, distributors: enrichedDistributors });
+    return jsonOk({ success: true, distributors: enrichedDistributors }, { cacheSeconds: 45 });
   } catch (err) {
     console.error('Fetch Distributors API Error:', err);
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
@@ -74,13 +40,11 @@ export async function POST(req) {
     const db = await getDb();
     const distributorsCollection = db.collection('distributors');
 
-    // Check if email already exists
     const existing = await distributorsCollection.findOne({ email: email.toLowerCase().trim() });
     if (existing) {
       return NextResponse.json({ success: false, message: 'A distributor with this email is already registered.' }, { status: 400 });
     }
 
-    // Generate unique alphanumeric ID tag (e.g. dist_abc12)
     const id = 'dist_' + Math.random().toString(36).substring(2, 7);
 
     const newDist = {
@@ -89,7 +53,7 @@ export async function POST(req) {
       email: email.toLowerCase().trim(),
       password: password.trim(),
       role: 'distributor',
-      type: type, // 'A' or 'B'
+      type: type,
       commissionRate: parseFloat(commissionRate || 0),
       websiteCommissionRate: parseFloat(websiteCommissionRate || 0),
       createdAt: new Date().toISOString()
@@ -97,6 +61,8 @@ export async function POST(req) {
 
     await distributorsCollection.insertOne(newDist);
     cache.del('admin_stats');
+    cache.del('distributors_enriched');
+    invalidateTypeBDistributorCache();
 
     return NextResponse.json({ success: true, distributor: newDist, message: 'Distributor successfully registered!' });
   } catch (err) {
@@ -132,6 +98,8 @@ export async function PUT(req) {
     }
 
     cache.del('admin_stats');
+    cache.del('distributors_enriched');
+    invalidateTypeBDistributorCache();
     return NextResponse.json({ success: true, message: 'Distributor details updated successfully!' });
   } catch (err) {
     console.error('Update Distributor API Error:', err);
@@ -159,6 +127,8 @@ export async function DELETE(req) {
     }
 
     cache.del('admin_stats');
+    cache.del('distributors_enriched');
+    invalidateTypeBDistributorCache();
     return NextResponse.json({ success: true, message: 'Distributor deleted successfully!' });
   } catch (err) {
     console.error('Delete Distributor API Error:', err);
