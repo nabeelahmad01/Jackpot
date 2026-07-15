@@ -52,6 +52,21 @@ export async function staffCanAccessGame(db, adminEmail, gameTitle) {
   return titles.some((t) => t.toLowerCase() === String(gameTitle).toLowerCase());
 }
 
+export function filterGamesForStaff(games, adminUser) {
+  if (!Array.isArray(games) || !adminUser) return games || [];
+  if (isFullAccessRole(adminUser.role)) return games;
+
+  const roles = parseRoles(adminUser.role);
+  if (!roles.includes('coins_admin')) return games;
+
+  const allowedIds = Array.isArray(adminUser.allowedGameIds)
+    ? adminUser.allowedGameIds.map(String)
+    : [];
+  if (allowedIds.length === 0) return [];
+
+  return games.filter((g) => allowedIds.includes(String(g.id)));
+}
+
 export async function validateAllowedGameIds(db, allowedGameIds, distributorId = '') {
   if (!Array.isArray(allowedGameIds) || allowedGameIds.length === 0) {
     return { valid: false, message: 'Please select at least one game for coins admin access.' };

@@ -12,6 +12,7 @@ import LedgerTab from '../../components/admin/LedgerTab';
 import ShiftDashboardTab from '../../components/admin/ShiftDashboardTab';
 import RemainderClaimAction from '../../components/RemainderClaimAction';
 import { canShowClaimRemainderButton } from '../../lib/remainderClaim';
+import { filterGamesForStaff } from '../../lib/staffGameAccess';
 import { SupportModal } from '../../components/Modals';
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -168,6 +169,15 @@ export default function DistributorPortal() {
 
   const gatewayStats = gatewayStatsData?.stats || [];
   const players = statsData?.players || [];
+
+  const staffAdminUser = {
+    role: distSession?.staffRole || distSession?.role || 'distributor',
+    distributorId: distId,
+    email: distSession?.email || '',
+    allowedGameIds: distSession?.allowedGameIds || []
+  };
+
+  const visiblePoolGames = filterGamesForStaff(gamesData?.games || [], distSession?.isStaff ? staffAdminUser : null) || gamesData?.games || [];
 
   const { data: settingsData } = useSWR('/api/settings', fetcher);
   const usdtAddress = settingsData?.settings?.usdtAddress || '';
@@ -2162,12 +2172,12 @@ export default function DistributorPortal() {
                       </tr>
                     </thead>
                     <tbody>
-                      {!gamesData?.games || gamesData.games.length === 0 ? (
+                      {!visiblePoolGames.length ? (
                         <tr>
                           <td colSpan="6" className="text-center text-muted" style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>No games loaded in library.</td>
                         </tr>
                       ) : (
-                        gamesData.games.map((game) => (
+                        visiblePoolGames.map((game) => (
                           <tr key={game.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
                             <td style={{ padding: '0.6rem 0.5rem' }}><strong>{game.title}</strong></td>
                             <td style={{ padding: '0.6rem 0.5rem' }}><span className={`admin-badge-preview b-${game.badge}`} style={{ textTransform: 'uppercase', padding: '0.15rem 0.35rem', borderRadius: '4px', fontSize: '0.6rem', fontWeight: 'bold' }}>{game.badge}</span></td>
@@ -2538,11 +2548,7 @@ export default function DistributorPortal() {
             completedActionIds={{}}
             processingIds={{}}
             wrapAction={(id, fn) => fn}
-            adminUser={{
-              role: distSession.staffRole || distSession.role,
-              distributorId: distId,
-              email: distSession.email
-            }}
+            adminUser={staffAdminUser}
           />
         )}
 
@@ -2553,22 +2559,14 @@ export default function DistributorPortal() {
             completedActionIds={{}}
             processingIds={{}}
             wrapAction={(id, fn) => fn}
-            adminUser={{
-              role: distSession.staffRole || distSession.role,
-              distributorId: distId,
-              email: distSession.email
-            }}
+            adminUser={staffAdminUser}
           />
         )}
 
         {/* TAB: SHIFT DASHBOARD */}
         {activeTab === 'shift_dashboard' && distSession.type === 'B' && (
           <ShiftDashboardTab
-            adminUser={{
-              role: distSession.staffRole || distSession.role,
-              distributorId: distId,
-              email: distSession.email
-            }}
+            adminUser={staffAdminUser}
           />
         )}
 
@@ -2581,11 +2579,7 @@ export default function DistributorPortal() {
             completedActionIds={{}}
             processingIds={{}}
             wrapAction={(id, fn) => fn}
-            adminUser={{
-              role: distSession.staffRole || distSession.role,
-              distributorId: distId,
-              email: distSession.email
-            }}
+            adminUser={staffAdminUser}
           />
         )}
 

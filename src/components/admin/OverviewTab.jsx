@@ -2,6 +2,8 @@ import React from 'react';
 import useSWR from 'swr';
 import usePollingSWR from '../../hooks/usePollingSWR';
 import { POLL } from '../../lib/pollingConfig';
+import { filterGamesForStaff, parseRoles } from '../../lib/staffGameAccess';
+import GatewayRevenueBreakdown from './GatewayRevenueBreakdown';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -58,7 +60,10 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
     yesterdayWithdrawals: 0
   };
 
-  const games = gamesData?.games || [];
+  const games = filterGamesForStaff(gamesData?.games || [], adminUser);
+  const roles = parseRoles(adminUser?.role);
+  const isFinancialAdmin = roles.includes('financial_admin');
+  const isFullAdminView = roles.includes('admin') || roles.includes('operation_admin');
 
   const [updateModalOpen, setUpdateModalOpen] = React.useState(false);
   const [selectedGame, setSelectedGame] = React.useState(null);
@@ -255,6 +260,11 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
           </div>
         </div>
       </section>
+
+      {/* Financial ledger overview for finance staff only */}
+      {isFinancialAdmin && !isFullAdminView && (
+        <GatewayRevenueBreakdown adminDistributorId={adminUser?.distributorId || ''} />
+      )}
 
       {/* End of Shift Coins Loading Report Card (Visible to all admins/staff to submit except financial_admin) */}
       {adminUser && !adminUser.role?.toLowerCase().split(',').map(r => r.trim()).includes('financial_admin') && (
