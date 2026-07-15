@@ -15,6 +15,7 @@ import { canShowClaimRemainderButton } from '../../lib/remainderClaim';
 import { filterGamesForStaff } from '../../lib/staffGameAccess';
 import { SupportModal } from '../../components/Modals';
 import ParticlesBackground from '../../components/ParticlesBackground';
+import { initAudioUnlock, playNotificationSound } from '../../lib/notificationSound';
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
 export default function DistributorPortal() {
@@ -84,6 +85,18 @@ export default function DistributorPortal() {
       window.history.replaceState({}, '', targetPath);
     }
   }, [activeTab]);
+
+  // Unlock audio on first user gesture so request alert sounds are not blocked
+  useEffect(() => {
+    initAudioUnlock();
+  }, []);
+
+  // Referred Players tab is owner-only; redirect staff away if they land on it
+  useEffect(() => {
+    if (distSession?.isStaff && activeTab === 'referred_players') {
+      setActiveTab('overview');
+    }
+  }, [distSession, activeTab]);
 
   // Stats SWR
   const distId = distSession?.id;
@@ -300,46 +313,8 @@ export default function DistributorPortal() {
 
   const prevCountsRef = useRef({ requests: 0, coins: 0, ledger: 0 });
 
-  const playSynthesizedBackup = () => {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const playTone = (freq, startTime, duration) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, startTime);
-        gain.gain.setValueAtTime(0.12, startTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-        osc.start(startTime);
-        osc.stop(startTime + duration);
-      };
-      const now = ctx.currentTime;
-      playTone(523.25, now, 0.12);
-      playTone(659.25, now + 0.08, 0.25);
-    } catch (e) {
-      console.log('Synthesized audio failed:', e);
-    }
-  };
-
   const playAlertSound = () => {
-    try {
-      const customSound = frontendSettingsData?.settings?.notificationSoundUrl || settingsData?.settings?.notificationSoundUrl;
-      if (customSound) {
-        const cleanUrl = customSound.replace(/^data:video\/[^;]+;/, 'data:audio/mpeg;');
-        const audio = new Audio(cleanUrl);
-        audio.play().catch(err => {
-          console.log('Autoplay blocked custom audio playing, trying synthesizer tone as backup:', err);
-          playSynthesizedBackup();
-        });
-      } else {
-        playSynthesizedBackup();
-      }
-    } catch (e) {
-      console.log('Audio playback failed:', e);
-      playSynthesizedBackup();
-    }
+    playNotificationSound(frontendSettingsData?.settings?.notificationSoundUrl || settingsData?.settings?.notificationSoundUrl);
   };
 
   useEffect(() => {
@@ -1120,7 +1095,7 @@ export default function DistributorPortal() {
     if (!distSession?.isStaff) return true;
     const role = distSession.staffRole || distSession.role;
     if (role === 'coins_admin') {
-      return ['overview', 'referred_players', 'operations', 'requests', 'shift_dashboard'].includes(tabName);
+      return ['overview', 'operations', 'requests', 'shift_dashboard'].includes(tabName);
     }
     if (role === 'support_admin') {
       return ['overview', 'support'].includes(tabName);
@@ -1174,7 +1149,7 @@ export default function DistributorPortal() {
             </button>
           )}
 
-          {hasTabAccess('referred_players') && (
+          {!distSession?.isStaff && (
             <button
               onClick={() => setActiveTab('referred_players')}
               style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'referred_players' ? 'var(--gold-primary)' : 'none', color: activeTab === 'referred_players' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
@@ -1416,7 +1391,7 @@ export default function DistributorPortal() {
         )}
 
         {/* TAB: REFERRED PLAYERS */}
-        {activeTab === 'referred_players' && (
+        {activeTab === 'referred_players' && !distSession?.isStaff && (
           <div>
             <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#fff' }}>Referred Players</h1>
             <p style={{ fontSize: '0.75rem', color: '#888', marginBottom: '2rem' }}>Detailed list of all players registered through your referral link.</p>
@@ -1509,6 +1484,54 @@ export default function DistributorPortal() {
                             >
                               <i className="fa-solid fa-trash"></i> Delete
                             </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* REFERRED PLAYERS TRANSACTIONS HISTORY */}
+            <div className="glow-card" style={{ background: '#0b0d16', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', padding: '1.5rem', marginTop: '1.5rem' }}>
+              <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <i className="fa-solid fa-file-invoice-dollar gold-text"></i> Referred Players Transactions History
+              </h3>
+              <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+                  <thead>
+                    <tr style={{ textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#888' }}>
+                      <th style={{ padding: '0.5rem' }}>PLAYER</th>
+                      <th style={{ padding: '0.5rem' }}>TYPE</th>
+                      <th style={{ padding: '0.5rem' }}>AMOUNT</th>
+                      <th style={{ padding: '0.5rem' }}>STATUS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {referredTransactions.length === 0 ? (
+                      <tr>
+                        <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>No transactions recorded.</td>
+                      </tr>
+                    ) : (
+                      referredTransactions.map(tx => (
+                        <tr key={tx.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                          <td style={{ padding: '0.6rem 0.5rem' }}>{tx.userEmail}</td>
+                          <td style={{ padding: '0.6rem 0.5rem' }}>
+                            <span style={{ color: tx.isFreeplayWithdraw ? '#9b59b6' : (tx.type === 'DEPOSIT' ? '#2ecc71' : '#e74c3c'), fontWeight: 'bold' }}>
+                              {tx.isFreeplayWithdraw ? 'FREEPLAY' : tx.type}
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.6rem 0.5rem', fontWeight: 'bold' }}>${parseFloat(tx.amount || 0).toFixed(2)}</td>
+                          <td style={{ padding: '0.6rem 0.5rem' }}>
+                            <span style={{
+                              padding: '0.15rem 0.35rem',
+                              borderRadius: '4px',
+                              fontSize: '0.6rem',
+                              fontWeight: 'bold',
+                              background: tx.status === 'SUCCESS' ? 'rgba(46,204,113,0.1)' : tx.status === 'FAILED' ? 'rgba(239,68,68,0.1)' : 'rgba(241,196,15,0.1)',
+                              color: tx.status === 'SUCCESS' ? '#2ecc71' : tx.status === 'FAILED' ? '#ef4444' : '#f1c40f'
+                            }}>{tx.status}</span>
                           </td>
                         </tr>
                       ))
@@ -2023,79 +2046,6 @@ export default function DistributorPortal() {
                   <div style={{ fontSize: '1.75rem', fontWeight: '900', color: 'var(--gold-primary)', marginTop: '0.25rem' }}>${(stats.commissionEarned || 0).toFixed(2)}</div>
                 </div>
               )}
-            </div>
-
-            {/* TWO COLUMN GRID FOR PLAYERS & LEDGER */}
-            <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '1.5rem' }}>
-              {/* PLAYERS LIST */}
-              <div className="glow-card" style={{ background: '#0b0d16', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', padding: '1.25rem' }}>
-                <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <i className="fa-solid fa-users gold-text"></i> Referred Players ({players.length})
-                </h3>
-                <div style={{ maxHeight: '400px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {players.length === 0 ? (
-                    <div style={{ textAlign: 'center', color: '#666', fontSize: '0.75rem', padding: '2rem' }}>No players registered.</div>
-                  ) : (
-                    players.map(p => (
-                      <div key={p.email} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#040509', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.02)' }}>
-                        <div>
-                          <div style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>{p.name}</div>
-                          <div style={{ fontSize: '0.6rem', color: '#666' }}>{p.email}</div>
-                        </div>
-                        <span style={{ fontSize: '0.6rem', background: 'rgba(46,204,113,0.1)', color: '#2ecc71', padding: '0.15rem 0.35rem', borderRadius: '4px', fontWeight: 'bold' }}>ACTIVE</span>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* TRANSACTIONS HIST */}
-              <div className="glow-card" style={{ background: '#0b0d16', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', padding: '1.25rem' }}>
-                <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <i className="fa-solid fa-file-invoice-dollar gold-text"></i> Referred Players Transactions History
-                </h3>
-                <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
-                    <thead>
-                      <tr style={{ textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#888' }}>
-                        <th style={{ padding: '0.5rem' }}>PLAYER</th>
-                        <th style={{ padding: '0.5rem' }}>TYPE</th>
-                        <th style={{ padding: '0.5rem' }}>AMOUNT</th>
-                        <th style={{ padding: '0.5rem' }}>STATUS</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {referredTransactions.length === 0 ? (
-                        <tr>
-                          <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>No transactions recorded.</td>
-                        </tr>
-                      ) : (
-                        referredTransactions.map(tx => (
-                          <tr key={tx.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                            <td style={{ padding: '0.6rem 0.5rem' }}>{tx.userEmail}</td>
-                            <td style={{ padding: '0.6rem 0.5rem' }}>
-                              <span style={{ color: tx.isFreeplayWithdraw ? '#9b59b6' : (tx.type === 'DEPOSIT' ? '#2ecc71' : '#e74c3c'), fontWeight: 'bold' }}>
-                                {tx.isFreeplayWithdraw ? 'FREEPLAY' : tx.type}
-                              </span>
-                            </td>
-                            <td style={{ padding: '0.6rem 0.5rem', fontWeight: 'bold' }}>${parseFloat(tx.amount || 0).toFixed(2)}</td>
-                            <td style={{ padding: '0.6rem 0.5rem' }}>
-                              <span style={{
-                                padding: '0.15rem 0.35rem',
-                                borderRadius: '4px',
-                                fontSize: '0.6rem',
-                                fontWeight: 'bold',
-                                background: tx.status === 'SUCCESS' ? 'rgba(46,204,113,0.1)' : tx.status === 'FAILED' ? 'rgba(239,68,68,0.1)' : 'rgba(241,196,15,0.1)',
-                                color: tx.status === 'SUCCESS' ? '#2ecc71' : tx.status === 'FAILED' ? '#ef4444' : '#f1c40f'
-                              }}>{tx.status}</span>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
             </div>
 
             {/* Gateway revenue stats summary (Only for Type B distributors with finance access) */}

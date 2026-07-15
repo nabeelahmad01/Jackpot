@@ -7,6 +7,7 @@ import usePollingSWR from '../hooks/usePollingSWR';
 import { POLL } from '../lib/pollingConfig';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import TabErrorBoundary from './TabErrorBoundary';
+import { initAudioUnlock, playNotificationSound } from '../lib/notificationSound';
 
 // Lazy load tab components with automatic retry on chunk failures
 const OverviewTab = lazyWithRetry(() => import('./admin/OverviewTab'));
@@ -99,46 +100,13 @@ export default function AdminDashboard({
 
   const prevCountsRef = React.useRef({ requests: 0, transactions: 0, coins: 0, chats: 0, campaigns: 0 });
 
-  const playSynthesizedBackup = () => {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const playTone = (freq, startTime, duration) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, startTime);
-        gain.gain.setValueAtTime(0.12, startTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-        osc.start(startTime);
-        osc.stop(startTime + duration);
-      };
-      const now = ctx.currentTime;
-      playTone(523.25, now, 0.12);
-      playTone(659.25, now + 0.08, 0.25);
-    } catch (e) {
-      console.log('Synthesized audio failed:', e);
-    }
-  };
+  // Unlock audio on first user gesture so alert sounds are not blocked by the browser
+  useEffect(() => {
+    initAudioUnlock();
+  }, []);
 
   const playAlertSound = () => {
-    try {
-      const customSound = settingsData?.settings?.notificationSoundUrl;
-      if (customSound) {
-        const cleanUrl = customSound.replace(/^data:video\/[^;]+;/, 'data:audio/mpeg;');
-        const audio = new Audio(cleanUrl);
-        audio.play().catch(err => {
-          console.log('Autoplay blocked custom audio playing, trying synthesizer tone as backup:', err);
-          playSynthesizedBackup();
-        });
-      } else {
-        playSynthesizedBackup();
-      }
-    } catch (e) {
-      console.log('Audio playback failed:', e);
-      playSynthesizedBackup();
-    }
+    playNotificationSound(settingsData?.settings?.notificationSoundUrl);
   };
 
   useEffect(() => {
