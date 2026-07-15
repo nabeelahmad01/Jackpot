@@ -7,6 +7,7 @@ import { POLL } from '../../lib/pollingConfig';
 import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 
 import { SupportModal, GoogleWarningModal } from '../../components/Modals';
+import ParticlesBackground from '../../components/ParticlesBackground';
 import RemainderClaimAction from '../../components/RemainderClaimAction';
 import { canShowClaimRemainderButton } from '../../lib/remainderClaim';
 import { parseAffiliatePayoutFields } from '../../lib/affiliatePayout';
@@ -736,6 +737,7 @@ function AffiliatePortal() {
 
   return (
     <div className="admin-dashboard-layout" style={{ minHeight: '100vh', background: '#060812', color: '#fff', fontFamily: "var(--font-body), 'Inter', sans-serif" }}>
+      <ParticlesBackground />
 
       {/* MOBILE HEADER */}
       <div className="admin-mobile-header">

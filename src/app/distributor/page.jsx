@@ -14,6 +14,7 @@ import RemainderClaimAction from '../../components/RemainderClaimAction';
 import { canShowClaimRemainderButton } from '../../lib/remainderClaim';
 import { filterGamesForStaff } from '../../lib/staffGameAccess';
 import { SupportModal } from '../../components/Modals';
+import ParticlesBackground from '../../components/ParticlesBackground';
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
 export default function DistributorPortal() {
@@ -1136,6 +1137,7 @@ export default function DistributorPortal() {
 
   return (
     <div className="admin-dashboard-layout" style={{ minHeight: '100vh', background: '#060812', color: '#fff', fontFamily: "'Inter', sans-serif" }}>
+      <ParticlesBackground />
       
       {/* SIDEBAR NAVIGATION */}
       <aside className="admin-sidebar-nav" style={{ display: 'flex', flexDirection: 'column' }}>
