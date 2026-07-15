@@ -17,9 +17,14 @@ export function parseAffiliatePayoutFields(tx) {
     }
   }
 
+  if (method.includes('TRC20') || method.includes('BEP20')) {
+    method = method.includes('BEP20') ? 'USDT (BEP20)' : 'USDT (TRC20)';
+  }
+
   return {
     method: method || '—',
     account: account || '—',
-    holder: tx?.nameOnTag || '—'
+    holder: tx?.nameOnTag || '—',
+    qr: tx?.payoutQr || ''
   };
 }

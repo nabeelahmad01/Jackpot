@@ -300,6 +300,12 @@ export default function AffiliateCommissionTab({
                 <div style={{ marginTop: '0.25rem' }}>Method: <strong>{payout.method}</strong></div>
                 <div style={{ marginTop: '0.25rem' }}>Account Number: <strong>{payout.account}</strong></div>
                 <div style={{ marginTop: '0.25rem' }}>Amount: <strong style={{ color: 'var(--gold-primary)' }}>${parseFloat(selectedTx.amount).toFixed(2)}</strong></div>
+                {(selectedTx.payoutQr || payout.qr) && (
+                  <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,215,0,0.15)' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#aaa', marginBottom: '0.5rem' }}>Affiliate Wallet QR (scan to pay)</div>
+                    <img src={selectedTx.payoutQr || payout.qr} alt="Affiliate wallet QR" style={{ width: '120px', height: '120px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }} />
+                  </div>
+                )}
               </div>
               <form onSubmit={handlePayoutSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>

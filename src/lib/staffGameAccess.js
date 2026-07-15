@@ -19,11 +19,11 @@ export async function getStaffAllowedGameTitles(db, adminEmail) {
   if (isFullAccessRole(staff.role)) return null;
   if (!isCoinsAdminRole(staff.role)) return null;
 
-  const allowedIds = Array.isArray(staff.allowedGameIds) ? staff.allowedGameIds : [];
+  const allowedIds = Array.isArray(staff.allowedGameIds) ? staff.allowedGameIds.map(String) : [];
   if (allowedIds.length === 0) return null;
 
-  const games = await db.collection('games').find({ id: { $in: allowedIds } }).toArray();
-  return games.map((g) => g.title).filter(Boolean);
+  const games = await db.collection('games').find({}).toArray();
+  return games.filter((g) => allowedIds.includes(String(g.id))).map((g) => g.title).filter(Boolean);
 }
 
 export async function applyStaffGameFilter(db, query, adminEmail) {
@@ -72,22 +72,16 @@ export async function validateAllowedGameIds(db, allowedGameIds, distributorId =
     return { valid: false, message: 'Please select at least one game for coins admin access.' };
   }
 
-  let validIds = allowedGameIds.map(String);
-  const games = await db.collection('games').find({ id: { $in: validIds } }).toArray();
-  const foundIds = new Set(games.map((g) => g.id));
+  const requestedIds = [...new Set(allowedGameIds.map(String))];
+  const games = await db.collection('games').find({}).toArray();
+  const foundIds = new Set(games.map((g) => String(g.id)));
+  const validIds = requestedIds.filter((id) => foundIds.has(id));
 
-  if (distributorId) {
-    const distGames = await db.collection('distributorGames').find({ distributorId }).toArray();
-    if (distGames.length > 0) {
-      const distGameIds = new Set(distGames.map((dg) => dg.gameId));
-      validIds = validIds.filter((id) => foundIds.has(id) && distGameIds.has(id));
-    } else {
-      validIds = validIds.filter((id) => foundIds.has(id));
-    }
-    if (validIds.length === 0) {
-      return { valid: false, message: 'Selected games must belong to your distributor catalog.' };
-    }
-  } else if (foundIds.size !== validIds.length) {
+  if (validIds.length === 0) {
+    return { valid: false, message: distributorId ? 'Selected games must exist in the catalog.' : 'One or more selected games are invalid.' };
+  }
+
+  if (validIds.length !== requestedIds.length) {
     return { valid: false, message: 'One or more selected games are invalid.' };
   }
 

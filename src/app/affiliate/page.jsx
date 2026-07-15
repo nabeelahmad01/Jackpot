@@ -194,7 +194,6 @@ function AffiliatePortal() {
   const [withdrawPayoutMethod, setWithdrawPayoutMethod] = useState('bank');
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [claimedRemainderIds, setClaimedRemainderIds] = useState([]);
-  const [copiedPayoutWallet, setCopiedPayoutWallet] = useState(false);
 
   // Create Team Member
   const [teamView, setTeamView] = useState('list');
@@ -550,14 +549,8 @@ function AffiliatePortal() {
   const platformCommissionRate = globalSettings.affiliatePlatformCommissionRate !== undefined
     ? parseFloat(globalSettings.affiliatePlatformCommissionRate)
     : Math.max(0, 100 - agentCommissionRate);
-  const affiliateCryptoNetwork = withdrawPayoutMethod === 'bep20' ? 'BEP20' : withdrawPayoutMethod === 'trc20' ? 'TRC20' : (globalSettings.affiliatePayoutNetwork || 'TRC20');
-  const affiliateCryptoLabel = affiliateCryptoNetwork === 'BEP20' ? 'BNB Smart Chain (BEP20)' : 'USDT (TRC20)';
-  const affiliatePayoutWallet = affiliateCryptoNetwork === 'BEP20'
-    ? (globalSettings.affiliatePayoutWalletBEP20 || globalSettings.affiliatePayoutWallet || '')
-    : (globalSettings.affiliatePayoutWallet || '');
-  const affiliatePayoutQr = affiliateCryptoNetwork === 'BEP20'
-    ? (globalSettings.affiliatePayoutQrBEP20 || globalSettings.affiliatePayoutQrCode || '')
-    : (globalSettings.affiliatePayoutQrCode || '');
+  const affiliateCryptoNetwork = withdrawPayoutMethod === 'bep20' ? 'BEP20' : withdrawPayoutMethod === 'trc20' ? 'TRC20' : '';
+  const affiliateCryptoLabel = affiliateCryptoNetwork === 'BEP20' ? 'BNB Smart Chain (BEP20)' : affiliateCryptoNetwork === 'TRC20' ? 'USDT (TRC20)' : '';
   const adPaymentNetwork = globalSettings.adPaymentNetwork || 'BEP20';
   const adPaymentWallet = globalSettings.adPaymentWallet || '';
   const adPaymentQr = globalSettings.adPaymentQrCode || '';
@@ -1339,36 +1332,6 @@ function AffiliatePortal() {
                 ))}
               </div>
 
-              {(withdrawPayoutMethod === 'trc20' || withdrawPayoutMethod === 'bep20') && (affiliatePayoutWallet || affiliatePayoutQr) && (
-                <div style={{ background: '#0b0d16', borderRadius: '12px', border: '1px solid rgba(255,215,0,0.1)', padding: '1rem', marginBottom: '1rem' }}>
-                  <h4 style={{ fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '0.75rem' }}>
-                    <i className="fa-solid fa-wallet" style={{ color: 'var(--gold-primary)', marginRight: '0.35rem' }}></i>
-                    Payment Details
-                  </h4>
-                  <div style={{ fontSize: '0.75rem', color: '#aaa', marginBottom: '0.5rem' }}>
-                    Network: <strong style={{ color: '#fff' }}>{affiliateCryptoLabel}</strong>
-                  </div>
-                  {affiliatePayoutWallet && (
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.75rem' }}>
-                      <div style={{ flex: 1, background: '#040509', padding: '0.55rem 0.75rem', borderRadius: '8px', fontFamily: 'monospace', fontSize: '0.7rem', color: '#ccc', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {affiliatePayoutWallet}
-                      </div>
-                      <button type="button" onClick={() => { navigator.clipboard.writeText(affiliatePayoutWallet); setCopiedPayoutWallet(true); setTimeout(() => setCopiedPayoutWallet(false), 2000); }} style={{ background: copiedPayoutWallet ? '#2ecc71' : '#6366f1', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.45rem 0.7rem', fontSize: '0.65rem', fontWeight: 'bold', cursor: 'pointer' }}>
-                        {copiedPayoutWallet ? '✓' : 'Copy'}
-                      </button>
-                    </div>
-                  )}
-                  {affiliatePayoutQr && (
-                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                      <img src={affiliatePayoutQr} alt="Network QR" style={{ width: '100px', height: '100px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }} />
-                      <p style={{ fontSize: '0.65rem', color: '#888', margin: 0, lineHeight: 1.5, flex: 1 }}>
-                        Send only USDT via <strong style={{ color: 'var(--gold-primary)' }}>{affiliateCryptoNetwork}</strong>. Enter your own {affiliateCryptoNetwork} wallet below for receiving commission payouts.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-
               <form onSubmit={handleWithdrawRequest} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Amount ($)</label>
@@ -1380,14 +1343,22 @@ function AffiliatePortal() {
                 </div>
                 {withdrawPayoutMethod === 'trc20' || withdrawPayoutMethod === 'bep20' ? (
                   <>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <div style={{ background: 'rgba(255,215,0,0.06)', border: '1px solid rgba(255,215,0,0.15)', borderRadius: '10px', padding: '0.75rem', marginBottom: '0.25rem' }}>
+                        <p style={{ fontSize: '0.7rem', color: '#ccc', margin: 0, lineHeight: 1.5 }}>
+                          Enter <strong style={{ color: 'var(--gold-primary)' }}>your own</strong> {affiliateCryptoLabel} wallet details below. Admin will send commission to this address.
+                        </p>
+                      </div>
+                    </div>
                     <div>
-                      <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>{affiliateCryptoNetwork} Wallet Address</label>
+                      <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Your {affiliateCryptoNetwork} Wallet Address</label>
                       <input type="text" placeholder={affiliateCryptoNetwork === 'BEP20' ? '0x...' : 'T...'} value={withdrawTrc20} onChange={(e)=>setWithdrawTrc20(e.target.value)} style={inputStyle} required />
                     </div>
                     <div>
-                      <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Upload Wallet QR (Optional)</label>
+                      <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Upload Your Wallet QR</label>
                       <input type="file" accept="image/*" onChange={handleWithdrawQrChange} style={{ ...inputStyle, padding: '0.45rem' }} />
-                      {withdrawQr && <img src={withdrawQr} alt="Wallet QR" style={{ marginTop: '0.5rem', width: '72px', height: '72px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)' }} />}
+                      <p style={{ fontSize: '0.6rem', color: '#666', margin: '0.35rem 0 0' }}>Admin can scan this QR when processing your payout.</p>
+                      {withdrawQr && <img src={withdrawQr} alt="Your wallet QR" style={{ marginTop: '0.5rem', width: '96px', height: '96px', borderRadius: '8px', border: '1px solid rgba(255,215,0,0.25)' }} />}
                     </div>
                   </>
                 ) : (

@@ -181,7 +181,15 @@ export default function DistributorPortal() {
     POLL.LISTS
   );
 
-  const gatewayStats = gatewayStatsData?.stats || [];
+  const toggleStaffGameId = (gameId, setter) => {
+    const id = String(gameId);
+    setter((prev) => {
+      const normalized = prev.map(String);
+      return normalized.includes(id) ? prev.filter((x) => String(x) !== id) : [...prev, id];
+    });
+  };
+
+  const gameTitleById = (id) => gamesData?.games?.find((g) => String(g.id) === String(id))?.title || id;
   const players = statsData?.players || [];
 
   const staffAdminUser = {
@@ -2344,15 +2352,11 @@ export default function DistributorPortal() {
                           <span style={{ fontSize: '0.65rem', color: '#666' }}>No games available.</span>
                         ) : (
                           gamesData.games.map((game) => (
-                            <label key={game.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.7rem', cursor: 'pointer', color: staffAllowedGameIds.includes(game.id) ? 'var(--gold-primary)' : '#fff' }}>
+                            <label key={game.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.7rem', cursor: 'pointer', color: staffAllowedGameIds.map(String).includes(String(game.id)) ? 'var(--gold-primary)' : '#fff' }}>
                               <input
                                 type="checkbox"
-                                checked={staffAllowedGameIds.includes(game.id)}
-                                onChange={() => {
-                                  setStaffAllowedGameIds((prev) =>
-                                    prev.includes(game.id) ? prev.filter((id) => id !== game.id) : [...prev, game.id]
-                                  );
-                                }}
+                                checked={staffAllowedGameIds.map(String).includes(String(game.id))}
+                                onChange={() => toggleStaffGameId(game.id, setStaffAllowedGameIds)}
                               />
                               <span>{game.title}</span>
                             </label>
@@ -2395,9 +2399,9 @@ export default function DistributorPortal() {
                               {s.role}
                             </span>
                           </td>
-                          <td style={{ padding: '0.6rem 0.5rem', fontSize: '0.65rem', color: '#888', maxWidth: '120px' }}>
+                          <td style={{ padding: '0.6rem 0.5rem', fontSize: '0.65rem', color: '#888', maxWidth: '180px', whiteSpace: 'normal' }}>
                             {s.role === 'coins_admin' && Array.isArray(s.allowedGameIds) && s.allowedGameIds.length > 0
-                              ? s.allowedGameIds.map((id) => gamesData?.games?.find((g) => g.id === id)?.title || id).join(', ')
+                              ? s.allowedGameIds.map((id) => gameTitleById(id)).join(', ')
                               : '—'}
                           </td>
                           <td style={{ padding: '0.6rem 0.5rem' }}>
@@ -2466,15 +2470,11 @@ export default function DistributorPortal() {
                         <label style={{ fontSize: '0.65rem', color: '#aaa', display: 'block', marginBottom: '0.35rem' }}>Game Access</label>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', background: '#040509', padding: '0.6rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)', maxHeight: '140px', overflowY: 'auto' }}>
                           {(gamesData?.games || []).map((game) => (
-                            <label key={game.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.7rem', cursor: 'pointer', color: editStaffAllowedGameIds.includes(game.id) ? 'var(--gold-primary)' : '#fff' }}>
+                            <label key={game.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.7rem', cursor: 'pointer', color: editStaffAllowedGameIds.map(String).includes(String(game.id)) ? 'var(--gold-primary)' : '#fff' }}>
                               <input
                                 type="checkbox"
-                                checked={editStaffAllowedGameIds.includes(game.id)}
-                                onChange={() => {
-                                  setEditStaffAllowedGameIds((prev) =>
-                                    prev.includes(game.id) ? prev.filter((id) => id !== game.id) : [...prev, game.id]
-                                  );
-                                }}
+                                checked={editStaffAllowedGameIds.map(String).includes(String(game.id))}
+                                onChange={() => toggleStaffGameId(game.id, setEditStaffAllowedGameIds)}
                               />
                               <span>{game.title}</span>
                             </label>
