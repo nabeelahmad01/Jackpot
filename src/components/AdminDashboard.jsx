@@ -1,32 +1,35 @@
 'use client';
 
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import useSWR, { mutate } from 'swr';
 import { motion, AnimatePresence } from 'framer-motion';
 import usePollingSWR from '../hooks/usePollingSWR';
 import { POLL } from '../lib/pollingConfig';
+import { lazyWithRetry } from '../lib/lazyWithRetry';
+import TabErrorBoundary from './TabErrorBoundary';
 
-// Lazy load the sub-tab components to optimize bundle size and initial load speed
-const OverviewTab = lazy(() => import('./admin/OverviewTab'));
-const GamesLibraryTab = lazy(() => import('./admin/GamesLibraryTab'));
-const PlayerAccountsTab = lazy(() => import('./admin/PlayerAccountsTab'));
-const RequestsTab = lazy(() => import('./admin/RequestsTab'));
-const LedgerTab = lazy(() => import('./admin/LedgerTab'));
-const GatewaysTab = lazy(() => import('./admin/GatewaysTab'));
-const CoinsAllotmentTab = lazy(() => import('./admin/CoinsAllotmentTab'));
-const SupportTab = lazy(() => import('./admin/SupportTab'));
-const StaffTab = lazy(() => import('./admin/StaffTab'));
-const SettingsTab = lazy(() => import('./admin/SettingsTab'));
-const FrontendSettingsTab = lazy(() => import('./admin/FrontendSettingsTab'));
-const ShiftReportsTab = lazy(() => import('./admin/ShiftReportsTab'));
-const ShiftDashboardTab = lazy(() => import('./admin/ShiftDashboardTab'));
-const PromotionsTab = lazy(() => import('./admin/PromotionsTab'));
-const TxSearchTab = lazy(() => import('./admin/TxSearchTab'));
-const DistributorsTab = lazy(() => import('./admin/DistributorsTab'));
-const AffiliatesTab = lazy(() => import('./admin/AffiliatesTab'));
-const DeletedPlayersTab = lazy(() => import('./admin/DeletedPlayersTab'));
-const AffiliateCommissionTab = lazy(() => import('./admin/AffiliateCommissionTab'));
-const CampaignRequestsTab = lazy(() => import('./admin/CampaignRequestsTab'));
+// Lazy load tab components with automatic retry on chunk failures
+const OverviewTab = lazyWithRetry(() => import('./admin/OverviewTab'));
+const GamesLibraryTab = lazyWithRetry(() => import('./admin/GamesLibraryTab'));
+const PlayerAccountsTab = lazyWithRetry(() => import('./admin/PlayerAccountsTab'));
+const RequestsTab = lazyWithRetry(() => import('./admin/RequestsTab'));
+const LedgerTab = lazyWithRetry(() => import('./admin/LedgerTab'));
+const GatewaysTab = lazyWithRetry(() => import('./admin/GatewaysTab'));
+const CoinsAllotmentTab = lazyWithRetry(() => import('./admin/CoinsAllotmentTab'));
+const SupportTab = lazyWithRetry(() => import('./admin/SupportTab'));
+const StaffTab = lazyWithRetry(() => import('./admin/StaffTab'));
+const SettingsTab = lazyWithRetry(() => import('./admin/SettingsTab'));
+const FrontendSettingsTab = lazyWithRetry(() => import('./admin/FrontendSettingsTab'));
+const ShiftReportsTab = lazyWithRetry(() => import('./admin/ShiftReportsTab'));
+const ShiftDashboardTab = lazyWithRetry(() => import('./admin/ShiftDashboardTab'));
+const PromotionsTab = lazyWithRetry(() => import('./admin/PromotionsTab'));
+const TxSearchTab = lazyWithRetry(() => import('./admin/TxSearchTab'));
+const DistributorsTab = lazyWithRetry(() => import('./admin/DistributorsTab'));
+const AffiliatesTab = lazyWithRetry(() => import('./admin/AffiliatesTab'));
+const DeletedPlayersTab = lazyWithRetry(() => import('./admin/DeletedPlayersTab'));
+const AffiliateCommissionTab = lazyWithRetry(() => import('./admin/AffiliateCommissionTab'));
+const WebsitePaymentsTab = lazyWithRetry(() => import('./admin/WebsitePaymentsTab'));
+const CampaignRequestsTab = lazyWithRetry(() => import('./admin/CampaignRequestsTab'));
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -78,6 +81,7 @@ export default function AdminDashboard({
       window.history.replaceState({}, '', targetPath);
     }
   }, [activeTab]);
+
   const [processingIds, setProcessingIds] = useState({});
 
   // Use SWR to poll counts/stats for the sidebar badges
@@ -242,6 +246,25 @@ export default function AdminDashboard({
       return false;
     });
   };
+
+  const isSuperAdminOnlyTab = (tabName) => (
+    ['affiliate_commissions', 'website_payments', 'deleted_accounts', 'campaign_requests'].includes(tabName)
+  );
+
+  const canRenderActiveTab = () => {
+    if (!adminUser) return false;
+    if (isSuperAdminOnlyTab(activeTab)) {
+      return isSuperAdmin() && !adminUser?.distributorId;
+    }
+    return hasAccess(activeTab);
+  };
+
+  useEffect(() => {
+    if (!adminUser || suppressUrlSyncRef.current) return;
+    if (!canRenderActiveTab()) {
+      setActiveTab('dashboard');
+    }
+  }, [adminUser, activeTab]);
 
   return (
     <div id="view-admin-dashboard" className="admin-dashboard-layout">
@@ -698,7 +721,7 @@ export default function AdminDashboard({
             </button>
           )}
 
-          {adminUser?.role === 'admin' && !adminUser?.distributorId && (
+          {isSuperAdmin() && !adminUser?.distributorId && (
             <button
               onClick={() => { setActiveTab('affiliate_commissions'); setSidebarOpen(false); }}
               style={{
@@ -729,7 +752,7 @@ export default function AdminDashboard({
             </button>
           )}
 
-          {!adminUser?.distributorId && adminUser?.role === 'admin' && (
+          {!adminUser?.distributorId && isSuperAdmin() && (
             <button
               onClick={() => { setActiveTab('website_payments'); setSidebarOpen(false); }}
               style={{
@@ -882,6 +905,7 @@ export default function AdminDashboard({
 
       {/* Main Content Workspace Wrapper */}
       <main className="admin-main-workspace" style={activeTab === 'support' ? { overflowY: 'hidden', height: '100vh' } : {}}>
+        <TabErrorBoundary onBack={() => setActiveTab('dashboard')}>
         <Suspense fallback={
           <div style={{ padding: '2rem', textAlign: 'center', opacity: 0.5 }}>
             <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '2rem', color: 'var(--gold-primary)', marginBottom: '1rem', display: 'block' }}></i>
@@ -944,24 +968,24 @@ export default function AdminDashboard({
               {activeTab === 'affiliates' && hasAccess('distributors') && (
                 <AffiliatesTab />
               )}
-              {activeTab === 'deleted_accounts' && !adminUser?.distributorId && adminUser?.role === 'admin' && (
+              {activeTab === 'deleted_accounts' && !adminUser?.distributorId && isSuperAdmin() && (
                 <DeletedPlayersTab />
               )}
-              {activeTab === 'affiliate_commissions' && adminUser?.role === 'admin' && !adminUser?.distributorId && (
+              {activeTab === 'affiliate_commissions' && isSuperAdmin() && !adminUser?.distributorId && (
                 <AffiliateCommissionTab
                   onInspectProof={onInspectProof}
                   completedActionIds={completedActionIds}
                   adminUser={adminUser}
                 />
               )}
-              {activeTab === 'website_payments' && !adminUser?.distributorId && adminUser?.role === 'admin' && (
+              {activeTab === 'website_payments' && !adminUser?.distributorId && isSuperAdmin() && (
                 <WebsitePaymentsTab
                   onInspectProof={onInspectProof}
                   completedActionIds={completedActionIds}
                   adminUser={adminUser}
                 />
               )}
-              {activeTab === 'campaign_requests' && !adminUser?.distributorId && adminUser?.role === 'admin' && (
+              {activeTab === 'campaign_requests' && !adminUser?.distributorId && isSuperAdmin() && (
                 <CampaignRequestsTab
                   adminUser={adminUser}
                   onInspectProof={onInspectProof}
@@ -988,6 +1012,7 @@ export default function AdminDashboard({
             </motion.div>
           </AnimatePresence>
         </Suspense>
+        </TabErrorBoundary>
       </main>
     </div>
   );

@@ -1,16 +1,27 @@
+const SW_VERSION = 'v3';
+
 self.addEventListener('install', (e) => {
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (e) => {
-  e.waitUntil(self.clients.claim());
+  e.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== SW_VERSION).map((k) => caches.delete(k)))
+    ).then(() => self.clients.claim())
+  );
 });
 
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
 
-  // Never intercept page navigations — let the server/Next.js handle refreshes directly
+  // Never intercept page navigations — let Next.js handle refreshes directly
   if (e.request.mode === 'navigate') {
+    return;
+  }
+
+  // Never cache Next.js bundles — stale chunks cause intermittent load failures
+  if (url.pathname.startsWith('/_next/')) {
     return;
   }
 

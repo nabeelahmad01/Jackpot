@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import usePollingSWR from '../../hooks/usePollingSWR';
 import { POLL } from '../../lib/pollingConfig';
+import { parseAffiliatePayoutFields } from '../../lib/affiliatePayout';
 
 export default function AffiliateCommissionTab({
   onInspectProof,

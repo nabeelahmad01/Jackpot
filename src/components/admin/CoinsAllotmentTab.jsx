@@ -5,6 +5,8 @@ import usePollingSWR from '../../hooks/usePollingSWR';
 import useSWR from 'swr';
 import { POLL } from '../../lib/pollingConfig';
 
+const fetcher = (...args) => fetch(...args).then((res) => res.json());
+
 export default function CoinsAllotmentTab({
   onUpdateCoinsNotification,
   completedActionIds = {},
