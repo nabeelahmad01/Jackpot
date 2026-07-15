@@ -190,14 +190,6 @@ export default function LedgerTab({
     if (page < totalPages) setPage(page + 1);
   };
 
-  const handleHistoryPrevPage = () => {
-    if (historyPage > 1) setHistoryPage(historyPage - 1);
-  };
-
-  const handleHistoryNextPage = () => {
-    if (historyPage < totalPages) setHistoryPage(historyPage + 1);
-  };
-
   const isLoading = !data && !error;
 
   return (

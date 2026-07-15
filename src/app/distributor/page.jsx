@@ -1676,7 +1676,7 @@ export default function DistributorPortal() {
                       </form>
                     </div>
 
-                    <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div className="glow-card" style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                       <h3 style={{ fontSize: '0.9rem', marginBottom: '1rem', fontWeight: 'bold' }}>Website Commission Payment logs</h3>
                       <div style={{ maxHeight: '420px', overflowY: 'auto' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
@@ -1803,7 +1803,7 @@ export default function DistributorPortal() {
                       </form>
                     </div>
 
-                    <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div className="glow-card" style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                       <h3 style={{ fontSize: '0.9rem', marginBottom: '1rem', fontWeight: 'bold' }}>Commission Withdrawal Logs</h3>
                       <div style={{ maxHeight: '310px', overflowY: 'auto' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
@@ -1896,7 +1896,7 @@ export default function DistributorPortal() {
             <p style={{ fontSize: '0.75rem', color: '#888', marginBottom: '2rem' }}>Share these active codes and welcome bonuses with players to drive referrals.</p>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-              <div style={{ background: '#0b0d16', padding: '1.5rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div className="glow-card" style={{ background: '#0b0d16', padding: '1.5rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <h3 style={{ fontSize: '0.9rem', marginBottom: '1.25rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <i className="fa-solid fa-gift gold-text"></i> ${signupFreeplay} Signup Freeplay Code
                 </h3>
@@ -1914,7 +1914,7 @@ export default function DistributorPortal() {
                 </ul>
               </div>
 
-              <div style={{ background: '#0b0d16', padding: '1.5rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div className="glow-card" style={{ background: '#0b0d16', padding: '1.5rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <h3 style={{ fontSize: '0.9rem', marginBottom: '1.25rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <i className="fa-solid fa-percent gold-text"></i> {firstDepositBonus}% Signup Match Bonus
                 </h3>
@@ -1992,31 +1992,31 @@ export default function DistributorPortal() {
 
             {/* METRICS CARDS */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
-              <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div className="glow-card" style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <div style={{ color: '#888', fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Referred Players</div>
                 <div style={{ fontSize: '1.75rem', fontWeight: '900', color: '#fff', marginTop: '0.25rem' }}>{stats.playersCount || 0}</div>
               </div>
-              <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div className="glow-card" style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <div style={{ color: '#888', fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Total Deposits</div>
                 <div style={{ fontSize: '1.75rem', fontWeight: '900', color: '#2ecc71', marginTop: '0.25rem' }}>${(stats.totalDeposits || 0).toFixed(2)}</div>
               </div>
-              <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div className="glow-card" style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <div style={{ color: '#888', fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Total Withdrawals</div>
                 <div style={{ fontSize: '1.75rem', fontWeight: '900', color: '#ef4444', marginTop: '0.25rem' }}>${(stats.totalWithdrawals || 0).toFixed(2)}</div>
               </div>
               {distSession.type === 'B' && !distSession.isStaff ? (
-                <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div className="glow-card" style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                   <div style={{ color: '#888', fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Net Profit</div>
                   <div style={{ fontSize: '1.75rem', fontWeight: '900', color: '#fff', marginTop: '0.25rem' }}>${(stats.netProfit ?? Math.max(0, (stats.totalDeposits || 0) - (stats.totalWithdrawals || 0))).toFixed(2)}</div>
                 </div>
               ) : null}
               {distSession.type === 'B' && !distSession.isStaff ? (
-                <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div className="glow-card" style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                   <div style={{ color: '#888', fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Website Commission ({stats.websiteCommissionRate || 0}% of profit)</div>
                   <div style={{ fontSize: '1.75rem', fontWeight: '900', color: '#ff4d6d', marginTop: '0.25rem' }}>${dueWebsiteCommission.toFixed(2)}</div>
                 </div>
               ) : (
-                <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div className="glow-card" style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                   <div style={{ color: '#888', fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>My Commission ({stats.commissionRate || 0}% of profit)</div>
                   <div style={{ fontSize: '1.75rem', fontWeight: '900', color: 'var(--gold-primary)', marginTop: '0.25rem' }}>${(stats.commissionEarned || 0).toFixed(2)}</div>
                 </div>
@@ -2026,7 +2026,7 @@ export default function DistributorPortal() {
             {/* TWO COLUMN GRID FOR PLAYERS & LEDGER */}
             <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '1.5rem' }}>
               {/* PLAYERS LIST */}
-              <div style={{ background: '#0b0d16', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', padding: '1.25rem' }}>
+              <div className="glow-card" style={{ background: '#0b0d16', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', padding: '1.25rem' }}>
                 <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <i className="fa-solid fa-users gold-text"></i> Referred Players ({players.length})
                 </h3>
@@ -2048,7 +2048,7 @@ export default function DistributorPortal() {
               </div>
 
               {/* TRANSACTIONS HIST */}
-              <div style={{ background: '#0b0d16', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', padding: '1.25rem' }}>
+              <div className="glow-card" style={{ background: '#0b0d16', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', padding: '1.25rem' }}>
                 <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <i className="fa-solid fa-file-invoice-dollar gold-text"></i> Referred Players Transactions History
                 </h3>
@@ -2327,7 +2327,7 @@ export default function DistributorPortal() {
                 </form>
               </div>
 
-              <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div className="glow-card" style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <h3 style={{ fontSize: '0.9rem', marginBottom: '1rem', fontWeight: 'bold' }}>My Gateways Catalog</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
                   {(!gatewaysData?.gateways || gatewaysData.gateways.length === 0) ? (
@@ -2416,7 +2416,7 @@ export default function DistributorPortal() {
                 </form>
               </div>
 
-              <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div className="glow-card" style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <h3 style={{ fontSize: '0.9rem', marginBottom: '1rem', fontWeight: 'bold' }}>Administrative Staff Registry</h3>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
                   <thead>

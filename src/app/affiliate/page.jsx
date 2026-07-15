@@ -846,7 +846,7 @@ function AffiliatePortal() {
               </div>
 
               {/* Invite Link Card */}
-              <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)', height: 'fit-content' }}>
+              <div className="glow-card" style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)', height: 'fit-content' }}>
                 <h3 style={{ fontSize: '0.95rem', fontWeight: 'bold', marginBottom: '0.3rem' }}>Your Invite Link</h3>
                 <p style={{ fontSize: '0.65rem', color: '#888', marginBottom: '0.85rem' }}>Share this link with players. New signups will be tracked under your owner account.</p>
                 <div style={{ background: '#040509', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)', fontSize: '0.7rem', color: '#aaa', wordBreak: 'break-all', marginBottom: '0.75rem', fontFamily: 'monospace' }}>
@@ -881,7 +881,7 @@ function AffiliatePortal() {
                 { icon: 'fa-solid fa-triangle-exclamation', iconBg: 'rgba(239,68,68,0.12)', iconColor: '#ef4444', label: 'UNVERIFIED PLAYERS', value: stats.unverifiedPlayers || 0, valueColor: '#ef4444' },
                 { icon: 'fa-solid fa-user-plus', iconBg: 'rgba(59,130,246,0.12)', iconColor: '#3b82f6', label: 'DEPOSITING PLAYERS', value: stats.depositingPlayers || 0, valueColor: '#3b82f6' },
               ].map((c, i) => (
-                <div key={i} style={{ background: '#0b0d16', padding: '1.15rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                <div key={i} className="glow-card" style={{ background: '#0b0d16', padding: '1.15rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
                   <div style={{ width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: c.iconBg, color: c.iconColor, fontSize: '0.95rem', marginBottom: '0.6rem' }}>
                     <i className={c.icon}></i>
                   </div>
@@ -899,7 +899,7 @@ function AffiliatePortal() {
                 { icon: 'fa-solid fa-chart-bar', iconBg: 'rgba(139,92,246,0.12)', iconColor: '#8b5cf6', label: 'NET PROFIT', value: `$${(stats.netProfit||0).toFixed(2)}`, sub: 'Deposit minus cashout' },
                 { icon: 'fa-solid fa-coins', iconBg: 'rgba(59,130,246,0.12)', iconColor: '#3b82f6', label: 'TOTAL COINS USED', value: '0.00', sub: 'Deposit coins only' },
               ].map((c, i) => (
-                <div key={i} style={{ background: '#0b0d16', padding: '1.15rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                <div key={i} className="glow-card" style={{ background: '#0b0d16', padding: '1.15rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
                   <div style={{ width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: c.iconBg, color: c.iconColor, fontSize: '0.95rem', marginBottom: '0.6rem' }}>
                     <i className={c.icon}></i>
                   </div>
@@ -918,7 +918,7 @@ function AffiliatePortal() {
                 { icon: 'fa-solid fa-money-check-dollar', iconBg: 'rgba(139,92,246,0.12)', iconColor: '#8b5cf6', label: 'TOTAL WITHDRAWN', value: `$${(stats.totalWithdrawn||0).toFixed(2)}` },
                 { icon: 'fa-solid fa-hourglass-half', iconBg: 'rgba(59,130,246,0.12)', iconColor: '#3b82f6', label: 'PENDING WITHDRAWALS', value: `$${(stats.pendingWithdrawals||0).toFixed(2)}` },
               ].map((c, i) => (
-                <div key={i} style={{ background: '#0b0d16', padding: '1.15rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                <div key={i} className="glow-card" style={{ background: '#0b0d16', padding: '1.15rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
                   <div style={{ width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: c.iconBg, color: c.iconColor, fontSize: '0.95rem', marginBottom: '0.6rem' }}>
                     <i className={c.icon}></i>
                   </div>
@@ -935,7 +935,7 @@ function AffiliatePortal() {
                 { icon: 'fa-solid fa-wallet', iconBg: 'rgba(46,204,113,0.15)', iconColor: '#2ecc71', label: 'AVAILABLE BALANCE', value: `$${(stats.availableBalance||0).toFixed(2)}`, sub: 'After paid and pending withdrawals', valueColor: '#2ecc71' },
                 { icon: 'fa-solid fa-user', iconBg: 'rgba(59,130,246,0.12)', iconColor: '#3b82f6', label: 'DIRECT PLAYERS', value: stats.totalPlayers || 0, sub: 'Players without player referral' },
               ].map((c, i) => (
-                <div key={i} style={{ background: '#0b0d16', padding: '1.15rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                <div key={i} className="glow-card" style={{ background: '#0b0d16', padding: '1.15rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
                   <div style={{ width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: c.iconBg, color: c.iconColor, fontSize: '0.95rem', marginBottom: '0.6rem' }}>
                     <i className={c.icon}></i>
                   </div>
@@ -1455,7 +1455,7 @@ function AffiliatePortal() {
                 { icon: 'fa-brands fa-facebook', iconBg: 'rgba(59,130,246,0.1)', iconColor: '#3b82f6', label: 'FACEBOOK SIGNUPS', value: signupStats.facebookSignups || 0 },
                 { icon: 'fa-solid fa-leaf', iconBg: 'rgba(46,204,113,0.1)', iconColor: '#2ecc71', label: 'ORGANIC SIGNUPS', value: signupStats.organicSignups || 0, valueColor: '#eab308' },
               ].map((c, i) => (
-                <div key={i} style={{ background: '#0b0d16', padding: '1.15rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                <div key={i} className="glow-card" style={{ background: '#0b0d16', padding: '1.15rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
                   <div style={{ width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: c.iconBg, color: c.iconColor, fontSize: '0.95rem', marginBottom: '0.6rem' }}><i className={c.icon}></i></div>
                   <div style={{ fontSize: '0.6rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px', marginBottom: '0.25rem' }}>{c.label}</div>
                   <div style={{ fontSize: '1.75rem', fontWeight: '900', color: c.valueColor || '#fff' }}>{c.value}</div>
@@ -1471,7 +1471,7 @@ function AffiliatePortal() {
                 { icon: 'fa-brands fa-facebook', iconBg: 'rgba(59,130,246,0.1)', iconColor: '#3b82f6', label: 'FACEBOOK VERIFIED', value: signupStats.facebookVerified || 0 },
                 { icon: 'fa-solid fa-leaf', iconBg: 'rgba(46,204,113,0.1)', iconColor: '#2ecc71', label: 'ORGANIC VERIFIED', value: signupStats.organicVerified || 0 },
               ].map((c, i) => (
-                <div key={i} style={{ background: '#0b0d16', padding: '1.15rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                <div key={i} className="glow-card" style={{ background: '#0b0d16', padding: '1.15rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
                   <div style={{ width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: c.iconBg, color: c.iconColor, fontSize: '0.95rem', marginBottom: '0.6rem' }}><i className={c.icon}></i></div>
                   <div style={{ fontSize: '0.6rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px', marginBottom: '0.25rem' }}>{c.label}</div>
                   <div style={{ fontSize: '1.75rem', fontWeight: '900', color: c.valueColor || '#fff' }}>{c.value}</div>
@@ -1488,7 +1488,7 @@ function AffiliatePortal() {
                 { icon: 'fa-solid fa-leaf', iconBg: 'rgba(46,204,113,0.1)', iconColor: '#2ecc71', label: 'ORGANIC DEPOSITED', value: signupStats.organicDeposited || 0, valueColor: '#2ecc71' },
                 { icon: 'fa-solid fa-clock-rotate-left', iconBg: 'rgba(139,92,246,0.12)', iconColor: '#8b5cf6', label: 'OLD SIGNUP DEPOSITED', value: signupStats.oldSignupDeposited || 0, valueColor: '#eab308' },
               ].map((c, i) => (
-                <div key={i} style={{ background: '#0b0d16', padding: '1.15rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                <div key={i} className="glow-card" style={{ background: '#0b0d16', padding: '1.15rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
                   <div style={{ width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: c.iconBg, color: c.iconColor, fontSize: '0.95rem', marginBottom: '0.6rem' }}><i className={c.icon}></i></div>
                   <div style={{ fontSize: '0.6rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px', marginBottom: '0.25rem' }}>{c.label}</div>
                   <div style={{ fontSize: '1.75rem', fontWeight: '900', color: c.valueColor || '#fff' }}>{c.value}</div>

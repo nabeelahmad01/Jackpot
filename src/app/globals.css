@@ -2127,7 +2127,8 @@ select option {
 .admin-section-card,
 .lobby-feature-card,
 .recent-withdrawals-section,
-.lobby-cashout-trust-item {
+.lobby-cashout-trust-item,
+.glow-card {
   position: relative;
   overflow: hidden;
 }
@@ -2142,7 +2143,8 @@ select option {
 .admin-section-card::before,
 .lobby-feature-card::before,
 .recent-withdrawals-section::before,
-.lobby-cashout-trust-item::before {
+.lobby-cashout-trust-item::before,
+.glow-card::before {
   content: '';
   position: absolute;
   inset: 0;
