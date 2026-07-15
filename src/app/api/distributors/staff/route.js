@@ -30,7 +30,7 @@ export async function GET(req) {
 // POST register distributor staff
 export async function POST(req) {
   try {
-    const { name, email, password, role, distributorId } = await req.json();
+    const { name, email, password, role, distributorId, allowedGameIds } = await req.json();
 
     if (!distributorId) {
       return NextResponse.json({ success: false, message: 'Distributor ID is required.' }, { status: 400 });
@@ -58,6 +58,15 @@ export async function POST(req) {
       createdAt: new Date().toISOString()
     };
 
+    if (role.trim() === 'coins_admin') {
+      const { validateAllowedGameIds } = await import('../../../../lib/staffGameAccess');
+      const validation = await validateAllowedGameIds(db, allowedGameIds || [], distributorId);
+      if (!validation.valid) {
+        return NextResponse.json({ success: false, message: validation.message }, { status: 400 });
+      }
+      newStaff.allowedGameIds = validation.allowedGameIds;
+    }
+
     await usersCollection.insertOne(newStaff);
 
     return NextResponse.json({ success: true, staff: newStaff, message: 'Staff member registered successfully!' });
@@ -70,7 +79,7 @@ export async function POST(req) {
 // PUT edit distributor staff
 export async function PUT(req) {
   try {
-    const { name, email, password, role, distributorId } = await req.json();
+    const { name, email, password, role, distributorId, allowedGameIds } = await req.json();
 
     if (!email || !distributorId) {
       return NextResponse.json({ success: false, message: 'Staff Email and Distributor ID are required.' }, { status: 400 });
@@ -83,6 +92,19 @@ export async function PUT(req) {
     if (name !== undefined) updateFields.name = name.trim();
     if (role !== undefined) updateFields.role = role.trim();
     if (password !== undefined && password.trim() !== '') updateFields.password = password.trim();
+    if (allowedGameIds !== undefined) {
+      const targetRole = role !== undefined ? role.trim() : (await usersCollection.findOne({ email: email.toLowerCase().trim(), distributorId }))?.role;
+      if (targetRole === 'coins_admin') {
+        const { validateAllowedGameIds } = await import('../../../../lib/staffGameAccess');
+        const validation = await validateAllowedGameIds(db, allowedGameIds, distributorId);
+        if (!validation.valid) {
+          return NextResponse.json({ success: false, message: validation.message }, { status: 400 });
+        }
+        updateFields.allowedGameIds = validation.allowedGameIds;
+      } else {
+        updateFields.allowedGameIds = [];
+      }
+    }
 
     const result = await usersCollection.updateOne(
       { email: email.toLowerCase().trim(), distributorId },

@@ -46,7 +46,7 @@ export async function GET(req) {
 // POST registers a new user
 export async function POST(req) {
   try {
-    const { email, password, name, role, referredBy, distributorId, agentCode, campaign } = await req.json();
+    const { email, password, name, role, referredBy, distributorId, agentCode, campaign, allowedGameIds } = await req.json();
 
     if (!email || !password || !name) {
       return NextResponse.json(
@@ -104,6 +104,16 @@ export async function POST(req) {
       campaign: campaign || 'organic',
       createdAt: new Date().toISOString()
     };
+
+    const roleStr = (role || 'user').toLowerCase();
+    if (roleStr.split(',').map((r) => r.trim()).includes('coins_admin')) {
+      const { validateAllowedGameIds } = await import('../../../../lib/staffGameAccess');
+      const validation = await validateAllowedGameIds(db, allowedGameIds || []);
+      if (!validation.valid) {
+        return NextResponse.json({ success: false, message: validation.message }, { status: 400 });
+      }
+      newUser.allowedGameIds = validation.allowedGameIds;
+    }
 
     const result = await usersCollection.insertOne(newUser);
     newUser._id = result.insertedId;

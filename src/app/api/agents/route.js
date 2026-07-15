@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
+import { calcCommissionFromProfit, calcNetProfit } from '../../../lib/commission';
 
 // GET all agents with dynamic statistics
 export async function GET() {
@@ -41,8 +42,8 @@ export async function GET() {
         totalWithdrawals = withdrawDocs.reduce((acc, curr) => acc + parseFloat(curr.amount || 0), 0);
       }
 
-      // 4. Calculate commission earned
-      const commissionEarned = totalDeposits * ((agent.commissionRate || 0) / 100);
+      const netProfit = calcNetProfit(totalDeposits, totalWithdrawals);
+      const commissionEarned = calcCommissionFromProfit(totalDeposits, totalWithdrawals, agent.commissionRate);
 
       // 5. Calculate total withdrawn/pending commission withdrawals by this agent
       const agentWithdrawDocs = await transactionsCollection.find({
@@ -70,6 +71,7 @@ export async function GET() {
         parentAgentName: parentAgent ? parentAgent.name : '—',
         totalDeposits,
         totalWithdrawals,
+        netProfit,
         commissionEarned,
         totalWithdrawn,
         availableBalance

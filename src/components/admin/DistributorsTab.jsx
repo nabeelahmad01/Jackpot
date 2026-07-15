@@ -340,9 +340,10 @@ export default function DistributorsTab() {
                         <div>Players: <strong style={{ color: '#fff' }}>{dist.playersCount || 0}</strong></div>
                         <div>Deposits: <strong style={{ color: '#2ecc71' }}>${(dist.totalDeposits || 0).toFixed(2)}</strong></div>
                         <div>Withdrawals: <strong style={{ color: '#ef4444' }}>${(dist.totalWithdrawals || 0).toFixed(2)}</strong></div>
+                        <div>Profit: <strong style={{ color: '#fff' }}>${(dist.netProfit ?? Math.max(0, (dist.totalDeposits || 0) - (dist.totalWithdrawals || 0))).toFixed(2)}</strong></div>
                         <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.15rem', marginTop: '0.15rem' }}>
-                          <div>Dist Comm: <strong style={{ color: 'var(--gold-primary)' }}>${(dist.commissionEarned || 0).toFixed(2)}</strong></div>
-                          <div>Website Comm: <strong style={{ color: '#ff4d6d' }}>${(dist.websiteCommissionEarned || 0).toFixed(2)}</strong></div>
+                          <div>Dist Comm: <strong style={{ color: 'var(--gold-primary)' }}>${(dist.commissionEarned || 0).toFixed(2)}</strong> <span style={{ color: '#666', fontSize: '0.6rem' }}>(on profit)</span></div>
+                          <div>Website Comm: <strong style={{ color: '#ff4d6d' }}>${(dist.websiteCommissionEarned || 0).toFixed(2)}</strong> <span style={{ color: '#666', fontSize: '0.6rem' }}>(on profit)</span></div>
                         </div>
                       </div>
                     </td>

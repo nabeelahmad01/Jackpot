@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/mongodb';
+import { calcCommissionFromProfit, calcNetProfit } from '../../../../lib/commission';
 
 // GET stats, referred players, and transactions ledger for a distributor
 export async function GET(req) {
@@ -74,8 +75,9 @@ export async function GET(req) {
       unreadChatsCount = unreadChats.length;
     }
 
-    const commissionEarned = totalDeposits * ((distributor.commissionRate || 0) / 100);
-    const websiteCommissionEarned = totalDeposits * ((distributor.websiteCommissionRate || 0) / 100);
+    const netProfit = calcNetProfit(totalDeposits, totalWithdrawals);
+    const commissionEarned = calcCommissionFromProfit(totalDeposits, totalWithdrawals, distributor.commissionRate);
+    const websiteCommissionEarned = calcCommissionFromProfit(totalDeposits, totalWithdrawals, distributor.websiteCommissionRate);
 
     return NextResponse.json({
       success: true,
@@ -83,6 +85,7 @@ export async function GET(req) {
         playersCount: players.length,
         totalDeposits,
         totalWithdrawals,
+        netProfit,
         commissionEarned,
         commissionRate: distributor.commissionRate || 0,
         websiteCommissionEarned,

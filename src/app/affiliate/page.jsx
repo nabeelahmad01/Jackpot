@@ -7,6 +7,7 @@ import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 import { SupportModal, GoogleWarningModal } from '../../components/Modals';
 import RemainderClaimAction from '../../components/RemainderClaimAction';
 import { canShowClaimRemainderButton } from '../../lib/remainderClaim';
+import { parseAffiliatePayoutFields } from '../../lib/affiliatePayout';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -416,11 +417,19 @@ function AffiliatePortal() {
       alert(`Please enter your ${cryptoNetwork} wallet address.`);
       return;
     }
+    if (withdrawPayoutMethod !== 'crypto' && !withdrawAccount.trim()) {
+      alert('Please enter your account number or tag.');
+      return;
+    }
+    if (withdrawPayoutMethod !== 'crypto' && !withdrawBank.trim()) {
+      alert('Please enter bank or payment method (e.g. CashApp, E sewa).');
+      return;
+    }
     setWithdrawLoading(true);
     try {
       const payoutDetails = withdrawPayoutMethod === 'crypto'
         ? `${cryptoNetwork}: ${withdrawTrc20.trim()}`
-        : `${withdrawBank || 'Bank Transfer'} - Acc: ${withdrawAccount || 'N/A'}`;
+        : `${withdrawBank.trim()} - Acc: ${withdrawAccount.trim()}`;
 
       const response = await fetch('/api/transactions', {
         method: 'POST',
@@ -429,8 +438,9 @@ function AffiliatePortal() {
           userEmail: agentSession.email,
           type: 'AFFILIATE_COMMISSION_WITHDRAW',
           amount,
-          gateway: withdrawPayoutMethod === 'crypto' ? `USDT (${cryptoNetwork})` : (withdrawBank || 'Bank Transfer'),
-          code: withdrawPayoutMethod === 'crypto' ? withdrawTrc20.trim() : `AGENT-COMM-${agentSession.agentCode}`,
+          gateway: withdrawPayoutMethod === 'crypto' ? `USDT (${cryptoNetwork})` : withdrawBank.trim(),
+          code: withdrawPayoutMethod === 'crypto' ? withdrawTrc20.trim() : withdrawAccount.trim(),
+          nameOnTag: withdrawName.trim(),
           payoutQr: withdrawQr || '',
           status: 'PENDING',
           note: `Affiliate Commission Cashout - ${withdrawName || agentSession.name} - ${payoutDetails}`,
@@ -911,7 +921,7 @@ function AffiliatePortal() {
             {/* Stats Cards - Row 4: Account Summary */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.85rem', marginBottom: '1.5rem' }}>
               {[
-                { icon: 'fa-solid fa-hand-holding-dollar', iconBg: 'rgba(255,215,0,0.12)', iconColor: 'var(--gold-primary)', label: 'ACCOUNT SHARE', value: `$${(stats.commissionEarned||0).toFixed(2)}`, sub: 'Based on account commission rules', valueColor: '#2ecc71' },
+                { icon: 'fa-solid fa-hand-holding-dollar', iconBg: 'rgba(255,215,0,0.12)', iconColor: 'var(--gold-primary)', label: 'ACCOUNT SHARE', value: `$${(stats.commissionEarned||0).toFixed(2)}`, sub: 'Commission on net profit', valueColor: '#2ecc71' },
                 { icon: 'fa-solid fa-wallet', iconBg: 'rgba(46,204,113,0.15)', iconColor: '#2ecc71', label: 'AVAILABLE BALANCE', value: `$${(stats.availableBalance||0).toFixed(2)}`, sub: 'After paid and pending withdrawals', valueColor: '#2ecc71' },
                 { icon: 'fa-solid fa-user', iconBg: 'rgba(59,130,246,0.12)', iconColor: '#3b82f6', label: 'DIRECT PLAYERS', value: stats.totalPlayers || 0, sub: 'Players without player referral' },
               ].map((c, i) => (
@@ -938,12 +948,14 @@ function AffiliatePortal() {
                   <tbody>
                     {commissionWithdrawals.length === 0 ? (
                       <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: '#888' }}>No withdrawal history found.</td></tr>
-                    ) : commissionWithdrawals.map((tx) => (
+                    ) : commissionWithdrawals.map((tx) => {
+                      const payout = parseAffiliatePayoutFields(tx);
+                      return (
                       <tr key={tx.id}>
                         <td style={{ fontWeight: 'bold' }}>${parseFloat(tx.amount||0).toFixed(2)}</td>
-                        <td>{agentSession.name}</td>
-                        <td>{tx.code || 'N/A'}</td>
-                        <td>{tx.gateway || 'N/A'}</td>
+                        <td>{payout.holder !== '—' ? payout.holder : agentSession.name}</td>
+                        <td>{payout.account}</td>
+                        <td>{payout.method}</td>
                         <td>
                           <span className={`admin-badge-preview b-${tx.status?.toLowerCase()==='success'?'ready':tx.status?.toLowerCase()==='pending'?'hot':'none'}`}>{tx.status}</span>
                           {tx.status === 'SUCCESS' && parseFloat(tx.payoutHold || 0) > 0 && (
@@ -955,7 +967,8 @@ function AffiliatePortal() {
                         <td style={{ fontSize: '0.65rem', color: '#888' }}>{tx.note || '—'}</td>
                         <td style={{ fontSize: '0.65rem', color: '#888' }}>{tx.date ? new Date(tx.date).toLocaleString() : 'N/A'}</td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

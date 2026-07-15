@@ -13,13 +13,17 @@ const AVAILABLE_ROLES = [
 
 export default function StaffTab({ adminUser, onCreateAdmin, onDeleteUser }) {
   const { data: usersData, mutate } = useSWR('/api/users?limit=200&segment=staff', fetcher);
+  const { data: gamesData } = useSWR('/api/games', fetcher);
   const [staffSearch, setStaffSearch] = useState('');
+
+  const catalogGames = gamesData?.games || [];
 
   // Admin Creation Form State
   const [newAdminName, setNewAdminName] = useState('');
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [newAdminPassword, setNewAdminPassword] = useState('');
   const [selectedRoles, setSelectedRoles] = useState(['financial_admin']);
+  const [allowedGameIds, setAllowedGameIds] = useState([]);
 
   // Editing staff states
   const [editingStaff, setEditingStaff] = useState(null);
@@ -27,6 +31,7 @@ export default function StaffTab({ adminUser, onCreateAdmin, onDeleteUser }) {
   const [editEmail, setEditEmail] = useState('');
   const [editPassword, setEditPassword] = useState('');
   const [selectedEditRoles, setSelectedEditRoles] = useState([]);
+  const [editAllowedGameIds, setEditAllowedGameIds] = useState([]);
 
   const users = usersData?.users || [];
   
@@ -89,6 +94,26 @@ export default function StaffTab({ adminUser, onCreateAdmin, onDeleteUser }) {
     }
   };
 
+  const handleGameCheckboxChange = (gameId, isEdit = false) => {
+    const setter = isEdit ? setEditAllowedGameIds : setAllowedGameIds;
+    const current = isEdit ? editAllowedGameIds : allowedGameIds;
+    if (current.includes(gameId)) {
+      setter(current.filter((id) => id !== gameId));
+    } else {
+      setter([...current, gameId]);
+    }
+  };
+
+  const formatAllowedGames = (staff) => {
+    if (!staff?.allowedGameIds?.length) return '—';
+    const titles = staff.allowedGameIds
+      .map((id) => catalogGames.find((g) => g.id === id)?.title)
+      .filter(Boolean);
+    return titles.length ? titles.join(', ') : staff.allowedGameIds.join(', ');
+  };
+
+  const needsGameAccess = (roles) => roles.includes('coins_admin');
+
   const handleAddStaffSubmit = async (e) => {
     e.preventDefault();
     if (isSubmitting) return;
@@ -98,19 +123,30 @@ export default function StaffTab({ adminUser, onCreateAdmin, onDeleteUser }) {
       return;
     }
 
+    if (needsGameAccess(selectedRoles) && allowedGameIds.length === 0) {
+      alert('Please select at least one game for Coins Admin access.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      await onCreateAdmin({
+      const payload = {
         name: newAdminName,
         email: newAdminEmail,
         password: newAdminPassword,
         role: selectedRoles.join(',')
-      });
+      };
+      if (needsGameAccess(selectedRoles)) {
+        payload.allowedGameIds = allowedGameIds;
+      }
+
+      await onCreateAdmin(payload);
 
       setNewAdminName('');
       setNewAdminEmail('');
       setNewAdminPassword('');
       setSelectedRoles(['financial_admin']);
+      setAllowedGameIds([]);
     } finally {
       setIsSubmitting(false);
     }
@@ -123,6 +159,7 @@ export default function StaffTab({ adminUser, onCreateAdmin, onDeleteUser }) {
     setEditEmail(staff.email);
     setEditPassword('');
     setSelectedEditRoles(staff.role.split(',').map(r => r.trim()));
+    setEditAllowedGameIds(Array.isArray(staff.allowedGameIds) ? [...staff.allowedGameIds] : []);
   };
 
   const handleEditSubmit = async (e) => {
@@ -130,6 +167,11 @@ export default function StaffTab({ adminUser, onCreateAdmin, onDeleteUser }) {
     if (!editName.trim()) return;
     if (selectedEditRoles.length === 0) {
       alert('Please select at least one permission role.');
+      return;
+    }
+
+    if (needsGameAccess(selectedEditRoles) && editAllowedGameIds.length === 0) {
+      alert('Please select at least one game for Coins Admin access.');
       return;
     }
 
@@ -142,6 +184,11 @@ export default function StaffTab({ adminUser, onCreateAdmin, onDeleteUser }) {
       };
       if (editPassword.trim()) {
         payload.password = editPassword.trim();
+      }
+      if (needsGameAccess(selectedEditRoles)) {
+        payload.allowedGameIds = editAllowedGameIds;
+      } else {
+        payload.allowedGameIds = [];
       }
 
       const res = await fetch('/api/users', {
@@ -263,6 +310,32 @@ export default function StaffTab({ adminUser, onCreateAdmin, onDeleteUser }) {
             </div>
           </div>
 
+          {needsGameAccess(selectedRoles) && (
+            <div className="input-group" style={{ marginBottom: '1.5rem' }}>
+              <label style={{ marginBottom: '0.5rem', display: 'block' }}>Game Access (Coins Admin)</label>
+              <p style={{ fontSize: '0.65rem', color: '#888', marginBottom: '0.5rem' }}>
+                Select which games this staff member can process requests for.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', background: '#0b0d16', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)', maxHeight: '180px', overflowY: 'auto' }}>
+                {catalogGames.length === 0 ? (
+                  <span style={{ fontSize: '0.7rem', color: '#666' }}>Loading games...</span>
+                ) : (
+                  catalogGames.map((game) => (
+                    <label key={game.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', cursor: 'pointer', color: allowedGameIds.includes(game.id) ? 'var(--gold-primary)' : '#fff' }}>
+                      <input
+                        type="checkbox"
+                        checked={allowedGameIds.includes(game.id)}
+                        onChange={() => handleGameCheckboxChange(game.id)}
+                        style={{ cursor: 'pointer' }}
+                      />
+                      <span>{game.title}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
           <button type="submit" className="submit-btn" style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold' }} disabled={isSubmitting}>
             {isSubmitting ? 'CREATING...' : 'CREATE STAFF USER ➔'}
           </button>
@@ -327,13 +400,14 @@ export default function StaffTab({ adminUser, onCreateAdmin, onDeleteUser }) {
                 <th>Full Name</th>
                 <th>Email</th>
                 <th>Privilege Permissions</th>
+                <th>Game Access</th>
                 {activeSubTab === 'distributor' && <th>Distributor</th>}
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredStaff.length === 0 ? (
-                <tr><td colSpan={activeSubTab === 'distributor' ? 5 : 4} className="text-center text-muted">No staff found.</td></tr>
+                <tr><td colSpan={activeSubTab === 'distributor' ? 6 : 5} className="text-center text-muted">No staff found.</td></tr>
               ) : (
                 filteredStaff.map((staff) => (
                   <tr key={staff.email}>
@@ -343,6 +417,11 @@ export default function StaffTab({ adminUser, onCreateAdmin, onDeleteUser }) {
                       <span className="admin-badge-preview b-ready" style={{ textTransform: 'uppercase', display: 'inline-block', fontSize: '0.65rem', padding: '0.15rem 0.45rem' }}>
                         {formatRoleName(staff.role)}
                       </span>
+                    </td>
+                    <td style={{ fontSize: '0.7rem', color: '#aaa', maxWidth: '140px' }}>
+                      {staff.role.split(',').map(r => r.trim()).includes('coins_admin')
+                        ? formatAllowedGames(staff)
+                        : '—'}
                     </td>
                     {activeSubTab === 'distributor' && (
                       <td style={{ color: 'var(--gold-primary)', fontWeight: 'bold' }}>
@@ -442,6 +521,25 @@ export default function StaffTab({ adminUser, onCreateAdmin, onDeleteUser }) {
                     ))}
                   </div>
                 </div>
+
+                {needsGameAccess(selectedEditRoles) && (
+                  <div className="input-group" style={{ marginBottom: '1.5rem' }}>
+                    <label style={{ marginBottom: '0.5rem', display: 'block' }}>Game Access (Coins Admin)</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', background: '#0b0d16', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)', maxHeight: '160px', overflowY: 'auto' }}>
+                      {catalogGames.map((game) => (
+                        <label key={game.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', cursor: 'pointer', color: editAllowedGameIds.includes(game.id) ? 'var(--gold-primary)' : '#fff' }}>
+                          <input
+                            type="checkbox"
+                            checked={editAllowedGameIds.includes(game.id)}
+                            onChange={() => handleGameCheckboxChange(game.id, true)}
+                            style={{ cursor: 'pointer' }}
+                          />
+                          <span>{game.title}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <button type="submit" className="submit-btn" style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold' }} disabled={isSubmitting}>
                   {isSubmitting ? 'UPDATING...' : 'UPDATE STAFF DETAILS'}

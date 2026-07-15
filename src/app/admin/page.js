@@ -189,7 +189,8 @@ export default function AdminPage({ portalName, forcedRole }) {
           email: adminData.email,
           password: adminData.password,
           name: adminData.name,
-          role: adminData.role
+          role: adminData.role,
+          ...(adminData.allowedGameIds ? { allowedGameIds: adminData.allowedGameIds } : {})
         })
       });
       const data = await response.json();
@@ -244,7 +245,7 @@ export default function AdminPage({ portalName, forcedRole }) {
       const response = await fetch('/api/coins-notifications', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status, read, holdNote, processedBy: adminUser?.email || 'admin@jackpot.com' })
+        body: JSON.stringify({ id, status, read, holdNote, processedBy: adminUser?.email || 'admin@jackpot.com', adminEmail: adminUser?.email || '' })
       });
       const data = await response.json();
       if (data.success) {
@@ -380,7 +381,9 @@ export default function AdminPage({ portalName, forcedRole }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: credData.requestId,
-          status: 'READY'
+          status: 'READY',
+          processedBy: adminUser?.email || 'admin@jackpot.com',
+          adminEmail: adminUser?.email || ''
         })
       });
       const reqResult = await reqResponse.json();

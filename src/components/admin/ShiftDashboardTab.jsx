@@ -7,11 +7,11 @@ const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
 export default function ShiftDashboardTab({ adminUser }) {
   // SWR endpoints polling every 10 seconds
-  const { data: reqData, mutate: mutateRequests } = useSWR(`/api/account-requests?status=PENDING&limit=50&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}`, fetcher, {
+  const { data: reqData, mutate: mutateRequests } = useSWR(`/api/account-requests?status=PENDING&limit=50&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`, fetcher, {
     refreshInterval: 10000
   });
 
-  const { data: coinData, mutate: mutateCoins } = useSWR(`/api/coins-notifications?limit=50&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}`, fetcher, {
+  const { data: coinData, mutate: mutateCoins } = useSWR(`/api/coins-notifications?limit=50&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`, fetcher, {
     refreshInterval: 10000
   });
 
@@ -81,7 +81,9 @@ export default function ShiftDashboardTab({ adminUser }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: reqItem.id,
-          status: 'READY'
+          status: 'READY',
+          processedBy: adminUser?.email || 'admin@jackpot.com',
+          adminEmail: adminUser?.email || ''
         })
       });
       const reqResult = await reqResponse.json();
@@ -107,7 +109,7 @@ export default function ShiftDashboardTab({ adminUser }) {
       const res = await fetch('/api/coins-notifications', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: notiId, status: 'COMPLETED', read: true, processedBy: adminUser?.email || 'admin@jackpot.com' })
+        body: JSON.stringify({ id: notiId, status: 'COMPLETED', read: true, processedBy: adminUser?.email || 'admin@jackpot.com', adminEmail: adminUser?.email || '' })
       });
       const data = await res.json();
       if (data.success) {
@@ -136,7 +138,7 @@ export default function ShiftDashboardTab({ adminUser }) {
       const res = await fetch('/api/coins-notifications', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: notiId, status: 'HOLD', read: true, holdNote: reason, processedBy: adminUser?.email || 'admin@jackpot.com' })
+        body: JSON.stringify({ id: notiId, status: 'HOLD', read: true, holdNote: reason, processedBy: adminUser?.email || 'admin@jackpot.com', adminEmail: adminUser?.email || '' })
       });
       const data = await res.json();
       if (data.success) {

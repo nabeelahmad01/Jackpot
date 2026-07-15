@@ -84,6 +84,7 @@ export default function DistributorPortal() {
 
   // Stats SWR
   const distId = distSession?.id;
+  const staffAdminEmail = distSession?.isStaff ? distSession.email : '';
 
   // Heartbeat ping tracker for current active distributor staff/admin
   useEffect(() => {
@@ -138,13 +139,13 @@ export default function DistributorPortal() {
 
   // Pending queue counts for sidebar badges (status-filtered, use total from API)
   const { data: pendingRequestsData, mutate: mutatePendingRequests } = useSWR(
-    distId && distSession?.type === 'B' ? `/api/account-requests?status=PENDING&page=1&limit=1&adminRole=distributor&adminDistributorId=${distId}` : null,
+    distId && distSession?.type === 'B' ? `/api/account-requests?status=PENDING&page=1&limit=1&adminRole=distributor&adminDistributorId=${distId}&adminEmail=${encodeURIComponent(staffAdminEmail)}` : null,
     fetcher,
     { refreshInterval: 5000 }
   );
 
   const { data: pendingCoinsData, mutate: mutatePendingCoins } = useSWR(
-    distId && distSession?.type === 'B' ? `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED&page=1&limit=1&adminRole=distributor&adminDistributorId=${distId}` : null,
+    distId && distSession?.type === 'B' ? `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED&page=1&limit=1&adminRole=distributor&adminDistributorId=${distId}&adminEmail=${encodeURIComponent(staffAdminEmail)}` : null,
     fetcher,
     { refreshInterval: 5000 }
   );
@@ -201,7 +202,17 @@ export default function DistributorPortal() {
   const [staffEmail, setStaffEmail] = useState('');
   const [staffPassword, setStaffPassword] = useState('');
   const [staffRole, setStaffRole] = useState('coins_admin');
+  const [staffAllowedGameIds, setStaffAllowedGameIds] = useState([]);
   const [isSubmittingStaff, setIsSubmittingStaff] = useState(false);
+
+  // Edit staff states (Type B)
+  const [editingStaffMember, setEditingStaffMember] = useState(null);
+  const [editStaffName, setEditStaffName] = useState('');
+  const [editStaffEmail, setEditStaffEmail] = useState('');
+  const [editStaffPassword, setEditStaffPassword] = useState('');
+  const [editStaffRole, setEditStaffRole] = useState('coins_admin');
+  const [editStaffAllowedGameIds, setEditStaffAllowedGameIds] = useState([]);
+  const [isUpdatingStaff, setIsUpdatingStaff] = useState(false);
 
   // Commission Withdraw Form States
   const [commAmount, setCommAmount] = useState('');
@@ -254,7 +265,7 @@ export default function DistributorPortal() {
 
   // Commission Lookup Calendar States
   const [commLookupDate, setCommLookupDate] = useState(getTodayDateString());
-  const [commLookupStats, setCommLookupStats] = useState({ deposits: 0, withdrawals: 0, commission: 0, websiteCommission: 0 });
+  const [commLookupStats, setCommLookupStats] = useState({ deposits: 0, withdrawals: 0, profit: 0, commission: 0, websiteCommission: 0 });
   const [commLookupLoading, setCommLookupLoading] = useState(false);
 
   useEffect(() => {
@@ -267,6 +278,7 @@ export default function DistributorPortal() {
           setCommLookupStats({
             deposits: data.totalDeposits || 0,
             withdrawals: data.totalWithdrawals || 0,
+            profit: data.netProfit ?? Math.max(0, (data.totalDeposits || 0) - (data.totalWithdrawals || 0)),
             commission: data.commissionEarned || 0,
             websiteCommission: data.websiteCommissionEarned || 0,
             commissionRate: data.commissionRate || 0,
@@ -709,24 +721,34 @@ export default function DistributorPortal() {
       alert('Please fill out all staff fields.');
       return;
     }
+    if (staffRole === 'coins_admin' && staffAllowedGameIds.length === 0) {
+      alert('Please select at least one game for Coins Admin access.');
+      return;
+    }
     setIsSubmittingStaff(true);
     try {
+      const payload = {
+        name: staffName.trim(),
+        email: staffEmail.toLowerCase().trim(),
+        password: staffPassword.trim(),
+        role: staffRole,
+        distributorId: distId
+      };
+      if (staffRole === 'coins_admin') {
+        payload.allowedGameIds = staffAllowedGameIds;
+      }
+
       const res = await fetch('/api/distributors/staff', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: staffName.trim(),
-          email: staffEmail.toLowerCase().trim(),
-          password: staffPassword.trim(),
-          role: staffRole,
-          distributorId: distId
-        })
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (data.success) {
         setStaffName('');
         setStaffEmail('');
         setStaffPassword('');
+        setStaffAllowedGameIds([]);
         mutateStaff();
         alert('Staff account registered successfully!');
       } else {
@@ -740,6 +762,60 @@ export default function DistributorPortal() {
   };
 
   // Delete Staff (Type B)
+  const handleEditStaffClick = (staff) => {
+    setEditingStaffMember(staff);
+    setEditStaffName(staff.name || '');
+    setEditStaffEmail(staff.email || '');
+    setEditStaffPassword('');
+    setEditStaffRole(staff.role || 'coins_admin');
+    setEditStaffAllowedGameIds(Array.isArray(staff.allowedGameIds) ? [...staff.allowedGameIds] : []);
+  };
+
+  const handleEditStaffSubmit = async (e) => {
+    e.preventDefault();
+    if (!editStaffName.trim()) {
+      alert('Please enter staff name.');
+      return;
+    }
+    if (editStaffRole === 'coins_admin' && editStaffAllowedGameIds.length === 0) {
+      alert('Please select at least one game for Coins Admin access.');
+      return;
+    }
+
+    setIsUpdatingStaff(true);
+    try {
+      const payload = {
+        email: editStaffEmail,
+        name: editStaffName.trim(),
+        role: editStaffRole,
+        distributorId: distId,
+        allowedGameIds: editStaffRole === 'coins_admin' ? editStaffAllowedGameIds : []
+      };
+      if (editStaffPassword.trim()) {
+        payload.password = editStaffPassword.trim();
+      }
+
+      const res = await fetch('/api/distributors/staff', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        setEditingStaffMember(null);
+        mutateStaff();
+        alert('Staff details updated successfully!');
+      } else {
+        alert(data.message || 'Failed to update staff.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error updating staff member.');
+    } finally {
+      setIsUpdatingStaff(false);
+    }
+  };
+
   const handleDeleteStaff = async (staffEmailAddress) => {
     if (window.confirm(`Delete staff registry account "${staffEmailAddress}"?`)) {
       try {
@@ -767,7 +843,7 @@ export default function DistributorPortal() {
       const res = await fetch('/api/account-requests', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: reqId, status: 'READY', gameAccountUsername: username, gameAccountPassword: password, processedBy: distSession.name })
+        body: JSON.stringify({ id: reqId, status: 'READY', gameAccountUsername: username, gameAccountPassword: password, processedBy: distSession.name, adminEmail: distSession.email })
       });
       const data = await res.json();
       if (data.success) {
@@ -788,7 +864,7 @@ export default function DistributorPortal() {
       const res = await fetch('/api/account-requests', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: reqId, status: 'FAILED', rejectionReason: reason, processedBy: distSession.name })
+        body: JSON.stringify({ id: reqId, status: 'FAILED', rejectionReason: reason, processedBy: distSession.name, adminEmail: distSession.email })
       });
       const data = await res.json();
       if (data.success) {
@@ -807,7 +883,7 @@ export default function DistributorPortal() {
       const res = await fetch('/api/coins-notifications', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: noti.id, status: 'COMPLETED', processedBy: distSession.name })
+        body: JSON.stringify({ id: noti.id, status: 'COMPLETED', processedBy: distSession.name, adminEmail: distSession.email })
       });
       const data = await res.json();
       if (data.success) {
@@ -826,6 +902,7 @@ export default function DistributorPortal() {
       if (status !== undefined) {
         payload.status = status;
         payload.processedBy = distSession?.name || 'Staff';
+        payload.adminEmail = distSession?.email || '';
       }
       if (read !== undefined) payload.read = read;
 
@@ -850,7 +927,8 @@ export default function DistributorPortal() {
       const payload = {
         id: reqId,
         status: status,
-        processedBy: distSession?.name || 'Staff'
+        processedBy: distSession?.name || 'Staff',
+        adminEmail: distSession?.email || ''
       };
       if (username !== undefined) payload.gameAccountUsername = username;
       if (password !== undefined) payload.gameAccountPassword = password;
@@ -924,7 +1002,7 @@ export default function DistributorPortal() {
       const res = await fetch('/api/coins-notifications', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: invalidatingNoti.id, status: 'HOLD', holdNote: holdReason.trim(), processedBy: distSession.name })
+        body: JSON.stringify({ id: invalidatingNoti.id, status: 'HOLD', holdNote: holdReason.trim(), processedBy: distSession.name, adminEmail: distSession.email })
       });
       const data = await res.json();
       if (data.success) {
@@ -1483,13 +1561,16 @@ export default function DistributorPortal() {
                       <span style={{ fontSize: '0.8rem', color: '#ef4444', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         📤 Out: ${(commLookupStats.withdrawals || 0).toFixed(2)}
                       </span>
+                      <span style={{ fontSize: '0.8rem', color: '#fff', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        📊 Profit: ${(commLookupStats.profit || 0).toFixed(2)}
+                      </span>
                     </div>
                     <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.4rem' }}>
                       <span style={{ fontSize: '0.75rem', color: 'var(--gold-primary)', fontWeight: 'bold' }}>
-                        My Comm ({commLookupStats.commissionRate || 0}%): ${(commLookupStats.commission || 0).toFixed(2)}
+                        My Comm ({commLookupStats.commissionRate || 0}% of profit): ${(commLookupStats.commission || 0).toFixed(2)}
                       </span>
                       <span style={{ fontSize: '0.75rem', color: '#ff4d6d', fontWeight: 'bold' }}>
-                        Web Comm ({commLookupStats.websiteCommissionRate || 0}%): ${(commLookupStats.websiteCommission || 0).toFixed(2)}
+                        Web Comm ({commLookupStats.websiteCommissionRate || 0}% of profit): ${(commLookupStats.websiteCommission || 0).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -1864,7 +1945,7 @@ export default function DistributorPortal() {
               <div style={{ borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '1.25rem' }}>
                 <h4 style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--gold-primary)', marginBottom: '0.4rem' }}>2. How is my distributor commission calculated?</h4>
                 <p style={{ fontSize: '0.75rem', color: '#aaa', lineHeight: '1.4' }}>
-                  Your commission is based on your unique rate (e.g. {stats.commissionRate || 10}%) applied directly to all successful deposits completed by your referred players. Earnings are calculated in real-time.
+                  Your commission is based on your unique rate (e.g. {stats.commissionRate || 10}%) applied to net profit (successful deposits minus withdrawals) from your referred players. Earnings are calculated in real-time.
                 </p>
               </div>
               <div style={{ borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '1.25rem' }}>
@@ -1918,12 +1999,18 @@ export default function DistributorPortal() {
               </div>
               {distSession.type === 'B' && !distSession.isStaff ? (
                 <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                  <div style={{ color: '#888', fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Website Commission ({stats.websiteCommissionRate || 0}%)</div>
+                  <div style={{ color: '#888', fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Net Profit</div>
+                  <div style={{ fontSize: '1.75rem', fontWeight: '900', color: '#fff', marginTop: '0.25rem' }}>${(stats.netProfit ?? Math.max(0, (stats.totalDeposits || 0) - (stats.totalWithdrawals || 0))).toFixed(2)}</div>
+                </div>
+              ) : null}
+              {distSession.type === 'B' && !distSession.isStaff ? (
+                <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ color: '#888', fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Website Commission ({stats.websiteCommissionRate || 0}% of profit)</div>
                   <div style={{ fontSize: '1.75rem', fontWeight: '900', color: '#ff4d6d', marginTop: '0.25rem' }}>${dueWebsiteCommission.toFixed(2)}</div>
                 </div>
               ) : (
                 <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                  <div style={{ color: '#888', fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>My Commission ({stats.commissionRate || 0}%)</div>
+                  <div style={{ color: '#888', fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>My Commission ({stats.commissionRate || 0}% of profit)</div>
                   <div style={{ fontSize: '1.75rem', fontWeight: '900', color: 'var(--gold-primary)', marginTop: '0.25rem' }}>${(stats.commissionEarned || 0).toFixed(2)}</div>
                 </div>
               )}
@@ -2282,12 +2369,39 @@ export default function DistributorPortal() {
                   </div>
                   <div style={{ marginBottom: '1.25rem' }}>
                     <label style={{ fontSize: '0.65rem', color: '#aaa', display: 'block', marginBottom: '0.2rem' }}>Authority Role</label>
-                    <select value={staffRole} onChange={(e) => setStaffRole(e.target.value)} style={{ width: '100%', background: '#040509', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', padding: '0.4rem 0.6rem', color: '#fff', fontSize: '0.75rem', outline: 'none' }}>
+                    <select value={staffRole} onChange={(e) => { setStaffRole(e.target.value); if (e.target.value !== 'coins_admin') setStaffAllowedGameIds([]); }} style={{ width: '100%', background: '#040509', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', padding: '0.4rem 0.6rem', color: '#fff', fontSize: '0.75rem', outline: 'none' }}>
                       <option value="coins_admin">Coins Admin (Load allotments)</option>
                       <option value="support_admin">Support Admin (Live Chat support)</option>
                       <option value="financial_admin">Financial Admin (Audit ledger)</option>
                     </select>
                   </div>
+
+                  {staffRole === 'coins_admin' && (
+                    <div style={{ marginBottom: '1.25rem' }}>
+                      <label style={{ fontSize: '0.65rem', color: '#aaa', display: 'block', marginBottom: '0.35rem' }}>Game Access</label>
+                      <p style={{ fontSize: '0.6rem', color: '#666', marginBottom: '0.5rem' }}>Select games this staff can process requests for.</p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', background: '#040509', padding: '0.6rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)', maxHeight: '140px', overflowY: 'auto' }}>
+                        {(!gamesData?.games || gamesData.games.length === 0) ? (
+                          <span style={{ fontSize: '0.65rem', color: '#666' }}>No games available.</span>
+                        ) : (
+                          gamesData.games.map((game) => (
+                            <label key={game.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.7rem', cursor: 'pointer', color: staffAllowedGameIds.includes(game.id) ? 'var(--gold-primary)' : '#fff' }}>
+                              <input
+                                type="checkbox"
+                                checked={staffAllowedGameIds.includes(game.id)}
+                                onChange={() => {
+                                  setStaffAllowedGameIds((prev) =>
+                                    prev.includes(game.id) ? prev.filter((id) => id !== game.id) : [...prev, game.id]
+                                  );
+                                }}
+                              />
+                              <span>{game.title}</span>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   <button type="submit" style={{ width: '100%', background: 'var(--gold-primary)', color: '#000', border: 'none', padding: '0.5rem', borderRadius: '6px', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer' }} disabled={isSubmittingStaff}>
                     {isSubmittingStaff ? 'REGISTERING...' : 'REGISTER STAFF'}
@@ -2303,13 +2417,14 @@ export default function DistributorPortal() {
                       <th style={{ padding: '0.5rem' }}>Name</th>
                       <th style={{ padding: '0.5rem' }}>Email</th>
                       <th style={{ padding: '0.5rem' }}>Role Permission</th>
+                      <th style={{ padding: '0.5rem' }}>Game Access</th>
                       <th style={{ padding: '0.5rem' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(!staffData?.staff || staffData.staff.length === 0) ? (
                       <tr>
-                        <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>No staff members registered.</td>
+                        <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>No staff members registered.</td>
                       </tr>
                     ) : (
                       staffData.staff.map(s => (
@@ -2321,10 +2436,20 @@ export default function DistributorPortal() {
                               {s.role}
                             </span>
                           </td>
+                          <td style={{ padding: '0.6rem 0.5rem', fontSize: '0.65rem', color: '#888', maxWidth: '120px' }}>
+                            {s.role === 'coins_admin' && Array.isArray(s.allowedGameIds) && s.allowedGameIds.length > 0
+                              ? s.allowedGameIds.map((id) => gamesData?.games?.find((g) => g.id === id)?.title || id).join(', ')
+                              : '—'}
+                          </td>
                           <td style={{ padding: '0.6rem 0.5rem' }}>
-                            <button onClick={() => handleDeleteStaff(s.email)} style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', border: 'none', borderRadius: '4px', padding: '0.2rem 0.4rem', fontSize: '0.65rem', cursor: 'pointer' }}>
-                              Remove
-                            </button>
+                            <div style={{ display: 'flex', gap: '0.35rem' }}>
+                              <button onClick={() => handleEditStaffClick(s)} style={{ background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.3)', color: 'var(--gold-primary)', borderRadius: '4px', padding: '0.2rem 0.4rem', fontSize: '0.65rem', cursor: 'pointer' }}>
+                                Edit
+                              </button>
+                              <button onClick={() => handleDeleteStaff(s.email)} style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', borderRadius: '4px', padding: '0.2rem 0.4rem', fontSize: '0.65rem', cursor: 'pointer' }}>
+                                Remove
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -2333,6 +2458,79 @@ export default function DistributorPortal() {
                 </table>
               </div>
             </div>
+
+            {editingStaffMember && (
+              <div
+                onClick={() => setEditingStaffMember(null)}
+                style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}
+              >
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ background: '#0b0d16', border: '1px solid rgba(255,215,0,0.25)', borderRadius: '12px', padding: '1.25rem', width: '100%', maxWidth: '400px', maxHeight: '90vh', overflowY: 'auto' }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <h3 style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--gold-primary)' }}>Edit Staff Member</h3>
+                    <button type="button" onClick={() => setEditingStaffMember(null)} style={{ background: 'none', border: 'none', color: '#888', fontSize: '1.25rem', cursor: 'pointer' }}>&times;</button>
+                  </div>
+
+                  <form onSubmit={handleEditStaffSubmit}>
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <label style={{ fontSize: '0.65rem', color: '#aaa', display: 'block', marginBottom: '0.2rem' }}>Email (cannot change)</label>
+                      <input type="text" value={editStaffEmail} readOnly disabled style={{ width: '100%', background: '#040509', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', padding: '0.4rem 0.6rem', color: '#666', fontSize: '0.75rem', opacity: 0.7 }} />
+                    </div>
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <label style={{ fontSize: '0.65rem', color: '#aaa', display: 'block', marginBottom: '0.2rem' }}>Full Name</label>
+                      <input type="text" value={editStaffName} onChange={(e) => setEditStaffName(e.target.value)} style={{ width: '100%', background: '#040509', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', padding: '0.4rem 0.6rem', color: '#fff', fontSize: '0.75rem', outline: 'none' }} required />
+                    </div>
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <label style={{ fontSize: '0.65rem', color: '#aaa', display: 'block', marginBottom: '0.2rem' }}>New Password (leave blank to keep)</label>
+                      <input type="text" placeholder="Enter only if changing..." value={editStaffPassword} onChange={(e) => setEditStaffPassword(e.target.value)} style={{ width: '100%', background: '#040509', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', padding: '0.4rem 0.6rem', color: '#fff', fontSize: '0.75rem', outline: 'none' }} />
+                    </div>
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <label style={{ fontSize: '0.65rem', color: '#aaa', display: 'block', marginBottom: '0.2rem' }}>Authority Role</label>
+                      <select
+                        value={editStaffRole}
+                        onChange={(e) => {
+                          setEditStaffRole(e.target.value);
+                          if (e.target.value !== 'coins_admin') setEditStaffAllowedGameIds([]);
+                        }}
+                        style={{ width: '100%', background: '#040509', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', padding: '0.4rem 0.6rem', color: '#fff', fontSize: '0.75rem', outline: 'none' }}
+                      >
+                        <option value="coins_admin">Coins Admin (Load allotments)</option>
+                        <option value="support_admin">Support Admin (Live Chat support)</option>
+                        <option value="financial_admin">Financial Admin (Audit ledger)</option>
+                      </select>
+                    </div>
+
+                    {editStaffRole === 'coins_admin' && (
+                      <div style={{ marginBottom: '1rem' }}>
+                        <label style={{ fontSize: '0.65rem', color: '#aaa', display: 'block', marginBottom: '0.35rem' }}>Game Access</label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', background: '#040509', padding: '0.6rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)', maxHeight: '140px', overflowY: 'auto' }}>
+                          {(gamesData?.games || []).map((game) => (
+                            <label key={game.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.7rem', cursor: 'pointer', color: editStaffAllowedGameIds.includes(game.id) ? 'var(--gold-primary)' : '#fff' }}>
+                              <input
+                                type="checkbox"
+                                checked={editStaffAllowedGameIds.includes(game.id)}
+                                onChange={() => {
+                                  setEditStaffAllowedGameIds((prev) =>
+                                    prev.includes(game.id) ? prev.filter((id) => id !== game.id) : [...prev, game.id]
+                                  );
+                                }}
+                              />
+                              <span>{game.title}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <button type="submit" style={{ width: '100%', background: 'var(--gold-primary)', color: '#000', border: 'none', padding: '0.5rem', borderRadius: '6px', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer' }} disabled={isUpdatingStaff}>
+                      {isUpdatingStaff ? 'UPDATING...' : 'UPDATE STAFF'}
+                    </button>
+                  </form>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

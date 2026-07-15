@@ -30,7 +30,7 @@ export default function CoinsAllotmentTab({
 
   // SWR automatically polls every 4s for coin allotments
   const { data, error, mutate } = useSWR(
-    `/api/coins-notifications?page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}`,
+    `/api/coins-notifications?page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
     fetcher,
     { refreshInterval: 4000 }
   );

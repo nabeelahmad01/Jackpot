@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/mongodb';
+import { calcCommissionFromProfit } from '../../../../lib/commission';
 
 export async function GET(req) {
   try {
@@ -108,8 +109,7 @@ export async function GET(req) {
       });
     }
 
-    // Calculate commission earned
-    const commissionEarned = totalDeposits * ((agent.commissionRate || 0) / 100);
+    const commissionEarned = calcCommissionFromProfit(totalDeposits, totalWithdrawals, agent.commissionRate);
 
     // Sum up commission withdrawals by this agent
     const agentWithdrawDocs = await transactionsCollection.find({

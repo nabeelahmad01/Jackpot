@@ -37,7 +37,7 @@ export async function POST(req) {
     return NextResponse.json({
       success: true,
       message: 'Login successful!',
-      user: { name: matchedUser.name, email: matchedUser.email, role: matchedUser.role, coins: matchedUser.coins || 0, referralCode: matchedUser.referralCode || '', isSubscribed: matchedUser.isSubscribed || false, distributorId: matchedUser.distributorId || '' }
+      user: { name: matchedUser.name, email: matchedUser.email, role: matchedUser.role, coins: matchedUser.coins || 0, referralCode: matchedUser.referralCode || '', isSubscribed: matchedUser.isSubscribed || false, distributorId: matchedUser.distributorId || '', allowedGameIds: matchedUser.allowedGameIds || [] }
     });
   } catch (err) {
     console.error('Login API Error:', err);

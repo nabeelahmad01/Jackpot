@@ -59,6 +59,7 @@ export async function POST(req) {
           email: matchedStaff.email,
           role: 'distributor_staff',
           staffRole: matchedStaff.role,
+          allowedGameIds: matchedStaff.allowedGameIds || [],
           type: parentDistributor ? parentDistributor.type : 'B',
           isStaff: true,
           commissionRate: parentDistributor ? parentDistributor.commissionRate : 0

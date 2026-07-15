@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
+import { calcCommissionFromProfit } from '../../../lib/commission';
 
 // GET transactions (supports filtering by email for users, or returning all for admins)
 export async function GET(req) {
@@ -300,13 +301,14 @@ export async function POST(req) {
       
       let commissionEarned = 0;
       if (playerEmails.length > 0) {
-        const playerDeposits = await db.collection('transactions').find({
+        const playerTxs = await db.collection('transactions').find({
           userEmail: { $in: playerEmails },
-          type: 'DEPOSIT',
+          type: { $in: ['DEPOSIT', 'WITHDRAW'] },
           status: 'SUCCESS'
         }).toArray();
-        const totalDeposits = playerDeposits.reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
-        commissionEarned = (totalDeposits * (distDoc.commissionRate || 0)) / 100;
+        const totalDeposits = playerTxs.filter((tx) => tx.type === 'DEPOSIT').reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
+        const totalWithdrawals = playerTxs.filter((tx) => tx.type === 'WITHDRAW').reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
+        commissionEarned = calcCommissionFromProfit(totalDeposits, totalWithdrawals, distDoc.commissionRate);
       }
 
       const availableCommission = commissionEarned - totalWithdrawn;
@@ -335,13 +337,14 @@ export async function POST(req) {
 
       let commissionEarned = 0;
       if (playerEmails.length > 0) {
-        const playerDeposits = await db.collection('transactions').find({
+        const playerTxs = await db.collection('transactions').find({
           userEmail: { $in: playerEmails },
-          type: 'DEPOSIT',
+          type: { $in: ['DEPOSIT', 'WITHDRAW'] },
           status: 'SUCCESS'
         }).toArray();
-        const totalDeposits = playerDeposits.reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
-        commissionEarned = (totalDeposits * (agentDoc.commissionRate || 0)) / 100;
+        const totalDeposits = playerTxs.filter((tx) => tx.type === 'DEPOSIT').reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
+        const totalWithdrawals = playerTxs.filter((tx) => tx.type === 'WITHDRAW').reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
+        commissionEarned = calcCommissionFromProfit(totalDeposits, totalWithdrawals, agentDoc.commissionRate);
       }
 
       const pendingAmount = withdrawals

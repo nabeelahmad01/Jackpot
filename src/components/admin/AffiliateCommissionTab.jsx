@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
+import { parseAffiliatePayoutFields } from '../../lib/affiliatePayout';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -177,12 +178,17 @@ export default function AffiliateCommissionTab({
               <tbody>
                 {pendingTransactions.length === 0 ? (
                   <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#888' }}>No pending affiliate commission requests.</td></tr>
-                ) : pendingTransactions.map((tx, idx) => (
+                ) : pendingTransactions.map((tx, idx) => {
+                  const payout = parseAffiliatePayoutFields(tx);
+                  return (
                   <tr key={tx.id}>
                     <td>{(page - 1) * limit + idx + 1}</td>
-                    <td><strong>{tx.userEmail}</strong></td>
-                    <td><span className="admin-badge-preview b-new">{tx.gateway}</span></td>
-                    <td><code style={{ fontSize: '0.7rem' }}>{tx.code}</code></td>
+                    <td>
+                      <strong>{tx.userEmail}</strong>
+                      {payout.holder !== '—' && <div style={{ fontSize: '0.65rem', color: '#888' }}>{payout.holder}</div>}
+                    </td>
+                    <td><span className="admin-badge-preview b-new">{payout.method}</span></td>
+                    <td><code style={{ fontSize: '0.7rem' }}>{payout.account}</code></td>
                     <td><strong style={{ color: 'var(--gold-primary)' }}>${parseFloat(tx.amount).toFixed(2)}</strong></td>
                     <td>
                       {tx.payoutQr ? (
@@ -203,7 +209,8 @@ export default function AffiliateCommissionTab({
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -232,12 +239,14 @@ export default function AffiliateCommissionTab({
               <tbody>
                 {processedTransactions.length === 0 ? (
                   <tr><td colSpan="9" style={{ textAlign: 'center', padding: '2rem', color: '#888' }}>No processed affiliate payouts yet.</td></tr>
-                ) : processedTransactions.map((tx, idx) => (
+                ) : processedTransactions.map((tx, idx) => {
+                  const payout = parseAffiliatePayoutFields(tx);
+                  return (
                   <tr key={tx.id}>
                     <td>{(page - 1) * limit + idx + 1}</td>
                     <td><strong>{tx.userEmail}</strong></td>
-                    <td>{tx.gateway}</td>
-                    <td><code style={{ fontSize: '0.65rem' }}>{tx.code}</code></td>
+                    <td>{payout.method}</td>
+                    <td><code style={{ fontSize: '0.65rem' }}>{payout.account}</code></td>
                     <td style={{ color: 'var(--gold-primary)', fontWeight: 'bold' }}>${parseFloat(tx.amount).toFixed(2)}</td>
                     <td><span className={`admin-badge-preview b-${tx.status === 'SUCCESS' ? 'ready' : 'none'}`}>{tx.status}</span></td>
                     <td style={{ fontSize: '0.7rem' }}>
@@ -254,7 +263,8 @@ export default function AffiliateCommissionTab({
                       ) : '—'}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -269,7 +279,9 @@ export default function AffiliateCommissionTab({
         </>
       )}
 
-      {payoutModalOpen && selectedTx && (
+      {payoutModalOpen && selectedTx && (() => {
+        const payout = parseAffiliatePayoutFields(selectedTx);
+        return (
         <div className="modal-backdrop-custom" onClick={() => setPayoutModalOpen(false)}>
           <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px', width: '92%' }}>
             <div className="modal-header">
@@ -279,8 +291,9 @@ export default function AffiliateCommissionTab({
             <div className="modal-body">
               <div style={{ marginBottom: '1rem', fontSize: '0.8rem', color: '#aaa' }}>
                 <div>Affiliate: <strong style={{ color: '#fff' }}>{selectedTx.userEmail}</strong></div>
-                <div style={{ marginTop: '0.25rem' }}>Method: <strong>{selectedTx.gateway}</strong></div>
-                <div style={{ marginTop: '0.25rem' }}>Address: <strong>{selectedTx.code}</strong></div>
+                {payout.holder !== '—' && <div style={{ marginTop: '0.25rem' }}>Account Holder: <strong>{payout.holder}</strong></div>}
+                <div style={{ marginTop: '0.25rem' }}>Method: <strong>{payout.method}</strong></div>
+                <div style={{ marginTop: '0.25rem' }}>Account Number: <strong>{payout.account}</strong></div>
                 <div style={{ marginTop: '0.25rem' }}>Amount: <strong style={{ color: 'var(--gold-primary)' }}>${parseFloat(selectedTx.amount).toFixed(2)}</strong></div>
               </div>
               <form onSubmit={handlePayoutSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -324,7 +337,8 @@ export default function AffiliateCommissionTab({
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </section>
   );
 }

@@ -392,11 +392,12 @@ export default function AffiliatesTab() {
                         <div>Team: <strong style={{ color: '#a855f7', cursor: 'pointer' }} onClick={() => handleViewTeam(agent)}>{agent.teamMembersCount || 0}</strong></div>
                         <div>Deposits: <strong>${parseFloat(agent.totalDeposits || 0).toFixed(2)}</strong></div>
                         <div>Withdrawals: <strong>${parseFloat(agent.totalWithdrawals || 0).toFixed(2)}</strong></div>
+                        <div>Profit: <strong>${parseFloat(agent.netProfit ?? Math.max(0, (agent.totalDeposits || 0) - (agent.totalWithdrawals || 0))).toFixed(2)}</strong></div>
                       </div>
                     </td>
                     <td>
                       <div style={{ fontSize: '0.7rem' }}>
-                        <div>Commission: <strong style={{ color: '#2ecc71' }}>${parseFloat(agent.commissionEarned || 0).toFixed(2)}</strong></div>
+                        <div>Commission: <strong style={{ color: '#2ecc71' }}>${parseFloat(agent.commissionEarned || 0).toFixed(2)}</strong> <span style={{ color: '#666', fontSize: '0.6rem' }}>(on profit)</span></div>
                         <div>Withdrawn: <strong>${parseFloat(agent.totalWithdrawn || 0).toFixed(2)}</strong></div>
                         <div>Available: <strong style={{ color: 'var(--gold-primary)' }}>${parseFloat(agent.availableBalance || 0).toFixed(2)}</strong></div>
                       </div>

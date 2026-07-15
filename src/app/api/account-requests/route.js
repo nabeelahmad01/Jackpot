@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
+import { applyStaffGameFilter, staffCanAccessGame } from '../../../lib/staffGameAccess';
 
 // GET requests (supports filtering by email for users, or returning all for admins)
 export async function GET(req) {
@@ -17,6 +18,7 @@ export async function GET(req) {
 
     const adminRole = searchParams.get('adminRole');
     const adminDistributorId = searchParams.get('adminDistributorId');
+    const adminEmail = searchParams.get('adminEmail');
 
     // 1. FAST PATH: No Search Active (Only fetch actual requests)
     if (!search) {
@@ -38,6 +40,10 @@ export async function GET(req) {
 
       if (status) {
         query.status = status.toUpperCase().trim();
+      }
+
+      if (adminEmail) {
+        query = await applyStaffGameFilter(db, query, adminEmail);
       }
 
       const totalRequests = await requestsCollection.countDocuments(query);
@@ -299,7 +305,7 @@ export async function POST(req) {
 // PUT (update status) request (Admin approval/rejection)
 export async function PUT(req) {
   try {
-    const { id, status, gameAccountUsername, gameAccountPassword, processedBy, rejectionReason } = await req.json();
+    const { id, status, gameAccountUsername, gameAccountPassword, processedBy, rejectionReason, adminEmail } = await req.json();
 
     if (!id || !status) {
       return NextResponse.json({ success: false, message: 'Request ID and status are required.' }, { status: 400 });
@@ -311,6 +317,11 @@ export async function PUT(req) {
     const requestDoc = await requestsCollection.findOne({ id });
     if (!requestDoc) {
       return NextResponse.json({ success: false, message: 'Account request not found.' }, { status: 404 });
+    }
+
+    const actorEmail = adminEmail || processedBy;
+    if (actorEmail && !(await staffCanAccessGame(db, actorEmail, requestDoc.gameTitle))) {
+      return NextResponse.json({ success: false, message: 'You do not have access to process requests for this game.' }, { status: 403 });
     }
 
     // Normalize COMPLETED -> READY when credentials are provided (distributor approve flow)

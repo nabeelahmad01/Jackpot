@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/mongodb';
 import { cache } from '../../../../lib/cache';
+import { applyStaffGameFilter } from '../../../../lib/staffGameAccess';
 
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const adminRole = searchParams.get('adminRole');
     const adminDistributorId = searchParams.get('adminDistributorId');
+    const adminEmail = searchParams.get('adminEmail');
 
     // Contextual cache key to prevent collision
-    const cacheKey = `admin_stats_${adminRole || 'anon'}_${adminDistributorId || 'global'}`;
+    const cacheKey = `admin_stats_${adminRole || 'anon'}_${adminDistributorId || 'global'}_${adminEmail || 'all'}`;
     const cachedStats = cache.get(cacheKey);
     if (cachedStats) {
       return NextResponse.json({ success: true, stats: cachedStats });
@@ -29,6 +31,13 @@ export async function GET(req) {
       }
     }
 
+    let requestsQuery = { ...baseQuery, status: 'PENDING' };
+    let coinsQuery = { ...baseQuery, status: { $in: ['PENDING', 'CLAIM_REQUESTED'] } };
+    if (adminEmail) {
+      requestsQuery = await applyStaffGameFilter(db, requestsQuery, adminEmail);
+      coinsQuery = await applyStaffGameFilter(db, coinsQuery, adminEmail);
+    }
+
     // Run pending queue counts in parallel
     const [
       pendingRequestsCount,
@@ -38,13 +47,13 @@ export async function GET(req) {
       pendingWebsitePaymentsCount,
       pendingAffiliateCommissionsCount
     ] = await Promise.all([
-      db.collection('accountRequests').countDocuments({ ...baseQuery, status: 'PENDING' }),
+      db.collection('accountRequests').countDocuments(requestsQuery),
       db.collection('transactions').countDocuments({
         ...baseQuery,
         status: 'PENDING',
         type: { $nin: ['WEBSITE_COMMISSION_PAYMENT', 'COMMISSION_WITHDRAW', 'AFFILIATE_COMMISSION_WITHDRAW'] }
       }),
-      db.collection('coinsNotifications').countDocuments({ ...baseQuery, status: { $in: ['PENDING', 'CLAIM_REQUESTED'] } }),
+      db.collection('coinsNotifications').countDocuments(coinsQuery),
       db.collection('supportMessages').distinct('userEmail', adminDistributorId ? { distributorId: adminDistributorId, senderType: 'player', read: false } : { distributorType: { $ne: 'B' }, senderType: 'player', read: false }),
       db.collection('transactions').countDocuments({ type: { $in: ['WEBSITE_COMMISSION_PAYMENT', 'COMMISSION_WITHDRAW'] }, distributorId: adminDistributorId || { $exists: true }, status: 'PENDING' }),
       db.collection('transactions').countDocuments({ type: 'AFFILIATE_COMMISSION_WITHDRAW', status: 'PENDING' })

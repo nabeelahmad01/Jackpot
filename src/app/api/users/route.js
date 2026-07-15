@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
+import { isCoinsAdminRole } from '../../../lib/staffGameAccess';
 
 // GET users (Admin listing, or referrals query)
 export async function GET(req) {
@@ -102,7 +103,7 @@ export async function GET(req) {
 // PUT update user details (Admin adjustment of coins or role modifications)
 export async function PUT(req) {
   try {
-    const { email, coins, role, name, password, status } = await req.json();
+    const { email, coins, role, name, password, status, allowedGameIds } = await req.json();
 
     if (!email) {
       return NextResponse.json({ success: false, message: 'User email is required.' }, { status: 400 });
@@ -138,6 +139,19 @@ export async function PUT(req) {
     }
     if (status !== undefined) {
       updateFields.status = status;
+    }
+    if (allowedGameIds !== undefined) {
+      const roleToCheck = role !== undefined ? role : currentUser.role;
+      if (isCoinsAdminRole(roleToCheck)) {
+        const { validateAllowedGameIds } = await import('../../../lib/staffGameAccess');
+        const validation = await validateAllowedGameIds(db, allowedGameIds, currentUser.distributorId || '');
+        if (!validation.valid) {
+          return NextResponse.json({ success: false, message: validation.message }, { status: 400 });
+        }
+        updateFields.allowedGameIds = validation.allowedGameIds;
+      } else {
+        updateFields.allowedGameIds = [];
+      }
     }
 
     const result = await usersCollection.updateOne(

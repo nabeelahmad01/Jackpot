@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
+import { calcCommissionFromProfit, calcNetProfit } from '../../../lib/commission';
 
 // GET list of distributors (with dynamic statistics)
 export async function GET() {
@@ -39,14 +40,16 @@ export async function GET() {
         totalWithdrawals = withdrawDocs.reduce((acc, curr) => acc + parseFloat(curr.amount || 0), 0);
       }
 
-      const commissionEarned = totalDeposits * ((dist.commissionRate || 0) / 100);
-      const websiteCommissionEarned = totalDeposits * ((dist.websiteCommissionRate || 0) / 100);
+      const netProfit = calcNetProfit(totalDeposits, totalWithdrawals);
+      const commissionEarned = calcCommissionFromProfit(totalDeposits, totalWithdrawals, dist.commissionRate);
+      const websiteCommissionEarned = calcCommissionFromProfit(totalDeposits, totalWithdrawals, dist.websiteCommissionRate);
 
       return {
         ...dist,
         playersCount: playerEmails.length,
         totalDeposits,
         totalWithdrawals,
+        netProfit,
         commissionEarned,
         websiteCommissionEarned
       };

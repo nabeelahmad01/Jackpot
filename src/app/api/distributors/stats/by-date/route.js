@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../../lib/mongodb';
+import { calcCommissionFromProfit, calcNetProfit } from '../../../../../lib/commission';
 
 export async function GET(req) {
   try {
@@ -63,14 +64,16 @@ export async function GET(req) {
       });
     }
 
-    const commissionEarned = totalDeposits * (commissionRate / 100);
-    const websiteCommissionEarned = totalDeposits * (websiteCommissionRate / 100);
+    const netProfit = calcNetProfit(totalDeposits, totalWithdrawals);
+    const commissionEarned = calcCommissionFromProfit(totalDeposits, totalWithdrawals, commissionRate);
+    const websiteCommissionEarned = calcCommissionFromProfit(totalDeposits, totalWithdrawals, websiteCommissionRate);
 
     return NextResponse.json({
       success: true,
       date: dateParam,
       totalDeposits,
       totalWithdrawals,
+      netProfit,
       commissionEarned,
       websiteCommissionEarned,
       commissionRate,

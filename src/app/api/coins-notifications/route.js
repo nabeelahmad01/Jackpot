@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
+import { applyStaffGameFilter, staffCanAccessGame } from '../../../lib/staffGameAccess';
 
 // GET all coins notifications (supports filtering by email for users, or returning all for admins)
 export async function GET(req) {
@@ -20,6 +21,7 @@ export async function GET(req) {
     }
 
     const adminDistributorId = searchParams.get('adminDistributorId');
+    const adminEmail = searchParams.get('adminEmail');
 
     if (adminDistributorId) {
       query.distributorId = adminDistributorId;
@@ -59,6 +61,10 @@ export async function GET(req) {
       } else {
         query.status = statusFilter;
       }
+    }
+
+    if (adminEmail) {
+      query = await applyStaffGameFilter(db, query, adminEmail);
     }
 
     const totalNotifications = await notificationsCollection.countDocuments(query);
@@ -110,7 +116,7 @@ export async function GET(req) {
 // PUT update status, read indicator, or hold note
 export async function PUT(req) {
   try {
-    const { id, status, read, holdNote, processedBy } = await req.json();
+    const { id, status, read, holdNote, processedBy, adminEmail } = await req.json();
 
     if (!id) {
       return NextResponse.json({ success: false, message: 'Notification ID is required.' }, { status: 400 });
@@ -122,6 +128,11 @@ export async function PUT(req) {
     const originalNoti = await notificationsCollection.findOne({ id });
     if (!originalNoti) {
       return NextResponse.json({ success: false, message: 'Notification not found.' }, { status: 404 });
+    }
+
+    const actorEmail = adminEmail || processedBy;
+    if (actorEmail && !(await staffCanAccessGame(db, actorEmail, originalNoti.gameTitle))) {
+      return NextResponse.json({ success: false, message: 'You do not have access to process notifications for this game.' }, { status: 403 });
     }
 
     const updateFields = {};

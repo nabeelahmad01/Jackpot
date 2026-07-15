@@ -82,7 +82,7 @@ export default function AdminDashboard({
 
   // Use SWR to poll counts/stats for the sidebar badges
   const { data: statsData } = useSWR(
-    `/api/admin/stats?adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}`,
+    `/api/admin/stats?adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
     fetcher,
     {
       refreshInterval: 4000
