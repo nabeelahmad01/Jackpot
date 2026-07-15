@@ -2,12 +2,22 @@
 
 import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
+import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 
-import { SupportModal } from '../../components/Modals';
+import { SupportModal, GoogleWarningModal } from '../../components/Modals';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
-export default function AffiliatePortal() {
+const GoogleIcon = () => (
+  <svg className="google-svg" viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
+    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
+  </svg>
+);
+
+function AffiliatePortal() {
   const [mounted, setMounted] = useState(false);
   const [agentSession, setAgentSession] = useState(null);
   const [supportOpen, setSupportOpen] = useState(false);
@@ -26,6 +36,95 @@ export default function AffiliatePortal() {
   const [regCode, setRegCode] = useState('');
   const [regError, setRegError] = useState('');
   const [isRegisteringSubmit, setIsRegisteringSubmit] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [googleWarnOpen, setGoogleWarnOpen] = useState(false);
+
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || 'your_google_client_id_here';
+
+  const isMessengerWebView = () => {
+    if (typeof window === 'undefined') return false;
+    const ua = navigator.userAgent || navigator.vendor || window.opera;
+    return (ua.indexOf('FBAN') > -1) || (ua.indexOf('FBAV') > -1) || (ua.indexOf('Messenger') > -1);
+  };
+
+  const completeGoogleAuth = async (userEmail, userName, promoCode = '') => {
+    setIsGoogleLoading(true);
+    setLoginError('');
+    setRegError('');
+    try {
+      const response = await fetch('/api/agents/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: userEmail,
+          name: userName,
+          agentCode: promoCode || regCode.trim() || undefined
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        localStorage.setItem('jackpot_agent_session', JSON.stringify(data.agent));
+        setAgentSession(data.agent);
+        setActiveTab('dashboard');
+        setIsRegistering(false);
+        setRegName('');
+        setRegEmail('');
+        setRegPassword('');
+        setRegCode('');
+      } else {
+        const msg = data.message || 'Google sign-in failed.';
+        if (isRegistering) setRegError(msg);
+        else setLoginError(msg);
+      }
+    } catch (err) {
+      console.error(err);
+      const msg = 'Connection failure.';
+      if (isRegistering) setRegError(msg);
+      else setLoginError(msg);
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
+
+  const loginWithGoogle = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      try {
+        const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
+        });
+        const profile = await res.json();
+        if (!profile.email) {
+          const msg = 'Failed to fetch email from Google.';
+          if (isRegistering) setRegError(msg);
+          else setLoginError(msg);
+          return;
+        }
+        await completeGoogleAuth(profile.email.toLowerCase(), profile.name || 'Google Affiliate');
+      } catch (err) {
+        console.error(err);
+        const msg = 'Google authentication failed.';
+        if (isRegistering) setRegError(msg);
+        else setLoginError(msg);
+      }
+    },
+    onError: () => {
+      const msg = 'Google sign-in was cancelled or failed.';
+      if (isRegistering) setRegError(msg);
+      else setLoginError(msg);
+    }
+  });
+
+  const handleGoogleClick = () => {
+    if (isMessengerWebView()) {
+      setGoogleWarnOpen(true);
+      return;
+    }
+    if (googleClientId === 'your_google_client_id_here' || !googleClientId) {
+      completeGoogleAuth('google-affiliate@test.com', 'Google Demo Affiliate');
+      return;
+    }
+    loginWithGoogle();
+  };
 
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
@@ -94,7 +193,7 @@ export default function AffiliatePortal() {
   const [teamEmail, setTeamEmail] = useState('');
   const [teamPassword, setTeamPassword] = useState('');
   const [teamConfirmPassword, setTeamConfirmPassword] = useState('');
-  const [teamAccountType, setTeamAccountType] = useState('');
+  const [teamAccountType] = useState('agent');
   const [teamStatus, setTeamStatus] = useState('ACTIVE');
   const [createTeamLoading, setCreateTeamLoading] = useState(false);
   const [copiedMemberLink, setCopiedMemberLink] = useState(null);
@@ -261,7 +360,6 @@ export default function AffiliatePortal() {
 
   const backToTeamList = () => {
     setTeamView('list');
-    setTeamAccountType('');
     setTeamName('');
     setTeamEmail('');
     setTeamPassword('');
@@ -298,7 +396,6 @@ export default function AffiliatePortal() {
     || agentSession?.accountType
     || (agentSession?.agentCode?.startsWith('SUB') ? 'sub-distributor' : 'agent');
   const currentRoleLabel = currentAccountType === 'sub-distributor' ? 'Sub-Distributor' : 'Agent';
-  const canCreateSubDistributor = currentAccountType === 'sub-distributor';
 
   // Commission withdraw request
   const handleWithdrawRequest = async (e) => {
@@ -340,10 +437,6 @@ export default function AffiliatePortal() {
 
   const handleCreateTeam = async (e) => {
     e.preventDefault();
-    if (!teamAccountType) {
-      alert('Please select an account type.');
-      return;
-    }
     if (!teamName.trim() || !teamEmail.trim() || !teamPassword.trim()) {
       alert('Name, email and password are required.');
       return;
@@ -437,6 +530,16 @@ export default function AffiliatePortal() {
                     <i className="fa-solid fa-circle-exclamation" style={{ marginRight: '0.4rem' }}></i> {loginError}
                   </div>
                 )}
+                <button type="button" className="google-auth-btn" onClick={handleGoogleClick} disabled={isGoogleLoading} style={{ opacity: isGoogleLoading ? 0.7 : 1 }}>
+                  <GoogleIcon />
+                  <span>{isGoogleLoading ? 'Please wait...' : 'Continue with Google'}</span>
+                </button>
+                <p className="messenger-warning" style={{ marginBottom: '1rem' }}>
+                  <i className="fa-solid fa-circle-exclamation"></i> Google sign-in is not supported inside Messenger. Please open this page in Chrome or Safari.
+                </p>
+                <div className="divider" style={{ marginBottom: '1.25rem' }}>
+                  <span>or login with email</span>
+                </div>
                 <div style={{ marginBottom: '1.25rem', textAlign: 'left' }}>
                   <label style={{ fontSize: '0.7rem', color: '#aaa', fontWeight: 'bold', display: 'block', marginBottom: '0.4rem' }}>Email Address</label>
                   <div style={{ display: 'flex', alignItems: 'center', background: '#0b0d16', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '0.6rem 0.85rem' }}>
@@ -476,6 +579,16 @@ export default function AffiliatePortal() {
                     <i className="fa-solid fa-circle-exclamation" style={{ marginRight: '0.4rem' }}></i> {regError}
                   </div>
                 )}
+                <button type="button" className="google-auth-btn" onClick={handleGoogleClick} disabled={isGoogleLoading} style={{ opacity: isGoogleLoading ? 0.7 : 1 }}>
+                  <GoogleIcon />
+                  <span>{isGoogleLoading ? 'Please wait...' : 'Continue with Google'}</span>
+                </button>
+                <p className="messenger-warning" style={{ marginBottom: '1rem' }}>
+                  <i className="fa-solid fa-circle-exclamation"></i> Google sign-in is not supported inside Messenger. Please open this page in Chrome or Safari.
+                </p>
+                <div className="divider" style={{ marginBottom: '1.25rem' }}>
+                  <span>or create account with email</span>
+                </div>
                 <div style={{ marginBottom: '1.1rem', textAlign: 'left' }}>
                   <label style={{ fontSize: '0.7rem', color: '#aaa', fontWeight: 'bold', display: 'block', marginBottom: '0.35rem' }}>Full Name</label>
                   <div style={{ display: 'flex', alignItems: 'center', background: '#0b0d16', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '0.55rem 0.8rem' }}>
@@ -518,6 +631,7 @@ export default function AffiliatePortal() {
           )}
 
         </div>
+        <GoogleWarningModal isOpen={googleWarnOpen} onClose={() => setGoogleWarnOpen(false)} />
       </div>
     );
   }
@@ -793,7 +907,7 @@ export default function AffiliatePortal() {
               </div>
               <div>
                 <h1 style={{ fontSize: '1.75rem', fontWeight: 'bold', fontFamily: 'var(--font-heading)', margin: 0 }}>Create Team Account</h1>
-                <p style={{ fontSize: '0.75rem', color: '#888', margin: 0 }}>Create sub-distributor or agent account based on your role.</p>
+                <p style={{ fontSize: '0.75rem', color: '#888', margin: 0 }}>Create agent staff account under your team.</p>
               </div>
             </div>
 
@@ -802,11 +916,7 @@ export default function AffiliatePortal() {
               <form onSubmit={handleCreateTeam} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div>
                   <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.35rem' }}>Account Type</label>
-                  <select value={teamAccountType} onChange={(e) => setTeamAccountType(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }} required>
-                    <option value="">Select account type</option>
-                    <option value="agent">Agent</option>
-                    {canCreateSubDistributor && <option value="sub-distributor">Sub-Distributor</option>}
-                  </select>
+                  <div style={{ ...inputStyle, background: '#040509', color: '#fff', fontWeight: 'bold' }}>Agent</div>
                 </div>
                 <div>
                   <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.35rem' }}>Full Name</label>
@@ -1768,5 +1878,14 @@ export default function AffiliatePortal() {
 
       </main>
     </div>
+  );
+}
+
+export default function AffiliatePortalPage() {
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || 'your_google_client_id_here';
+  return (
+    <GoogleOAuthProvider clientId={googleClientId}>
+      <AffiliatePortal />
+    </GoogleOAuthProvider>
   );
 }
