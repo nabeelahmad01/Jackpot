@@ -8,6 +8,8 @@ import CoinsAllotmentTab from '../../components/admin/CoinsAllotmentTab';
 import RequestsTab from '../../components/admin/RequestsTab';
 import LedgerTab from '../../components/admin/LedgerTab';
 import ShiftDashboardTab from '../../components/admin/ShiftDashboardTab';
+import RemainderClaimAction from '../../components/RemainderClaimAction';
+import { canShowClaimRemainderButton } from '../../lib/remainderClaim';
 import { SupportModal } from '../../components/Modals';
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -134,18 +136,21 @@ export default function DistributorPortal() {
     fetcher
   );
 
-  // Dynamic operations queues (Requests & Coins check for Type B players)
-  const { data: allRequestsData, mutate: mutateAllRequests } = useSWR(
-    distId && distSession?.type === 'B' ? `/api/account-requests?adminRole=distributor&adminDistributorId=${distId}` : null,
+  // Pending queue counts for sidebar badges (status-filtered, use total from API)
+  const { data: pendingRequestsData, mutate: mutatePendingRequests } = useSWR(
+    distId && distSession?.type === 'B' ? `/api/account-requests?status=PENDING&page=1&limit=1&adminRole=distributor&adminDistributorId=${distId}` : null,
     fetcher,
     { refreshInterval: 5000 }
   );
 
-  const { data: allCoinsData, mutate: mutateAllCoins } = useSWR(
-    distId && distSession?.type === 'B' ? `/api/coins-notifications?adminRole=distributor&adminDistributorId=${distId}` : null,
+  const { data: pendingCoinsData, mutate: mutatePendingCoins } = useSWR(
+    distId && distSession?.type === 'B' ? `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED&page=1&limit=1&adminRole=distributor&adminDistributorId=${distId}` : null,
     fetcher,
     { refreshInterval: 5000 }
   );
+
+  const pendingAccountRequestsCount = pendingRequestsData?.totalRequests || 0;
+  const pendingCoinsCount = pendingCoinsData?.totalNotifications || 0;
 
   const { data: commTxData, mutate: mutateCommTx } = useSWR(
     distSession ? `/api/transactions?email=${encodeURIComponent(distSession.email)}&type=COMMISSION_WITHDRAW` : null,
@@ -164,20 +169,7 @@ export default function DistributorPortal() {
   );
 
   const gatewayStats = gatewayStatsData?.stats || [];
-
-  // Filter player queues to show only referred players' requests
   const players = statsData?.players || [];
-  const playerEmails = players.map(p => (p.email || '').toLowerCase().trim()).filter(Boolean);
-
-  const referredRequests = (allRequestsData?.accountRequests || []).filter(req => {
-    const email = req.userEmail || req.email;
-    return email && playerEmails.includes(email.toLowerCase().trim());
-  });
-
-  const referredCoins = (allCoinsData?.coinsNotifications || []).filter(noti => {
-    const email = noti.userEmail || noti.email;
-    return email && playerEmails.includes(email.toLowerCase().trim());
-  });
 
   const { data: settingsData } = useSWR('/api/settings', fetcher);
   const usdtAddress = settingsData?.settings?.usdtAddress || '';
@@ -332,8 +324,8 @@ export default function DistributorPortal() {
 
   useEffect(() => {
     const counts = {
-      requests: referredRequests.length,
-      coins: referredCoins.length,
+      requests: pendingAccountRequestsCount,
+      coins: pendingCoinsCount,
       ledger: statsData?.stats?.pendingLedgerCount || 0
     };
     const prev = prevCountsRef.current;
@@ -341,7 +333,7 @@ export default function DistributorPortal() {
       playAlertSound();
     }
     prevCountsRef.current = counts;
-  }, [referredRequests.length, referredCoins.length, statsData?.stats?.pendingLedgerCount, settingsData]);
+  }, [pendingAccountRequestsCount, pendingCoinsCount, statsData?.stats?.pendingLedgerCount, settingsData]);
 
   const handleRequestCommWithdraw = async (e) => {
     e.preventDefault();
@@ -395,6 +387,10 @@ export default function DistributorPortal() {
   };
 
   const handleClaimDistributorRemainder = async (tx) => {
+    if (!canShowClaimRemainderButton(tx, claimedRemainderIds)) {
+      alert('Claim is not available yet. Please wait for the countdown to finish.');
+      return;
+    }
     if (!window.confirm(`Do you want to submit a cashout request for the remaining $${parseFloat(tx.payoutHold).toFixed(2)} on Hold?`)) {
       return;
     }
@@ -662,6 +658,9 @@ export default function DistributorPortal() {
           theme: gwTheme,
           qrImage: gwQr.trim() || undefined,
           isWithdrawActive: gwWithdraw,
+          requireNameOnTag: true,
+          requireTag: true,
+          requirePhoneOnTag: true,
           distributorId: distId
         })
       });
@@ -772,7 +771,7 @@ export default function DistributorPortal() {
       });
       const data = await res.json();
       if (data.success) {
-        mutateAllRequests();
+        mutatePendingRequests();
         alert('Credentials approved and dispatched!');
       }
     } catch (err) {
@@ -793,7 +792,7 @@ export default function DistributorPortal() {
       });
       const data = await res.json();
       if (data.success) {
-        mutateAllRequests();
+        mutatePendingRequests();
         alert('Credentials request rejected.');
       }
     } catch (err) {
@@ -812,7 +811,7 @@ export default function DistributorPortal() {
       });
       const data = await res.json();
       if (data.success) {
-        mutateAllCoins();
+        mutatePendingCoins();
         mutateStats();
         alert('Coin loading processed successfully!');
       }
@@ -837,7 +836,7 @@ export default function DistributorPortal() {
       });
       const resData = await response.json();
       if (resData.success) {
-        mutateAllCoins();
+        mutatePendingCoins();
         mutateStats();
         mutate((key) => typeof key === 'string' && key.startsWith('/api/coins-notifications'));
       }
@@ -864,7 +863,7 @@ export default function DistributorPortal() {
       });
       const data = await res.json();
       if (data.success) {
-        mutateAllRequests();
+        mutatePendingRequests();
         mutate((key) => typeof key === 'string' && key.startsWith('/api/account-requests'));
         alert('Credentials status updated successfully!');
       }
@@ -931,7 +930,7 @@ export default function DistributorPortal() {
       if (data.success) {
         setInvalidatingNoti(null);
         setHoldReason('');
-        mutateAllCoins();
+        mutatePendingCoins();
         mutateStats();
         alert('Allotment request invalidated.');
       }
@@ -1171,9 +1170,9 @@ export default function DistributorPortal() {
                 >
                   <i className="fa-solid fa-circle-play" style={{ width: '16px' }}></i>
                   Operations Queue
-                  {(referredRequests.length + referredCoins.length) > 0 && (
+                  {pendingCoinsCount > 0 && (
                     <span style={{ marginLeft: 'auto', background: '#ef4444', color: '#fff', fontSize: '0.625rem', padding: '0.15rem 0.35rem', borderRadius: '10px' }}>
-                      {referredRequests.length + referredCoins.length}
+                      {pendingCoinsCount}
                     </span>
                   )}
                 </button>
@@ -1200,9 +1199,9 @@ export default function DistributorPortal() {
                 >
                   <i className="fa-solid fa-key" style={{ width: '16px' }}></i>
                   Account Requests
-                  {referredRequests.length > 0 && (
+                  {pendingAccountRequestsCount > 0 && (
                     <span style={{ marginLeft: 'auto', background: '#ef4444', color: '#fff', fontSize: '0.625rem', padding: '0.15rem 0.35rem', borderRadius: '10px' }}>
-                      {referredRequests.length}
+                      {pendingAccountRequestsCount}
                     </span>
                   )}
                 </button>
@@ -1764,20 +1763,13 @@ export default function DistributorPortal() {
                                   </td>
                                   <td style={{ padding: '0.6rem 0.5rem' }}>
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center' }}>
-                                      {tx.status === 'SUCCESS' && tx.payoutHold > 0 && !tx.remainderPaid && (
-                                        (tx.remainderRequested || claimedRemainderIds.includes(tx.id)) ? (
-                                          <span style={{ fontSize: '0.6rem', color: 'var(--gold-primary)', fontWeight: 'bold', background: 'rgba(255,215,0,0.1)', padding: '0.15rem 0.35rem', borderRadius: '4px' }}>
-                                            [Remainder Requested]
-                                          </span>
-                                        ) : (
-                                          <button
-                                            onClick={() => handleClaimDistributorRemainder(tx)}
-                                            style={{ border: '1px solid var(--gold-primary)', background: 'rgba(255,215,0,0.08)', color: 'var(--gold-primary)', borderRadius: '4px', padding: '0.2rem 0.4rem', fontSize: '0.6rem', cursor: 'pointer', fontWeight: 'bold' }}
-                                          >
-                                            Claim Remainder (${parseFloat(tx.payoutHold).toFixed(2)})
-                                          </button>
-                                        )
-                                      )}
+                                      <RemainderClaimAction
+                                        tx={tx}
+                                        claimedIds={claimedRemainderIds}
+                                        onClaim={handleClaimDistributorRemainder}
+                                        compact
+                                        buttonStyle={{ marginTop: 0 }}
+                                      />
                                       {tx.payoutProof ? (
                                         <button
                                           onClick={() => handleInspectProof(null, tx.id)}

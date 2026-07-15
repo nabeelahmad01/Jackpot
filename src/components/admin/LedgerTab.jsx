@@ -74,6 +74,7 @@ export default function LedgerTab({
   const [payoutGateway, setPayoutGateway] = useState('');
   const [payoutCustomNote, setPayoutCustomNote] = useState('');
   const [payoutProof, setPayoutProof] = useState('');
+  const [remainderWaitHours, setRemainderWaitHours] = useState('0');
   const [isProcessingPayout, setIsProcessingPayout] = useState(false);
 
   const handleOpenPayoutModal = (tx) => {
@@ -85,6 +86,7 @@ export default function LedgerTab({
     setPayoutGateway(tx.gateway || 'Chime');
     setPayoutCustomNote(`Full payout processed to ${tx.gateway || 'Chime'}`);
     setPayoutProof('');
+    setRemainderWaitHours('0');
     setPayoutModalOpen(true);
   };
 
@@ -136,15 +138,19 @@ export default function LedgerTab({
 
     setIsProcessingPayout(true);
     try {
+      const holdVal = parseFloat(payoutHoldAmount || 0);
       const payload = {
         id: selectedPayoutTx.id,
         status: 'SUCCESS',
         note: payoutCustomNote.trim() || `Payout processed to ${payoutGateway}`,
         payoutSent: parseFloat(payoutSentAmount || 0),
-        payoutHold: parseFloat(payoutHoldAmount || 0),
+        payoutHold: holdVal,
         processedBy: adminUser?.email || 'admin@jackpot.com',
         payoutProof: payoutProof
       };
+      if (holdVal > 0) {
+        payload.remainderWaitHours = Math.max(0, Number(remainderWaitHours) || 0);
+      }
 
       const response = await fetch('/api/transactions', {
         method: 'PUT',
@@ -658,6 +664,27 @@ export default function LedgerTab({
                     />
                   </div>
                 </div>
+
+                {payoutType === 'partial' && parseFloat(payoutHoldAmount || 0) > 0 && (
+                  <div className="input-group">
+                    <label htmlFor="remainder-wait-hours">Claim Wait Time (Hours before player can claim remainder)</label>
+                    <div className="input-wrapper">
+                      <i className="fa-solid fa-clock input-icon"></i>
+                      <input
+                        type="number"
+                        id="remainder-wait-hours"
+                        min="0"
+                        step="1"
+                        placeholder="e.g. 24"
+                        value={remainderWaitHours}
+                        onChange={(e) => setRemainderWaitHours(e.target.value)}
+                      />
+                    </div>
+                    <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
+                      Player will see a countdown timer. Claim button appears only after this wait period ends.
+                    </p>
+                  </div>
+                )}
 
                 {/* Auto Payout Custom Note description */}
                 <div className="input-group" style={{ marginBottom: '1rem' }}>

@@ -136,6 +136,13 @@ export async function GET(req) {
         phoneOnTag: 1,
         payoutSent: 1,
         payoutHold: 1,
+        remainderPaid: 1,
+        remainderRequested: 1,
+        remainderStatus: 1,
+        remainderClaimAvailableAt: 1,
+        remainderWaitHours: 1,
+        parentTxId: 1,
+        payoutAmount: 1,
         approvedBy: 1,
         allottedBy: 1,
         isFreeplayWithdraw: 1,
@@ -407,7 +414,7 @@ export async function POST(req) {
 // PUT update transaction status (Admin action - approve/decline)
 export async function PUT(req) {
   try {
-    const { id, status, note, payoutSent, payoutHold, processedBy, payoutProof } = await req.json();
+    const { id, status, note, payoutSent, payoutHold, processedBy, payoutProof, remainderWaitHours } = await req.json();
 
     if (!id || !status) {
       return NextResponse.json({ success: false, message: 'Transaction ID and status are required.' }, { status: 400 });
@@ -438,7 +445,12 @@ export async function PUT(req) {
       updateFields.payoutSent = Number(payoutSent);
     }
     if (payoutHold !== undefined) {
-      updateFields.payoutHold = Number(payoutHold);
+      const holdVal = Number(payoutHold);
+      updateFields.payoutHold = holdVal;
+      if (holdVal <= 0) {
+        updateFields.remainderPaid = true;
+        updateFields.payoutHold = 0;
+      }
     }
     if (processedBy !== undefined) {
       updateFields.approvedBy = processedBy;
@@ -447,14 +459,45 @@ export async function PUT(req) {
       updateFields.payoutProof = payoutProof;
     }
 
+    if (status === 'SUCCESS' && payoutHold !== undefined && Number(payoutHold) > 0) {
+      const hours = remainderWaitHours !== undefined ? Math.max(0, Number(remainderWaitHours) || 0) : 0;
+      updateFields.remainderWaitHours = hours;
+      updateFields.remainderClaimAvailableAt = hours > 0
+        ? new Date(Date.now() + hours * 3600000).toISOString()
+        : new Date().toISOString();
+      updateFields.remainderRequested = false;
+      updateFields.remainderStatus = '';
+    }
+
     await transactionsCollection.updateOne({ id }, { $set: updateFields });
 
     if (status === 'SUCCESS' && originalTx.parentTxId) {
       try {
-        await transactionsCollection.updateOne(
-          { id: originalTx.parentTxId },
-          { $set: { remainderPaid: true, remainderStatus: 'SUCCESS' } }
-        );
+        const finalChildHold = payoutHold !== undefined ? Number(payoutHold) : parseFloat(originalTx.payoutHold || 0);
+        if (finalChildHold > 0) {
+          const parentUpdate = {
+            payoutHold: finalChildHold,
+            remainderPaid: false,
+            remainderRequested: false,
+            remainderStatus: ''
+          };
+          const hours = remainderWaitHours !== undefined ? Math.max(0, Number(remainderWaitHours) || 0) : 0;
+          if (hours > 0) {
+            parentUpdate.remainderWaitHours = hours;
+            parentUpdate.remainderClaimAvailableAt = new Date(Date.now() + hours * 3600000).toISOString();
+          } else {
+            parentUpdate.remainderClaimAvailableAt = new Date().toISOString();
+          }
+          await transactionsCollection.updateOne(
+            { id: originalTx.parentTxId },
+            { $set: parentUpdate }
+          );
+        } else {
+          await transactionsCollection.updateOne(
+            { id: originalTx.parentTxId },
+            { $set: { remainderPaid: true, remainderStatus: 'SUCCESS', payoutHold: 0, remainderRequested: false } }
+          );
+        }
       } catch (err) {
         console.error('Failed to update parent transaction remainder status:', err);
       }

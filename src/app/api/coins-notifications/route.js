@@ -48,6 +48,19 @@ export async function GET(req) {
       }
     }
 
+    const statusParam = searchParams.get('status');
+    if (statusParam) {
+      const statuses = statusParam.split(',').map(s => s.toUpperCase().trim()).filter(Boolean);
+      const statusFilter = statuses.length > 1 ? { $in: statuses } : statuses[0];
+      if (query.$and) {
+        query.$and.push({ status: statusFilter });
+      } else if (Object.keys(query).length > 0) {
+        query = { $and: [query, { status: statusFilter }] };
+      } else {
+        query.status = statusFilter;
+      }
+    }
+
     const totalNotifications = await notificationsCollection.countDocuments(query);
     const skip = (page - 1) * limit;
 

@@ -4,6 +4,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PaymentMethodModal } from './Modals';
 import ReferralCenter from './ReferralCenter';
+import RemainderClaimAction from './RemainderClaimAction';
+import { canShowClaimRemainderButton } from '../lib/remainderClaim';
 
 export default function UserLobby({
   games,
@@ -469,6 +471,10 @@ export default function UserLobby({
 
   const handleClaimRemainder = async (tx) => {
     if (actionLoading) return;
+    if (!canShowClaimRemainderButton(tx, claimedRemainderIds)) {
+      showToast('Claim is not available yet. Please wait for the countdown to finish.', 'error');
+      return;
+    }
     if (!window.confirm(`Do you want to submit a payout request for the remaining $${parseFloat(tx.payoutHold).toFixed(2)} on Hold?`)) {
       return;
     }
@@ -513,7 +519,6 @@ export default function UserLobby({
     const gw = selectedWithdrawGateway;
     // Players must always provide payout destination
     if (fieldName === 'tag' || fieldName === 'name') return true;
-    if (fieldName === 'phone') return gw.requirePhoneOnTag === true;
     if (fieldName === 'email') return gw.requireEmailOnTag === true;
     return false;
   };
@@ -531,8 +536,8 @@ export default function UserLobby({
       showToast('Please provide the name on your tag.', 'error');
       return;
     }
-    if (shouldShowField('phone') && phoneOnTag.trim() === '') {
-      showToast('Please provide the linked phone number.', 'error');
+    if (phoneOnTag.trim() === '') {
+      showToast('Please provide your phone number on tag.', 'error');
       return;
     }
     if (shouldShowField('email') && withdrawEmail.trim() === '') {
@@ -559,7 +564,7 @@ export default function UserLobby({
       gateway: withdrawMethod,
       code: shouldShowField('tag') ? withdrawTag.trim() : '—',
       nameOnTag: shouldShowField('name') ? nameOnTag.trim() : '',
-      phoneOnTag: shouldShowField('phone') ? phoneOnTag.trim() : '',
+      phoneOnTag: phoneOnTag.trim(),
       emailOnTag: shouldShowField('email') ? withdrawEmail.trim() : '',
       ...(isFreeplaySession ? { isFreeplayWithdraw: true } : {}),
       screenshot: withdrawScreenshot,
@@ -1829,42 +1834,13 @@ export default function UserLobby({
                                     <span style={{ fontSize: '0.725rem', opacity: 0.8 }}>
                                       {tx.note && tx.status !== 'FAILED' ? tx.note : (tx.code === 'SIGNUP-FREE3' ? 'Freeplay (SIGNUP-FREE3)' : tx.code === 'FREEPLAY' ? 'Freeplay' : `${tx.gateway} (${tx.code})`)}
                                     </span>
-                                    {tx.type === 'WITHDRAW' && tx.status === 'SUCCESS' && tx.payoutHold > 0 && !tx.remainderPaid && (!tx.remainderRequested || tx.remainderStatus === 'FAILED') && !claimedRemainderIds.includes(tx.id) && (
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleClaimRemainder(tx);
-                                        }}
-                                        style={{
-                                          alignSelf: 'flex-start',
-                                          background: 'rgba(255,215,0,0.1)',
-                                          border: '1px solid var(--gold-primary)',
-                                          color: 'var(--gold-primary)',
-                                          fontSize: '0.625rem',
-                                          padding: '0.2rem 0.5rem',
-                                          borderRadius: '4px',
-                                          cursor: 'pointer',
-                                          fontWeight: 'bold',
-                                          marginTop: '0.25rem',
-                                          transition: 'all 0.2s ease',
-                                          textTransform: 'uppercase'
-                                        }}
-                                        onMouseEnter={(e) => {
-                                          e.target.style.background = 'var(--gold-primary)';
-                                          e.target.style.color = '#000';
-                                        }}
-                                        onMouseLeave={(e) => {
-                                          e.target.style.background = 'rgba(255,215,0,0.1)';
-                                          e.target.style.color = 'var(--gold-primary)';
-                                        }}
-                                      >
-                                        Claim Remainder (${parseFloat(tx.payoutHold).toFixed(2)})
-                                      </button>
-                                    )}
-                                    {tx.type === 'WITHDRAW' && tx.status === 'SUCCESS' && tx.payoutHold > 0 && tx.remainderRequested && tx.remainderStatus !== 'FAILED' && !tx.remainderPaid && (claimedRemainderIds.includes(tx.id) || tx.remainderRequested) && (
-                                      <span style={{ fontSize: '0.625rem', color: '#888', fontStyle: 'italic' }}>
-                                        Remainder Requested
-                                      </span>
+                                    {tx.type === 'WITHDRAW' && (
+                                      <RemainderClaimAction
+                                        tx={tx}
+                                        claimedIds={claimedRemainderIds}
+                                        onClaim={handleClaimRemainder}
+                                        actionLoading={actionLoading}
+                                      />
                                     )}
                                   </div>
                                 </td>
@@ -2098,23 +2074,21 @@ export default function UserLobby({
                 </div>
               )}
 
-              {shouldShowField('phone') && (
-                <div className="input-group">
-                  <label htmlFor="tag-phone">Linked number on Tag</label>
-                  <div className="input-wrapper" style={{ background: '#0b0c16' }}>
-                    <i className="fa-solid fa-phone input-icon"></i>
-                    <input
-                      type="tel"
-                      id="tag-phone"
-                      placeholder="e.g. +1 555 123 4567"
-                      value={phoneOnTag}
-                      onChange={(e) => setPhoneOnTag(e.target.value)}
-                      style={{ paddingLeft: '2.5rem' }}
-                      required
-                    />
-                  </div>
+              <div className="input-group">
+                <label htmlFor="tag-phone">Phone Number on Tag</label>
+                <div className="input-wrapper" style={{ background: '#0b0c16' }}>
+                  <i className="fa-solid fa-phone input-icon"></i>
+                  <input
+                    type="tel"
+                    id="tag-phone"
+                    placeholder="e.g. +1 555 123 4567"
+                    value={phoneOnTag}
+                    onChange={(e) => setPhoneOnTag(e.target.value)}
+                    style={{ paddingLeft: '2.5rem' }}
+                    required
+                  />
                 </div>
-              )}
+              </div>
 
               {shouldShowField('email') && (
                 <div className="input-group">

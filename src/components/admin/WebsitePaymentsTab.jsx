@@ -22,6 +22,7 @@ export default function WebsitePaymentsTab({
   const [isProcessing, setIsProcessing] = useState(false);
   const [payoutSent, setPayoutSent] = useState(0);
   const [payoutHold, setPayoutHold] = useState(0);
+  const [remainderWaitHours, setRemainderWaitHours] = useState('0');
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -116,6 +117,7 @@ export default function WebsitePaymentsTab({
     setPayoutProof('');
     setPayoutSent(tx.amount || 0);
     setPayoutHold(0);
+    setRemainderWaitHours('0');
     setPayoutModalOpen(true);
   };
 
@@ -139,18 +141,24 @@ export default function WebsitePaymentsTab({
 
     setIsProcessing(true);
     try {
+      const holdVal = Number(payoutHold);
+      const payload = {
+        id: selectedTx.id,
+        status: 'SUCCESS',
+        note: payoutNote.trim() || 'Distributor payout processed',
+        payoutProof: payoutProof,
+        payoutSent: Number(payoutSent),
+        payoutHold: holdVal,
+        processedBy: adminUser?.email || 'admin@jackpot.com'
+      };
+      if (holdVal > 0) {
+        payload.remainderWaitHours = Math.max(0, Number(remainderWaitHours) || 0);
+      }
+
       const response = await fetch('/api/transactions', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: selectedTx.id,
-          status: 'SUCCESS',
-          note: payoutNote.trim() || 'Distributor payout processed',
-          payoutProof: payoutProof,
-          payoutSent: Number(payoutSent),
-          payoutHold: Number(payoutHold),
-          processedBy: adminUser?.email || 'admin@jackpot.com'
-        })
+        body: JSON.stringify(payload)
       });
       const resData = await response.json();
       if (resData.success) {
@@ -574,6 +582,24 @@ export default function WebsitePaymentsTab({
                     />
                   </div>
                 </div>
+
+                {payoutHold > 0 && (
+                  <div className="input-group">
+                    <label>Claim Wait Time (Hours)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="e.g. 24"
+                      value={remainderWaitHours}
+                      onChange={(e) => setRemainderWaitHours(e.target.value)}
+                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.4rem 0.6rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none', width: '100%' }}
+                    />
+                    <p style={{ fontSize: '0.65rem', color: '#888', marginTop: '0.35rem' }}>
+                      Distributor will see countdown before claim button appears.
+                    </p>
+                  </div>
+                )}
 
                 <div className="input-group">
                   <label htmlFor="payout-note">Payout Note</label>

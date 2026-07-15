@@ -49,7 +49,7 @@ export async function POST(req) {
       isWithdrawActive: Boolean(isWithdrawActive),
       requireNameOnTag: isWithdrawActive ? requireNameOnTag !== false : false,
       requireTag: isWithdrawActive ? requireTag !== false : false,
-      requirePhoneOnTag: Boolean(requirePhoneOnTag),
+      requirePhoneOnTag: isWithdrawActive ? requirePhoneOnTag !== false : false,
       requireEmailOnTag: Boolean(requireEmailOnTag),
       distributorId: distributorId
     };
