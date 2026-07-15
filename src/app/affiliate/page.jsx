@@ -84,7 +84,18 @@ export default function AffiliatePortal() {
   const [withdrawName, setWithdrawName] = useState('');
   const [withdrawAccount, setWithdrawAccount] = useState('');
   const [withdrawBank, setWithdrawBank] = useState('');
+  const [withdrawTrc20, setWithdrawTrc20] = useState('');
+  const [withdrawPayoutMethod, setWithdrawPayoutMethod] = useState('bank');
   const [withdrawLoading, setWithdrawLoading] = useState(false);
+
+  // Create Team Member
+  const [showCreateTeam, setShowCreateTeam] = useState(false);
+  const [teamName, setTeamName] = useState('');
+  const [teamEmail, setTeamEmail] = useState('');
+  const [teamPassword, setTeamPassword] = useState('');
+  const [teamCommissionRate, setTeamCommissionRate] = useState('5');
+  const [teamCode, setTeamCode] = useState('');
+  const [createTeamLoading, setCreateTeamLoading] = useState(false);
 
   // Invite link copy
   const [copiedLink, setCopiedLink] = useState(false);
@@ -167,6 +178,7 @@ export default function AffiliatePortal() {
 
   const stats = statsData?.stats || {};
   const players = statsData?.players || [];
+  const teamAgents = statsData?.teamAgents || [];
   const commissionWithdrawals = statsData?.commissionWithdrawals || [];
   const campaignsList = campaignsData?.campaigns || [];
   const remainingLimit = campaignsData?.remainingLimit !== undefined ? campaignsData.remainingLimit : 6000.00;
@@ -214,28 +226,77 @@ export default function AffiliatePortal() {
     const amount = parseFloat(withdrawAmount);
     if (!amount || amount <= 0) { alert('Please enter a valid amount.'); return; }
     if (amount > (stats.availableBalance || 0)) { alert('Amount exceeds available balance.'); return; }
+    if (withdrawPayoutMethod === 'trc20' && !withdrawTrc20.trim()) {
+      alert('Please enter your TRC20 wallet address.');
+      return;
+    }
     setWithdrawLoading(true);
     try {
+      const payoutDetails = withdrawPayoutMethod === 'trc20'
+        ? `TRC20: ${withdrawTrc20.trim()}`
+        : `${withdrawBank || 'Bank Transfer'} - Acc: ${withdrawAccount || 'N/A'}`;
+
       const response = await fetch('/api/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userEmail: agentSession.email, type: 'COMMISSION_WITHDRAW', amount,
-          gateway: withdrawBank || 'Bank Transfer',
-          code: `AGENT-COMM-${agentSession.agentCode}`, status: 'PENDING',
-          note: `Agent Commission Cashout - ${withdrawName || agentSession.name} - Acc: ${withdrawAccount || 'N/A'}`,
+          gateway: withdrawPayoutMethod === 'trc20' ? 'USDT (TRC20)' : (withdrawBank || 'Bank Transfer'),
+          code: withdrawPayoutMethod === 'trc20' ? withdrawTrc20.trim() : `AGENT-COMM-${agentSession.agentCode}`,
+          status: 'PENDING',
+          note: `Agent Commission Cashout - ${withdrawName || agentSession.name} - ${payoutDetails}`,
           date: new Date().toISOString()
         })
       });
       const data = await response.json();
       if (data.success) {
         alert('Withdrawal request submitted!');
-        setWithdrawAmount(''); setWithdrawName(''); setWithdrawAccount(''); setWithdrawBank('');
+        setWithdrawAmount(''); setWithdrawName(''); setWithdrawAccount(''); setWithdrawBank(''); setWithdrawTrc20('');
         mutateStats();
       } else { alert(data.message || 'Failed.'); }
     } catch (err) { console.error(err); alert('Connection error.'); }
     finally { setWithdrawLoading(false); }
   };
+
+  const handleCreateTeam = async (e) => {
+    e.preventDefault();
+    if (!teamName.trim() || !teamEmail.trim() || !teamPassword.trim()) {
+      alert('Name, email and password are required.');
+      return;
+    }
+    setCreateTeamLoading(true);
+    try {
+      const response = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: teamName.trim(),
+          email: teamEmail.toLowerCase().trim(),
+          password: teamPassword.trim(),
+          commissionRate: parseFloat(teamCommissionRate || 0),
+          agentCode: teamCode.trim() || undefined,
+          parentAgentCode: agentSession.agentCode
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        alert(`Team member created! Agent code: ${data.agent.agentCode}`);
+        setTeamName(''); setTeamEmail(''); setTeamPassword(''); setTeamCode(''); setTeamCommissionRate('5');
+        setShowCreateTeam(false);
+        mutateStats();
+      } else {
+        alert(data.message || 'Failed to create team member.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Connection error.');
+    } finally {
+      setCreateTeamLoading(false);
+    }
+  };
+
+  const agentCommissionRate = parseFloat(agentSession?.commissionRate || 0);
+  const platformCommissionRate = Math.max(0, 100 - agentCommissionRate);
 
   // Change password handler
   const handleChangePassword = async (e) => {
@@ -670,14 +731,50 @@ export default function AffiliatePortal() {
               </div>
             </div>
 
-            {/* My Team Table */}
+            {/* Sub-Agents / Team Members */}
+            <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(168,85,247,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <i className="fa-solid fa-user-plus" style={{ color: '#a855f7', fontSize: '0.8rem' }}></i>
+                  </div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: 0 }}>Team Agents</h3>
+                </div>
+                <button
+                  onClick={() => setShowCreateTeam(true)}
+                  style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.5rem 1rem', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <i className="fa-solid fa-plus"></i> Create Team
+                </button>
+              </div>
+              <div className="table-responsive">
+                <table className="admin-table" style={{ fontSize: '0.75rem' }}>
+                  <thead><tr><th>NAME</th><th>EMAIL</th><th>AGENT CODE</th><th>COMMISSION %</th><th>JOINED</th></tr></thead>
+                  <tbody>
+                    {teamAgents.length === 0 ? (
+                      <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: '#888' }}>No team agents yet. Click &quot;Create Team&quot; to add a sub-agent.</td></tr>
+                    ) : teamAgents.map((a) => (
+                      <tr key={a.id}>
+                        <td style={{ fontWeight: 'bold' }}>{a.name}</td>
+                        <td style={{ color: '#aaa', fontSize: '0.7rem' }}>{a.email}</td>
+                        <td><span style={{ background: 'rgba(168,85,247,0.12)', color: '#a855f7', padding: '0.15rem 0.45rem', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 'bold' }}>{a.agentCode}</span></td>
+                        <td style={{ fontWeight: 'bold', color: 'var(--gold-primary)' }}>{a.commissionRate || 0}%</td>
+                        <td style={{ fontSize: '0.65rem', color: '#888' }}>{a.createdAt ? new Date(a.createdAt).toLocaleDateString() : 'N/A'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* My Team Table (Players) */}
             <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(46,204,113,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <i className="fa-solid fa-bolt" style={{ color: '#2ecc71', fontSize: '0.8rem' }}></i>
                   </div>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: 0 }}>My Team</h3>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: 0 }}>My Players</h3>
                 </div>
                 <span style={{ background: 'rgba(255,255,255,0.06)', padding: '0.3rem 0.65rem', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 'bold' }}>{players.length} Accounts</span>
               </div>
@@ -686,7 +783,7 @@ export default function AffiliatePortal() {
                   <thead><tr><th>NAME</th><th>EMAIL</th><th>STATUS</th><th>TOTAL DEPOSITS</th><th>TOTAL CASHOUTS</th><th>JOINED</th></tr></thead>
                   <tbody>
                     {players.length === 0 ? (
-                      <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2.5rem', color: '#888' }}>No team accounts created yet.</td></tr>
+                      <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2.5rem', color: '#888' }}>No players registered under your link yet.</td></tr>
                     ) : players.map((p, i) => (
                       <tr key={i}>
                         <td style={{ fontWeight: 'bold' }}>{p.name}</td>
@@ -701,6 +798,44 @@ export default function AffiliatePortal() {
                 </table>
               </div>
             </div>
+
+            {showCreateTeam && (
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', backdropFilter: 'blur(6px)' }}>
+                <div style={{ background: '#0b0d16', borderRadius: '16px', border: '1px solid rgba(168,85,247,0.25)', padding: '1.5rem', width: '100%', maxWidth: '440px', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: 0 }}>Create Team Agent</h3>
+                    <button type="button" onClick={() => setShowCreateTeam(false)} style={{ background: 'none', border: 'none', color: '#888', fontSize: '1.25rem', cursor: 'pointer' }}>&times;</button>
+                  </div>
+                  <form onSubmit={handleCreateTeam} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                    <div>
+                      <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Full Name</label>
+                      <input type="text" placeholder="Agent name" value={teamName} onChange={(e) => setTeamName(e.target.value)} style={inputStyle} required />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Email</label>
+                      <input type="email" placeholder="agent@email.com" value={teamEmail} onChange={(e) => setTeamEmail(e.target.value)} style={inputStyle} required />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Password</label>
+                      <input type="password" placeholder="Min 6 characters" value={teamPassword} onChange={(e) => setTeamPassword(e.target.value)} style={inputStyle} required minLength={6} />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                      <div>
+                        <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Agent Code (optional)</label>
+                        <input type="text" placeholder="Auto-generated" value={teamCode} onChange={(e) => setTeamCode(e.target.value.toUpperCase())} style={inputStyle} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Commission %</label>
+                        <input type="number" placeholder="5" min="0" max="100" step="0.1" value={teamCommissionRate} onChange={(e) => setTeamCommissionRate(e.target.value)} style={inputStyle} required />
+                      </div>
+                    </div>
+                    <button type="submit" disabled={createTeamLoading} style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', fontWeight: 'bold', padding: '0.75rem', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '0.85rem', marginTop: '0.25rem', opacity: createTeamLoading ? 0.6 : 1 }}>
+                      {createTeamLoading ? 'Creating...' : 'Create Team Agent'}
+                    </button>
+                  </form>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -785,16 +920,72 @@ export default function AffiliatePortal() {
             </div>
 
             {/* Withdrawal Request Form */}
-            <div style={{ background: '#0b0d16', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)', padding: '1.25rem' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 'bold', marginBottom: '0.3rem' }}>Request Commission Withdrawal</h3>
-              <p style={{ fontSize: '0.7rem', color: '#888', marginBottom: '1rem' }}>Available: <strong style={{ color: 'var(--gold-primary)' }}>${(stats.availableBalance||0).toFixed(2)}</strong></p>
+            <div style={{ background: 'linear-gradient(145deg, #0b0d16 0%, #101322 100%)', borderRadius: '16px', border: '1px solid rgba(255,215,0,0.12)', padding: '1.5rem', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Request Commission Withdrawal</h3>
+                  <p style={{ fontSize: '0.7rem', color: '#888', margin: 0 }}>Available Balance: <strong style={{ color: 'var(--gold-primary)', fontSize: '1.1rem' }}>${(stats.availableBalance||0).toFixed(2)}</strong></p>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div style={{ background: 'rgba(46,204,113,0.1)', border: '1px solid rgba(46,204,113,0.25)', borderRadius: '10px', padding: '0.5rem 0.85rem', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.55rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold' }}>Your Share</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: '900', color: '#2ecc71' }}>{agentCommissionRate}%</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,77,109,0.1)', border: '1px solid rgba(255,77,109,0.25)', borderRadius: '10px', padding: '0.5rem 0.85rem', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.55rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold' }}>Platform Share</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: '900', color: '#ff4d6d' }}>{platformCommissionRate}%</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                {[{ id: 'bank', label: 'Bank / CashApp', icon: 'fa-building-columns' }, { id: 'trc20', label: 'USDT (TRC20)', icon: 'fa-wallet' }].map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setWithdrawPayoutMethod(m.id)}
+                    style={{
+                      flex: 1, padding: '0.65rem', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.75rem',
+                      background: withdrawPayoutMethod === m.id ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.03)',
+                      border: withdrawPayoutMethod === m.id ? '1.5px solid var(--gold-primary)' : '1px solid rgba(255,255,255,0.06)',
+                      color: withdrawPayoutMethod === m.id ? 'var(--gold-primary)' : '#aaa'
+                    }}
+                  >
+                    <i className={`fa-solid ${m.icon}`} style={{ marginRight: '0.35rem' }}></i>{m.label}
+                  </button>
+                ))}
+              </div>
+
               <form onSubmit={handleWithdrawRequest} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
-                <div><label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Amount ($)</label><input type="number" placeholder="50.00" step="0.01" value={withdrawAmount} onChange={(e)=>setWithdrawAmount(e.target.value)} max={stats.availableBalance||0} style={inputStyle} required /></div>
-                <div><label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Account Holder</label><input type="text" placeholder="Full name" value={withdrawName} onChange={(e)=>setWithdrawName(e.target.value)} style={inputStyle} required /></div>
-                <div><label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Account Number</label><input type="text" placeholder="Account number" value={withdrawAccount} onChange={(e)=>setWithdrawAccount(e.target.value)} style={inputStyle} required /></div>
-                <div><label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Bank / Method</label><input type="text" placeholder="CashApp, Venmo" value={withdrawBank} onChange={(e)=>setWithdrawBank(e.target.value)} style={inputStyle} required /></div>
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <button type="submit" disabled={withdrawLoading} style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold', padding: '0.65rem 1.5rem', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '0.8rem' }}>{withdrawLoading ? 'Submitting...' : 'Submit Request'}</button>
+                  <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Amount ($)</label>
+                  <input type="number" placeholder="50.00" step="0.01" value={withdrawAmount} onChange={(e)=>setWithdrawAmount(e.target.value)} max={stats.availableBalance||0} style={inputStyle} required />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Account Holder</label>
+                  <input type="text" placeholder="Full name" value={withdrawName} onChange={(e)=>setWithdrawName(e.target.value)} style={inputStyle} required />
+                </div>
+                {withdrawPayoutMethod === 'trc20' ? (
+                  <div>
+                    <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>TRC20 Wallet Address</label>
+                    <input type="text" placeholder="T..." value={withdrawTrc20} onChange={(e)=>setWithdrawTrc20(e.target.value)} style={inputStyle} required />
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Account Number / Tag</label>
+                      <input type="text" placeholder="Account or $cashtag" value={withdrawAccount} onChange={(e)=>setWithdrawAccount(e.target.value)} style={inputStyle} required />
+                    </div>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Bank / Method</label>
+                      <input type="text" placeholder="CashApp, Venmo, Chime..." value={withdrawBank} onChange={(e)=>setWithdrawBank(e.target.value)} style={inputStyle} required />
+                    </div>
+                  </>
+                )}
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <button type="submit" disabled={withdrawLoading || (stats.availableBalance||0) <= 0} style={{ width: '100%', background: 'linear-gradient(135deg, var(--gold-primary), #cca000)', color: '#000', fontWeight: 'bold', padding: '0.75rem 1.5rem', borderRadius: '10px', border: 'none', cursor: 'pointer', fontSize: '0.85rem', opacity: (withdrawLoading || (stats.availableBalance||0) <= 0) ? 0.5 : 1 }}>
+                    {withdrawLoading ? 'Submitting...' : 'Submit Withdrawal Request'}
+                  </button>
                 </div>
               </form>
             </div>

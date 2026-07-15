@@ -73,7 +73,7 @@ export async function GET() {
 // POST create a new agent
 export async function POST(req) {
   try {
-    const { name, email, password, commissionRate, agentCode } = await req.json();
+    const { name, email, password, commissionRate, agentCode, parentAgentCode } = await req.json();
 
     if (!name || !email || !password) {
       return NextResponse.json({ success: false, message: 'Name, email, and password are required.' }, { status: 400 });
@@ -107,6 +107,7 @@ export async function POST(req) {
       password: password.trim(),
       agentCode: finalCode,
       commissionRate: parseFloat(commissionRate || 0),
+      parentAgentCode: parentAgentCode ? parentAgentCode.trim().toUpperCase() : '',
       createdAt: new Date().toISOString()
     };
 

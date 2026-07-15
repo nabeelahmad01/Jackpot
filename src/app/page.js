@@ -362,42 +362,6 @@ export default function Home() {
         currentUser={session}
       />
 
-      {!supportOpen && view === 'auth' && (
-        <button
-          onClick={() => setSupportOpen(true)}
-          style={{
-            position: 'fixed',
-            bottom: '2rem',
-            right: '2rem',
-            zIndex: 99,
-            width: '60px',
-            height: '60px',
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #ffd700 0%, #cca000 100%)',
-            color: '#000',
-            border: 'none',
-            boxShadow: '0 8px 30px rgba(255,215,0,0.35)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '1.5rem',
-            transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
-          }}
-          title="Chat with Live Support"
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'scale(1.1)';
-            e.currentTarget.style.boxShadow = '0 12px 40px rgba(255,215,0,0.5)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'scale(1)';
-            e.currentTarget.style.boxShadow = '0 8px 30px rgba(255,215,0,0.35)';
-          }}
-        >
-          <i className="fa-solid fa-headset"></i>
-        </button>
-      )}
-
       <GoogleWarningModal isOpen={googleWarnOpen} onClose={() => setGoogleWarnOpen(false)} />
 
       <LoadingOverlay active={loadingActive} />

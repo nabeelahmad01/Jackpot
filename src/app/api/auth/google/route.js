@@ -8,7 +8,7 @@ function generateReferralCode() {
 
 export async function POST(req) {
   try {
-    const { email, name, referredBy, distributorId, agentCode } = await req.json();
+    const { email, name, referredBy, distributorId, agentCode, campaign } = await req.json();
 
     if (!email || !name) {
       return NextResponse.json(

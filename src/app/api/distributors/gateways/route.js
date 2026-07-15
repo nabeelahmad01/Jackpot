@@ -47,8 +47,8 @@ export async function POST(req) {
       theme: theme || 'cashapp',
       qrImage: qrImage || `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(name + '-' + tag)}`,
       isWithdrawActive: Boolean(isWithdrawActive),
-      requireNameOnTag: Boolean(requireNameOnTag),
-      requireTag: Boolean(requireTag),
+      requireNameOnTag: isWithdrawActive ? requireNameOnTag !== false : false,
+      requireTag: isWithdrawActive ? requireTag !== false : false,
       requirePhoneOnTag: Boolean(requirePhoneOnTag),
       requireEmailOnTag: Boolean(requireEmailOnTag),
       distributorId: distributorId

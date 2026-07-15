@@ -46,7 +46,7 @@ export async function GET(req) {
 // POST registers a new user
 export async function POST(req) {
   try {
-    const { email, password, name, role, referredBy, distributorId, agentCode } = await req.json();
+    const { email, password, name, role, referredBy, distributorId, agentCode, campaign } = await req.json();
 
     if (!email || !password || !name) {
       return NextResponse.json(

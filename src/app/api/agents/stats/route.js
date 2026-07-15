@@ -122,6 +122,17 @@ export async function GET(req) {
 
     const availableBalance = Math.max(0, commissionEarned - totalWithdrawn - pendingAgentWithdrawals);
 
+    // Sub-agents created under this affiliate
+    const teamAgents = await agentsCollection.find({ parentAgentCode: agent.agentCode }).toArray();
+    const enrichedTeamAgents = teamAgents.map((a) => ({
+      id: a.id,
+      name: a.name,
+      email: a.email,
+      agentCode: a.agentCode,
+      commissionRate: a.commissionRate || 0,
+      createdAt: a.createdAt || ''
+    }));
+
     return NextResponse.json({
       success: true,
       stats: {
@@ -141,6 +152,7 @@ export async function GET(req) {
         pendingAgentWithdrawals
       },
       players: enrichedPlayers,
+      teamAgents: enrichedTeamAgents,
       commissionWithdrawals: agentWithdrawDocs
     });
   } catch (err) {

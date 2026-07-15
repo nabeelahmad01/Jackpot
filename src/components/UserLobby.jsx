@@ -509,13 +509,11 @@ export default function UserLobby({
   };
 
   const shouldShowField = (fieldName) => {
-    if (!selectedWithdrawGateway) return true; // Legacy fallback
+    if (!selectedWithdrawGateway) return true;
     const gw = selectedWithdrawGateway;
-    // If the gateway has ALL detail fields disabled, force-show tag so the user always provides a payment destination
-    const noFieldsConfigured = gw.requireNameOnTag === false && gw.requireTag === false && gw.requirePhoneOnTag === false && gw.requireEmailOnTag !== true;
-    if (fieldName === 'tag') return noFieldsConfigured ? true : gw.requireTag !== false;
-    if (fieldName === 'name') return gw.requireNameOnTag !== false;
-    if (fieldName === 'phone') return gw.requirePhoneOnTag !== false;
+    // Players must always provide payout destination
+    if (fieldName === 'tag' || fieldName === 'name') return true;
+    if (fieldName === 'phone') return gw.requirePhoneOnTag === true;
     if (fieldName === 'email') return gw.requireEmailOnTag === true;
     return false;
   };
