@@ -23,7 +23,7 @@ const TxSearchTab = lazy(() => import('./admin/TxSearchTab'));
 const DistributorsTab = lazy(() => import('./admin/DistributorsTab'));
 const AffiliatesTab = lazy(() => import('./admin/AffiliatesTab'));
 const DeletedPlayersTab = lazy(() => import('./admin/DeletedPlayersTab'));
-const WebsitePaymentsTab = lazy(() => import('./admin/WebsitePaymentsTab'));
+const AffiliateCommissionTab = lazy(() => import('./admin/AffiliateCommissionTab'));
 const CampaignRequestsTab = lazy(() => import('./admin/CampaignRequestsTab'));
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
@@ -698,6 +698,37 @@ export default function AdminDashboard({
             </button>
           )}
 
+          {adminUser?.role === 'admin' && !adminUser?.distributorId && (
+            <button
+              onClick={() => { setActiveTab('affiliate_commissions'); setSidebarOpen(false); }}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                background: activeTab === 'affiliate_commissions' ? 'var(--gold-primary)' : 'none',
+                color: activeTab === 'affiliate_commissions' ? '#111' : '#fff',
+                fontSize: '0.8rem',
+                fontWeight: 'bold',
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'all 0.2s ease',
+                marginTop: '0.25rem'
+              }}
+            >
+              <i className="fa-solid fa-hand-holding-dollar" style={{ width: '18px' }}></i>
+              <span>Affiliate Commissions</span>
+              {statsData?.stats?.pendingAffiliateCommissionsCount > 0 && (
+                <span className="notification-badge" style={{ marginLeft: 'auto', background: '#a855f7', color: '#fff', fontSize: '0.65rem', padding: '0.15rem 0.35rem', borderRadius: '10px', fontWeight: 'bold' }}>
+                  {statsData.stats.pendingAffiliateCommissionsCount}
+                </span>
+              )}
+            </button>
+          )}
+
           {!adminUser?.distributorId && adminUser?.role === 'admin' && (
             <button
               onClick={() => { setActiveTab('website_payments'); setSidebarOpen(false); }}
@@ -910,6 +941,13 @@ export default function AdminDashboard({
               )}
               {activeTab === 'deleted_accounts' && !adminUser?.distributorId && adminUser?.role === 'admin' && (
                 <DeletedPlayersTab />
+              )}
+              {activeTab === 'affiliate_commissions' && adminUser?.role === 'admin' && !adminUser?.distributorId && (
+                <AffiliateCommissionTab
+                  onInspectProof={onInspectProof}
+                  completedActionIds={completedActionIds}
+                  adminUser={adminUser}
+                />
               )}
               {activeTab === 'website_payments' && !adminUser?.distributorId && adminUser?.role === 'admin' && (
                 <WebsitePaymentsTab

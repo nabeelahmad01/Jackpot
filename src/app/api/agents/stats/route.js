@@ -114,10 +114,12 @@ export async function GET(req) {
     // Sum up commission withdrawals by this agent
     const agentWithdrawDocs = await transactionsCollection.find({
       userEmail: agent.email.toLowerCase().trim(),
-      type: 'COMMISSION_WITHDRAW',
+      type: 'AFFILIATE_COMMISSION_WITHDRAW',
       status: { $in: ['SUCCESS', 'PENDING'] }
     }).toArray();
-    const totalWithdrawn = agentWithdrawDocs.filter(tx => tx.status === 'SUCCESS').reduce((acc, curr) => acc + parseFloat(curr.amount || 0), 0);
+    const totalWithdrawn = agentWithdrawDocs
+      .filter((tx) => tx.status === 'SUCCESS')
+      .reduce((acc, curr) => acc + parseFloat(curr.amount || 0) - parseFloat(curr.payoutHold || 0), 0);
     const pendingAgentWithdrawals = agentWithdrawDocs.filter(tx => tx.status === 'PENDING').reduce((acc, curr) => acc + parseFloat(curr.amount || 0), 0);
 
     const availableBalance = Math.max(0, commissionEarned - totalWithdrawn - pendingAgentWithdrawals);

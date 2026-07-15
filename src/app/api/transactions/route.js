@@ -99,7 +99,7 @@ export async function GET(req) {
     }
 
     if (!isSpecifyingType) {
-      const excludedTypes = ['WEBSITE_COMMISSION_PAYMENT', 'COMMISSION_WITHDRAW'];
+      const excludedTypes = ['WEBSITE_COMMISSION_PAYMENT', 'COMMISSION_WITHDRAW', 'AFFILIATE_COMMISSION_WITHDRAW'];
       if (query.$and) {
         query.$and.push({ type: { $nin: excludedTypes } });
       } else if (query.$or) {
@@ -141,6 +141,7 @@ export async function GET(req) {
         remainderStatus: 1,
         remainderClaimAvailableAt: 1,
         remainderWaitHours: 1,
+        payoutQr: 1,
         parentTxId: 1,
         payoutAmount: 1,
         approvedBy: 1,
@@ -309,6 +310,44 @@ export async function POST(req) {
       }
 
       const availableCommission = commissionEarned - totalWithdrawn;
+      const requestAmount = parseFloat(newTx.amount);
+
+      if (requestAmount > availableCommission) {
+        return NextResponse.json({ success: false, message: `Insufficient commission balance. Available: $${availableCommission.toFixed(2)}` }, { status: 400 });
+      }
+    }
+
+    if (newTx.type === 'AFFILIATE_COMMISSION_WITHDRAW') {
+      const agentDoc = await db.collection('agents').findOne({ email: newTx.userEmail.toLowerCase().trim() });
+      if (!agentDoc) {
+        return NextResponse.json({ success: false, message: 'Affiliate profile not found.' }, { status: 404 });
+      }
+
+      const withdrawals = await db.collection('transactions').find({
+        userEmail: newTx.userEmail.toLowerCase().trim(),
+        type: 'AFFILIATE_COMMISSION_WITHDRAW',
+        status: { $in: ['PENDING', 'SUCCESS'] }
+      }).toArray();
+      const totalWithdrawn = withdrawals.reduce((sum, tx) => sum + parseFloat(tx.amount || 0) - parseFloat(tx.payoutHold || 0), 0);
+
+      const referredPlayers = await db.collection('users').find({ agentCode: agentDoc.agentCode, role: 'user' }).toArray();
+      const playerEmails = referredPlayers.map((p) => p.email.toLowerCase().trim());
+
+      let commissionEarned = 0;
+      if (playerEmails.length > 0) {
+        const playerDeposits = await db.collection('transactions').find({
+          userEmail: { $in: playerEmails },
+          type: 'DEPOSIT',
+          status: 'SUCCESS'
+        }).toArray();
+        const totalDeposits = playerDeposits.reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
+        commissionEarned = (totalDeposits * (agentDoc.commissionRate || 0)) / 100;
+      }
+
+      const pendingAmount = withdrawals
+        .filter((tx) => tx.status === 'PENDING')
+        .reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
+      const availableCommission = commissionEarned - totalWithdrawn - pendingAmount;
       const requestAmount = parseFloat(newTx.amount);
 
       if (requestAmount > availableCommission) {

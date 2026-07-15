@@ -14,10 +14,11 @@ export function getRemainderCountdown(tx, now = Date.now()) {
   if (diff <= 0) return null;
   const hours = Math.floor(diff / 3600000);
   const minutes = Math.floor((diff % 3600000) / 60000);
-  return { hours, minutes };
+  const seconds = Math.floor((diff % 60000) / 1000);
+  return { hours, minutes, seconds };
 }
 
-const CLAIMABLE_TYPES = ['WITHDRAW', 'COMMISSION_WITHDRAW'];
+const CLAIMABLE_TYPES = ['WITHDRAW', 'COMMISSION_WITHDRAW', 'AFFILIATE_COMMISSION_WITHDRAW'];
 
 export function canShowClaimRemainderButton(tx, claimedIds = [], now = Date.now()) {
   if (!CLAIMABLE_TYPES.includes(tx.type) || tx.status !== 'SUCCESS') return false;
@@ -33,5 +34,5 @@ export function canShowClaimRemainderButton(tx, claimedIds = [], now = Date.now(
 
 export function formatRemainderCountdown(countdown) {
   if (!countdown) return '';
-  return `${countdown.hours}h ${countdown.minutes}m`;
+  return `${countdown.hours}h ${countdown.minutes}m ${countdown.seconds}s`;
 }

@@ -207,12 +207,22 @@ export default function AdminPage({ portalName, forcedRole }) {
     }
   };
 
-  const handleUpdateSettings = async (firstDepositBonus, regularDepositBonus, referralBonus, usdtAddress, usdtQrCode) => {
+  const handleUpdateSettings = async (firstDepositBonus, regularDepositBonus, referralBonus, usdtAddress, usdtQrCode, affiliatePayoutNetwork, affiliatePayoutWallet, affiliatePayoutQrCode, affiliatePlatformCommissionRate) => {
     try {
       const response = await fetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstDepositBonus, regularDepositBonus, referralBonus, usdtAddress, usdtQrCode })
+        body: JSON.stringify({
+          firstDepositBonus,
+          regularDepositBonus,
+          referralBonus,
+          usdtAddress,
+          usdtQrCode,
+          affiliatePayoutNetwork,
+          affiliatePayoutWallet,
+          affiliatePayoutQrCode,
+          affiliatePlatformCommissionRate
+        })
       });
       const data = await response.json();
       if (data.success) {

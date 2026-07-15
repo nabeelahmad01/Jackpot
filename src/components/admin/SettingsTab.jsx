@@ -11,6 +11,10 @@ export default function SettingsTab({ onUpdateSettings }) {
   const [referralBonusInput, setReferralBonusInput] = useState(10);
   const [usdtAddressInput, setUsdtAddressInput] = useState('');
   const [usdtQrCodeInput, setUsdtQrCodeInput] = useState('');
+  const [affiliatePayoutNetwork, setAffiliatePayoutNetwork] = useState('TRC20');
+  const [affiliatePayoutWallet, setAffiliatePayoutWallet] = useState('');
+  const [affiliatePayoutQrCode, setAffiliatePayoutQrCode] = useState('');
+  const [affiliatePlatformCommissionRate, setAffiliatePlatformCommissionRate] = useState(90);
 
   // Sync settings inputs when SWR loads data
   useEffect(() => {
@@ -20,6 +24,10 @@ export default function SettingsTab({ onUpdateSettings }) {
       setReferralBonusInput(settingsData.settings.referralBonus || 10);
       setUsdtAddressInput(settingsData.settings.usdtAddress || '');
       setUsdtQrCodeInput(settingsData.settings.usdtQrCode || '');
+      setAffiliatePayoutNetwork(settingsData.settings.affiliatePayoutNetwork || 'TRC20');
+      setAffiliatePayoutWallet(settingsData.settings.affiliatePayoutWallet || '');
+      setAffiliatePayoutQrCode(settingsData.settings.affiliatePayoutQrCode || '');
+      setAffiliatePlatformCommissionRate(settingsData.settings.affiliatePlatformCommissionRate ?? 90);
     }
   }, [settingsData]);
 
@@ -35,9 +43,30 @@ export default function SettingsTab({ onUpdateSettings }) {
     reader.readAsDataURL(file);
   };
 
+  const handleAffiliateQrChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAffiliatePayoutQrCode(reader.result);
+      alert('Affiliate payout QR loaded. Click Save configurations to update!');
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSettingsSubmit = async (e) => {
     e.preventDefault();
-    await onUpdateSettings(firstBonusInput, regularBonusInput, referralBonusInput, usdtAddressInput, usdtQrCodeInput);
+    await onUpdateSettings(
+      firstBonusInput,
+      regularBonusInput,
+      referralBonusInput,
+      usdtAddressInput,
+      usdtQrCodeInput,
+      affiliatePayoutNetwork,
+      affiliatePayoutWallet,
+      affiliatePayoutQrCode,
+      affiliatePlatformCommissionRate
+    );
     mutate(); // reload settings SWR cache
   };
 
@@ -153,6 +182,59 @@ export default function SettingsTab({ onUpdateSettings }) {
             )}
           </div>
           <span className="game-tap-tip">Upload a QR Code screenshot so distributors can quickly scan and pay.</span>
+        </div>
+
+        <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <h4 style={{ fontSize: '0.95rem', color: 'var(--gold-primary)', marginBottom: '1rem' }}>
+            <i className="fa-solid fa-users" style={{ marginRight: '0.4rem' }}></i> Affiliate Commission Payout Settings
+          </h4>
+
+          <div className="input-group">
+            <label>Affiliate Crypto Network</label>
+            <select
+              value={affiliatePayoutNetwork}
+              onChange={(e) => setAffiliatePayoutNetwork(e.target.value)}
+              style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem' }}
+            >
+              <option value="TRC20">USDT (TRC20)</option>
+              <option value="BEP20">BNB Smart Chain (BEP20)</option>
+            </select>
+            <span className="game-tap-tip">Which crypto network affiliates will see when requesting commission withdrawal.</span>
+          </div>
+
+          <div className="input-group" style={{ marginTop: '1rem' }}>
+            <label>Affiliate Payout Reference Wallet (Optional)</label>
+            <input
+              type="text"
+              placeholder="TRC20 or BEP20 wallet address"
+              value={affiliatePayoutWallet}
+              onChange={(e) => setAffiliatePayoutWallet(e.target.value)}
+              style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem' }}
+            />
+          </div>
+
+          <div className="input-group" style={{ marginTop: '1rem' }}>
+            <label>Platform Commission Share (%)</label>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={affiliatePlatformCommissionRate}
+              onChange={(e) => setAffiliatePlatformCommissionRate(e.target.value)}
+              style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem' }}
+            />
+            <span className="game-tap-tip">Shown to affiliates as platform share (affiliate share = 100 - this value).</span>
+          </div>
+
+          <div className="input-group" style={{ marginTop: '1rem' }}>
+            <label>Affiliate Network QR Code (Optional)</label>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <input type="file" accept="image/*" onChange={handleAffiliateQrChange} style={{ color: '#888', fontSize: '0.75rem' }} />
+              {affiliatePayoutQrCode && (
+                <img src={affiliatePayoutQrCode} alt="Affiliate QR" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)' }} />
+              )}
+            </div>
+          </div>
         </div>
 
         <button type="submit" className="submit-btn" style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold', marginTop: '2rem' }}>

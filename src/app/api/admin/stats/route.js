@@ -35,13 +35,19 @@ export async function GET(req) {
       pendingTransactionsCount,
       pendingCoinsCount,
       unreadChatUsers,
-      pendingWebsitePaymentsCount
+      pendingWebsitePaymentsCount,
+      pendingAffiliateCommissionsCount
     ] = await Promise.all([
       db.collection('accountRequests').countDocuments({ ...baseQuery, status: 'PENDING' }),
-      db.collection('transactions').countDocuments({ ...baseQuery, status: 'PENDING' }),
+      db.collection('transactions').countDocuments({
+        ...baseQuery,
+        status: 'PENDING',
+        type: { $nin: ['WEBSITE_COMMISSION_PAYMENT', 'COMMISSION_WITHDRAW', 'AFFILIATE_COMMISSION_WITHDRAW'] }
+      }),
       db.collection('coinsNotifications').countDocuments({ ...baseQuery, status: { $in: ['PENDING', 'CLAIM_REQUESTED'] } }),
       db.collection('supportMessages').distinct('userEmail', adminDistributorId ? { distributorId: adminDistributorId, senderType: 'player', read: false } : { distributorType: { $ne: 'B' }, senderType: 'player', read: false }),
-      db.collection('transactions').countDocuments({ type: { $in: ['WEBSITE_COMMISSION_PAYMENT', 'COMMISSION_WITHDRAW'] }, distributorId: adminDistributorId || { $exists: true }, status: 'PENDING' })
+      db.collection('transactions').countDocuments({ type: { $in: ['WEBSITE_COMMISSION_PAYMENT', 'COMMISSION_WITHDRAW'] }, distributorId: adminDistributorId || { $exists: true }, status: 'PENDING' }),
+      db.collection('transactions').countDocuments({ type: 'AFFILIATE_COMMISSION_WITHDRAW', status: 'PENDING' })
     ]);
 
     const pendingChatsCount = unreadChatUsers.length;
@@ -88,7 +94,8 @@ export async function GET(req) {
       pendingTransactionsCount,
       pendingCoinsCount,
       pendingChatsCount,
-      pendingWebsitePaymentsCount
+      pendingWebsitePaymentsCount,
+      pendingAffiliateCommissionsCount
     };
 
     // Cache the statistics for 60 seconds

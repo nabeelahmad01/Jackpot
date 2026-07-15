@@ -20,7 +20,7 @@ export default function RemainderClaimAction({
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 60000);
+    const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
 

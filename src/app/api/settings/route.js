@@ -17,7 +17,7 @@ export async function GET() {
     
     // Seed defaults if missing
     if (!settings) {
-      settings = { id: 'global_settings', firstDepositBonus: 300, regularDepositBonus: 20, referralBonus: 10, usdtAddress: '', usdtQrCode: '' };
+      settings = { id: 'global_settings', firstDepositBonus: 300, regularDepositBonus: 20, referralBonus: 10, usdtAddress: '', usdtQrCode: '', affiliatePayoutNetwork: 'TRC20', affiliatePayoutWallet: '', affiliatePayoutQrCode: '', affiliatePlatformCommissionRate: 90 };
       await settingsCollection.insertOne(settings);
     } else {
       let needsUpdate = false;
@@ -37,6 +37,26 @@ export async function GET() {
         settings.usdtQrCode = '';
         needsUpdate = true;
       }
+      if (settings.affiliatePayoutNetwork === undefined) {
+        updates.affiliatePayoutNetwork = 'TRC20';
+        settings.affiliatePayoutNetwork = 'TRC20';
+        needsUpdate = true;
+      }
+      if (settings.affiliatePayoutWallet === undefined) {
+        updates.affiliatePayoutWallet = '';
+        settings.affiliatePayoutWallet = '';
+        needsUpdate = true;
+      }
+      if (settings.affiliatePayoutQrCode === undefined) {
+        updates.affiliatePayoutQrCode = '';
+        settings.affiliatePayoutQrCode = '';
+        needsUpdate = true;
+      }
+      if (settings.affiliatePlatformCommissionRate === undefined) {
+        updates.affiliatePlatformCommissionRate = 90;
+        settings.affiliatePlatformCommissionRate = 90;
+        needsUpdate = true;
+      }
       if (needsUpdate) {
         await settingsCollection.updateOne({ id: 'global_settings' }, { $set: updates });
       }
@@ -53,7 +73,7 @@ export async function GET() {
 // PUT / POST update settings (Super Admin only)
 export async function PUT(req) {
   try {
-    const { firstDepositBonus, regularDepositBonus, referralBonus, usdtAddress, usdtQrCode } = await req.json();
+    const { firstDepositBonus, regularDepositBonus, referralBonus, usdtAddress, usdtQrCode, affiliatePayoutNetwork, affiliatePayoutWallet, affiliatePayoutQrCode, affiliatePlatformCommissionRate } = await req.json();
 
     const db = await getDb();
     const settingsCollection = db.collection('settings');
@@ -73,6 +93,18 @@ export async function PUT(req) {
     }
     if (usdtQrCode !== undefined) {
       updateFields.usdtQrCode = String(usdtQrCode);
+    }
+    if (affiliatePayoutNetwork !== undefined) {
+      updateFields.affiliatePayoutNetwork = ['TRC20', 'BEP20'].includes(affiliatePayoutNetwork) ? affiliatePayoutNetwork : 'TRC20';
+    }
+    if (affiliatePayoutWallet !== undefined) {
+      updateFields.affiliatePayoutWallet = String(affiliatePayoutWallet).trim();
+    }
+    if (affiliatePayoutQrCode !== undefined) {
+      updateFields.affiliatePayoutQrCode = String(affiliatePayoutQrCode);
+    }
+    if (affiliatePlatformCommissionRate !== undefined) {
+      updateFields.affiliatePlatformCommissionRate = Number(affiliatePlatformCommissionRate) || 90;
     }
 
     await settingsCollection.updateOne(

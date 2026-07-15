@@ -195,7 +195,7 @@ export default function AffiliatesTab() {
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: '1.5rem' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 380px) 1fr', gap: '1.5rem' }}>
       
       {/* 1. CREATION OR EDIT FORM PANEL */}
       <div className="section-card" style={{ height: 'fit-content' }}>
@@ -297,11 +297,11 @@ export default function AffiliatesTab() {
             <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>If blank, an ID like SUBxxxxxx is generated.</span>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginTop: '0.75rem' }}>
             <button
               type="submit"
               className="submit-btn"
-              style={{ flex: 1, background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold' }}
+              style={{ width: '100%', minHeight: '44px', background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
               disabled={isSubmitting}
             >
               {editingAgent ? 'SAVE CHANGES' : 'CREATE AGENT'}
@@ -311,7 +311,7 @@ export default function AffiliatesTab() {
                 type="button"
                 className="submit-btn"
                 onClick={() => setEditingAgent(null)}
-                style={{ background: 'rgba(255,255,255,0.08)', color: '#fff' }}
+                style={{ width: '100%', minHeight: '44px', background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: '0.8rem' }}
               >
                 CANCEL
               </button>

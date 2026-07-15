@@ -47,7 +47,7 @@ export async function GET() {
       // 5. Calculate total withdrawn/pending commission withdrawals by this agent
       const agentWithdrawDocs = await transactionsCollection.find({
         userEmail: agent.email.toLowerCase().trim(),
-        type: 'COMMISSION_WITHDRAW',
+        type: 'AFFILIATE_COMMISSION_WITHDRAW',
         status: { $in: ['SUCCESS', 'PENDING'] }
       }).toArray();
       const totalWithdrawn = agentWithdrawDocs.reduce((acc, curr) => acc + parseFloat(curr.amount || 0), 0);
