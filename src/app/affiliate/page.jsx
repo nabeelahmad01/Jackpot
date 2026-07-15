@@ -412,22 +412,22 @@ function AffiliatePortal() {
     const amount = parseFloat(withdrawAmount);
     if (!amount || amount <= 0) { alert('Please enter a valid amount.'); return; }
     if (amount > (stats.availableBalance || 0)) { alert('Amount exceeds available balance.'); return; }
-    const cryptoNetwork = globalSettings.affiliatePayoutNetwork || 'TRC20';
-    if (withdrawPayoutMethod === 'crypto' && !withdrawTrc20.trim()) {
+    const cryptoNetwork = withdrawPayoutMethod === 'bep20' ? 'BEP20' : withdrawPayoutMethod === 'trc20' ? 'TRC20' : '';
+    if ((withdrawPayoutMethod === 'trc20' || withdrawPayoutMethod === 'bep20') && !withdrawTrc20.trim()) {
       alert(`Please enter your ${cryptoNetwork} wallet address.`);
       return;
     }
-    if (withdrawPayoutMethod !== 'crypto' && !withdrawAccount.trim()) {
+    if (withdrawPayoutMethod === 'bank' && !withdrawAccount.trim()) {
       alert('Please enter your account number or tag.');
       return;
     }
-    if (withdrawPayoutMethod !== 'crypto' && !withdrawBank.trim()) {
+    if (withdrawPayoutMethod === 'bank' && !withdrawBank.trim()) {
       alert('Please enter bank or payment method (e.g. CashApp, E sewa).');
       return;
     }
     setWithdrawLoading(true);
     try {
-      const payoutDetails = withdrawPayoutMethod === 'crypto'
+      const payoutDetails = (withdrawPayoutMethod === 'trc20' || withdrawPayoutMethod === 'bep20')
         ? `${cryptoNetwork}: ${withdrawTrc20.trim()}`
         : `${withdrawBank.trim()} - Acc: ${withdrawAccount.trim()}`;
 
@@ -438,8 +438,8 @@ function AffiliatePortal() {
           userEmail: agentSession.email,
           type: 'AFFILIATE_COMMISSION_WITHDRAW',
           amount,
-          gateway: withdrawPayoutMethod === 'crypto' ? `USDT (${cryptoNetwork})` : withdrawBank.trim(),
-          code: withdrawPayoutMethod === 'crypto' ? withdrawTrc20.trim() : withdrawAccount.trim(),
+          gateway: (withdrawPayoutMethod === 'trc20' || withdrawPayoutMethod === 'bep20') ? `USDT (${cryptoNetwork})` : withdrawBank.trim(),
+          code: (withdrawPayoutMethod === 'trc20' || withdrawPayoutMethod === 'bep20') ? withdrawTrc20.trim() : withdrawAccount.trim(),
           nameOnTag: withdrawName.trim(),
           payoutQr: withdrawQr || '',
           status: 'PENDING',
@@ -547,10 +547,18 @@ function AffiliatePortal() {
   const platformCommissionRate = globalSettings.affiliatePlatformCommissionRate !== undefined
     ? parseFloat(globalSettings.affiliatePlatformCommissionRate)
     : Math.max(0, 100 - agentCommissionRate);
-  const affiliateCryptoNetwork = globalSettings.affiliatePayoutNetwork || 'TRC20';
+  const affiliateCryptoNetwork = withdrawPayoutMethod === 'bep20' ? 'BEP20' : withdrawPayoutMethod === 'trc20' ? 'TRC20' : (globalSettings.affiliatePayoutNetwork || 'TRC20');
   const affiliateCryptoLabel = affiliateCryptoNetwork === 'BEP20' ? 'BNB Smart Chain (BEP20)' : 'USDT (TRC20)';
-  const affiliatePayoutWallet = globalSettings.affiliatePayoutWallet || '';
-  const affiliatePayoutQr = globalSettings.affiliatePayoutQrCode || '';
+  const affiliatePayoutWallet = affiliateCryptoNetwork === 'BEP20'
+    ? (globalSettings.affiliatePayoutWalletBEP20 || globalSettings.affiliatePayoutWallet || '')
+    : (globalSettings.affiliatePayoutWallet || '');
+  const affiliatePayoutQr = affiliateCryptoNetwork === 'BEP20'
+    ? (globalSettings.affiliatePayoutQrBEP20 || globalSettings.affiliatePayoutQrCode || '')
+    : (globalSettings.affiliatePayoutQrCode || '');
+  const adPaymentNetwork = globalSettings.adPaymentNetwork || 'BEP20';
+  const adPaymentWallet = globalSettings.adPaymentWallet || '';
+  const adPaymentQr = globalSettings.adPaymentQrCode || '';
+  const adNetworkLabel = adPaymentNetwork === 'TRC20' ? 'USDT (TRC20)' : 'BNB Smart Chain (BEP20)';
 
   // Change password handler
   const handleChangePassword = async (e) => {
@@ -1310,7 +1318,7 @@ function AffiliatePortal() {
               </div>
 
               <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-                {[{ id: 'bank', label: 'Bank / CashApp', icon: 'fa-building-columns' }, { id: 'crypto', label: affiliateCryptoLabel, icon: 'fa-wallet' }].map((m) => (
+                {[{ id: 'bank', label: 'Bank / CashApp', icon: 'fa-building-columns' }, { id: 'trc20', label: 'USDT (TRC20)', icon: 'fa-wallet' }, { id: 'bep20', label: 'BNB Smart Chain (BEP20)', icon: 'fa-wallet' }].map((m) => (
                   <button
                     key={m.id}
                     type="button"
@@ -1327,7 +1335,7 @@ function AffiliatePortal() {
                 ))}
               </div>
 
-              {withdrawPayoutMethod === 'crypto' && (affiliatePayoutWallet || affiliatePayoutQr) && (
+              {(withdrawPayoutMethod === 'trc20' || withdrawPayoutMethod === 'bep20') && (affiliatePayoutWallet || affiliatePayoutQr) && (
                 <div style={{ background: '#0b0d16', borderRadius: '12px', border: '1px solid rgba(255,215,0,0.1)', padding: '1rem', marginBottom: '1rem' }}>
                   <h4 style={{ fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '0.75rem' }}>
                     <i className="fa-solid fa-wallet" style={{ color: 'var(--gold-primary)', marginRight: '0.35rem' }}></i>
@@ -1366,7 +1374,7 @@ function AffiliatePortal() {
                   <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Account Holder</label>
                   <input type="text" placeholder="Full name" value={withdrawName} onChange={(e)=>setWithdrawName(e.target.value)} style={inputStyle} required />
                 </div>
-                {withdrawPayoutMethod === 'crypto' ? (
+                {withdrawPayoutMethod === 'trc20' || withdrawPayoutMethod === 'bep20' ? (
                   <>
                     <div>
                       <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>{affiliateCryptoNetwork} Wallet Address</label>
@@ -1795,7 +1803,7 @@ function AffiliatePortal() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.8rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '0.5rem' }}>
                       <span style={{ color: '#888' }}>Network</span>
-                      <strong style={{ color: '#fff' }}>BNB Smart Chain (BEP20)</strong>
+                      <strong style={{ color: '#fff' }}>{adNetworkLabel}</strong>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '0.5rem' }}>
                       <span style={{ color: '#888' }}>Remaining Limit</span>
@@ -1804,21 +1812,28 @@ function AffiliatePortal() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '0.75rem' }}>
                       <span style={{ color: '#888' }}>Wallet Address</span>
                       <div style={{ display: 'flex', alignItems: 'center', background: '#07090f', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)', fontSize: '0.725rem', fontFamily: 'monospace', color: '#fff', wordBreak: 'break-all', gap: '0.5rem', marginTop: '0.2rem' }}>
-                        <span>0xbe912598c0f2a38365ac1f6838f943935326be74</span>
+                        <span>{adPaymentWallet || 'Not configured by admin'}</span>
+                        {adPaymentWallet && (
                         <button onClick={() => {
-                          navigator.clipboard.writeText('0xbe912598c0f2a38365ac1f6838f943935326be74');
+                          navigator.clipboard.writeText(adPaymentWallet);
                           alert('Wallet address copied to clipboard!');
                         }} style={{ background: '#6366f1', border: 'none', borderRadius: '4px', color: '#fff', padding: '0.2rem 0.4rem', cursor: 'pointer', fontSize: '0.65rem', fontWeight: 'bold' }}>Copy</button>
+                        )}
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem' }}>
-                      {/* BNB BEP20 QR Logo Mascot rendering */}
-                      <div style={{ background: '#fff', padding: '0.4rem', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '90px', height: '90px' }}>
-                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=0xbe912598c0f2a38365ac1f6838f943935326be74" alt="BSC BEP20 Wallet Address QR Code" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                      </div>
+                      {adPaymentQr ? (
+                        <div style={{ background: '#fff', padding: '0.4rem', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '90px', height: '90px' }}>
+                          <img src={adPaymentQr} alt="Ads payment QR" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                        </div>
+                      ) : adPaymentWallet ? (
+                        <div style={{ background: '#fff', padding: '0.4rem', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '90px', height: '90px' }}>
+                          <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(adPaymentWallet)}`} alt="Ads payment QR" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                        </div>
+                      ) : null}
                       <div style={{ fontSize: '0.675rem', color: 'var(--text-muted)' }}>
-                        <p style={{ margin: '0 0 0.25rem 0' }}>Scan this QR code to transfer your ad budget directly using BNB Smart Chain (BEP20).</p>
-                        <strong style={{ color: 'var(--gold-primary)' }}>Important:</strong> Send only USDT/BNB via BEP20. Transfers on other chains cannot be processed.
+                        <p style={{ margin: '0 0 0.25rem 0' }}>Scan this QR code to transfer your ad budget using {adNetworkLabel}.</p>
+                        <strong style={{ color: 'var(--gold-primary)' }}>Important:</strong> Send only via the configured network. Transfers on other chains cannot be processed.
                       </div>
                     </div>
                   </div>

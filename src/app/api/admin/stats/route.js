@@ -45,7 +45,8 @@ export async function GET(req) {
       pendingCoinsCount,
       unreadChatUsers,
       pendingWebsitePaymentsCount,
-      pendingAffiliateCommissionsCount
+      pendingAffiliateCommissionsCount,
+      pendingCampaignRequestsCount
     ] = await Promise.all([
       db.collection('accountRequests').countDocuments(requestsQuery),
       db.collection('transactions').countDocuments({
@@ -56,7 +57,8 @@ export async function GET(req) {
       db.collection('coinsNotifications').countDocuments(coinsQuery),
       db.collection('supportMessages').distinct('userEmail', adminDistributorId ? { distributorId: adminDistributorId, senderType: 'player', read: false } : { distributorType: { $ne: 'B' }, senderType: 'player', read: false }),
       db.collection('transactions').countDocuments({ type: { $in: ['WEBSITE_COMMISSION_PAYMENT', 'COMMISSION_WITHDRAW'] }, distributorId: adminDistributorId || { $exists: true }, status: 'PENDING' }),
-      db.collection('transactions').countDocuments({ type: 'AFFILIATE_COMMISSION_WITHDRAW', status: 'PENDING' })
+      db.collection('transactions').countDocuments({ type: 'AFFILIATE_COMMISSION_WITHDRAW', status: 'PENDING' }),
+      db.collection('campaignRequests').countDocuments({ status: 'PENDING' })
     ]);
 
     const pendingChatsCount = unreadChatUsers.length;
@@ -104,7 +106,8 @@ export async function GET(req) {
       pendingCoinsCount,
       pendingChatsCount,
       pendingWebsitePaymentsCount,
-      pendingAffiliateCommissionsCount
+      pendingAffiliateCommissionsCount,
+      pendingCampaignRequestsCount
     };
 
     // Cache the statistics for 60 seconds

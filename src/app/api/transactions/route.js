@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
+import { buildRemainderClaimAvailableAt } from '../../../lib/claimWait';
 import { calcCommissionFromProfit } from '../../../lib/commission';
 
 // GET transactions (supports filtering by email for users, or returning all for admins)
@@ -142,6 +143,7 @@ export async function GET(req) {
         remainderStatus: 1,
         remainderClaimAvailableAt: 1,
         remainderWaitHours: 1,
+        remainderWaitMinutes: 1,
         payoutQr: 1,
         parentTxId: 1,
         payoutAmount: 1,
@@ -456,7 +458,7 @@ export async function POST(req) {
 // PUT update transaction status (Admin action - approve/decline)
 export async function PUT(req) {
   try {
-    const { id, status, note, payoutSent, payoutHold, processedBy, payoutProof, remainderWaitHours } = await req.json();
+    const { id, status, note, payoutSent, payoutHold, processedBy, payoutProof, remainderWaitHours, remainderWaitMinutes } = await req.json();
 
     if (!id || !status) {
       return NextResponse.json({ success: false, message: 'Transaction ID and status are required.' }, { status: 400 });
@@ -503,10 +505,10 @@ export async function PUT(req) {
 
     if (status === 'SUCCESS' && payoutHold !== undefined && Number(payoutHold) > 0) {
       const hours = remainderWaitHours !== undefined ? Math.max(0, Number(remainderWaitHours) || 0) : 0;
+      const minutes = remainderWaitMinutes !== undefined ? Math.max(0, Number(remainderWaitMinutes) || 0) : 0;
       updateFields.remainderWaitHours = hours;
-      updateFields.remainderClaimAvailableAt = hours > 0
-        ? new Date(Date.now() + hours * 3600000).toISOString()
-        : new Date().toISOString();
+      updateFields.remainderWaitMinutes = minutes;
+      updateFields.remainderClaimAvailableAt = buildRemainderClaimAvailableAt(hours, minutes);
       updateFields.remainderRequested = false;
       updateFields.remainderStatus = '';
     }
@@ -524,9 +526,11 @@ export async function PUT(req) {
             remainderStatus: ''
           };
           const hours = remainderWaitHours !== undefined ? Math.max(0, Number(remainderWaitHours) || 0) : 0;
-          if (hours > 0) {
+          const minutes = remainderWaitMinutes !== undefined ? Math.max(0, Number(remainderWaitMinutes) || 0) : 0;
+          if (hours > 0 || minutes > 0) {
             parentUpdate.remainderWaitHours = hours;
-            parentUpdate.remainderClaimAvailableAt = new Date(Date.now() + hours * 3600000).toISOString();
+            parentUpdate.remainderWaitMinutes = minutes;
+            parentUpdate.remainderClaimAvailableAt = buildRemainderClaimAvailableAt(hours, minutes);
           } else {
             parentUpdate.remainderClaimAvailableAt = new Date().toISOString();
           }

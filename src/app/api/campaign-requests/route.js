@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
 
+async function getAdBudgetLimit(db) {
+  const settings = await db.collection('settings').findOne({ id: 'global_settings' });
+  return Number(settings?.adBudgetLimit) > 0 ? Number(settings.adBudgetLimit) : 6000;
+}
+
 // GET campaign requests
 export async function GET(req) {
   try {
@@ -22,11 +27,12 @@ export async function GET(req) {
       .toArray();
 
     // If querying for a specific agent, calculate their remaining budget limit
-    let remainingLimit = 6000.0;
+    const budgetCap = await getAdBudgetLimit(db);
+    let remainingLimit = budgetCap;
     if (agentEmail) {
       const activeCampaigns = campaigns.filter(c => c.status !== 'REJECTED');
       const totalSpent = activeCampaigns.reduce((sum, c) => sum + parseFloat(c.budget || 0), 0);
-      remainingLimit = Math.max(0, 6000.0 - totalSpent);
+      remainingLimit = Math.max(0, budgetCap - totalSpent);
     }
 
     return NextResponse.json({
@@ -64,9 +70,10 @@ export async function POST(req) {
 
     // Double check agent limit
     const cleanEmail = agentEmail.toLowerCase().trim();
+    const budgetCap = await getAdBudgetLimit(db);
     const agentCampaigns = await campaignsCollection.find({ agentEmail: cleanEmail }).toArray();
     const totalSpent = agentCampaigns.filter(c => c.status !== 'REJECTED').reduce((sum, c) => sum + parseFloat(c.budget || 0), 0);
-    const remainingLimit = Math.max(0, 6000.0 - totalSpent);
+    const remainingLimit = Math.max(0, budgetCap - totalSpent);
 
     const budgetVal = parseFloat(budget);
     if (budgetVal > remainingLimit) {
@@ -90,6 +97,7 @@ export async function POST(req) {
     };
 
     await campaignsCollection.insertOne(newRequest);
+    cache.del('admin_stats');
 
     return NextResponse.json({
       success: true,
@@ -128,6 +136,8 @@ export async function PUT(req) {
       { id },
       { $set: updateFields }
     );
+
+    cache.del('admin_stats');
 
     return NextResponse.json({
       success: true,

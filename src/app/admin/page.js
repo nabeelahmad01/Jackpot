@@ -460,19 +460,27 @@ export default function AdminPage({ portalName, forcedRole }) {
 
   // View Screenshot proof trigger
   const handleInspectProof = async (imgUrl, txId) => {
-    if (!imgUrl) return;
-
     if (typeof imgUrl === 'string' && imgUrl.startsWith('data:')) {
       setProofImageUrl(imgUrl);
       setProofModalOpen(true);
-    } else if (txId) {
-      setProofImageUrl(''); // Set to empty to trigger loading spinner
+      return;
+    }
+
+    if (typeof imgUrl === 'string' && imgUrl.startsWith('http')) {
+      setProofImageUrl(imgUrl);
+      setProofModalOpen(true);
+      return;
+    }
+
+    if (txId) {
+      setProofImageUrl('');
       setProofModalOpen(true);
       try {
         const res = await fetch(`/api/transactions?id=${txId}&adminRole=admin`);
         const data = await res.json();
-        if (data.success && data.transaction?.screenshot) {
-          setProofImageUrl(data.transaction.screenshot);
+        const proof = data.transaction?.payoutProof || data.transaction?.screenshot || data.transaction?.paymentProof;
+        if (data.success && proof && proof !== true) {
+          setProofImageUrl(proof);
         } else {
           alert('Failed to load payment receipt screenshot.');
           setProofModalOpen(false);
@@ -482,6 +490,12 @@ export default function AdminPage({ portalName, forcedRole }) {
         alert('Error fetching payment proof.');
         setProofModalOpen(false);
       }
+      return;
+    }
+
+    if (imgUrl) {
+      setProofImageUrl(imgUrl);
+      setProofModalOpen(true);
     }
   };
 

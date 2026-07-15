@@ -75,6 +75,7 @@ export default function LedgerTab({
   const [payoutCustomNote, setPayoutCustomNote] = useState('');
   const [payoutProof, setPayoutProof] = useState('');
   const [remainderWaitHours, setRemainderWaitHours] = useState('0');
+  const [remainderWaitMinutes, setRemainderWaitMinutes] = useState('0');
   const [isProcessingPayout, setIsProcessingPayout] = useState(false);
 
   const handleOpenPayoutModal = (tx) => {
@@ -150,6 +151,7 @@ export default function LedgerTab({
       };
       if (holdVal > 0) {
         payload.remainderWaitHours = Math.max(0, Number(remainderWaitHours) || 0);
+        payload.remainderWaitMinutes = Math.max(0, Number(remainderWaitMinutes) || 0);
       }
 
       const response = await fetch('/api/transactions', {
@@ -666,21 +668,39 @@ export default function LedgerTab({
                 </div>
 
                 {payoutType === 'partial' && parseFloat(payoutHoldAmount || 0) > 0 && (
-                  <div className="input-group">
-                    <label htmlFor="remainder-wait-hours">Claim Wait Time (Hours before player can claim remainder)</label>
-                    <div className="input-wrapper">
-                      <i className="fa-solid fa-clock input-icon"></i>
-                      <input
-                        type="number"
-                        id="remainder-wait-hours"
-                        min="0"
-                        step="1"
-                        placeholder="e.g. 24"
-                        value={remainderWaitHours}
-                        onChange={(e) => setRemainderWaitHours(e.target.value)}
-                      />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div className="input-group">
+                      <label htmlFor="remainder-wait-hours">Claim Wait (Hours)</label>
+                      <div className="input-wrapper">
+                        <i className="fa-solid fa-clock input-icon"></i>
+                        <input
+                          type="number"
+                          id="remainder-wait-hours"
+                          min="0"
+                          step="1"
+                          placeholder="e.g. 24"
+                          value={remainderWaitHours}
+                          onChange={(e) => setRemainderWaitHours(e.target.value)}
+                        />
+                      </div>
                     </div>
-                    <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
+                    <div className="input-group">
+                      <label htmlFor="remainder-wait-minutes">Claim Wait (Minutes)</label>
+                      <div className="input-wrapper">
+                        <i className="fa-solid fa-hourglass-half input-icon"></i>
+                        <input
+                          type="number"
+                          id="remainder-wait-minutes"
+                          min="0"
+                          max="59"
+                          step="1"
+                          placeholder="e.g. 30"
+                          value={remainderWaitMinutes}
+                          onChange={(e) => setRemainderWaitMinutes(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '0.35rem', gridColumn: '1 / -1' }}>
                       Player will see a countdown timer. Claim button appears only after this wait period ends.
                     </p>
                   </div>

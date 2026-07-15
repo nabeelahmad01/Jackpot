@@ -50,10 +50,16 @@ export default function AdminDashboard({
 }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const skipUrlPushRef = React.useRef(true);
+  const urlSyncedRef = React.useRef(false);
 
   // Sync tab state changes to browser URL pathnames
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (skipUrlPushRef.current) {
+      skipUrlPushRef.current = false;
+      return;
+    }
     const path = window.location.pathname;
     const parts = path.split('/').filter(Boolean);
     const basePrefix = parts[0] || 'admin';
@@ -73,9 +79,10 @@ export default function AdminDashboard({
       } else {
         setActiveTab('dashboard');
       }
+      urlSyncedRef.current = true;
     };
     window.addEventListener('popstate', handlePathChange);
-    handlePathChange(); // Sync initial view on mount
+    handlePathChange();
     return () => window.removeEventListener('popstate', handlePathChange);
   }, []);
   const [processingIds, setProcessingIds] = useState({});
@@ -94,8 +101,9 @@ export default function AdminDashboard({
   const pendingRequestsCount = statsData?.stats?.pendingRequestsCount || 0;
   const pendingTransactionsCount = statsData?.stats?.pendingTransactionsCount || 0;
   const pendingCoinsCount = statsData?.stats?.pendingCoinsCount || 0;
+  const pendingCampaignRequestsCount = statsData?.stats?.pendingCampaignRequestsCount || 0;
 
-  const prevCountsRef = React.useRef({ requests: 0, transactions: 0, coins: 0, chats: 0 });
+  const prevCountsRef = React.useRef({ requests: 0, transactions: 0, coins: 0, chats: 0, campaigns: 0 });
 
   const playSynthesizedBackup = () => {
     try {
@@ -141,21 +149,23 @@ export default function AdminDashboard({
 
   useEffect(() => {
     if (!statsData?.stats) return;
-    const { pendingRequestsCount, pendingTransactionsCount, pendingCoinsCount, pendingChatsCount } = statsData.stats;
+    const { pendingRequestsCount, pendingTransactionsCount, pendingCoinsCount, pendingChatsCount, pendingCampaignRequestsCount } = statsData.stats;
     const prev = prevCountsRef.current;
     
     const hasNewRequest = pendingRequestsCount > prev.requests;
     const hasNewTx = pendingTransactionsCount > prev.transactions;
     const hasNewCoin = pendingCoinsCount > prev.coins;
     const hasNewChat = pendingChatsCount > prev.chats;
+    const hasNewCampaign = pendingCampaignRequestsCount > prev.campaigns;
     
     const countChanged =
       pendingRequestsCount !== prev.requests ||
       pendingTransactionsCount !== prev.transactions ||
       pendingCoinsCount !== prev.coins ||
-      pendingChatsCount !== prev.chats;
+      pendingChatsCount !== prev.chats ||
+      pendingCampaignRequestsCount !== prev.campaigns;
 
-    if (hasNewRequest || hasNewTx || hasNewCoin || hasNewChat) {
+    if (hasNewRequest || hasNewTx || hasNewCoin || hasNewChat || hasNewCampaign) {
       playAlertSound();
     }
 
@@ -167,7 +177,8 @@ export default function AdminDashboard({
       requests: pendingRequestsCount,
       transactions: pendingTransactionsCount,
       coins: pendingCoinsCount,
-      chats: pendingChatsCount
+      chats: pendingChatsCount,
+      campaigns: pendingCampaignRequestsCount
     };
   }, [statsData]);
 
@@ -219,6 +230,11 @@ export default function AdminDashboard({
   };
 
   // Helper: tab permissions checking based on role
+  const isSuperAdmin = () => {
+    if (!adminUser?.role) return false;
+    return adminUser.role.toLowerCase().split(',').map((r) => r.trim()).includes('admin');
+  };
+
   const hasAccess = (tabName) => {
     if (!adminUser?.role) return false;
     const roleString = adminUser.role.toLowerCase();
@@ -759,7 +775,7 @@ export default function AdminDashboard({
             </button>
           )}
 
-          {!adminUser?.distributorId && adminUser?.role === 'admin' && (
+          {!adminUser?.distributorId && isSuperAdmin() && (
             <button
               onClick={() => { setActiveTab('campaign_requests'); setSidebarOpen(false); }}
               style={{
@@ -782,10 +798,15 @@ export default function AdminDashboard({
             >
               <i className="fa-solid fa-bullhorn" style={{ width: '18px' }}></i>
               <span>Ads Campaigns</span>
+              {statsData?.stats?.pendingCampaignRequestsCount > 0 && (
+                <span className="notification-badge" style={{ marginLeft: 'auto', background: '#ef4444', color: '#fff', fontSize: '0.65rem', padding: '0.15rem 0.35rem', borderRadius: '10px', fontWeight: 'bold' }}>
+                  {statsData.stats.pendingCampaignRequestsCount}
+                </span>
+              )}
             </button>
           )}
 
-          {!adminUser?.distributorId && adminUser?.role === 'admin' && (
+          {!adminUser?.distributorId && isSuperAdmin() && (
             <button
               onClick={() => { setActiveTab('deleted_accounts'); setSidebarOpen(false); }}
               style={{

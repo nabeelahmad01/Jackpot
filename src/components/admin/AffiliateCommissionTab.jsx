@@ -22,6 +22,7 @@ export default function AffiliateCommissionTab({
   const [payoutSent, setPayoutSent] = useState(0);
   const [payoutHold, setPayoutHold] = useState(0);
   const [remainderWaitHours, setRemainderWaitHours] = useState('0');
+  const [remainderWaitMinutes, setRemainderWaitMinutes] = useState('0');
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -64,6 +65,10 @@ export default function AffiliateCommissionTab({
   const handlePayoutSubmit = async (e) => {
     e.preventDefault();
     if (!selectedTx) return;
+    if (!payoutProof) {
+      alert('Please upload a payout receipt screenshot before completing.');
+      return;
+    }
     setIsProcessing(true);
     try {
       const holdVal = Number(payoutHold);
@@ -78,6 +83,7 @@ export default function AffiliateCommissionTab({
       };
       if (holdVal > 0) {
         payload.remainderWaitHours = Math.max(0, Number(remainderWaitHours) || 0);
+        payload.remainderWaitMinutes = Math.max(0, Number(remainderWaitMinutes) || 0);
       }
       const response = await fetch('/api/transactions', {
         method: 'PUT',
@@ -257,7 +263,7 @@ export default function AffiliateCommissionTab({
                     <td style={{ fontSize: '0.65rem', color: '#aaa' }}>{tx.note || '—'}</td>
                     <td>
                       {tx.payoutProof ? (
-                        <button type="button" onClick={() => onInspectProof(tx.payoutProof, tx.id)} className="submit-btn" style={{ background: '#3498db', margin: 0, padding: '0.3rem 0.55rem', width: 'auto', fontSize: '0.65rem' }}>
+                        <button type="button" onClick={() => onInspectProof(null, tx.id)} className="submit-btn" style={{ background: '#3498db', margin: 0, padding: '0.3rem 0.55rem', width: 'auto', fontSize: '0.65rem' }}>
                           View Receipt
                         </button>
                       ) : '—'}
@@ -316,10 +322,16 @@ export default function AffiliateCommissionTab({
                   </div>
                 </div>
                 {payoutHold > 0 && (
-                  <div className="input-group">
-                    <label>Claim Wait Time (Hours)</label>
-                    <input type="number" min="0" step="1" value={remainderWaitHours} onChange={(e) => setRemainderWaitHours(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.5rem', borderRadius: '6px' }} />
-                    <p style={{ fontSize: '0.65rem', color: '#888', marginTop: '0.35rem' }}>Affiliate will see countdown before claim button appears.</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div className="input-group">
+                      <label>Claim Wait (Hours)</label>
+                      <input type="number" min="0" step="1" value={remainderWaitHours} onChange={(e) => setRemainderWaitHours(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.5rem', borderRadius: '6px' }} />
+                    </div>
+                    <div className="input-group">
+                      <label>Claim Wait (Minutes)</label>
+                      <input type="number" min="0" max="59" step="1" value={remainderWaitMinutes} onChange={(e) => setRemainderWaitMinutes(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.5rem', borderRadius: '6px' }} />
+                    </div>
+                    <p style={{ fontSize: '0.65rem', color: '#888', marginTop: '0.35rem', gridColumn: '1 / -1' }}>Affiliate will see countdown before claim button appears.</p>
                   </div>
                 )}
                 <div className="input-group">

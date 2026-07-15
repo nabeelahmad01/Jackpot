@@ -256,7 +256,7 @@ export default function DistributorsTab() {
               />
             </div>
             <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-              Percentage of deposits earned by the distributor.
+              Percentage of net profit earned by the distributor.
             </div>
           </div>
 
@@ -275,7 +275,7 @@ export default function DistributorsTab() {
               />
             </div>
             <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-              Percentage of deposits paid to the platform owner.
+              Percentage of net profit paid to the platform owner.
             </div>
           </div>
 

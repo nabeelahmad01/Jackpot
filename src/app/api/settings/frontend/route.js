@@ -59,7 +59,13 @@ const DEFAULT_SETTINGS = {
     { title: '3. Minimum & Maximum Cashouts', description: 'The minimum cashout limit is $5. Daily maximum cashouts are capped at $5,000 for standard players. Support can raise limits for VIP accounts.' },
     { title: '4. Payout Duration', description: 'Withdrawal requests are processed instantly or within 10-15 minutes on average via digital wallets.' }
   ],
-  proofScreenshots: []
+  proofScreenshots: [],
+  lobbyCashoutTrustItems: [
+    { icon: 'fa-shield-halved', title: '100% SECURE', description: 'Your data is always protected' },
+    { icon: 'fa-circle-check', title: 'FAIR PLAY', description: 'Provably fair and transparent' },
+    { icon: 'fa-bolt', title: 'INSTANT WITHDRAWALS', description: 'Get your winnings instantly' },
+    { icon: 'fa-headset', title: '24/7 SUPPORT', description: 'Always here to help you' }
+  ]
 };
 
 // GET Frontend Settings

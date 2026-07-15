@@ -14,7 +14,13 @@ export default function SettingsTab({ onUpdateSettings }) {
   const [affiliatePayoutNetwork, setAffiliatePayoutNetwork] = useState('TRC20');
   const [affiliatePayoutWallet, setAffiliatePayoutWallet] = useState('');
   const [affiliatePayoutQrCode, setAffiliatePayoutQrCode] = useState('');
+  const [affiliatePayoutWalletBEP20, setAffiliatePayoutWalletBEP20] = useState('');
+  const [affiliatePayoutQrBEP20, setAffiliatePayoutQrBEP20] = useState('');
   const [affiliatePlatformCommissionRate, setAffiliatePlatformCommissionRate] = useState(90);
+  const [adPaymentNetwork, setAdPaymentNetwork] = useState('BEP20');
+  const [adPaymentWallet, setAdPaymentWallet] = useState('');
+  const [adPaymentQrCode, setAdPaymentQrCode] = useState('');
+  const [adBudgetLimit, setAdBudgetLimit] = useState(6000);
 
   // Sync settings inputs when SWR loads data
   useEffect(() => {
@@ -27,7 +33,13 @@ export default function SettingsTab({ onUpdateSettings }) {
       setAffiliatePayoutNetwork(settingsData.settings.affiliatePayoutNetwork || 'TRC20');
       setAffiliatePayoutWallet(settingsData.settings.affiliatePayoutWallet || '');
       setAffiliatePayoutQrCode(settingsData.settings.affiliatePayoutQrCode || '');
+      setAffiliatePayoutWalletBEP20(settingsData.settings.affiliatePayoutWalletBEP20 || '');
+      setAffiliatePayoutQrBEP20(settingsData.settings.affiliatePayoutQrBEP20 || '');
       setAffiliatePlatformCommissionRate(settingsData.settings.affiliatePlatformCommissionRate ?? 90);
+      setAdPaymentNetwork(settingsData.settings.adPaymentNetwork || 'BEP20');
+      setAdPaymentWallet(settingsData.settings.adPaymentWallet || '');
+      setAdPaymentQrCode(settingsData.settings.adPaymentQrCode || '');
+      setAdBudgetLimit(settingsData.settings.adBudgetLimit ?? 6000);
     }
   }, [settingsData]);
 
@@ -54,20 +66,60 @@ export default function SettingsTab({ onUpdateSettings }) {
     reader.readAsDataURL(file);
   };
 
+  const handleAffiliateQrBep20Change = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => setAffiliatePayoutQrBEP20(reader.result);
+    reader.readAsDataURL(file);
+  };
+
+  const handleAdQrChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => setAdPaymentQrCode(reader.result);
+    reader.readAsDataURL(file);
+  };
+
   const handleSettingsSubmit = async (e) => {
     e.preventDefault();
-    await onUpdateSettings(
-      firstBonusInput,
-      regularBonusInput,
-      referralBonusInput,
-      usdtAddressInput,
-      usdtQrCodeInput,
-      affiliatePayoutNetwork,
-      affiliatePayoutWallet,
-      affiliatePayoutQrCode,
-      affiliatePlatformCommissionRate
-    );
-    mutate(); // reload settings SWR cache
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstDepositBonus: firstBonusInput,
+          regularDepositBonus: regularBonusInput,
+          referralBonus: referralBonusInput,
+          usdtAddress: usdtAddressInput,
+          usdtQrCode: usdtQrCodeInput,
+          affiliatePayoutNetwork,
+          affiliatePayoutWallet,
+          affiliatePayoutQrCode,
+          affiliatePayoutWalletBEP20,
+          affiliatePayoutQrBEP20,
+          affiliatePlatformCommissionRate,
+          adPaymentNetwork,
+          adPaymentWallet,
+          adPaymentQrCode,
+          adBudgetLimit
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('System settings updated successfully!');
+        mutate();
+        if (onUpdateSettings) {
+          await onUpdateSettings(firstBonusInput, regularBonusInput, referralBonusInput, usdtAddressInput, usdtQrCodeInput, affiliatePayoutNetwork, affiliatePayoutWallet, affiliatePayoutQrCode, affiliatePlatformCommissionRate);
+        }
+      } else {
+        alert(data.message || 'Failed to update settings.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Connection error updating settings.');
+    }
   };
 
   if (!settingsData && !error) {
@@ -203,14 +255,37 @@ export default function SettingsTab({ onUpdateSettings }) {
           </div>
 
           <div className="input-group" style={{ marginTop: '1rem' }}>
-            <label>Affiliate Payout Reference Wallet (Optional)</label>
+            <label>USDT TRC20 Wallet + QR</label>
             <input
               type="text"
-              placeholder="TRC20 or BEP20 wallet address"
+              placeholder="TRC20 wallet address"
               value={affiliatePayoutWallet}
               onChange={(e) => setAffiliatePayoutWallet(e.target.value)}
-              style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem' }}
+              style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', marginBottom: '0.5rem' }}
             />
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <input type="file" accept="image/*" onChange={handleAffiliateQrChange} style={{ color: '#888', fontSize: '0.75rem' }} />
+              {affiliatePayoutQrCode && (
+                <img src={affiliatePayoutQrCode} alt="TRC20 QR" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)' }} />
+              )}
+            </div>
+          </div>
+
+          <div className="input-group" style={{ marginTop: '1rem' }}>
+            <label>USDT BEP20 Wallet + QR</label>
+            <input
+              type="text"
+              placeholder="BEP20 wallet address (0x...)"
+              value={affiliatePayoutWalletBEP20}
+              onChange={(e) => setAffiliatePayoutWalletBEP20(e.target.value)}
+              style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', marginBottom: '0.5rem' }}
+            />
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <input type="file" accept="image/*" onChange={handleAffiliateQrBep20Change} style={{ color: '#888', fontSize: '0.75rem' }} />
+              {affiliatePayoutQrBEP20 && (
+                <img src={affiliatePayoutQrBEP20} alt="BEP20 QR" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)' }} />
+              )}
+            </div>
           </div>
 
           <div className="input-group" style={{ marginTop: '1rem' }}>
@@ -225,13 +300,37 @@ export default function SettingsTab({ onUpdateSettings }) {
             />
             <span className="game-tap-tip">Shown to affiliates as platform share (affiliate share = 100 - this value).</span>
           </div>
+        </div>
+
+        <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <h4 style={{ fontSize: '0.95rem', color: 'var(--gold-primary)', marginBottom: '1rem' }}>
+            <i className="fa-solid fa-bullhorn" style={{ marginRight: '0.4rem' }}></i> Affiliate Ads Payment Settings
+          </h4>
+
+          <div className="input-group">
+            <label>Ads Budget Limit Per Agent ($)</label>
+            <input type="number" min="0" step="1" value={adBudgetLimit} onChange={(e) => setAdBudgetLimit(e.target.value)} style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem' }} />
+          </div>
 
           <div className="input-group" style={{ marginTop: '1rem' }}>
-            <label>Affiliate Network QR Code (Optional)</label>
+            <label>Ads Payment Network</label>
+            <select value={adPaymentNetwork} onChange={(e) => setAdPaymentNetwork(e.target.value)} style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem' }}>
+              <option value="BEP20">BNB Smart Chain (BEP20)</option>
+              <option value="TRC20">USDT (TRC20)</option>
+            </select>
+          </div>
+
+          <div className="input-group" style={{ marginTop: '1rem' }}>
+            <label>Ads Payment Wallet Address</label>
+            <input type="text" placeholder="Wallet for ad budget deposits" value={adPaymentWallet} onChange={(e) => setAdPaymentWallet(e.target.value)} style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem' }} />
+          </div>
+
+          <div className="input-group" style={{ marginTop: '1rem' }}>
+            <label>Ads Payment QR Code</label>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <input type="file" accept="image/*" onChange={handleAffiliateQrChange} style={{ color: '#888', fontSize: '0.75rem' }} />
-              {affiliatePayoutQrCode && (
-                <img src={affiliatePayoutQrCode} alt="Affiliate QR" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)' }} />
+              <input type="file" accept="image/*" onChange={handleAdQrChange} style={{ color: '#888', fontSize: '0.75rem' }} />
+              {adPaymentQrCode && (
+                <img src={adPaymentQrCode} alt="Ads QR" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)' }} />
               )}
             </div>
           </div>

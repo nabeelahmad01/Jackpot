@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import useSWR from 'swr';
+import React, { useState, useEffect } from 'react';
+import useSWR, { mutate as globalMutate } from 'swr';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -10,18 +10,37 @@ export default function CampaignRequestsTab({ adminUser, onInspectProof }) {
   const [approvingId, setApprovingId] = useState(null);
   const [customLink, setCustomLink] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [prevPendingCount, setPrevPendingCount] = useState(null);
 
   const { data, error, mutate } = useSWR('/api/campaign-requests', fetcher, {
     refreshInterval: 5000
   });
 
+  const { data: settingsData } = useSWR('/api/settings/frontend', fetcher);
+
   const campaigns = data?.campaigns || [];
   const isLoading = !data && !error;
+  const pendingCount = campaigns.filter((c) => c.status === 'PENDING').length;
+
+  useEffect(() => {
+    if (data) {
+      if (prevPendingCount !== null && pendingCount > prevPendingCount) {
+        try {
+          const rawUrl = settingsData?.settings?.notificationSoundUrl || 'https://raw.githubusercontent.com/AUTOMATIC1111/stable-diffusion-webui/master/notification.mp3';
+          const cleanUrl = rawUrl.replace(/^data:video\/[^;]+;/, 'data:audio/mpeg;');
+          const audio = new Audio(cleanUrl);
+          audio.play().catch(() => {});
+        } catch (e) { /* ignore */ }
+      }
+      setPrevPendingCount(pendingCount);
+    }
+  }, [data, pendingCount, prevPendingCount, settingsData]);
 
   const filteredCampaigns = campaigns.filter(c => 
     c.campaignName.toLowerCase().includes(search.toLowerCase()) ||
     c.agentEmail.toLowerCase().includes(search.toLowerCase()) ||
-    c.agentCode.toLowerCase().includes(search.toLowerCase())
+    c.agentCode.toLowerCase().includes(search.toLowerCase()) ||
+    (c.notes || '').toLowerCase().includes(search.toLowerCase())
   );
 
   const handleApprove = async (id) => {
@@ -42,6 +61,7 @@ export default function CampaignRequestsTab({ adminUser, onInspectProof }) {
         setApprovingId(null);
         setCustomLink('');
         mutate();
+        globalMutate((key) => typeof key === 'string' && key.includes('/api/admin/stats'));
       } else {
         alert(resData.message || 'Approval failed.');
       }
@@ -69,6 +89,7 @@ export default function CampaignRequestsTab({ adminUser, onInspectProof }) {
       if (resData.success) {
         alert('Campaign request rejected.');
         mutate();
+        globalMutate((key) => typeof key === 'string' && key.includes('/api/admin/stats'));
       } else {
         alert(resData.message || 'Rejection failed.');
       }
@@ -108,6 +129,7 @@ export default function CampaignRequestsTab({ adminUser, onInspectProof }) {
               <th>Campaign Name</th>
               <th>Budget</th>
               <th>Facebook Page</th>
+              <th>Targeting / Notes</th>
               <th>Dates</th>
               <th>Proof</th>
               <th>Status</th>
@@ -117,13 +139,13 @@ export default function CampaignRequestsTab({ adminUser, onInspectProof }) {
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan="9" className="text-center text-muted" style={{ padding: '2rem' }}>
+                <td colSpan="10" className="text-center text-muted" style={{ padding: '2rem' }}>
                   <i className="fa-solid fa-spinner fa-spin" style={{ color: 'var(--gold-primary)', marginRight: '6px' }}></i> Loading campaign requests...
                 </td>
               </tr>
             ) : filteredCampaigns.length === 0 ? (
               <tr>
-                <td colSpan="9" className="text-center text-muted" style={{ padding: '2rem' }}>
+                <td colSpan="10" className="text-center text-muted" style={{ padding: '2rem' }}>
                   No campaign requests found.
                 </td>
               </tr>
@@ -141,6 +163,9 @@ export default function CampaignRequestsTab({ adminUser, onInspectProof }) {
                     <td><strong style={{ color: 'var(--gold-primary)' }}>${parseFloat(c.budget).toFixed(2)}</strong></td>
                     <td style={{ fontSize: '0.75rem', maxWidth: '150px', wordBreak: 'break-all' }}>
                       <a href={c.facebookPageLink} target="_blank" rel="noopener noreferrer" style={{ color: '#6366f1', textDecoration: 'underline' }}>View Page</a>
+                    </td>
+                    <td style={{ fontSize: '0.7rem', color: '#ccc', maxWidth: '200px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                      {c.notes?.trim() ? c.notes : <span style={{ color: '#666' }}>No notes provided</span>}
                     </td>
                     <td style={{ fontSize: '0.7rem', whiteSpace: 'nowrap' }}>
                       Start: {new Date(c.startDate).toLocaleDateString()}<br/>

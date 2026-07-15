@@ -56,10 +56,15 @@ export default function DistributorPortal() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const [activeTab, setActiveTab] = useState('overview');
+  const skipUrlPushRef = useRef(true);
 
   // Sync tab state changes to browser URL pathnames
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (skipUrlPushRef.current) {
+      skipUrlPushRef.current = false;
+      return;
+    }
     const targetPath = `/distributor/${activeTab}`;
     if (window.location.pathname !== targetPath) {
       window.history.pushState({}, '', targetPath);
@@ -78,7 +83,7 @@ export default function DistributorPortal() {
       }
     };
     window.addEventListener('popstate', handlePathChange);
-    handlePathChange(); // Sync initial view on mount
+    handlePathChange();
     return () => window.removeEventListener('popstate', handlePathChange);
   }, []);
 
@@ -317,7 +322,7 @@ export default function DistributorPortal() {
 
   const playAlertSound = () => {
     try {
-      const customSound = settingsData?.settings?.notificationSoundUrl;
+      const customSound = frontendSettingsData?.settings?.notificationSoundUrl || settingsData?.settings?.notificationSoundUrl;
       if (customSound) {
         const cleanUrl = customSound.replace(/^data:video\/[^;]+;/, 'data:audio/mpeg;');
         const audio = new Audio(cleanUrl);
@@ -345,7 +350,7 @@ export default function DistributorPortal() {
       playAlertSound();
     }
     prevCountsRef.current = counts;
-  }, [pendingAccountRequestsCount, pendingCoinsCount, statsData?.stats?.pendingLedgerCount, settingsData]);
+  }, [pendingAccountRequestsCount, pendingCoinsCount, statsData?.stats?.pendingLedgerCount, frontendSettingsData, settingsData]);
 
   const handleRequestCommWithdraw = async (e) => {
     e.preventDefault();

@@ -56,6 +56,12 @@ export default function FrontendSettingsTab({ adminUser }) {
   // Accordion cashout rules
   const [cashoutRules, setCashoutRules] = useState([]);
   const [proofScreenshots, setProofScreenshots] = useState([]);
+  const [lobbyCashoutTrustItems, setLobbyCashoutTrustItems] = useState([
+    { icon: 'fa-shield-halved', title: '100% SECURE', description: 'Your data is always protected' },
+    { icon: 'fa-circle-check', title: 'FAIR PLAY', description: 'Provably fair and transparent' },
+    { icon: 'fa-bolt', title: 'INSTANT WITHDRAWALS', description: 'Get your winnings instantly' },
+    { icon: 'fa-headset', title: '24/7 SUPPORT', description: 'Always here to help you' }
+  ]);
   
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -105,6 +111,12 @@ export default function FrontendSettingsTab({ adminUser }) {
       setMarqueePayouts(s.marqueePayouts || []);
       setCashoutRules(s.cashoutRules || []);
       setProofScreenshots(s.proofScreenshots || []);
+      setLobbyCashoutTrustItems(s.lobbyCashoutTrustItems || [
+        { icon: 'fa-shield-halved', title: '100% SECURE', description: 'Your data is always protected' },
+        { icon: 'fa-circle-check', title: 'FAIR PLAY', description: 'Provably fair and transparent' },
+        { icon: 'fa-bolt', title: 'INSTANT WITHDRAWALS', description: 'Get your winnings instantly' },
+        { icon: 'fa-headset', title: '24/7 SUPPORT', description: 'Always here to help you' }
+      ]);
     }
   }, [data]);
 
@@ -203,7 +215,8 @@ export default function FrontendSettingsTab({ adminUser }) {
 
           marqueePayouts,
           cashoutRules,
-          proofScreenshots
+          proofScreenshots,
+          lobbyCashoutTrustItems
         })
       });
 
@@ -570,6 +583,70 @@ export default function FrontendSettingsTab({ adminUser }) {
                 ))
               )}
             </div>
+          </div>
+
+          {/* Lobby trust badges (below cashout rules on player lobby) */}
+          <div style={{ background: '#0b0d16', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1.5rem' }}>
+            <h4 style={{ fontSize: '0.8rem', color: '#fff', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
+              Lobby Trust Badges (Below Cashout Rules)
+            </h4>
+            <p style={{ fontSize: '0.75rem', color: '#888', marginBottom: '1rem' }}>
+              Shown on the player lobby under the cashout accordion. Use Font Awesome icon class (e.g. fa-shield-halved).
+            </p>
+            {lobbyCashoutTrustItems.map((item, idx) => (
+              <div key={idx} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 1fr', gap: '0.5rem', marginBottom: '0.75rem', alignItems: 'end' }}>
+                <div className="input-group" style={{ margin: 0 }}>
+                  <label>Icon</label>
+                  <div className="input-wrapper" style={{ background: '#07090f' }}>
+                    <i className={`fa-solid ${item.icon || 'fa-star'} input-icon`}></i>
+                    <input
+                      type="text"
+                      placeholder="fa-shield-halved"
+                      value={item.icon || ''}
+                      onChange={(e) => {
+                        const updated = [...lobbyCashoutTrustItems];
+                        updated[idx] = { ...updated[idx], icon: e.target.value };
+                        setLobbyCashoutTrustItems(updated);
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="input-group" style={{ margin: 0 }}>
+                  <label>Title</label>
+                  <input
+                    type="text"
+                    value={item.title || ''}
+                    onChange={(e) => {
+                      const updated = [...lobbyCashoutTrustItems];
+                      updated[idx] = { ...updated[idx], title: e.target.value };
+                      setLobbyCashoutTrustItems(updated);
+                    }}
+                    style={{ width: '100%', background: '#07090f', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '0.6rem', color: '#fff' }}
+                  />
+                </div>
+                <div className="input-group" style={{ margin: 0 }}>
+                  <label>Description</label>
+                  <input
+                    type="text"
+                    value={item.description || ''}
+                    onChange={(e) => {
+                      const updated = [...lobbyCashoutTrustItems];
+                      updated[idx] = { ...updated[idx], description: e.target.value };
+                      setLobbyCashoutTrustItems(updated);
+                    }}
+                    style={{ width: '100%', background: '#07090f', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '0.6rem', color: '#fff' }}
+                  />
+                </div>
+              </div>
+            ))}
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{ fontSize: '0.75rem', padding: '0.4rem 0.8rem' }}
+              onClick={() => setLobbyCashoutTrustItems([...lobbyCashoutTrustItems, { icon: 'fa-star', title: 'NEW BADGE', description: 'Short description' }])}
+            >
+              + Add Badge
+            </button>
           </div>
 
           {/* Rewards & Limit Constraints */}

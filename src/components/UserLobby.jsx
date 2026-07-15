@@ -1295,6 +1295,25 @@ export default function UserLobby({
               </div>
             </div>
           </section>
+
+          <section className="lobby-cashout-trust-section" style={{ marginTop: '1.25rem' }}>
+            {(frontendSettings?.lobbyCashoutTrustItems || [
+              { icon: 'fa-shield-halved', title: '100% SECURE', description: 'Your data is always protected' },
+              { icon: 'fa-circle-check', title: 'FAIR PLAY', description: 'Provably fair and transparent' },
+              { icon: 'fa-bolt', title: 'INSTANT WITHDRAWALS', description: 'Get your winnings instantly' },
+              { icon: 'fa-headset', title: '24/7 SUPPORT', description: 'Always here to help you' }
+            ]).map((item, idx) => (
+              <div key={idx} className="lobby-cashout-trust-item">
+                <div className="lobby-cashout-trust-icon">
+                  <i className={`fa-solid ${item.icon || 'fa-shield-halved'}`}></i>
+                </div>
+                <div>
+                  <strong>{item.title}</strong>
+                  <p>{item.description}</p>
+                </div>
+              </div>
+            ))}
+          </section>
         </motion.div>
       ) : (
         /* ==============================================================

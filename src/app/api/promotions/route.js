@@ -110,6 +110,27 @@ export async function POST(req) {
           }
         });
 
+        const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://jackpotroyals.com').replace(/\/$/, '');
+        const attachments = [];
+        let imageHtml = '';
+        if (image) {
+          if (image.startsWith('data:')) {
+            const match = image.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+            if (match) {
+              attachments.push({
+                filename: 'promo-flyer.png',
+                content: Buffer.from(match[2], 'base64'),
+                cid: 'promo-flyer',
+                contentType: match[1]
+              });
+              imageHtml = '<img class="promo-image" src="cid:promo-flyer" alt="Special Promotion Flyer" />';
+            }
+          } else {
+            const imgSrc = image.startsWith('http') ? image : `${siteUrl}${image.startsWith('/') ? '' : '/'}${image}`;
+            imageHtml = `<img class="promo-image" src="${imgSrc}" alt="Special Promotion Flyer" />`;
+          }
+        }
+
         const htmlContent = `
           <!DOCTYPE html>
           <html>
@@ -192,12 +213,12 @@ export async function POST(req) {
                 <h1>JACKPOT ROYALS</h1>
               </div>
               <div class="email-body">
-                ${image ? `<img class="promo-image" src="${image}" alt="Special Promotion Flyer" />` : ''}
+                ${imageHtml}
                 <p>Hello Player,</p>
                 <h2 style="color: #ffd700; margin-top: 0;">${title}</h2>
                 <p style="white-space: pre-wrap;">${message}</p>
                 <div style="text-align: center;">
-                  <a href="http://localhost:3000" class="cta-button">Play Now</a>
+                  <a href="${siteUrl}" class="cta-button">Play Now</a>
                 </div>
               </div>
               <div class="email-footer">
@@ -211,10 +232,11 @@ export async function POST(req) {
 
         const mailOptions = {
           from: `"Jackpot Royals" <${smtpUser}>`,
-          to: smtpUser, // Send to self
-          bcc: emails, // BCC target segment players
+          to: smtpUser,
+          bcc: emails,
           subject: `🔥 Special Offer: ${title}`,
-          html: htmlContent
+          html: htmlContent,
+          attachments
         };
 
         transporter.sendMail(mailOptions).catch(err => {
