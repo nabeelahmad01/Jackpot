@@ -181,6 +181,7 @@ export default function DistributorPortal() {
     POLL.LISTS
   );
 
+  const gatewayStats = gatewayStatsData?.stats || [];
   const toggleStaffGameId = (gameId, setter) => {
     const id = String(gameId);
     setter((prev) => {
