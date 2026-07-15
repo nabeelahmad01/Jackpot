@@ -30,7 +30,10 @@ export async function POST(req) {
         email: agent.email,
         agentCode: agent.agentCode,
         commissionRate: agent.commissionRate || 0,
-        role: 'agent'
+        accountType: agent.accountType || (agent.agentCode?.startsWith('SUB') ? 'sub-distributor' : 'agent'),
+        role: agent.role || (agent.agentCode?.startsWith('SUB') ? 'Sub-Distributor' : 'Agent'),
+        status: agent.status || 'ACTIVE',
+        parentAgentCode: agent.parentAgentCode || ''
       }
     });
   } catch (err) {

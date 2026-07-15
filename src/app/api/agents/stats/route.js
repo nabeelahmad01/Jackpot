@@ -124,17 +124,54 @@ export async function GET(req) {
 
     // Sub-agents created under this affiliate
     const teamAgents = await agentsCollection.find({ parentAgentCode: agent.agentCode }).toArray();
-    const enrichedTeamAgents = teamAgents.map((a) => ({
-      id: a.id,
-      name: a.name,
-      email: a.email,
-      agentCode: a.agentCode,
-      commissionRate: a.commissionRate || 0,
-      createdAt: a.createdAt || ''
+    const enrichedTeamAgents = await Promise.all(teamAgents.map(async (subAgent) => {
+      const subPlayers = await usersCollection.find({ agentCode: subAgent.agentCode, role: 'user' }).toArray();
+      return {
+        id: subAgent.id,
+        name: subAgent.name,
+        email: subAgent.email,
+        agentCode: subAgent.agentCode,
+        accountType: subAgent.accountType || 'agent',
+        role: subAgent.role || 'Agent',
+        status: subAgent.status || 'ACTIVE',
+        commissionRate: subAgent.commissionRate || 0,
+        playersCount: subPlayers.length,
+        createdAt: subAgent.createdAt || '',
+        memberType: 'agent'
+      };
     }));
+
+    const referralPlayers = enrichedPlayers.map((p) => ({
+      id: p.id,
+      name: p.name,
+      email: p.email,
+      agentCode: '—',
+      accountType: 'player',
+      role: 'Player',
+      status: p.status || 'ACTIVE',
+      commissionRate: 0,
+      playersCount: 0,
+      totalDeposits: p.totalDeposits,
+      totalWithdrawals: p.totalWithdrawals,
+      createdAt: p.createdAt || '',
+      memberType: 'player'
+    }));
+
+    const teamMembers = [...enrichedTeamAgents, ...referralPlayers];
 
     return NextResponse.json({
       success: true,
+      agent: {
+        id: agent.id,
+        name: agent.name,
+        email: agent.email,
+        agentCode: agent.agentCode,
+        accountType: agent.accountType || (agent.agentCode?.startsWith('SUB') ? 'sub-distributor' : 'agent'),
+        role: agent.role || (agent.agentCode?.startsWith('SUB') ? 'Sub-Distributor' : 'Agent'),
+        status: agent.status || 'ACTIVE',
+        commissionRate: agent.commissionRate || 0,
+        parentAgentCode: agent.parentAgentCode || ''
+      },
       stats: {
         totalPlayers: players.length,
         verifiedPlayers: verifiedPlayersCount,
@@ -153,6 +190,7 @@ export async function GET(req) {
       },
       players: enrichedPlayers,
       teamAgents: enrichedTeamAgents,
+      teamMembers,
       commissionWithdrawals: agentWithdrawDocs
     });
   } catch (err) {

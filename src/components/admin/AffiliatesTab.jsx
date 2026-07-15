@@ -24,18 +24,27 @@ export default function AffiliatesTab() {
   const [editPassword, setEditPassword] = useState('');
   const [editCommissionRate, setEditCommissionRate] = useState(0);
   const [editAgentCode, setEditAgentCode] = useState('');
+  const [editStatus, setEditStatus] = useState('ACTIVE');
+  const [editAccountType, setEditAccountType] = useState('agent');
 
   // Referred Players Modal
   const [viewingAgentPlayers, setViewingAgentPlayers] = useState(null);
   const [referredPlayersList, setReferredPlayersList] = useState([]);
   const [isLoadingPlayers, setIsLoadingPlayers] = useState(false);
 
+  // Team members modal
+  const [viewingTeamMembers, setViewingTeamMembers] = useState(null);
+  const [teamMembersList, setTeamMembersList] = useState([]);
+  const [isLoadingTeam, setIsLoadingTeam] = useState(false);
+
   const agents = data?.agents || [];
 
   const filteredAgents = agents.filter(a => 
     a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     a.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    a.agentCode.toLowerCase().includes(searchQuery.toLowerCase())
+    a.agentCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (a.parentAgentName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (a.role || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleCreateSubmit = async (e) => {
@@ -85,6 +94,8 @@ export default function AffiliatesTab() {
     setEditPassword('');
     setEditCommissionRate(agent.commissionRate || 0);
     setEditAgentCode(agent.agentCode || '');
+    setEditStatus(agent.status || 'ACTIVE');
+    setEditAccountType(agent.accountType || 'agent');
   };
 
   const handleEditSubmit = async (e) => {
@@ -104,7 +115,9 @@ export default function AffiliatesTab() {
           email: editEmail.toLowerCase().trim(),
           password: editPassword.trim(),
           commissionRate: Number(editCommissionRate),
-          agentCode: editAgentCode.trim()
+          agentCode: editAgentCode.trim(),
+          status: editStatus,
+          accountType: editAccountType
         })
       });
       const resData = await response.json();
@@ -140,6 +153,25 @@ export default function AffiliatesTab() {
     } catch (err) {
       console.error(err);
       alert('Error deleting agent.');
+    }
+  };
+
+  const handleViewTeam = async (agent) => {
+    setViewingTeamMembers(agent);
+    setIsLoadingTeam(true);
+    try {
+      const response = await fetch(`/api/agents/stats?agentCode=${encodeURIComponent(agent.agentCode)}`);
+      const resData = await response.json();
+      if (resData.success) {
+        setTeamMembersList(resData.teamMembers || []);
+      } else {
+        alert('Failed to load team members.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error fetching team list.');
+    } finally {
+      setIsLoadingTeam(false);
     }
   };
 
@@ -226,6 +258,33 @@ export default function AffiliatesTab() {
             />
           </div>
 
+          {editingAgent && (
+            <>
+              <div className="input-group">
+                <label style={{ fontSize: '0.7rem' }}>Account Type</label>
+                <select
+                  value={editAccountType}
+                  onChange={(e) => setEditAccountType(e.target.value)}
+                  style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
+                >
+                  <option value="agent">Agent</option>
+                  <option value="sub-distributor">Sub-Distributor</option>
+                </select>
+              </div>
+              <div className="input-group">
+                <label style={{ fontSize: '0.7rem' }}>Status</label>
+                <select
+                  value={editStatus}
+                  onChange={(e) => setEditStatus(e.target.value)}
+                  style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', outline: 'none' }}
+                >
+                  <option value="ACTIVE">Active</option>
+                  <option value="INACTIVE">Inactive</option>
+                </select>
+              </div>
+            </>
+          )}
+
           <div className="input-group">
             <label style={{ fontSize: '0.7rem' }}>Custom Invite Code (Optional)</label>
             <input
@@ -282,7 +341,9 @@ export default function AffiliatesTab() {
             <thead>
               <tr>
                 <th>Agent Info</th>
+                <th>Role / Parent</th>
                 <th>Invite Code</th>
+                <th>Status</th>
                 <th>Comm. Rate</th>
                 <th>Stats</th>
                 <th>Balance</th>
@@ -292,7 +353,7 @@ export default function AffiliatesTab() {
             <tbody>
               {filteredAgents.length === 0 ? (
                 <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
+                  <td colSpan="8" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
                     No affiliate agents found.
                   </td>
                 </tr>
@@ -304,25 +365,47 @@ export default function AffiliatesTab() {
                       <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{agent.email}</div>
                     </td>
                     <td>
+                      <div style={{ fontSize: '0.7rem' }}>
+                        <span style={{ background: 'rgba(168,85,247,0.12)', color: '#a855f7', padding: '0.1rem 0.35rem', borderRadius: '4px', fontSize: '0.6rem', fontWeight: 'bold' }}>
+                          {agent.role || 'Agent'}
+                        </span>
+                        <div style={{ marginTop: '0.25rem', color: 'var(--text-muted)', fontSize: '0.65rem' }}>
+                          Parent: <strong>{agent.parentAgentName || '—'}</strong>
+                          {agent.parentAgentCode ? ` (${agent.parentAgentCode})` : ''}
+                        </div>
+                      </div>
+                    </td>
+                    <td>
                       <code style={{ background: 'rgba(255,255,255,0.04)', padding: '0.15rem 0.35rem', borderRadius: '4px', color: 'var(--gold-primary)', fontWeight: 'bold' }}>
                         {agent.agentCode}
                       </code>
                     </td>
+                    <td>
+                      <span className={`admin-badge-preview b-${(agent.status || 'ACTIVE').toLowerCase() === 'active' ? 'ready' : 'none'}`}>
+                        {agent.status || 'ACTIVE'}
+                      </span>
+                    </td>
                     <td style={{ fontWeight: 'bold' }}>{agent.commissionRate}%</td>
                     <td>
                       <div style={{ fontSize: '0.7rem' }}>
-                        <div>Players: <strong style={{ color: 'var(--gold-primary)' }} onClick={() => handleViewPlayers(agent)} className="cursor-pointer">{agent.playersCount || 0}</strong></div>
-                        <div>Total Deposits: <strong>${parseFloat(agent.totalDeposits || 0).toFixed(2)}</strong></div>
+                        <div>Players: <strong style={{ color: 'var(--gold-primary)', cursor: 'pointer' }} onClick={() => handleViewPlayers(agent)}>{agent.playersCount || 0}</strong></div>
+                        <div>Team: <strong style={{ color: '#a855f7', cursor: 'pointer' }} onClick={() => handleViewTeam(agent)}>{agent.teamMembersCount || 0}</strong></div>
+                        <div>Deposits: <strong>${parseFloat(agent.totalDeposits || 0).toFixed(2)}</strong></div>
+                        <div>Withdrawals: <strong>${parseFloat(agent.totalWithdrawals || 0).toFixed(2)}</strong></div>
                       </div>
                     </td>
                     <td>
                       <div style={{ fontSize: '0.7rem' }}>
                         <div>Commission: <strong style={{ color: '#2ecc71' }}>${parseFloat(agent.commissionEarned || 0).toFixed(2)}</strong></div>
+                        <div>Withdrawn: <strong>${parseFloat(agent.totalWithdrawn || 0).toFixed(2)}</strong></div>
                         <div>Available: <strong style={{ color: 'var(--gold-primary)' }}>${parseFloat(agent.availableBalance || 0).toFixed(2)}</strong></div>
                       </div>
                     </td>
                     <td>
-                      <div style={{ display: 'flex', gap: '0.35rem' }}>
+                      <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                        <button onClick={() => handleViewTeam(agent)} style={{ border: '1px solid rgba(168,85,247,0.2)', padding: '0.2rem 0.4rem', fontSize: '0.65rem', borderRadius: '4px', background: 'none', color: '#a855f7', cursor: 'pointer' }}>
+                          Team
+                        </button>
                         <button onClick={() => handleEditClick(agent)} className="btn-edit" style={{ border: '1px solid rgba(255,215,0,0.2)', padding: '0.2rem 0.4rem', fontSize: '0.65rem', borderRadius: '4px', background: 'none', color: 'var(--gold-primary)', cursor: 'pointer' }}>
                           Edit
                         </button>
@@ -394,6 +477,69 @@ export default function AffiliatesTab() {
                           <td style={{ padding: '0.5rem', fontWeight: 'bold', color: 'var(--red-primary)' }}>
                             ${parseFloat(player.totalWithdrawals || 0).toFixed(2)}
                           </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 4. TEAM MEMBERS VIEW MODAL */}
+      {viewingTeamMembers && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div className="section-card" style={{ width: '100%', maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid rgba(168,85,247,0.3)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.75rem' }}>
+              <div>
+                <h3 className="section-card-title" style={{ fontSize: '1.1rem' }}>Team — {viewingTeamMembers.name}</h3>
+                <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Code: {viewingTeamMembers.agentCode} · Role: {viewingTeamMembers.role || 'Agent'}</p>
+              </div>
+              <button
+                onClick={() => setViewingTeamMembers(null)}
+                style={{ background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '50%', width: '30px', height: '30px', color: '#fff', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {isLoadingTeam ? (
+              <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>Loading team...</div>
+            ) : (
+              <div className="table-responsive">
+                <table className="admin-table" style={{ fontSize: '0.75rem' }}>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Code</th>
+                      <th>Role</th>
+                      <th>Status</th>
+                      <th>Commission</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {teamMembersList.length === 0 ? (
+                      <tr>
+                        <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                          No team members or referral players yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      teamMembersList.map((member) => (
+                        <tr key={`${member.memberType}-${member.id}`}>
+                          <td style={{ fontWeight: 'bold' }}>{member.name}</td>
+                          <td style={{ fontSize: '0.65rem', color: '#888' }}>{member.email}</td>
+                          <td>{member.agentCode !== '—' ? member.agentCode : '—'}</td>
+                          <td>{member.role}</td>
+                          <td>
+                            <span className={`admin-badge-preview b-${(member.status || 'ACTIVE').toLowerCase() === 'active' ? 'ready' : 'none'}`}>
+                              {member.status || 'ACTIVE'}
+                            </span>
+                          </td>
+                          <td>{member.memberType === 'player' ? '—' : `${member.commissionRate || 0}%`}</td>
                         </tr>
                       ))
                     )}

@@ -89,13 +89,17 @@ export default function AffiliatePortal() {
   const [withdrawLoading, setWithdrawLoading] = useState(false);
 
   // Create Team Member
-  const [showCreateTeam, setShowCreateTeam] = useState(false);
+  const [teamView, setTeamView] = useState('list');
   const [teamName, setTeamName] = useState('');
   const [teamEmail, setTeamEmail] = useState('');
   const [teamPassword, setTeamPassword] = useState('');
-  const [teamCommissionRate, setTeamCommissionRate] = useState('5');
-  const [teamCode, setTeamCode] = useState('');
+  const [teamConfirmPassword, setTeamConfirmPassword] = useState('');
+  const [teamAccountType, setTeamAccountType] = useState('');
+  const [teamStatus, setTeamStatus] = useState('ACTIVE');
   const [createTeamLoading, setCreateTeamLoading] = useState(false);
+  const [copiedMemberLink, setCopiedMemberLink] = useState(null);
+  const [viewPlayersModal, setViewPlayersModal] = useState(null);
+  const [viewPlayersLoading, setViewPlayersLoading] = useState(false);
 
   // Invite link copy
   const [copiedLink, setCopiedLink] = useState(false);
@@ -130,19 +134,35 @@ export default function AffiliatePortal() {
   // Sync tab to URL path
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (activeTab === 'team' && teamView === 'create') {
+      const createPath = '/affiliate/team/create';
+      if (window.location.pathname !== createPath) {
+        window.history.pushState({}, '', createPath);
+      }
+      return;
+    }
     const targetPath = `/affiliate/${activeTab}`;
     if (window.location.pathname !== targetPath) {
       window.history.pushState({}, '', targetPath);
     }
-  }, [activeTab]);
+  }, [activeTab, teamView]);
 
   // Sync popstate to tab
   useEffect(() => {
     const handlePathChange = () => {
       const path = window.location.pathname;
+      if (path.includes('/team/create')) {
+        setActiveTab('team');
+        setTeamView('create');
+        return;
+      }
+      setTeamView('list');
       const parts = path.split('/').filter(Boolean);
-      if (parts.length > 1) setActiveTab(parts[1]);
-      else setActiveTab('dashboard');
+      if (parts.length > 1 && parts[0] === 'affiliate') {
+        setActiveTab(parts[1]);
+      } else {
+        setActiveTab('dashboard');
+      }
     };
     window.addEventListener('popstate', handlePathChange);
     handlePathChange();
@@ -177,8 +197,9 @@ export default function AffiliatePortal() {
   );
 
   const stats = statsData?.stats || {};
+  const agentProfile = statsData?.agent || {};
   const players = statsData?.players || [];
-  const teamAgents = statsData?.teamAgents || [];
+  const teamMembers = statsData?.teamMembers || [];
   const commissionWithdrawals = statsData?.commissionWithdrawals || [];
   const campaignsList = campaignsData?.campaigns || [];
   const remainingLimit = campaignsData?.remainingLimit !== undefined ? campaignsData.remainingLimit : 6000.00;
@@ -220,6 +241,65 @@ export default function AffiliatePortal() {
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
+  const getReferralLink = (code) => {
+    if (!code || code === '—') return '';
+    return `${window.location.origin}/agent-player-login?agent=${code}`;
+  };
+
+  const handleCopyMemberLink = (code) => {
+    navigator.clipboard.writeText(getReferralLink(code));
+    setCopiedMemberLink(code);
+    setTimeout(() => setCopiedMemberLink(null), 2000);
+  };
+
+  const openTeamCreate = () => {
+    setTeamView('create');
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', '/affiliate/team/create');
+    }
+  };
+
+  const backToTeamList = () => {
+    setTeamView('list');
+    setTeamAccountType('');
+    setTeamName('');
+    setTeamEmail('');
+    setTeamPassword('');
+    setTeamConfirmPassword('');
+    setTeamStatus('ACTIVE');
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', '/affiliate/team');
+    }
+  };
+
+  const handleViewTeamPlayers = async (member) => {
+    if (member.memberType === 'player') return;
+    setViewPlayersModal({ name: member.name, agentCode: member.agentCode, players: null });
+    setViewPlayersLoading(true);
+    try {
+      const response = await fetch(`/api/agents/stats?agentCode=${encodeURIComponent(member.agentCode)}`);
+      const data = await response.json();
+      if (data.success) {
+        setViewPlayersModal({ name: member.name, agentCode: member.agentCode, players: data.players || [] });
+      } else {
+        alert('Failed to load players.');
+        setViewPlayersModal(null);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Connection error.');
+      setViewPlayersModal(null);
+    } finally {
+      setViewPlayersLoading(false);
+    }
+  };
+
+  const currentAccountType = agentProfile.accountType
+    || agentSession?.accountType
+    || (agentSession?.agentCode?.startsWith('SUB') ? 'sub-distributor' : 'agent');
+  const currentRoleLabel = currentAccountType === 'sub-distributor' ? 'Sub-Distributor' : 'Agent';
+  const canCreateSubDistributor = currentAccountType === 'sub-distributor';
+
   // Commission withdraw request
   const handleWithdrawRequest = async (e) => {
     e.preventDefault();
@@ -260,8 +340,20 @@ export default function AffiliatePortal() {
 
   const handleCreateTeam = async (e) => {
     e.preventDefault();
+    if (!teamAccountType) {
+      alert('Please select an account type.');
+      return;
+    }
     if (!teamName.trim() || !teamEmail.trim() || !teamPassword.trim()) {
       alert('Name, email and password are required.');
+      return;
+    }
+    if (teamPassword.length < 8) {
+      alert('Password must be at least 8 characters.');
+      return;
+    }
+    if (teamPassword !== teamConfirmPassword) {
+      alert('Passwords do not match.');
       return;
     }
     setCreateTeamLoading(true);
@@ -273,16 +365,15 @@ export default function AffiliatePortal() {
           name: teamName.trim(),
           email: teamEmail.toLowerCase().trim(),
           password: teamPassword.trim(),
-          commissionRate: parseFloat(teamCommissionRate || 0),
-          agentCode: teamCode.trim() || undefined,
+          accountType: teamAccountType,
+          status: teamStatus,
           parentAgentCode: agentSession.agentCode
         })
       });
       const data = await response.json();
       if (data.success) {
-        alert(`Team member created! Agent code: ${data.agent.agentCode}`);
-        setTeamName(''); setTeamEmail(''); setTeamPassword(''); setTeamCode(''); setTeamCommissionRate('5');
-        setShowCreateTeam(false);
+        alert(`Account created! Code: ${data.agent.agentCode}`);
+        backToTeamList();
         mutateStats();
       } else {
         alert(data.message || 'Failed to create team member.');
@@ -482,7 +573,7 @@ export default function AffiliatePortal() {
             {sidebarItems.map(item => (
               <button
                 key={item.id}
-                onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }}
+                onClick={() => { setTeamView('list'); setActiveTab(item.id); setSidebarOpen(false); }}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem',
                   background: activeTab === item.id ? 'linear-gradient(135deg, rgba(168,85,247,0.25), rgba(99,102,241,0.2))' : 'transparent',
@@ -691,10 +782,70 @@ export default function AffiliatePortal() {
         )}
 
         {/* ============== TEAM TAB ============== */}
-        {activeTab === 'team' && (
+        {activeTab === 'team' && teamView === 'create' && (
+          <div>
+            <button type="button" onClick={backToTeamList} style={{ background: 'none', border: 'none', color: '#888', fontSize: '0.8rem', cursor: 'pointer', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <i className="fa-solid fa-arrow-left"></i> Back
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(168,85,247,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <i className="fa-solid fa-user-plus" style={{ fontSize: '1.25rem', color: '#a855f7' }}></i>
+              </div>
+              <div>
+                <h1 style={{ fontSize: '1.75rem', fontWeight: 'bold', fontFamily: 'var(--font-heading)', margin: 0 }}>Create Team Account</h1>
+                <p style={{ fontSize: '0.75rem', color: '#888', margin: 0 }}>Create sub-distributor or agent account based on your role.</p>
+              </div>
+            </div>
+
+            <div style={{ background: '#0b0d16', padding: '1.5rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)', maxWidth: '640px' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 'bold', marginBottom: '1.25rem' }}>Account Details</h3>
+              <form onSubmit={handleCreateTeam} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.35rem' }}>Account Type</label>
+                  <select value={teamAccountType} onChange={(e) => setTeamAccountType(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }} required>
+                    <option value="">Select account type</option>
+                    <option value="agent">Agent</option>
+                    {canCreateSubDistributor && <option value="sub-distributor">Sub-Distributor</option>}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.35rem' }}>Full Name</label>
+                  <input type="text" placeholder="Enter full name" value={teamName} onChange={(e) => setTeamName(e.target.value)} style={inputStyle} required />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.35rem' }}>Email Address</label>
+                  <input type="email" placeholder="Enter email address" value={teamEmail} onChange={(e) => setTeamEmail(e.target.value)} style={inputStyle} required />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.35rem' }}>Password</label>
+                  <input type="password" placeholder="Minimum 8 characters" value={teamPassword} onChange={(e) => setTeamPassword(e.target.value)} style={inputStyle} required minLength={8} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.35rem' }}>Confirm Password</label>
+                  <input type="password" placeholder="Re-enter password" value={teamConfirmPassword} onChange={(e) => setTeamConfirmPassword(e.target.value)} style={inputStyle} required minLength={8} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.35rem' }}>Status</label>
+                  <select value={teamStatus} onChange={(e) => setTeamStatus(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
+                    <option value="ACTIVE">Active</option>
+                    <option value="INACTIVE">Inactive</option>
+                  </select>
+                </div>
+                <p style={{ fontSize: '0.7rem', color: '#888', margin: 0, lineHeight: 1.5 }}>
+                  Note: Agent code will be generated automatically. Agent accounts are treated as staff accounts with 0% commission by default.
+                </p>
+                <button type="submit" disabled={createTeamLoading} style={{ background: '#fff', color: '#000', fontWeight: 'bold', padding: '0.75rem', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '0.85rem', marginTop: '0.25rem', opacity: createTeamLoading ? 0.6 : 1 }}>
+                  {createTeamLoading ? 'Creating...' : 'Create Account'}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'team' && teamView === 'list' && (
           <div>
             {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(168,85,247,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <i className="fa-solid fa-users" style={{ fontSize: '1.25rem', color: '#a855f7' }}></i>
@@ -704,9 +855,14 @@ export default function AffiliatePortal() {
                   <p style={{ fontSize: '0.75rem', color: '#888', margin: 0 }}>Manage your sub-distributors and agents from one clean dashboard.</p>
                 </div>
               </div>
-              <button onClick={() => setActiveTab('dashboard')} style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '0.45rem 0.85rem', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                <i className="fa-solid fa-arrow-left"></i> Dashboard
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button onClick={() => setActiveTab('dashboard')} style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '0.45rem 0.85rem', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <i className="fa-solid fa-arrow-left"></i> Dashboard
+                </button>
+                <button onClick={openTeamCreate} style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.5rem 1rem', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <i className="fa-solid fa-plus"></i> Create Account
+                </button>
+              </div>
             </div>
 
             {/* Referral Link */}
@@ -717,13 +873,13 @@ export default function AffiliatePortal() {
                   <p style={{ fontSize: '0.7rem', color: '#888', margin: 0 }}>Share this link to bring players directly under your account.</p>
                 </div>
                 <div style={{ display: 'flex', gap: '0.35rem' }}>
-                  <span style={{ background: 'rgba(168,85,247,0.12)', color: '#a855f7', padding: '0.25rem 0.55rem', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 'bold' }}>Type: Sub-Distributor</span>
+                  <span style={{ background: 'rgba(168,85,247,0.12)', color: '#a855f7', padding: '0.25rem 0.55rem', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 'bold' }}>Type: {currentRoleLabel}</span>
                   <span style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', padding: '0.25rem 0.55rem', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 'bold' }}>Code: {agentSession.agentCode}</span>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                 <div style={{ flex: 1, background: '#040509', padding: '0.6rem 0.85rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)', fontSize: '0.75rem', color: '#aaa', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {typeof window !== 'undefined' ? `${window.location.origin}/agent-player-login?agent=${agentSession.agentCode}` : ''}
+                  {typeof window !== 'undefined' ? getReferralLink(agentSession.agentCode) : ''}
                 </div>
                 <button onClick={handleCopyInvite} style={{ background: copiedLink ? '#2ecc71' : '#6366f1', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.55rem 0.85rem', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                   {copiedLink ? '✓ Copied' : 'Copy Link'}
@@ -731,35 +887,92 @@ export default function AffiliatePortal() {
               </div>
             </div>
 
-            {/* Sub-Agents / Team Members */}
-            <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)', marginBottom: '1.5rem' }}>
+            {/* My Team Table */}
+            <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(168,85,247,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <i className="fa-solid fa-user-plus" style={{ color: '#a855f7', fontSize: '0.8rem' }}></i>
+                    <i className="fa-solid fa-puzzle-piece" style={{ color: '#a855f7', fontSize: '0.8rem' }}></i>
                   </div>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: 0 }}>Team Agents</h3>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: 0 }}>My Team</h3>
                 </div>
-                <button
-                  onClick={() => setShowCreateTeam(true)}
-                  style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.5rem 1rem', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                >
-                  <i className="fa-solid fa-plus"></i> Create Team
-                </button>
+                <span style={{ background: 'rgba(255,255,255,0.06)', padding: '0.3rem 0.65rem', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 'bold' }}>{teamMembers.length} Accounts</span>
               </div>
               <div className="table-responsive">
                 <table className="admin-table" style={{ fontSize: '0.75rem' }}>
-                  <thead><tr><th>NAME</th><th>EMAIL</th><th>AGENT CODE</th><th>COMMISSION %</th><th>JOINED</th></tr></thead>
+                  <thead>
+                    <tr>
+                      <th>NAME</th>
+                      <th>EMAIL</th>
+                      <th>CODE</th>
+                      <th>ROLE</th>
+                      <th>STATUS</th>
+                      <th>COMMISSION</th>
+                      <th>REFERRAL LINK</th>
+                      <th>ACTIONS</th>
+                      <th>CREATED</th>
+                    </tr>
+                  </thead>
                   <tbody>
-                    {teamAgents.length === 0 ? (
-                      <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: '#888' }}>No team agents yet. Click &quot;Create Team&quot; to add a sub-agent.</td></tr>
-                    ) : teamAgents.map((a) => (
-                      <tr key={a.id}>
-                        <td style={{ fontWeight: 'bold' }}>{a.name}</td>
-                        <td style={{ color: '#aaa', fontSize: '0.7rem' }}>{a.email}</td>
-                        <td><span style={{ background: 'rgba(168,85,247,0.12)', color: '#a855f7', padding: '0.15rem 0.45rem', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 'bold' }}>{a.agentCode}</span></td>
-                        <td style={{ fontWeight: 'bold', color: 'var(--gold-primary)' }}>{a.commissionRate || 0}%</td>
-                        <td style={{ fontSize: '0.65rem', color: '#888' }}>{a.createdAt ? new Date(a.createdAt).toLocaleDateString() : 'N/A'}</td>
+                    {teamMembers.length === 0 ? (
+                      <tr><td colSpan="9" style={{ textAlign: 'center', padding: '2.5rem', color: '#888' }}>No team members yet. Create an account or share your referral link to add players.</td></tr>
+                    ) : teamMembers.map((member) => (
+                      <tr key={`${member.memberType}-${member.id}`}>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: member.memberType === 'player' ? 'rgba(46,204,113,0.15)' : 'rgba(168,85,247,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <i className={`fa-solid ${member.memberType === 'player' ? 'fa-user' : 'fa-user-tie'}`} style={{ fontSize: '0.65rem', color: member.memberType === 'player' ? '#2ecc71' : '#a855f7' }}></i>
+                            </div>
+                            <span style={{ fontWeight: 'bold' }}>{member.name}</span>
+                          </div>
+                        </td>
+                        <td style={{ color: '#aaa', fontSize: '0.7rem' }}>{member.email}</td>
+                        <td>
+                          {member.agentCode !== '—' ? (
+                            <span style={{ background: 'rgba(168,85,247,0.12)', color: '#a855f7', padding: '0.15rem 0.45rem', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 'bold' }}>{member.agentCode}</span>
+                          ) : '—'}
+                        </td>
+                        <td>
+                          <span style={{
+                            background: member.role === 'Player' ? 'rgba(46,204,113,0.12)' : 'rgba(168,85,247,0.12)',
+                            color: member.role === 'Player' ? '#2ecc71' : '#a855f7',
+                            padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 'bold'
+                          }}>{member.role}</span>
+                        </td>
+                        <td>
+                          <span className={`admin-badge-preview b-${(member.status || 'ACTIVE').toLowerCase() === 'active' ? 'ready' : 'none'}`}>
+                            {member.status || 'ACTIVE'}
+                          </span>
+                        </td>
+                        <td style={{ fontWeight: 'bold', color: member.memberType === 'player' ? '#888' : 'var(--gold-primary)' }}>
+                          {member.memberType === 'player' ? '—' : `${parseFloat(member.commissionRate || 0).toFixed(2)}%`}
+                        </td>
+                        <td>
+                          {member.memberType === 'agent' && member.agentCode ? (
+                            <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', minWidth: '180px' }}>
+                              <div style={{ flex: 1, background: '#040509', padding: '0.35rem 0.5rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.04)', fontSize: '0.6rem', color: '#888', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }}>
+                                {getReferralLink(member.agentCode)}
+                              </div>
+                              <button type="button" onClick={() => handleCopyMemberLink(member.agentCode)} style={{ background: copiedMemberLink === member.agentCode ? '#2ecc71' : 'rgba(99,102,241,0.2)', color: '#fff', border: 'none', borderRadius: '6px', padding: '0.3rem 0.5rem', fontSize: '0.6rem', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                {copiedMemberLink === member.agentCode ? '✓' : 'Copy'}
+                              </button>
+                            </div>
+                          ) : (
+                            <span style={{ color: '#666', fontSize: '0.65rem' }}>—</span>
+                          )}
+                        </td>
+                        <td>
+                          {member.memberType === 'agent' ? (
+                            <button type="button" onClick={() => handleViewTeamPlayers(member)} style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: '6px', padding: '0.35rem 0.65rem', fontWeight: 'bold', fontSize: '0.65rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                              View Players
+                            </button>
+                          ) : (
+                            <span style={{ color: '#666', fontSize: '0.65rem' }}>—</span>
+                          )}
+                        </td>
+                        <td style={{ fontSize: '0.65rem', color: '#888', whiteSpace: 'nowrap' }}>
+                          {member.createdAt ? new Date(member.createdAt).toLocaleDateString() : 'N/A'}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -767,72 +980,39 @@ export default function AffiliatePortal() {
               </div>
             </div>
 
-            {/* My Team Table (Players) */}
-            <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(46,204,113,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <i className="fa-solid fa-bolt" style={{ color: '#2ecc71', fontSize: '0.8rem' }}></i>
-                  </div>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: 0 }}>My Players</h3>
-                </div>
-                <span style={{ background: 'rgba(255,255,255,0.06)', padding: '0.3rem 0.65rem', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 'bold' }}>{players.length} Accounts</span>
-              </div>
-              <div className="table-responsive">
-                <table className="admin-table" style={{ fontSize: '0.75rem' }}>
-                  <thead><tr><th>NAME</th><th>EMAIL</th><th>STATUS</th><th>TOTAL DEPOSITS</th><th>TOTAL CASHOUTS</th><th>JOINED</th></tr></thead>
-                  <tbody>
-                    {players.length === 0 ? (
-                      <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2.5rem', color: '#888' }}>No players registered under your link yet.</td></tr>
-                    ) : players.map((p, i) => (
-                      <tr key={i}>
-                        <td style={{ fontWeight: 'bold' }}>{p.name}</td>
-                        <td style={{ color: '#aaa', fontSize: '0.7rem' }}>{p.email}</td>
-                        <td><span className={`admin-badge-preview b-${p.status?.toLowerCase()==='active'?'ready':'none'}`}>{p.status || 'ACTIVE'}</span></td>
-                        <td style={{ fontWeight: 'bold', color: '#2ecc71' }}>${parseFloat(p.totalDeposits||0).toFixed(2)}</td>
-                        <td style={{ fontWeight: 'bold', color: '#ef4444' }}>${parseFloat(p.totalWithdrawals||0).toFixed(2)}</td>
-                        <td style={{ fontSize: '0.65rem', color: '#888' }}>{p.createdAt ? new Date(p.createdAt).toLocaleDateString() : 'N/A'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {showCreateTeam && (
+            {viewPlayersModal && (
               <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', backdropFilter: 'blur(6px)' }}>
-                <div style={{ background: '#0b0d16', borderRadius: '16px', border: '1px solid rgba(168,85,247,0.25)', padding: '1.5rem', width: '100%', maxWidth: '440px', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
+                <div style={{ background: '#0b0d16', borderRadius: '16px', border: '1px solid rgba(168,85,247,0.25)', padding: '1.5rem', width: '100%', maxWidth: '700px', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-                    <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: 0 }}>Create Team Agent</h3>
-                    <button type="button" onClick={() => setShowCreateTeam(false)} style={{ background: 'none', border: 'none', color: '#888', fontSize: '1.25rem', cursor: 'pointer' }}>&times;</button>
+                    <div>
+                      <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: 0 }}>Players — {viewPlayersModal.name}</h3>
+                      <p style={{ fontSize: '0.7rem', color: '#888', margin: '0.25rem 0 0' }}>Code: {viewPlayersModal.agentCode}</p>
+                    </div>
+                    <button type="button" onClick={() => setViewPlayersModal(null)} style={{ background: 'none', border: 'none', color: '#888', fontSize: '1.25rem', cursor: 'pointer' }}>&times;</button>
                   </div>
-                  <form onSubmit={handleCreateTeam} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                    <div>
-                      <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Full Name</label>
-                      <input type="text" placeholder="Agent name" value={teamName} onChange={(e) => setTeamName(e.target.value)} style={inputStyle} required />
+                  {viewPlayersLoading ? (
+                    <div style={{ textAlign: 'center', padding: '2rem', color: '#888' }}>Loading players...</div>
+                  ) : (
+                    <div className="table-responsive">
+                      <table className="admin-table" style={{ fontSize: '0.75rem' }}>
+                        <thead><tr><th>NAME</th><th>EMAIL</th><th>STATUS</th><th>DEPOSITS</th><th>CASHOUTS</th><th>JOINED</th></tr></thead>
+                        <tbody>
+                          {(viewPlayersModal.players || []).length === 0 ? (
+                            <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#888' }}>No players under this account yet.</td></tr>
+                          ) : viewPlayersModal.players.map((p) => (
+                            <tr key={p.id}>
+                              <td style={{ fontWeight: 'bold' }}>{p.name}</td>
+                              <td style={{ color: '#aaa', fontSize: '0.7rem' }}>{p.email}</td>
+                              <td><span className={`admin-badge-preview b-${(p.status || 'ACTIVE').toLowerCase() === 'active' ? 'ready' : 'none'}`}>{p.status || 'ACTIVE'}</span></td>
+                              <td style={{ fontWeight: 'bold', color: '#2ecc71' }}>${parseFloat(p.totalDeposits || 0).toFixed(2)}</td>
+                              <td style={{ fontWeight: 'bold', color: '#ef4444' }}>${parseFloat(p.totalWithdrawals || 0).toFixed(2)}</td>
+                              <td style={{ fontSize: '0.65rem', color: '#888' }}>{p.createdAt ? new Date(p.createdAt).toLocaleDateString() : 'N/A'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                    <div>
-                      <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Email</label>
-                      <input type="email" placeholder="agent@email.com" value={teamEmail} onChange={(e) => setTeamEmail(e.target.value)} style={inputStyle} required />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Password</label>
-                      <input type="password" placeholder="Min 6 characters" value={teamPassword} onChange={(e) => setTeamPassword(e.target.value)} style={inputStyle} required minLength={6} />
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                      <div>
-                        <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Agent Code (optional)</label>
-                        <input type="text" placeholder="Auto-generated" value={teamCode} onChange={(e) => setTeamCode(e.target.value.toUpperCase())} style={inputStyle} />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Commission %</label>
-                        <input type="number" placeholder="5" min="0" max="100" step="0.1" value={teamCommissionRate} onChange={(e) => setTeamCommissionRate(e.target.value)} style={inputStyle} required />
-                      </div>
-                    </div>
-                    <button type="submit" disabled={createTeamLoading} style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', fontWeight: 'bold', padding: '0.75rem', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '0.85rem', marginTop: '0.25rem', opacity: createTeamLoading ? 0.6 : 1 }}>
-                      {createTeamLoading ? 'Creating...' : 'Create Team Agent'}
-                    </button>
-                  </form>
+                  )}
                 </div>
               </div>
             )}

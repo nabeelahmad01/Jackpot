@@ -11,6 +11,8 @@ export async function GET() {
     const transactionsCollection = db.collection('transactions');
 
     const agents = await agentsCollection.find().toArray();
+    const agentCodeMap = {};
+    agents.forEach((a) => { agentCodeMap[a.agentCode] = a; });
 
     // Enrich each agent with statistics
     const enrichedAgents = await Promise.all(agents.map(async (agent) => {
@@ -52,9 +54,20 @@ export async function GET() {
 
       const availableBalance = Math.max(0, commissionEarned - totalWithdrawn);
 
+      const teamMembersCount = agents.filter(
+        (a) => (a.parentAgentCode || '').toUpperCase() === (agent.agentCode || '').toUpperCase()
+      ).length;
+
+      const parentAgent = agent.parentAgentCode ? agentCodeMap[agent.parentAgentCode] : null;
+
       return {
         ...agent,
+        accountType: agent.accountType || (agent.agentCode?.startsWith('SUB') ? 'sub-distributor' : 'agent'),
+        role: agent.role || (agent.agentCode?.startsWith('SUB') ? 'Sub-Distributor' : 'Agent'),
+        status: agent.status || 'ACTIVE',
         playersCount: playerEmails.length,
+        teamMembersCount,
+        parentAgentName: parentAgent ? parentAgent.name : '—',
         totalDeposits,
         totalWithdrawals,
         commissionEarned,
@@ -73,32 +86,39 @@ export async function GET() {
 // POST create a new agent
 export async function POST(req) {
   try {
-    const { name, email, password, commissionRate, agentCode, parentAgentCode } = await req.json();
+    const { name, email, password, commissionRate, agentCode, parentAgentCode, accountType, status } = await req.json();
 
     if (!name || !email || !password) {
       return NextResponse.json({ success: false, message: 'Name, email, and password are required.' }, { status: 400 });
     }
 
+    if (password.length < 8) {
+      return NextResponse.json({ success: false, message: 'Password must be at least 8 characters.' }, { status: 400 });
+    }
+
     const db = await getDb();
     const agentsCollection = db.collection('agents');
 
-    // Check if email already registered
     const existing = await agentsCollection.findOne({ email: email.toLowerCase().trim() });
     if (existing) {
       return NextResponse.json({ success: false, message: 'An agent with this email is already registered.' }, { status: 400 });
     }
 
-    // Auto-generate or sanitize agent code (e.g. SUB600718)
+    const normalizedType = (accountType || 'agent').toLowerCase();
+    const isSubDistributor = normalizedType === 'sub-distributor' || normalizedType === 'sub_distributor';
+
     let finalCode = agentCode ? agentCode.trim().toUpperCase() : '';
     if (!finalCode) {
-      finalCode = 'SUB' + Math.floor(100000 + Math.random() * 900000).toString();
+      const prefix = isSubDistributor ? 'SUB' : 'AGT';
+      finalCode = prefix + Math.floor(100000 + Math.random() * 900000).toString();
     }
 
-    // Check if code is unique
     const codeDup = await agentsCollection.findOne({ agentCode: finalCode });
     if (codeDup) {
       return NextResponse.json({ success: false, message: 'This affiliate code is already taken.' }, { status: 400 });
     }
+
+    const defaultCommission = isSubDistributor ? parseFloat(commissionRate || 0) : 0;
 
     const newAgent = {
       id: 'agent_' + Math.random().toString(36).substring(2, 7),
@@ -106,7 +126,10 @@ export async function POST(req) {
       email: email.toLowerCase().trim(),
       password: password.trim(),
       agentCode: finalCode,
-      commissionRate: parseFloat(commissionRate || 0),
+      accountType: isSubDistributor ? 'sub-distributor' : 'agent',
+      role: isSubDistributor ? 'Sub-Distributor' : 'Agent',
+      status: (status || 'ACTIVE').toUpperCase(),
+      commissionRate: defaultCommission,
       parentAgentCode: parentAgentCode ? parentAgentCode.trim().toUpperCase() : '',
       createdAt: new Date().toISOString()
     };
@@ -114,7 +137,7 @@ export async function POST(req) {
     await agentsCollection.insertOne(newAgent);
     cache.del('admin_stats');
 
-    return NextResponse.json({ success: true, agent: newAgent, message: 'Affiliate agent successfully registered!' });
+    return NextResponse.json({ success: true, agent: newAgent, message: 'Team account created successfully!' });
   } catch (err) {
     console.error('POST Create Agent API Error:', err);
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
@@ -124,7 +147,7 @@ export async function POST(req) {
 // PUT edit agent details
 export async function PUT(req) {
   try {
-    const { id, name, email, password, commissionRate, agentCode } = await req.json();
+    const { id, name, email, password, commissionRate, agentCode, status, accountType } = await req.json();
 
     if (!id) {
       return NextResponse.json({ success: false, message: 'Agent ID is required.' }, { status: 400 });
@@ -138,6 +161,12 @@ export async function PUT(req) {
     if (email !== undefined) updateFields.email = email.toLowerCase().trim();
     if (password !== undefined && password.trim() !== '') updateFields.password = password.trim();
     if (commissionRate !== undefined) updateFields.commissionRate = parseFloat(commissionRate || 0);
+    if (status !== undefined) updateFields.status = (status || 'ACTIVE').toUpperCase();
+    if (accountType !== undefined) {
+      const isSub = accountType === 'sub-distributor';
+      updateFields.accountType = isSub ? 'sub-distributor' : 'agent';
+      updateFields.role = isSub ? 'Sub-Distributor' : 'Agent';
+    }
 
     if (agentCode !== undefined && agentCode.trim() !== '') {
       const finalCode = agentCode.trim().toUpperCase();

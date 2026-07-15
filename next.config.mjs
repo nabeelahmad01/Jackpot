@@ -44,6 +44,10 @@ const nextConfig = {
       },
       // Affiliate agent portal sub-routes rewrite to '/affiliate'
       {
+        source: '/affiliate/team/create',
+        destination: '/affiliate',
+      },
+      {
         source: '/affiliate/:tab',
         destination: '/affiliate',
       },
