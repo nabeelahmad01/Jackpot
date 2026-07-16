@@ -241,53 +241,6 @@ export default function SettingsTab({ onUpdateSettings }) {
             <i className="fa-solid fa-users" style={{ marginRight: '0.4rem' }}></i> Affiliate Commission Payout Settings
           </h4>
 
-          <div className="input-group">
-            <label>Affiliate Crypto Network</label>
-            <select
-              value={affiliatePayoutNetwork}
-              onChange={(e) => setAffiliatePayoutNetwork(e.target.value)}
-              style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem' }}
-            >
-              <option value="TRC20">USDT (TRC20)</option>
-              <option value="BEP20">BNB Smart Chain (BEP20)</option>
-            </select>
-            <span className="game-tap-tip">Which crypto network affiliates will see when requesting commission withdrawal.</span>
-          </div>
-
-          <div className="input-group" style={{ marginTop: '1rem' }}>
-            <label>USDT TRC20 Wallet + QR</label>
-            <input
-              type="text"
-              placeholder="TRC20 wallet address"
-              value={affiliatePayoutWallet}
-              onChange={(e) => setAffiliatePayoutWallet(e.target.value)}
-              style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', marginBottom: '0.5rem' }}
-            />
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <input type="file" accept="image/*" onChange={handleAffiliateQrChange} style={{ color: '#888', fontSize: '0.75rem' }} />
-              {affiliatePayoutQrCode && (
-                <img src={affiliatePayoutQrCode} alt="TRC20 QR" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)' }} />
-              )}
-            </div>
-          </div>
-
-          <div className="input-group" style={{ marginTop: '1rem' }}>
-            <label>USDT BEP20 Wallet + QR</label>
-            <input
-              type="text"
-              placeholder="BEP20 wallet address (0x...)"
-              value={affiliatePayoutWalletBEP20}
-              onChange={(e) => setAffiliatePayoutWalletBEP20(e.target.value)}
-              style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', marginBottom: '0.5rem' }}
-            />
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <input type="file" accept="image/*" onChange={handleAffiliateQrBep20Change} style={{ color: '#888', fontSize: '0.75rem' }} />
-              {affiliatePayoutQrBEP20 && (
-                <img src={affiliatePayoutQrBEP20} alt="BEP20 QR" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)' }} />
-              )}
-            </div>
-          </div>
-
           <div className="input-group" style={{ marginTop: '1rem' }}>
             <label>Platform Commission Share (%)</label>
             <input

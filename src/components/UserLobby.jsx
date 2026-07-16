@@ -1046,19 +1046,57 @@ export default function UserLobby({
 
           <section className="lobby-hero">
             <div className="hero-promo-block">
+              <span className="hero-promo-kicker">Jackpot Royals Exclusive</span>
               <h2 className="hero-promo-headline" style={{ textTransform: 'uppercase' }}>
                 {frontendSettings?.lobbyHeroPromo || "GET 300% SIGNUP BONUS ON YOUR FIRST DEPOSIT"}
               </h2>
+              <p className="hero-promo-subtext">
+                Fast signup, instant access, and smooth cashouts. Pick your game below and get started in seconds.
+              </p>
               <div className="hero-trust-badges">
                 <div className="trust-pill"><i className="fa-solid fa-shield-halved"></i> {frontendSettings?.lobbyTrustBadge1 || "Instant Withdrawals"}</div>
                 <div className="trust-pill"><i className="fa-solid fa-lock"></i> {frontendSettings?.lobbyTrustBadge2 || "Secure & Safe"}</div>
                 <div className="trust-pill"><i className="fa-solid fa-trophy"></i> {frontendSettings?.lobbyTrustBadge3 || "Trusted by 1B+ Players"}</div>
+              </div>
+              <div className="hero-cta-row">
+                <button
+                  type="button"
+                  className="hero-primary-btn"
+                  onClick={() => document.getElementById('lobby-games-section')?.scrollIntoView({ behavior: 'smooth' })}
+                >
+                  <i className="fa-solid fa-gamepad"></i> Browse Games
+                </button>
+                <button
+                  type="button"
+                  className="hero-secondary-btn"
+                  onClick={handleFreeplayClaim}
+                >
+                  <i className="fa-solid fa-gift"></i> Claim Freeplay
+                </button>
+              </div>
+              <div className="hero-mini-stats">
+                <div className="hero-stat-chip">
+                  <strong>500%</strong>
+                  <span>Signup bonus</span>
+                </div>
+                <div className="hero-stat-chip">
+                  <strong>24/7</strong>
+                  <span>Quick support</span>
+                </div>
+                <div className="hero-stat-chip">
+                  <strong>Fast</strong>
+                  <span>Withdrawals</span>
+                </div>
               </div>
             </div>
 
             <div className="hero-badge-block">
               {(frontendSettings?.lobbyHeroSideImage) && (
                 <div className="hero-side-promo-image">
+                  <div className="hero-side-promo-copy">
+                    <span>Mobile App Bonus</span>
+                    <strong>Play on the go</strong>
+                  </div>
                   <img
                     src={frontendSettings.lobbyHeroSideImage}
                     alt={frontendSettings?.lobbyHeroSideImageAlt || 'Download mobile app promotion'}
