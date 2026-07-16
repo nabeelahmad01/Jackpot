@@ -1868,7 +1868,7 @@ export default function DistributorPortal() {
                 const availableCommission = Math.max(0, (stats.commissionEarned || 0) - totalWithdrawn);
 
                 return (
-                  <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '1.5rem' }}>
+                  <div className="panel-staff-layout">
                     <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', height: 'fit-content' }}>
                       <h3 style={{ fontSize: '0.9rem', marginBottom: '0.25rem', fontWeight: 'bold' }}>Request Commission</h3>
                       <p style={{ fontSize: '0.65rem', color: '#888', marginBottom: '1.25rem' }}>
@@ -2281,7 +2281,7 @@ export default function DistributorPortal() {
             <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>My Payment Gateways</h1>
             <p style={{ fontSize: '0.75rem', color: '#888', marginBottom: '2rem' }}>Add or delete payment methods visible to your referred players.</p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '1.5rem' }}>
+            <div className="panel-staff-layout">
               <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', height: 'fit-content' }}>
                 <h3 style={{ fontSize: '0.9rem', marginBottom: '1rem', fontWeight: 'bold' }}>Add Gateway</h3>
                 <form onSubmit={handleAddGateway}>
@@ -2410,7 +2410,7 @@ export default function DistributorPortal() {
             <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>My Staff Management</h1>
             <p style={{ fontSize: '0.75rem', color: '#888', marginBottom: '2rem' }}>Hire staff managers to process credentials and load coins allotments.</p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '1.5rem' }}>
+            <div className="panel-staff-layout">
               <div style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', height: 'fit-content' }}>
                 <h3 style={{ fontSize: '0.9rem', marginBottom: '1rem', fontWeight: 'bold' }}>Register Staff</h3>
                 <form onSubmit={handleAddStaff}>
@@ -2464,9 +2464,9 @@ export default function DistributorPortal() {
                 </form>
               </div>
 
-              <div className="glow-card" style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div className="glow-card table-responsive" style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', overflowX: 'auto' }}>
                 <h3 style={{ fontSize: '0.9rem', marginBottom: '1rem', fontWeight: 'bold' }}>Administrative Staff Registry</h3>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', minWidth: '520px' }}>
                   <thead>
                     <tr style={{ textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#888' }}>
                       <th style={{ padding: '0.5rem' }}>Name</th>

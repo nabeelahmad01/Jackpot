@@ -750,15 +750,26 @@ export default function UserLobby({
     setTimeout(() => setActionLoading(false), 2500);
 
     onRequestAccount(activeGame.title);
-    showToast('Game account credentials request submitted! Awaiting admin response.', 'success');
   };
 
+  const normEmail = (v) => String(v || '').toLowerCase().trim();
+  const normTitle = (v) => String(v || '').toLowerCase().trim();
+
   const currentRequest = activeGame
-    ? accountRequests.find((r) => r.gameTitle === activeGame.title && r.userEmail === currentUserEmail)
+    ? accountRequests.find(
+        (r) =>
+          normTitle(r.gameTitle) === normTitle(activeGame.title) &&
+          normEmail(r.userEmail) === normEmail(currentUserEmail) &&
+          r.status !== 'REJECTED'
+      )
     : null;
 
   const currentAccount = activeGame
-    ? gameAccounts.find((a) => a.gameTitle === activeGame.title && a.userEmail === currentUserEmail)
+    ? gameAccounts.find(
+        (a) =>
+          normTitle(a.gameTitle) === normTitle(activeGame.title) &&
+          normEmail(a.userEmail) === normEmail(currentUserEmail)
+      )
     : null;
 
   useEffect(() => {
@@ -774,8 +785,15 @@ export default function UserLobby({
   const totalTxPages = Math.ceil(totalTx / txLimit);
   const paginatedTransactions = filteredTransactions.slice((txPage - 1) * txLimit, txPage * txLimit);
 
-  const isFirstAccount = gameAccounts.length === 0 && !accountRequests.some(r => r.userEmail === currentUserEmail);
-  const hasClaimedBonus = (transactions || []).some(t => t.type === 'BONUS' && t.userEmail === currentUserEmail && (t.code === 'SIGNUP-FREE3' || t.code === 'FREEPLAY'));
+  const isFirstAccount = gameAccounts.length === 0 && !accountRequests.some(
+    (r) => normEmail(r.userEmail) === normEmail(currentUserEmail)
+  );
+  const hasClaimedBonus = (transactions || []).some(
+    (t) =>
+      t.type === 'BONUS' &&
+      normEmail(t.userEmail) === normEmail(currentUserEmail) &&
+      (t.code === 'SIGNUP-FREE3' || t.code === 'FREEPLAY')
+  );
   const eligibleForSignupBonus = isFirstAccount && !hasClaimedBonus;
 
   return (

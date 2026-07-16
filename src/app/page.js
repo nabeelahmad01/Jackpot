@@ -209,6 +209,7 @@ export default function Home() {
 
   // Player Account Creation Requests
   const handleRequestAccount = async (gameTitle) => {
+    const cacheKey = emailQuery ? `/api/account-requests?email=${emailQuery}` : null;
     try {
       const response = await fetch('/api/account-requests', {
         method: 'POST',
@@ -218,9 +219,29 @@ export default function Home() {
       const data = await response.json();
       if (data.success) {
         showToast(`Account creation request submitted for ${gameTitle}!`, 'success');
-        
-        // Mutate account requests cache key
-        mutate(emailQuery ? `/api/account-requests?email=${emailQuery}` : null);
+
+        // Optimistic pending row so lobby shows APPROVAL PENDING immediately
+        const optimistic = data.request || {
+          id: `temp-${Date.now()}`,
+          gameTitle,
+          userEmail: session.email.toLowerCase().trim(),
+          status: 'PENDING',
+          createdAt: new Date().toISOString()
+        };
+        if (cacheKey) {
+          mutate(
+            cacheKey,
+            (current) => ({
+              success: true,
+              accountRequests: [optimistic, ...(current?.accountRequests || []).filter(
+                (r) => !(String(r.gameTitle).toLowerCase() === String(gameTitle).toLowerCase() &&
+                  String(r.userEmail).toLowerCase() === String(session.email).toLowerCase())
+              )]
+            }),
+            false
+          );
+          mutate(cacheKey);
+        }
       } else {
         showToast(data.message || 'Failed to submit account request.', 'error');
       }

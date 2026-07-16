@@ -176,7 +176,7 @@ export default function DistributorsTab() {
   };
 
   return (
-    <div className="admin-layout-split" style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: '1.5rem', animation: 'fade-in 0.2s ease-out' }}>
+    <div className="admin-layout-split panel-staff-layout">
       
       {/* 1) ADD DISTRIBUTOR FORM */}
       <section className="admin-section-card">

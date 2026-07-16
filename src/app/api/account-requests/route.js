@@ -27,10 +27,11 @@ export async function GET(req) {
         query.userEmail = email.toLowerCase().trim();
       }
 
+      // Player self-view (?email=) must see their own requests even under Type B distributors.
+      // Type B exclusion only applies to global admin list views (no email, no adminDistributorId).
       if (adminDistributorId) {
         query.distributorId = adminDistributorId;
-      } else {
-        // Exclude Type B distributor account requests
+      } else if (!email) {
         const typeBDists = await db.collection('distributors').find({ type: 'B' }).project({ id: 1 }).toArray();
         const typeBDistIds = typeBDists.map(d => d.id).filter(Boolean);
         if (typeBDistIds.length > 0) {
@@ -156,14 +157,21 @@ export async function GET(req) {
     const filteredEmails = [];
     emailsArray.forEach(emailKey => {
       const userDistId = userDistMap[emailKey] || '';
+      // When a specific player email is requested, do not hide Type B players from themselves
+      if (email && emailKey === email.toLowerCase().trim()) {
+        filteredEmails.push(emailKey);
+        return;
+      }
       if (adminDistributorId) {
         if (userDistId === adminDistributorId) {
           filteredEmails.push(emailKey);
         }
-      } else {
+      } else if (!email) {
         if (!typeBDistIds.includes(userDistId)) {
           filteredEmails.push(emailKey);
         }
+      } else {
+        filteredEmails.push(emailKey);
       }
     });
 
