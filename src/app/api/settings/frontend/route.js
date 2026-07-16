@@ -41,6 +41,8 @@ const DEFAULT_SETTINGS = {
   lobbyBullet3Title: 'CASH OUT',
   lobbyBullet3Desc: 'Fast withdrawals',
   lobbyFreeplayClaimBtn: 'CLAIM FREEPLAY NOW',
+  lobbyHeroSideImage: '/lobby-app-download-promo.png',
+  lobbyHeroSideImageAlt: 'Download mobile app and get $3 freeplay',
   
   // Marquee Cards
   marqueePayouts: [

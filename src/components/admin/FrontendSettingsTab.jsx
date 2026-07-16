@@ -49,6 +49,8 @@ export default function FrontendSettingsTab({ adminUser }) {
   const [lobbyBullet3Title, setLobbyBullet3Title] = useState('');
   const [lobbyBullet3Desc, setLobbyBullet3Desc] = useState('');
   const [lobbyFreeplayClaimBtn, setLobbyFreeplayClaimBtn] = useState('');
+  const [lobbyHeroSideImage, setLobbyHeroSideImage] = useState('');
+  const [lobbyHeroSideImageAlt, setLobbyHeroSideImageAlt] = useState('');
 
   // Marquee Cards
   const [marqueePayouts, setMarqueePayouts] = useState([]);
@@ -107,6 +109,8 @@ export default function FrontendSettingsTab({ adminUser }) {
       setLobbyBullet3Title(s.lobbyBullet3Title || 'CASH OUT');
       setLobbyBullet3Desc(s.lobbyBullet3Desc || 'Fast withdrawals');
       setLobbyFreeplayClaimBtn(s.lobbyFreeplayClaimBtn || 'CLAIM FREEPLAY NOW');
+      setLobbyHeroSideImage(s.lobbyHeroSideImage || '/lobby-app-download-promo.png');
+      setLobbyHeroSideImageAlt(s.lobbyHeroSideImageAlt || 'Download mobile app and get $3 freeplay');
 
       setMarqueePayouts(s.marqueePayouts || []);
       setCashoutRules(s.cashoutRules || []);
@@ -212,6 +216,8 @@ export default function FrontendSettingsTab({ adminUser }) {
           lobbyBullet3Title,
           lobbyBullet3Desc,
           lobbyFreeplayClaimBtn,
+          lobbyHeroSideImage,
+          lobbyHeroSideImageAlt,
 
           marqueePayouts,
           cashoutRules,
@@ -357,6 +363,34 @@ export default function FrontendSettingsTab({ adminUser }) {
                     <label>Bullet 3 Description</label>
                     <input type="text" style={{ background: '#07090f', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.4rem', borderRadius: '6px', fontSize: '0.75rem', width: '100%' }} value={lobbyBullet3Desc} onChange={(e) => setLobbyBullet3Desc(e.target.value)} required />
                   </div>
+                </div>
+              </div>
+
+              <div className="input-group" style={{ margin: 0 }}>
+                <label>Hero Side Promo Image (Download App Banner)</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    if (file.size > 3 * 1024 * 1024) {
+                      alert('Image must be under 3MB.');
+                      e.target.value = '';
+                      return;
+                    }
+                    const reader = new FileReader();
+                    reader.onloadend = () => setLobbyHeroSideImage(reader.result);
+                    reader.readAsDataURL(file);
+                  }}
+                  style={{ color: '#888', fontSize: '0.75rem', marginBottom: '0.5rem' }}
+                />
+                {lobbyHeroSideImage && (
+                  <img src={lobbyHeroSideImage} alt="Hero side preview" style={{ width: '100%', maxHeight: '180px', objectFit: 'contain', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)', marginBottom: '0.5rem' }} />
+                )}
+                <div className="input-wrapper" style={{ background: '#07090f' }}>
+                  <i className="fa-solid fa-image input-icon"></i>
+                  <input type="text" value={lobbyHeroSideImageAlt} onChange={(e) => setLobbyHeroSideImageAlt(e.target.value)} placeholder="Image alt text" />
                 </div>
               </div>
 

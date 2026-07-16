@@ -49,15 +49,54 @@ export default function UserLobby({
   const [claimingReferralId, setClaimingReferralId] = useState(null);
   const [claimedRemainderIds, setClaimedRemainderIds] = useState([]);
   const [isFreeplaySession, setIsFreeplaySession] = useState(false);
+  const pendingGameSlugRef = useRef(null);
 
-  // Sync state changes to browser URL pathnames
+  const toGameSlug = (title) => String(title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+  const matchGameBySlug = (slug, gameList = games) => {
+    if (!slug) return null;
+    return gameList.find((g) => toGameSlug(g.title) === slug) || null;
+  };
+
+  const applyPathToState = (path, gameList = games) => {
+    if (path === '/lobby/referrals') {
+      setLobbySubView('referrals');
+      setActiveGame(null);
+      pendingGameSlugRef.current = null;
+      return;
+    }
+
+    if (path.startsWith('/lobby/game/')) {
+      const slug = path.replace('/lobby/game/', '').replace(/\/$/, '');
+      if (gameList.length === 0) {
+        pendingGameSlugRef.current = slug;
+        return;
+      }
+      const matched = matchGameBySlug(slug, gameList);
+      if (matched) {
+        setActiveGame(matched);
+        setLobbySubView('main');
+        pendingGameSlugRef.current = null;
+      } else {
+        setActiveGame(null);
+        setLobbySubView('main');
+        pendingGameSlugRef.current = null;
+        window.history.replaceState({}, '', '/lobby');
+      }
+      return;
+    }
+
+    setLobbySubView('main');
+    setActiveGame(null);
+    pendingGameSlugRef.current = null;
+  };
   useEffect(() => {
     if (typeof window === 'undefined') return;
     let targetPath = '/lobby';
     if (lobbySubView === 'referrals') {
       targetPath = '/lobby/referrals';
     } else if (activeGame) {
-      const slug = activeGame.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const slug = toGameSlug(activeGame.title);
       targetPath = `/lobby/game/${slug}`;
     }
     if (window.location.pathname !== targetPath) {
@@ -68,31 +107,23 @@ export default function UserLobby({
   // Sync browser back/forward buttons (popstate) to local state
   useEffect(() => {
     const handlePopState = () => {
-      const path = window.location.pathname;
-      if (path === '/lobby/referrals') {
-        setLobbySubView('referrals');
-        setActiveGame(null);
-      } else if (path.startsWith('/lobby/game/')) {
-        const slug = path.replace('/lobby/game/', '');
-        if (games.length > 0) {
-          const matched = games.find(g => g.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') === slug);
-          if (matched) {
-            setActiveGame(matched);
-            setLobbySubView('main');
-          } else {
-            setActiveGame(null);
-            setLobbySubView('main');
-            window.history.replaceState({}, '', '/lobby');
-          }
-        }
-      } else {
-        setLobbySubView('main');
-        setActiveGame(null);
-      }
+      applyPathToState(window.location.pathname, games);
     };
     window.addEventListener('popstate', handlePopState);
-    handlePopState(); // Sync initial path on mount
+    applyPathToState(window.location.pathname, games);
     return () => window.removeEventListener('popstate', handlePopState);
+  }, [games]);
+
+  // Restore game from URL after games list finishes loading (fixes refresh 404/redirect race)
+  useEffect(() => {
+    if (games.length === 0) return;
+    if (pendingGameSlugRef.current) {
+      applyPathToState(`/lobby/game/${pendingGameSlugRef.current}`, games);
+      return;
+    }
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/lobby/game/')) {
+      applyPathToState(window.location.pathname, games);
+    }
   }, [games]);
 
   // Active freeplay session: last action was a successful freeplay claim, with no deposit or freeplay cashout after it
@@ -1026,6 +1057,14 @@ export default function UserLobby({
             </div>
 
             <div className="hero-badge-block">
+              {(frontendSettings?.lobbyHeroSideImage) && (
+                <div className="hero-side-promo-image">
+                  <img
+                    src={frontendSettings.lobbyHeroSideImage}
+                    alt={frontendSettings?.lobbyHeroSideImageAlt || 'Download mobile app promotion'}
+                  />
+                </div>
+              )}
               <div className="freeplay-card">
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.5rem' }}>
                   <div style={{

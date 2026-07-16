@@ -1367,9 +1367,15 @@ function AffiliatePortal() {
                       <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Account Number / Tag</label>
                       <input type="text" placeholder="Account or $cashtag" value={withdrawAccount} onChange={(e)=>setWithdrawAccount(e.target.value)} style={inputStyle} required />
                     </div>
-                    <div style={{ gridColumn: '1 / -1' }}>
+                    <div>
                       <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Bank / Method</label>
                       <input type="text" placeholder="CashApp, Venmo, Chime..." value={withdrawBank} onChange={(e)=>setWithdrawBank(e.target.value)} style={inputStyle} required />
+                    </div>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Upload Payment QR</label>
+                      <input type="file" accept="image/*" onChange={handleWithdrawQrChange} style={{ ...inputStyle, padding: '0.45rem' }} />
+                      <p style={{ fontSize: '0.6rem', color: '#666', margin: '0.35rem 0 0' }}>Upload your CashApp/Bank QR so admin can scan and pay you.</p>
+                      {withdrawQr && <img src={withdrawQr} alt="Payment QR" style={{ marginTop: '0.5rem', width: '96px', height: '96px', borderRadius: '8px', border: '1px solid rgba(255,215,0,0.25)' }} />}
                     </div>
                   </>
                 )}
