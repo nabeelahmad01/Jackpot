@@ -1,5 +1,8 @@
 let unlocked = false;
 let sharedCtx = null;
+let activeAudio = null;
+let lastPlayAt = 0;
+const PLAY_COOLDOWN_MS = 1800;
 
 function getCtx() {
   if (typeof window === 'undefined') return null;
@@ -27,8 +30,8 @@ export function initAudioUnlock() {
         source.connect(ctx.destination);
         source.start(0);
       }
-    } catch (e) {
-      // ignore
+    } catch (_) {
+      // ignore unlock errors
     }
     unlocked = true;
     window.removeEventListener('pointerdown', unlock);
@@ -36,46 +39,85 @@ export function initAudioUnlock() {
     window.removeEventListener('touchstart', unlock);
   };
 
-  window.addEventListener('pointerdown', unlock);
+  window.addEventListener('pointerdown', unlock, { passive: true });
   window.addEventListener('keydown', unlock);
-  window.addEventListener('touchstart', unlock);
+  window.addEventListener('touchstart', unlock, { passive: true });
 }
 
 function playSynth() {
-  const ctx = getCtx();
-  if (!ctx) return;
-  if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+  try {
+    const ctx = getCtx();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
 
-  const playTone = (freq, startTime, duration) => {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(freq, startTime);
-    gain.gain.setValueAtTime(0.12, startTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-    osc.start(startTime);
-    osc.stop(startTime + duration);
-  };
+    const playTone = (freq, startTime, duration) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, startTime);
+      gain.gain.setValueAtTime(0.12, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+      osc.start(startTime);
+      osc.stop(startTime + duration);
+    };
 
-  const now = ctx.currentTime;
-  playTone(523.25, now, 0.12);
-  playTone(659.25, now + 0.08, 0.25);
+    const now = ctx.currentTime;
+    playTone(523.25, now, 0.12);
+    playTone(659.25, now + 0.08, 0.25);
+  } catch (_) {
+    // ignore synth errors
+  }
 }
 
-// Play custom uploaded sound if provided, otherwise a synthesized chime.
-export function playNotificationSound(customUrl) {
-  if (typeof window === 'undefined') return;
+function stopActiveAudio() {
+  if (!activeAudio) return;
   try {
+    activeAudio.pause();
+    activeAudio.currentTime = 0;
+  } catch (_) {
+    // ignore
+  }
+  activeAudio = null;
+}
+
+/**
+ * Play alert sound once. Rapid repeat calls within cooldown are ignored
+ * so parent + open tab both detecting the same event still produce one beep.
+ */
+export function playNotificationSound(customUrl) {
+  if (typeof window === 'undefined') return false;
+
+  const now = Date.now();
+  if (now - lastPlayAt < PLAY_COOLDOWN_MS) return false;
+  lastPlayAt = now;
+
+  try {
+    stopActiveAudio();
+
     if (customUrl) {
-      const cleanUrl = customUrl.replace(/^data:video\/[^;]+;/, 'data:audio/mpeg;');
+      const cleanUrl = String(customUrl).replace(/^data:video\/[^;]+;/, 'data:audio/mpeg;');
       const audio = new Audio(cleanUrl);
-      audio.play().catch(() => playSynth());
-    } else {
-      playSynth();
+      audio.preload = 'auto';
+      activeAudio = audio;
+      const playPromise = audio.play();
+      if (playPromise && typeof playPromise.then === 'function') {
+        playPromise.catch(() => {
+          if (activeAudio === audio) activeAudio = null;
+          playSynth();
+        });
+      }
+      audio.onended = () => {
+        if (activeAudio === audio) activeAudio = null;
+      };
+      return true;
     }
-  } catch (e) {
+
     playSynth();
+    return true;
+  } catch (_) {
+    playSynth();
+    return true;
   }
 }

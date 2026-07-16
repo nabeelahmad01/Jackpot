@@ -1,11 +1,11 @@
 // Real-time polling — fast enough for cross-screen approve/notify flow
 export const POLL = {
-  STATS: 4000,
-  QUEUES: 4000,
-  LISTS: 5000,
-  SUPPORT: 3000,
+  STATS: 3000,
+  QUEUES: 2000,
+  LISTS: 4000,
+  SUPPORT: 2500,
   CHAT: 2000,
-  PLAYER: 5000,
+  PLAYER: 4000,
   STATIC: 0
 };
 

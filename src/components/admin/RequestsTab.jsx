@@ -2,10 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import usePollingSWR from '../../hooks/usePollingSWR';
-import useSWR from 'swr';
 import { POLL } from '../../lib/pollingConfig';
-
-const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
 export default function RequestsTab({ adminUser, onApproveRequest, completedActionIds = {}, processingIds, wrapAction }) {
   const [search, setSearch] = useState('');
@@ -166,26 +163,6 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
   const requests = (data?.accountRequests || []).filter((r) => !completedActionIds[r.id]);
   const totalRequests = data?.totalRequests || 0;
   const totalPages = data?.totalPages || 1;
-
-  const { data: settingsData } = useSWR('/api/settings/frontend', fetcher);
-  const [prevCount, setPrevCount] = useState(null);
-
-  useEffect(() => {
-    if (data) {
-      const currentCount = (data.accountRequests || []).length;
-      if (prevCount !== null && currentCount > prevCount) {
-        try {
-          const rawUrl = settingsData?.settings?.notificationSoundUrl || 'https://raw.githubusercontent.com/AUTOMATIC1111/stable-diffusion-webui/master/notification.mp3';
-          const cleanUrl = rawUrl.replace(/^data:video\/[^;]+;/, 'data:audio/mpeg;');
-          const audio = new Audio(cleanUrl);
-          audio.play().catch(err => console.log('Audio playback blocked or failed:', err));
-        } catch (audioErr) {
-          console.error('Audio play error:', audioErr);
-        }
-      }
-      setPrevCount(currentCount);
-    }
-  }, [data, settingsData]);
 
   const handleApprove = async (reqItem) => {
     // Approve action wrapper handles state modifications

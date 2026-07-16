@@ -743,6 +743,10 @@ function AffiliatePortal() {
         </button>
       </div>
 
+      {sidebarOpen && (
+        <button type="button" className="admin-sidebar-overlay" aria-label="Close menu" onClick={() => setSidebarOpen(false)} />
+      )}
+
       {/* SIDEBAR */}
       <aside className={`admin-sidebar ${sidebarOpen ? 'mobile-show' : ''}`}>
         <div style={{ padding: '1.5rem 1.25rem', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -810,12 +814,12 @@ function AffiliatePortal() {
         {activeTab === 'dashboard' && (
           <div>
             {/* Top Row: Welcome + Invite Link */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '1.5rem', marginBottom: '1.5rem' }}>
+            <div className="panel-split-hero" style={{ marginBottom: '1.5rem' }}>
               {/* Welcome Section */}
               <div>
                 <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '1.5px', color: '#a855f7', fontWeight: 'bold' }}>AFFILIATE PERFORMANCE PORTAL</span>
                 <h1 style={{ fontSize: '2.25rem', fontWeight: '900', fontFamily: 'var(--font-heading)', margin: '0.3rem 0 0.15rem', lineHeight: 1.15 }}>
-                  Welcome back,<br/>{agentSession.name}
+                  Welcome back,<br/>{agentSession?.name || "Affiliate"}
                 </h1>
                 <p style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>
                   Sub Distributor account • Commission rate {agentSession.commissionRate || 0}.00%
@@ -869,7 +873,7 @@ function AffiliatePortal() {
             </div>
 
             {/* Stats Cards - Row 1: Player Stats */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.85rem', marginBottom: '0.85rem' }}>
+            <div className="panel-stat-grid panel-stat-grid--4" style={{ marginBottom: '0.85rem' }}>
               {[
                 { icon: 'fa-solid fa-users', iconBg: 'rgba(168,85,247,0.12)', iconColor: '#a855f7', label: 'TOTAL PLAYERS', value: stats.totalPlayers || 0, valueColor: '#a855f7' },
                 { icon: 'fa-solid fa-user-check', iconBg: 'rgba(46,204,113,0.12)', iconColor: '#2ecc71', label: 'VERIFIED PLAYERS', value: stats.verifiedPlayers || 0, valueColor: '#2ecc71' },
@@ -887,7 +891,7 @@ function AffiliatePortal() {
             </div>
 
             {/* Stats Cards - Row 2: Financial */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.85rem', marginBottom: '0.85rem' }}>
+            <div className="panel-stat-grid panel-stat-grid--4" style={{ marginBottom: '0.85rem' }}>
               {[
                 { icon: 'fa-solid fa-coins', iconBg: 'rgba(255,215,0,0.12)', iconColor: 'var(--gold-primary)', label: 'TOTAL DEPOSIT', value: `$${(stats.totalDeposits||0).toFixed(2)}`, sub: 'Dashboard scope only', valueColor: '#2ecc71' },
                 { icon: 'fa-solid fa-money-bill-wave', iconBg: 'rgba(234,179,8,0.12)', iconColor: '#eab308', label: 'TOTAL CASHOUT', value: `$${(stats.totalWithdrawals||0).toFixed(2)}`, sub: 'Dashboard scope only', valueColor: '#ef4444' },
@@ -906,7 +910,7 @@ function AffiliatePortal() {
             </div>
 
             {/* Stats Cards - Row 3: Today + Withdrawn */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.85rem', marginBottom: '0.85rem' }}>
+            <div className="panel-stat-grid panel-stat-grid--4" style={{ marginBottom: '0.85rem' }}>
               {[
                 { icon: 'fa-solid fa-arrow-down', iconBg: 'rgba(46,204,113,0.12)', iconColor: '#2ecc71', label: 'TODAY DEPOSIT', value: `$${(stats.todayDeposits||0).toFixed(2)}`, valueColor: '#2ecc71' },
                 { icon: 'fa-solid fa-arrow-up', iconBg: 'rgba(234,179,8,0.12)', iconColor: '#eab308', label: 'TODAY CASHOUT', value: `$${(stats.todayWithdrawals||0).toFixed(2)}`, valueColor: '#ef4444' },
@@ -924,7 +928,7 @@ function AffiliatePortal() {
             </div>
 
             {/* Stats Cards - Row 4: Account Summary */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.85rem', marginBottom: '1.5rem' }}>
+            <div className="panel-stat-grid panel-stat-grid--3" style={{ marginBottom: '1.5rem' }}>
               {[
                 { icon: 'fa-solid fa-hand-holding-dollar', iconBg: 'rgba(255,215,0,0.12)', iconColor: 'var(--gold-primary)', label: 'ACCOUNT SHARE', value: `$${(stats.commissionEarned||0).toFixed(2)}`, sub: 'Commission on net profit', valueColor: '#2ecc71' },
                 { icon: 'fa-solid fa-wallet', iconBg: 'rgba(46,204,113,0.15)', iconColor: '#2ecc71', label: 'AVAILABLE BALANCE', value: `$${(stats.availableBalance||0).toFixed(2)}`, sub: 'After paid and pending withdrawals', valueColor: '#2ecc71' },
@@ -1332,7 +1336,7 @@ function AffiliatePortal() {
                 ))}
               </div>
 
-              <form onSubmit={handleWithdrawRequest} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+              <form onSubmit={handleWithdrawRequest} className="panel-form-grid-2">
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={{ fontSize: '0.7rem', color: '#aaa', display: 'block', marginBottom: '0.3rem' }}>Amount ($)</label>
                   <input type="number" placeholder="50.00" step="0.01" value={withdrawAmount} onChange={(e)=>setWithdrawAmount(e.target.value)} max={stats.availableBalance||0} style={inputStyle} required />
@@ -1427,7 +1431,7 @@ function AffiliatePortal() {
             </div>
 
             {/* Signup Stats - Row 1: Signups */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.85rem', marginBottom: '0.85rem' }}>
+            <div className="panel-stat-grid panel-stat-grid--4" style={{ marginBottom: '0.85rem' }}>
               {[
                 { icon: 'fa-solid fa-users', iconBg: 'rgba(168,85,247,0.12)', iconColor: '#a855f7', label: 'TOTAL SIGNUPS', value: signupStats.totalPlayers || 0 },
                 { icon: 'fa-solid fa-link', iconBg: 'rgba(168,85,247,0.08)', iconColor: '#a855f7', label: 'REFERRAL SIGNUPS', value: signupStats.referralSignups || 0 },
@@ -1443,7 +1447,7 @@ function AffiliatePortal() {
             </div>
 
             {/* Row 2: Verified */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.85rem', marginBottom: '0.85rem' }}>
+            <div className="panel-stat-grid panel-stat-grid--4" style={{ marginBottom: '0.85rem' }}>
               {[
                 { icon: 'fa-solid fa-shield-halved', iconBg: 'rgba(239,68,68,0.12)', iconColor: '#ef4444', label: 'TOTAL VERIFIED PLAYERS', value: signupStats.totalVerified || 0, valueColor: '#ef4444' },
                 { icon: 'fa-solid fa-square-check', iconBg: 'rgba(46,204,113,0.12)', iconColor: '#2ecc71', label: 'REFERRAL VERIFIED', value: signupStats.referralVerified || 0 },
@@ -1459,7 +1463,7 @@ function AffiliatePortal() {
             </div>
 
             {/* Row 3: Deposited */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.85rem', marginBottom: '1.5rem' }}>
+            <div className="panel-stat-grid panel-stat-grid--5" style={{ marginBottom: '1.5rem' }}>
               {[
                 { icon: 'fa-solid fa-credit-card', iconBg: 'rgba(59,130,246,0.12)', iconColor: '#3b82f6', label: 'TOTAL DEPOSITED PLAYERS', value: signupStats.totalDeposited || 0 },
                 { icon: 'fa-solid fa-users', iconBg: 'rgba(168,85,247,0.08)', iconColor: '#a855f7', label: 'REFERRAL DEPOSITED', value: signupStats.referralDeposited || 0 },
@@ -1635,7 +1639,7 @@ function AffiliatePortal() {
             </div>
 
             {/* Content Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '1.5rem', alignItems: 'start', marginBottom: '2rem' }}>
+            <div className="panel-split-ads" style={{ marginBottom: '2rem' }}>
               
               {/* Left Column: Form & Payment */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>

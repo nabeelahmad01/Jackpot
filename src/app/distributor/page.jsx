@@ -23,6 +23,7 @@ export default function DistributorPortal() {
   const [distSession, setDistSession] = useState(null);
   const [proofModalUrl, setProofModalUrl] = useState('');
   const [supportOpen, setSupportOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleInspectProof = async (url, txId) => {
     const isValidUrl = typeof url === 'string' && (url.startsWith('data:') || url.startsWith('http') || url.startsWith('/'));
@@ -61,6 +62,10 @@ export default function DistributorPortal() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const [activeTab, setActiveTab] = useState('overview');
+  const goTab = (tab) => {
+    setActiveTab(tab);
+    setSidebarOpen(false);
+  };
   const suppressUrlSyncRef = useRef(true);
 
   useEffect(() => {
@@ -321,23 +326,78 @@ export default function DistributorPortal() {
   }, [distId, commLookupDate]);
 
   const prevCountsRef = useRef({ requests: 0, coins: 0, ledger: 0 });
-
-  const playAlertSound = () => {
-    playNotificationSound(frontendSettingsData?.settings?.notificationSoundUrl || settingsData?.settings?.notificationSoundUrl);
-  };
+  const alertsReadyRef = useRef(false);
+  const soundUrlRef = useRef('');
 
   useEffect(() => {
+    soundUrlRef.current =
+      frontendSettingsData?.settings?.notificationSoundUrl ||
+      settingsData?.settings?.notificationSoundUrl ||
+      '';
+  }, [frontendSettingsData, settingsData]);
+
+  useEffect(() => {
+    alertsReadyRef.current = false;
+    prevCountsRef.current = { requests: 0, coins: 0, ledger: 0 };
+  }, [distId]);
+
+  useEffect(() => {
+    if (!distId) return;
+
     const counts = {
-      requests: pendingAccountRequestsCount,
-      coins: pendingCoinsCount,
-      ledger: statsData?.stats?.pendingLedgerCount || 0
+      requests: Number(pendingAccountRequestsCount) || 0,
+      coins: Number(pendingCoinsCount) || 0,
+      ledger: Number(statsData?.stats?.pendingLedgerCount) || 0
     };
-    const prev = prevCountsRef.current;
-    if (counts.requests > prev.requests || counts.coins > prev.coins || counts.ledger > prev.ledger) {
-      playAlertSound();
+
+    // Baseline first snapshot — never sound on initial load of existing queue
+    if (!alertsReadyRef.current) {
+      prevCountsRef.current = counts;
+      alertsReadyRef.current = true;
+      return;
     }
+
+    const prev = prevCountsRef.current;
+    const hasNewRequest = counts.requests > prev.requests;
+    const hasNewCoin = counts.coins > prev.coins;
+    const hasNewLedger = counts.ledger > prev.ledger;
+
+    if (hasNewRequest || hasNewCoin || hasNewLedger) {
+      try {
+        playNotificationSound(soundUrlRef.current);
+      } catch (_) {
+        // never break the panel for audio
+      }
+
+      // Refresh open queue tabs instantly so lists update even if already open
+      try {
+        if (hasNewRequest) {
+          mutatePendingRequests();
+          mutate((key) => typeof key === 'string' && key.includes('/api/account-requests'));
+        }
+        if (hasNewCoin) {
+          mutatePendingCoins();
+          mutate((key) => typeof key === 'string' && key.includes('/api/coins-notifications'));
+        }
+        if (hasNewLedger) {
+          mutateStats();
+          mutate((key) => typeof key === 'string' && key.includes('/api/transactions'));
+        }
+      } catch (_) {
+        // ignore mutate errors
+      }
+    }
+
     prevCountsRef.current = counts;
-  }, [pendingAccountRequestsCount, pendingCoinsCount, statsData?.stats?.pendingLedgerCount, frontendSettingsData, settingsData]);
+  }, [
+    distId,
+    pendingAccountRequestsCount,
+    pendingCoinsCount,
+    statsData?.stats?.pendingLedgerCount,
+    mutatePendingRequests,
+    mutatePendingCoins,
+    mutateStats
+  ]);
 
   const handleRequestCommWithdraw = async (e) => {
     e.preventDefault();
@@ -1122,10 +1182,38 @@ export default function DistributorPortal() {
   return (
     <div className="admin-dashboard-layout" style={{ minHeight: '100vh', background: '#060812', color: '#fff', fontFamily: "'Inter', sans-serif" }}>
       <ParticlesBackground />
+
+      <div className="admin-mobile-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.35rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            title="Toggle Menu"
+          >
+            <i className={`fa-solid ${sidebarOpen ? 'fa-xmark' : 'fa-bars'}`}></i>
+          </button>
+          <span style={{ fontSize: '0.9rem', fontWeight: '900', color: '#fff', fontFamily: 'var(--font-heading)', letterSpacing: '0.05em' }}>
+            JACKPOT<span style={{ color: 'var(--gold-primary)' }}>ROYALS</span>
+          </span>
+        </div>
+        <button type="button" onClick={handleLogout} style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', padding: '0.4rem 0.75rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 'bold' }}>
+          Logout
+        </button>
+      </div>
+
+      {sidebarOpen && (
+        <button
+          type="button"
+          className="admin-sidebar-overlay"
+          aria-label="Close menu"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
       
       {/* SIDEBAR NAVIGATION */}
-      <aside className="admin-sidebar-nav" style={{ display: 'flex', flexDirection: 'column' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '2rem', paddingBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+      <aside className={`admin-sidebar ${sidebarOpen ? 'mobile-show' : ''}`} style={{ display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '2rem', paddingBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '1.5rem 1.25rem 1rem' }}>
           <i className="fa-solid fa-crown gold-text" style={{ fontSize: '1.5rem', color: 'var(--gold-primary)' }}></i>
           <div>
             <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', fontFamily: 'var(--font-heading)', margin: 0 }}>
@@ -1137,10 +1225,10 @@ export default function DistributorPortal() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, padding: '0 1rem', overflowY: 'auto' }}>
           {hasTabAccess('overview') && (
             <button
-              onClick={() => setActiveTab('overview')}
+              onClick={() => goTab('overview')}
               style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'overview' ? 'var(--gold-primary)' : 'none', color: activeTab === 'overview' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
             >
               <i className="fa-solid fa-chart-line" style={{ width: '16px' }}></i>
@@ -1150,7 +1238,7 @@ export default function DistributorPortal() {
 
           {hasTabAccess('tx_logs') && (
             <button
-              onClick={() => setActiveTab('tx_logs')}
+              onClick={() => goTab('tx_logs')}
               style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'tx_logs' ? 'var(--gold-primary)' : 'none', color: activeTab === 'tx_logs' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
             >
               <i className="fa-solid fa-clock-rotate-left" style={{ width: '16px' }}></i>
@@ -1160,7 +1248,7 @@ export default function DistributorPortal() {
 
           {!distSession?.isStaff && (
             <button
-              onClick={() => setActiveTab('referred_players')}
+              onClick={() => goTab('referred_players')}
               style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'referred_players' ? 'var(--gold-primary)' : 'none', color: activeTab === 'referred_players' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
             >
               <i className="fa-solid fa-users" style={{ width: '16px' }}></i>
@@ -1170,7 +1258,7 @@ export default function DistributorPortal() {
 
           {hasTabAccess('comm_cashout') && (
             <button
-              onClick={() => setActiveTab('comm_cashout')}
+              onClick={() => goTab('comm_cashout')}
               style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'comm_cashout' ? 'var(--gold-primary)' : 'none', color: activeTab === 'comm_cashout' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
             >
               <i className="fa-solid fa-hand-holding-dollar" style={{ width: '16px' }}></i>
@@ -1180,7 +1268,7 @@ export default function DistributorPortal() {
 
           {hasTabAccess('promotions') && (
             <button
-              onClick={() => setActiveTab('promotions')}
+              onClick={() => goTab('promotions')}
               style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'promotions' ? 'var(--gold-primary)' : 'none', color: activeTab === 'promotions' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
             >
               <i className="fa-solid fa-gift" style={{ width: '16px' }}></i>
@@ -1190,7 +1278,7 @@ export default function DistributorPortal() {
 
           {hasTabAccess('guidelines') && (
             <button
-              onClick={() => setActiveTab('guidelines')}
+              onClick={() => goTab('guidelines')}
               style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'guidelines' ? 'var(--gold-primary)' : 'none', color: activeTab === 'guidelines' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
             >
               <i className="fa-solid fa-circle-info" style={{ width: '16px' }}></i>
@@ -1202,7 +1290,7 @@ export default function DistributorPortal() {
             <>
               {hasTabAccess('gateways') && (
                 <button
-                  onClick={() => setActiveTab('gateways')}
+                  onClick={() => goTab('gateways')}
                   style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'gateways' ? 'var(--gold-primary)' : 'none', color: activeTab === 'gateways' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
                 >
                   <i className="fa-solid fa-wallet" style={{ width: '16px' }}></i>
@@ -1212,7 +1300,7 @@ export default function DistributorPortal() {
 
               {hasTabAccess('staff') && (
                 <button
-                  onClick={() => setActiveTab('staff')}
+                  onClick={() => goTab('staff')}
                   style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', background: activeTab === 'staff' ? 'var(--gold-primary)' : 'none', color: activeTab === 'staff' ? '#000' : '#fff', border: 'none', padding: '0.75rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'left' }}
                 >
                   <i className="fa-solid fa-user-shield" style={{ width: '16px' }}></i>
@@ -1222,7 +1310,7 @@ export default function DistributorPortal() {
 
               {hasTabAccess('operations') && (
                 <button
-                  onClick={() => setActiveTab('operations')}
+                  onClick={() => goTab('operations')}
                   style={{
                     width: '100%',
                     display: 'flex',
@@ -1251,7 +1339,7 @@ export default function DistributorPortal() {
 
               {hasTabAccess('requests') && (
                 <button
-                  onClick={() => setActiveTab('requests')}
+                  onClick={() => goTab('requests')}
                   style={{
                     width: '100%',
                     display: 'flex',
@@ -1280,7 +1368,7 @@ export default function DistributorPortal() {
 
               {hasTabAccess('shift_dashboard') && (
                 <button
-                  onClick={() => setActiveTab('shift_dashboard')}
+                  onClick={() => goTab('shift_dashboard')}
                   style={{
                     width: '100%',
                     display: 'flex',
@@ -1304,7 +1392,7 @@ export default function DistributorPortal() {
 
               {hasTabAccess('ledger') && (
                 <button
-                  onClick={() => setActiveTab('ledger')}
+                  onClick={() => goTab('ledger')}
                   style={{
                     width: '100%',
                     display: 'flex',
@@ -1333,7 +1421,7 @@ export default function DistributorPortal() {
 
               {hasTabAccess('support') && (
                 <button
-                  onClick={() => setActiveTab('support')}
+                  onClick={() => goTab('support')}
                   style={{
                     width: '100%',
                     display: 'flex',
@@ -1363,10 +1451,10 @@ export default function DistributorPortal() {
           )}
         </div>
 
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', padding: '1rem 1rem 1.25rem', marginTop: 'auto' }}>
           <div style={{ marginBottom: '1rem' }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>{distSession.name}</div>
-            <div style={{ fontSize: '0.65rem', color: '#888' }}>{distSession.email}</div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>{distSession?.name || 'Distributor'}</div>
+            <div style={{ fontSize: '0.65rem', color: '#888' }}>{distSession?.email || ''}</div>
           </div>
           <button onClick={handleLogout} style={{ width: '100%', background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', padding: '0.5rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>
             Log Out Panel
@@ -1929,7 +2017,7 @@ export default function DistributorPortal() {
             <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#fff' }}>Active Promotions</h1>
             <p style={{ fontSize: '0.75rem', color: '#888', marginBottom: '2rem' }}>Share these active codes and welcome bonuses with players to drive referrals.</p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+            <div className="panel-form-grid-2" style={{ gap: '1.5rem' }}>
               <div className="glow-card" style={{ background: '#0b0d16', padding: '1.5rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <h3 style={{ fontSize: '0.9rem', marginBottom: '1.25rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <i className="fa-solid fa-gift gold-text"></i> ${signupFreeplay} Signup Freeplay Code
@@ -2025,7 +2113,7 @@ export default function DistributorPortal() {
             </div>
 
             {/* METRICS CARDS */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
+            <div className="panel-stat-grid panel-stat-grid--4" style={{ gap: '1rem', marginBottom: '2rem' }}>
               <div className="glow-card" style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <div style={{ color: '#888', fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Referred Players</div>
                 <div style={{ fontSize: '1.75rem', fontWeight: '900', color: '#fff', marginTop: '0.25rem' }}>{stats.playersCount || 0}</div>
@@ -2290,7 +2378,7 @@ export default function DistributorPortal() {
 
               <div className="glow-card" style={{ background: '#0b0d16', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <h3 style={{ fontSize: '0.9rem', marginBottom: '1rem', fontWeight: 'bold' }}>My Gateways Catalog</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+                <div className="panel-form-grid-2" style={{ gap: '1rem' }}>
                   {(!gatewaysData?.gateways || gatewaysData.gateways.length === 0) ? (
                     <div style={{ colSpan: 2, color: '#666', fontSize: '0.75rem', padding: '1.5rem', textAlign: 'center', width: '100%' }}>No gateways registered yet.</div>
                   ) : (

@@ -2222,6 +2222,115 @@ select option {
   .admin-main-workspace {
     padding: calc(56px + 1.5rem) 1rem 1.5rem;
   }
+
+  .admin-sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 56px 0 0 0;
+    background: rgba(0, 0, 0, 0.55);
+    border: none;
+    z-index: 1002;
+    cursor: pointer;
+  }
+}
+
+.admin-sidebar-overlay {
+  display: none;
+}
+
+/* Shared panel responsive helpers */
+.panel-stat-grid {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.panel-stat-grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.panel-stat-grid--4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.panel-stat-grid--5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.panel-split-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 340px);
+  gap: 1.5rem;
+}
+
+.panel-form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+}
+
+.panel-split-ads {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .panel-stat-grid--5 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .panel-stat-grid--3,
+  .panel-stat-grid--4,
+  .panel-stat-grid--5 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .panel-split-hero,
+  .panel-split-ads,
+  .panel-form-grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-main-workspace {
+    overflow-x: hidden;
+  }
+
+  .admin-main-workspace h1 {
+    font-size: 1.65rem !important;
+  }
+
+  .admin-main-workspace h2 {
+    font-size: clamp(1.25rem, 6vw, 2rem) !important;
+  }
+
+  .table-responsive,
+  .admin-main-workspace .admin-table {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-section-card,
+  .admin-main-workspace > div {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 560px) {
+  .panel-stat-grid--3,
+  .panel-stat-grid--4,
+  .panel-stat-grid--5 {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-mobile-header span {
+    font-size: 0.8rem;
+  }
 }
 
 .admin-header {

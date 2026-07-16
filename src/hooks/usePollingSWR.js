@@ -15,10 +15,18 @@ export default function usePollingSWR(key, intervalMs, options = {}) {
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, []);
 
+  // Keep a slower poll in background tabs so new requests still surface.
+  const refreshInterval =
+    intervalMs > 0
+      ? (visible ? intervalMs : Math.max(intervalMs * 2, 6000))
+      : 0;
+
   return useSWR(key, fetcher, {
-    refreshInterval: visible && intervalMs > 0 ? intervalMs : 0,
+    refreshInterval,
     revalidateOnFocus: true,
-    dedupingInterval: intervalMs > 0 ? Math.min(2000, Math.floor(intervalMs / 2)) : 5000,
+    revalidateOnReconnect: true,
+    dedupingInterval: intervalMs > 0 ? Math.min(1500, Math.floor(intervalMs / 2)) : 5000,
+    keepPreviousData: true,
     ...options
   });
 }

@@ -1,40 +1,21 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import useSWR, { mutate as globalMutate } from 'swr';
+import React, { useState } from 'react';
+import { mutate as globalMutate } from 'swr';
 import usePollingSWR from '../../hooks/usePollingSWR';
 import { POLL } from '../../lib/pollingConfig';
-
-const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
 export default function CampaignRequestsTab({ adminUser, onInspectProof }) {
   const [search, setSearch] = useState('');
   const [approvingId, setApprovingId] = useState(null);
   const [customLink, setCustomLink] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
-  const [prevPendingCount, setPrevPendingCount] = useState(null);
 
   const { data, error, mutate } = usePollingSWR('/api/campaign-requests', POLL.LISTS);
-
-  const { data: settingsData } = useSWR('/api/settings/frontend', fetcher);
 
   const campaigns = data?.campaigns || [];
   const isLoading = !data && !error;
   const pendingCount = campaigns.filter((c) => c.status === 'PENDING').length;
-
-  useEffect(() => {
-    if (data) {
-      if (prevPendingCount !== null && pendingCount > prevPendingCount) {
-        try {
-          const rawUrl = settingsData?.settings?.notificationSoundUrl || 'https://raw.githubusercontent.com/AUTOMATIC1111/stable-diffusion-webui/master/notification.mp3';
-          const cleanUrl = rawUrl.replace(/^data:video\/[^;]+;/, 'data:audio/mpeg;');
-          const audio = new Audio(cleanUrl);
-          audio.play().catch(() => {});
-        } catch (e) { /* ignore */ }
-      }
-      setPrevPendingCount(pendingCount);
-    }
-  }, [data, pendingCount, prevPendingCount, settingsData]);
 
   const filteredCampaigns = campaigns.filter(c => 
     c.campaignName.toLowerCase().includes(search.toLowerCase()) ||

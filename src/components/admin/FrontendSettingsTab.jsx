@@ -325,7 +325,7 @@ export default function FrontendSettingsTab({ adminUser }) {
               Ye wahi right-side card hai: upar flyer image, neeche freeplay amount + claim button. Flyer off ho to classic freeplay card (lion + bullets) show hoga.
             </p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.1fr) minmax(220px, 0.9fr)', gap: '1rem', alignItems: 'start' }}>
+            <div className="panel-split-hero" style={{ gap: '1rem', alignItems: 'start' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <div className="input-group" style={{ margin: 0 }}>
                   <label>Flyer / Promo Image</label>

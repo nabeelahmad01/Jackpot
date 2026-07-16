@@ -1,19 +1,19 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import useSWR from 'swr';
-
-const fetcher = (...args) => fetch(...args).then((res) => res.json());
+import React, { useState } from 'react';
+import usePollingSWR from '../../hooks/usePollingSWR';
+import { POLL } from '../../lib/pollingConfig';
 
 export default function ShiftDashboardTab({ adminUser }) {
-  // SWR endpoints polling every 10 seconds
-  const { data: reqData, mutate: mutateRequests } = useSWR(`/api/account-requests?status=PENDING&limit=50&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`, fetcher, {
-    refreshInterval: 10000
-  });
+  const { data: reqData, mutate: mutateRequests } = usePollingSWR(
+    `/api/account-requests?status=PENDING&limit=50&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
+    POLL.QUEUES
+  );
 
-  const { data: coinData, mutate: mutateCoins } = useSWR(`/api/coins-notifications?limit=50&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`, fetcher, {
-    refreshInterval: 10000
-  });
+  const { data: coinData, mutate: mutateCoins } = usePollingSWR(
+    `/api/coins-notifications?limit=50&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
+    POLL.QUEUES
+  );
 
 
 
@@ -25,29 +25,8 @@ export default function ShiftDashboardTab({ adminUser }) {
   const [invalidReasons, setInvalidReasons] = useState({}); // { notificationId: reason }
   const [processingCoinId, setProcessingCoinId] = useState(null);
 
-  const { data: settingsData } = useSWR('/api/settings/frontend', fetcher);
-  const [prevPendingCount, setPrevPendingCount] = useState(null);
-
   const pendingRequests = reqData?.accountRequests || [];
   const pendingCoins = (coinData?.coinsNotifications || []).filter(n => n.status === 'PENDING' || n.status === 'CLAIM_REQUESTED');
-
-  useEffect(() => {
-    if (reqData && coinData) {
-      const currentCount = pendingRequests.length + pendingCoins.length;
-      if (prevPendingCount !== null && currentCount > prevPendingCount) {
-        try {
-          const rawUrl = settingsData?.settings?.notificationSoundUrl || 'https://raw.githubusercontent.com/AUTOMATIC1111/stable-diffusion-webui/master/notification.mp3';
-          const cleanUrl = rawUrl.replace(/^data:video\/[^;]+;/, 'data:audio/mpeg;');
-          const audio = new Audio(cleanUrl);
-          audio.play().catch(err => console.log('Audio playback blocked or failed:', err));
-        } catch (audioErr) {
-          console.error('Audio play error:', audioErr);
-        }
-      }
-      setPrevPendingCount(currentCount);
-    }
-  }, [reqData, coinData, pendingRequests.length, pendingCoins.length, settingsData]);
-
 
   // Handle saving credentials
   const handleSaveCredentials = async (reqItem) => {

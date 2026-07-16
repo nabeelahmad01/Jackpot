@@ -99,43 +99,68 @@ export default function AdminDashboard({
   const pendingCampaignRequestsCount = statsData?.stats?.pendingCampaignRequestsCount || 0;
 
   const prevCountsRef = React.useRef({ requests: 0, transactions: 0, coins: 0, chats: 0, campaigns: 0 });
+  const alertsReadyRef = React.useRef(false);
+  const soundUrlRef = React.useRef('');
 
   // Unlock audio on first user gesture so alert sounds are not blocked by the browser
   useEffect(() => {
     initAudioUnlock();
   }, []);
 
-  const playAlertSound = () => {
-    playNotificationSound(settingsData?.settings?.notificationSoundUrl);
-  };
+  useEffect(() => {
+    soundUrlRef.current = settingsData?.settings?.notificationSoundUrl || '';
+  }, [settingsData]);
 
   useEffect(() => {
     if (!statsData?.stats) return;
-    const { pendingRequestsCount, pendingTransactionsCount, pendingCoinsCount, pendingChatsCount, pendingCampaignRequestsCount } = statsData.stats;
+
+    const {
+      pendingRequestsCount = 0,
+      pendingTransactionsCount = 0,
+      pendingCoinsCount = 0,
+      pendingChatsCount = 0,
+      pendingCampaignRequestsCount = 0
+    } = statsData.stats;
+
+    const counts = {
+      requests: Number(pendingRequestsCount) || 0,
+      transactions: Number(pendingTransactionsCount) || 0,
+      coins: Number(pendingCoinsCount) || 0,
+      chats: Number(pendingChatsCount) || 0,
+      campaigns: Number(pendingCampaignRequestsCount) || 0
+    };
+
+    if (!alertsReadyRef.current) {
+      prevCountsRef.current = counts;
+      alertsReadyRef.current = true;
+      return;
+    }
+
     const prev = prevCountsRef.current;
-    
-    const hasNewRequest = pendingRequestsCount > prev.requests;
-    const hasNewTx = pendingTransactionsCount > prev.transactions;
-    const hasNewCoin = pendingCoinsCount > prev.coins;
-    const hasNewChat = pendingChatsCount > prev.chats;
-    const hasNewCampaign = pendingCampaignRequestsCount > prev.campaigns;
+    const hasNewRequest = counts.requests > prev.requests;
+    const hasNewTx = counts.transactions > prev.transactions;
+    const hasNewCoin = counts.coins > prev.coins;
+    const hasNewChat = counts.chats > prev.chats;
+    const hasNewCampaign = counts.campaigns > prev.campaigns;
 
     if (hasNewRequest || hasNewTx || hasNewCoin || hasNewChat || hasNewCampaign) {
-      playAlertSound();
-      if (hasNewRequest) mutate((key) => typeof key === 'string' && key.includes('/api/account-requests'));
-      if (hasNewTx) mutate((key) => typeof key === 'string' && key.includes('/api/transactions') && !key.includes('AFFILIATE_COMMISSION'));
-      if (hasNewCoin) mutate((key) => typeof key === 'string' && key.includes('/api/coins-notifications'));
-      if (hasNewChat) mutate((key) => typeof key === 'string' && key.includes('/api/support'));
-      if (hasNewCampaign) mutate((key) => typeof key === 'string' && key.includes('/api/campaign-requests'));
+      try {
+        playNotificationSound(soundUrlRef.current);
+      } catch (_) {
+        // never break dashboard for audio
+      }
+      try {
+        if (hasNewRequest) mutate((key) => typeof key === 'string' && key.includes('/api/account-requests'));
+        if (hasNewTx) mutate((key) => typeof key === 'string' && key.includes('/api/transactions') && !key.includes('AFFILIATE_COMMISSION'));
+        if (hasNewCoin) mutate((key) => typeof key === 'string' && key.includes('/api/coins-notifications'));
+        if (hasNewChat) mutate((key) => typeof key === 'string' && key.includes('/api/support'));
+        if (hasNewCampaign) mutate((key) => typeof key === 'string' && key.includes('/api/campaign-requests'));
+      } catch (_) {
+        // ignore mutate errors
+      }
     }
-    
-    prevCountsRef.current = {
-      requests: pendingRequestsCount,
-      transactions: pendingTransactionsCount,
-      coins: pendingCoinsCount,
-      chats: pendingChatsCount,
-      campaigns: pendingCampaignRequestsCount
-    };
+
+    prevCountsRef.current = counts;
   }, [statsData]);
 
   useEffect(() => {
@@ -270,6 +295,15 @@ export default function AdminDashboard({
           <i className="fa-solid fa-right-from-bracket"></i> <span>LOGOUT</span>
         </button>
       </div>
+
+      {sidebarOpen && (
+        <button
+          type="button"
+          className="admin-sidebar-overlay"
+          aria-label="Close menu"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
       {/* Left Sidebar Menu */}
       <aside className={`admin-sidebar ${sidebarOpen ? 'mobile-show' : ''}`}>

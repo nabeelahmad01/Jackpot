@@ -2,10 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import usePollingSWR from '../../hooks/usePollingSWR';
-import useSWR from 'swr';
 import { POLL } from '../../lib/pollingConfig';
-
-const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
 export default function CoinsAllotmentTab({
   onUpdateCoinsNotification,
@@ -39,26 +36,6 @@ export default function CoinsAllotmentTab({
   const notifications = (data?.coinsNotifications || []).filter((n) => !completedActionIds[n.id]);
   const totalNotifications = data?.totalNotifications || 0;
   const totalPages = data?.totalPages || 1;
-
-  const { data: settingsData } = useSWR('/api/settings/frontend', fetcher);
-  const [prevCount, setPrevCount] = useState(null);
-
-  useEffect(() => {
-    if (data) {
-      const currentCount = (data.coinsNotifications || []).filter(n => n.status === 'PENDING' || n.status === 'CLAIM_REQUESTED').length;
-      if (prevCount !== null && currentCount > prevCount) {
-        try {
-          const rawUrl = settingsData?.settings?.notificationSoundUrl || 'https://raw.githubusercontent.com/AUTOMATIC1111/stable-diffusion-webui/master/notification.mp3';
-          const cleanUrl = rawUrl.replace(/^data:video\/[^;]+;/, 'data:audio/mpeg;');
-          const audio = new Audio(cleanUrl);
-          audio.play().catch(err => console.log('Audio playback blocked or failed:', err));
-        } catch (audioErr) {
-          console.error('Audio play error:', audioErr);
-        }
-      }
-      setPrevCount(currentCount);
-    }
-  }, [data, settingsData]);
 
   const handleUpdate = async (id, status, read, holdNote) => {
     await onUpdateCoinsNotification(id, status, read, holdNote);
