@@ -892,7 +892,7 @@ function AffiliatePortal() {
                 { icon: 'fa-solid fa-coins', iconBg: 'rgba(255,215,0,0.12)', iconColor: 'var(--gold-primary)', label: 'TOTAL DEPOSIT', value: `$${(stats.totalDeposits||0).toFixed(2)}`, sub: 'Dashboard scope only', valueColor: '#2ecc71' },
                 { icon: 'fa-solid fa-money-bill-wave', iconBg: 'rgba(234,179,8,0.12)', iconColor: '#eab308', label: 'TOTAL CASHOUT', value: `$${(stats.totalWithdrawals||0).toFixed(2)}`, sub: 'Dashboard scope only', valueColor: '#ef4444' },
                 { icon: 'fa-solid fa-chart-bar', iconBg: 'rgba(139,92,246,0.12)', iconColor: '#8b5cf6', label: 'NET PROFIT', value: `$${(stats.netProfit||0).toFixed(2)}`, sub: 'Deposit minus cashout' },
-                { icon: 'fa-solid fa-coins', iconBg: 'rgba(59,130,246,0.12)', iconColor: '#3b82f6', label: 'TOTAL COINS USED', value: '0.00', sub: 'Deposit coins only' },
+                { icon: 'fa-solid fa-coins', iconBg: 'rgba(59,130,246,0.12)', iconColor: '#3b82f6', label: 'TOTAL COINS USED', value: (stats.totalCoinsUsed || 0).toFixed(2), sub: 'Loaded by your referred players' },
               ].map((c, i) => (
                 <div key={i} className="glow-card" style={{ background: '#0b0d16', padding: '1.15rem 1.25rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.04)' }}>
                   <div style={{ width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: c.iconBg, color: c.iconColor, fontSize: '0.95rem', marginBottom: '0.6rem' }}>

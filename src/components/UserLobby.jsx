@@ -203,6 +203,8 @@ export default function UserLobby({
   const [actionLoading, setActionLoading] = useState(false);
   const [activeTooltipId, setActiveTooltipId] = useState(null);
   const [lightboxImage, setLightboxImage] = useState(null);
+  const [proofSlideIndex, setProofSlideIndex] = useState(0);
+  const proofSliderPausedRef = useRef(false);
 
   // Subscription Alert Prompt states
   const [showSubPrompt, setShowSubPrompt] = useState(false);
@@ -216,6 +218,27 @@ export default function UserLobby({
       }
     }
   }, [currentUser]);
+
+  const proofScreenshots = frontendSettings?.proofScreenshots || [];
+
+  useEffect(() => {
+    if (proofScreenshots.length <= 1) return undefined;
+    const timer = setInterval(() => {
+      if (proofSliderPausedRef.current) return;
+      setProofSlideIndex((prev) => (prev + 1) % proofScreenshots.length);
+    }, 3200);
+    return () => clearInterval(timer);
+  }, [proofScreenshots.length]);
+
+  const goProofSlide = (direction) => {
+    if (proofScreenshots.length === 0) return;
+    setProofSlideIndex((prev) => {
+      const next = prev + direction;
+      if (next < 0) return proofScreenshots.length - 1;
+      if (next >= proofScreenshots.length) return 0;
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (withdrawModalOpen) {
@@ -1046,129 +1069,113 @@ export default function UserLobby({
 
           <section className="lobby-hero">
             <div className="hero-promo-block">
-              <span className="hero-promo-kicker">Jackpot Royals Exclusive</span>
               <h2 className="hero-promo-headline" style={{ textTransform: 'uppercase' }}>
                 {frontendSettings?.lobbyHeroPromo || "GET 300% SIGNUP BONUS ON YOUR FIRST DEPOSIT"}
               </h2>
-              <p className="hero-promo-subtext">
-                Fast signup, instant access, and smooth cashouts. Pick your game below and get started in seconds.
-              </p>
               <div className="hero-trust-badges">
                 <div className="trust-pill"><i className="fa-solid fa-shield-halved"></i> {frontendSettings?.lobbyTrustBadge1 || "Instant Withdrawals"}</div>
                 <div className="trust-pill"><i className="fa-solid fa-lock"></i> {frontendSettings?.lobbyTrustBadge2 || "Secure & Safe"}</div>
                 <div className="trust-pill"><i className="fa-solid fa-trophy"></i> {frontendSettings?.lobbyTrustBadge3 || "Trusted by 1B+ Players"}</div>
               </div>
-              <div className="hero-cta-row">
-                <button
-                  type="button"
-                  className="hero-primary-btn"
-                  onClick={() => document.getElementById('lobby-games-section')?.scrollIntoView({ behavior: 'smooth' })}
-                >
-                  <i className="fa-solid fa-gamepad"></i> Browse Games
-                </button>
-                <button
-                  type="button"
-                  className="hero-secondary-btn"
-                  onClick={handleFreeplayClaim}
-                >
-                  <i className="fa-solid fa-gift"></i> Claim Freeplay
-                </button>
-              </div>
-              <div className="hero-mini-stats">
-                <div className="hero-stat-chip">
-                  <strong>500%</strong>
-                  <span>Signup bonus</span>
-                </div>
-                <div className="hero-stat-chip">
-                  <strong>24/7</strong>
-                  <span>Quick support</span>
-                </div>
-                <div className="hero-stat-chip">
-                  <strong>Fast</strong>
-                  <span>Withdrawals</span>
-                </div>
-              </div>
             </div>
 
             <div className="hero-badge-block">
-              {(frontendSettings?.lobbyHeroSideImage) && (
-                <div className="hero-side-promo-image">
-                  <div className="hero-side-promo-copy">
-                    <span>Mobile App Bonus</span>
-                    <strong>Play on the go</strong>
-                  </div>
-                  <img
-                    src={frontendSettings.lobbyHeroSideImage}
-                    alt={frontendSettings?.lobbyHeroSideImageAlt || 'Download mobile app promotion'}
-                  />
-                </div>
-              )}
-              <div className="freeplay-card">
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.5rem' }}>
-                  <div style={{
-                    width: '60px',
-                    height: '60px',
-                    borderRadius: '50%',
-                    border: '2px solid var(--gold-primary)',
-                    background: '#000',
-                    boxShadow: '0 0 15px rgba(255,215,0,0.35)',
-                    overflow: 'hidden',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <img
-                      src="/jackpot_lion_mascot.png?v=2"
-                      alt="Jackpot Royals Lion Mascot"
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
+              <div className={`freeplay-card ${(frontendSettings?.lobbyHeroSideEnabled !== false && frontendSettings?.lobbyHeroSideImage) ? 'freeplay-card--with-flyer' : ''}`}>
+                {(frontendSettings?.lobbyHeroSideEnabled !== false && frontendSettings?.lobbyHeroSideImage) ? (
+                  <>
+                    <div className="freeplay-flyer">
+                      <img
+                        src={frontendSettings.lobbyHeroSideImage}
+                        alt={frontendSettings?.lobbyHeroSideImageAlt || 'Download mobile app promotion'}
+                      />
+                    </div>
+                    <div className="freeplay-flyer-footer">
+                      <div className="freeplay-flyer-offer">
+                        <span className="freeplay-flyer-amount">{frontendSettings?.lobbyFreeplayValue || "$3"}</span>
+                        <div className="freeplay-flyer-copy">
+                          <strong>{frontendSettings?.lobbyFreeplayLabel || "FREEPLAY"}</strong>
+                          <span>{frontendSettings?.lobbyFreeplayCondition || "ON SIGNUP!"}</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleFreeplayClaim}
+                        className="freeplay-claim-btn"
+                      >
+                        <i className="fa-solid fa-gift"></i>
+                        {frontendSettings?.lobbyFreeplayClaimBtn || "CLAIM FREEPLAY NOW"}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.5rem' }}>
+                      <div style={{
+                        width: '60px',
+                        height: '60px',
                         borderRadius: '50%',
-                        clipPath: 'circle(50%)',
-                        animation: 'pulse-lion 2s infinite ease-in-out',
-                        transform: 'scale(1.05)'
-                      }}
-                    />
-                  </div>
-                </div>
-                <h3 className="freeplay-value">{frontendSettings?.lobbyFreeplayValue || "$3"}</h3>
-                <h4 className="freeplay-label">{frontendSettings?.lobbyFreeplayLabel || "FREEPLAY"}</h4>
-                <p className="freeplay-condition">{frontendSettings?.lobbyFreeplayCondition || "ON SIGNUP!"}</p>
+                        border: '2px solid var(--gold-primary)',
+                        background: '#000',
+                        boxShadow: '0 0 15px rgba(255,215,0,0.35)',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <img
+                          src="/jackpot_lion_mascot.png?v=2"
+                          alt="Jackpot Royals Lion Mascot"
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            borderRadius: '50%',
+                            clipPath: 'circle(50%)',
+                            animation: 'pulse-lion 2s infinite ease-in-out',
+                            transform: 'scale(1.05)'
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <h3 className="freeplay-value">{frontendSettings?.lobbyFreeplayValue || "$3"}</h3>
+                    <h4 className="freeplay-label">{frontendSettings?.lobbyFreeplayLabel || "FREEPLAY"}</h4>
+                    <p className="freeplay-condition">{frontendSettings?.lobbyFreeplayCondition || "ON SIGNUP!"}</p>
 
-                <div className="freeplay-bullets">
-                  <div className="bullet-item">
-                    <i className="fa-solid fa-circle-play text-green"></i>
-                    <div className="bullet-desc"><strong>{frontendSettings?.lobbyBullet1Title || "PLAY"}</strong><span>{frontendSettings?.lobbyBullet1Desc || "Explore exciting games"}</span></div>
-                  </div>
-                  <div className="bullet-item">
-                    <i className="fa-solid fa-circle-check text-blue"></i>
-                    <div className="bullet-desc"><strong>{frontendSettings?.lobbyBullet2Title || "WIN"}</strong><span>{frontendSettings?.lobbyBullet2Desc || "Win real rewards"}</span></div>
-                  </div>
-                  <div className="bullet-item">
-                    <i className="fa-solid fa-circle-dollar-to-slot text-magenta"></i>
-                    <div className="bullet-desc"><strong>{frontendSettings?.lobbyBullet3Title || "CASH OUT"}</strong><span>{frontendSettings?.lobbyBullet3Desc || "Fast withdrawals"}</span></div>
-                  </div>
-                </div>
-                <button
-                  onClick={handleFreeplayClaim}
-                  className="submit-btn"
-                  style={{
-                    marginTop: '1.25rem',
-                    background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)',
-                    color: '#fff',
-                    fontWeight: 'bold',
-                    padding: '0.65rem 1rem',
-                    fontSize: '0.75rem',
-                    borderRadius: '10px',
-                    width: '100%',
-                    border: 'none',
-                    boxShadow: '0 4px 15px rgba(168,85,247,0.3)',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <i className="fa-solid fa-gift" style={{ marginRight: '6px' }}></i> {frontendSettings?.lobbyFreeplayClaimBtn || "CLAIM FREEPLAY NOW"}
-                </button>
+                    <div className="freeplay-bullets">
+                      <div className="bullet-item">
+                        <i className="fa-solid fa-circle-play text-green"></i>
+                        <div className="bullet-desc"><strong>{frontendSettings?.lobbyBullet1Title || "PLAY"}</strong><span>{frontendSettings?.lobbyBullet1Desc || "Explore exciting games"}</span></div>
+                      </div>
+                      <div className="bullet-item">
+                        <i className="fa-solid fa-circle-check text-blue"></i>
+                        <div className="bullet-desc"><strong>{frontendSettings?.lobbyBullet2Title || "WIN"}</strong><span>{frontendSettings?.lobbyBullet2Desc || "Win real rewards"}</span></div>
+                      </div>
+                      <div className="bullet-item">
+                        <i className="fa-solid fa-circle-dollar-to-slot text-magenta"></i>
+                        <div className="bullet-desc"><strong>{frontendSettings?.lobbyBullet3Title || "CASH OUT"}</strong><span>{frontendSettings?.lobbyBullet3Desc || "Fast withdrawals"}</span></div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleFreeplayClaim}
+                      className="submit-btn"
+                      style={{
+                        marginTop: '1.25rem',
+                        background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)',
+                        color: '#fff',
+                        fontWeight: 'bold',
+                        padding: '0.65rem 1rem',
+                        fontSize: '0.75rem',
+                        borderRadius: '10px',
+                        width: '100%',
+                        border: 'none',
+                        boxShadow: '0 4px 15px rgba(168,85,247,0.3)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <i className="fa-solid fa-gift" style={{ marginRight: '6px' }}></i> {frontendSettings?.lobbyFreeplayClaimBtn || "CLAIM FREEPLAY NOW"}
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </section>
@@ -1274,78 +1281,81 @@ export default function UserLobby({
             </div>
           </section>
 
-          {/* Cashout Proof Screenshots Slider/Gallery */}
-          {frontendSettings?.proofScreenshots && frontendSettings.proofScreenshots.length > 0 && (
-            <section className="rules-accordion-section" style={{ marginTop: '2.5rem' }}>
+          {/* Cashout Proof Screenshots Slider */}
+          {proofScreenshots.length > 0 && (
+            <section className="rules-accordion-section proof-slider-section" style={{ marginTop: '2.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
                 <i className="fa-solid fa-circle-check" style={{ color: '#2ecc71', fontSize: '1.2rem' }}></i>
                 <h4 style={{ fontSize: '1.05rem', fontFamily: 'var(--font-heading)', color: '#fff', margin: 0, textTransform: 'uppercase', letterSpacing: '1px' }}>
                   Our Cashout Proofs & Winnings
                 </h4>
               </div>
-              <div 
-                className="proof-gallery-scroll"
-                style={{ 
-                  display: 'flex', 
-                  gap: '1.25rem', 
-                  overflowX: 'auto', 
-                  paddingBottom: '1rem',
-                  scrollBehavior: 'smooth',
-                  scrollbarWidth: 'thin',
-                  WebkitOverflowScrolling: 'touch'
-                }}
+
+              <div
+                className="proof-slider"
+                onMouseEnter={() => { proofSliderPausedRef.current = true; }}
+                onMouseLeave={() => { proofSliderPausedRef.current = false; }}
+                onTouchStart={() => { proofSliderPausedRef.current = true; }}
+                onTouchEnd={() => { proofSliderPausedRef.current = false; }}
               >
-                {frontendSettings.proofScreenshots.map((proof, idx) => (
-                  <div 
-                    key={proof.id || idx} 
-                    onClick={() => setLightboxImage(proof.imageUrl)}
-                    style={{ 
-                      flex: '0 0 165px', 
-                      height: '290px', 
-                      borderRadius: '16px', 
-                      overflow: 'hidden', 
-                      background: '#090c15', 
-                      border: '1.5px solid rgba(255,215,0,0.15)',
-                      cursor: 'pointer',
-                      position: 'relative',
-                      boxShadow: '0 8px 25px rgba(0,0,0,0.4)',
-                      transition: 'all 0.3s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-4px)';
-                      e.currentTarget.style.borderColor = 'var(--gold-primary)';
-                      e.currentTarget.style.boxShadow = '0 12px 30px rgba(255,215,0,0.15)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.borderColor = 'rgba(255,215,0,0.15)';
-                      e.currentTarget.style.boxShadow = '0 8px 25px rgba(0,0,0,0.4)';
+                <button
+                  type="button"
+                  className="proof-slider-nav proof-slider-prev"
+                  onClick={() => goProofSlide(-1)}
+                  aria-label="Previous proof"
+                >
+                  <i className="fa-solid fa-chevron-left"></i>
+                </button>
+
+                <div className="proof-slider-viewport">
+                  <div
+                    className="proof-slider-track"
+                    style={{
+                      transform: `translateX(calc(-${proofSlideIndex} * (var(--proof-slide-width) + var(--proof-slide-gap))))`
                     }}
                   >
-                    <img 
-                      src={proof.imageUrl} 
-                      alt={proof.title || 'Cashout proof'} 
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                    />
-                    <div style={{
-                      position: 'absolute',
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0) 100%)',
-                      padding: '1rem 0.5rem 0.5rem 0.5rem',
-                      display: 'flex',
-                      alignItems: 'flex-end',
-                      justifyContent: 'center',
-                      textAlign: 'center'
-                    }}>
-                      <span style={{ fontSize: '0.65rem', color: '#fff', fontWeight: 'bold', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
-                        {proof.title || 'Cashout Completed'}
-                      </span>
-                    </div>
+                    {proofScreenshots.map((proof, idx) => (
+                      <button
+                        type="button"
+                        key={proof.id || idx}
+                        className={`proof-slide ${idx === proofSlideIndex ? 'active' : ''}`}
+                        onClick={() => setLightboxImage(proof.imageUrl)}
+                      >
+                        <img
+                          src={proof.imageUrl}
+                          alt={proof.title || 'Cashout proof'}
+                        />
+                        <span className="proof-slide-caption">
+                          {proof.title || 'Cashout Completed'}
+                        </span>
+                      </button>
+                    ))}
                   </div>
-                ))}
+                </div>
+
+                <button
+                  type="button"
+                  className="proof-slider-nav proof-slider-next"
+                  onClick={() => goProofSlide(1)}
+                  aria-label="Next proof"
+                >
+                  <i className="fa-solid fa-chevron-right"></i>
+                </button>
               </div>
+
+              {proofScreenshots.length > 1 && (
+                <div className="proof-slider-dots">
+                  {proofScreenshots.map((proof, idx) => (
+                    <button
+                      type="button"
+                      key={`dot-${proof.id || idx}`}
+                      className={`proof-slider-dot ${idx === proofSlideIndex ? 'active' : ''}`}
+                      onClick={() => setProofSlideIndex(idx)}
+                      aria-label={`Go to proof ${idx + 1}`}
+                    />
+                  ))}
+                </div>
+              )}
             </section>
           )}
 

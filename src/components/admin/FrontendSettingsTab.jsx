@@ -13,9 +13,6 @@ export default function FrontendSettingsTab({ adminUser }) {
   const [notificationSoundUrl, setNotificationSoundUrl] = useState('');
   const [withdrawNotice, setWithdrawNotice] = useState('');
   const [cashoutNotice, setCashoutNotice] = useState('');
-  const [slide1, setSlide1] = useState('');
-  const [slide2, setSlide2] = useState('');
-  const [slide3, setSlide3] = useState('');
   const [chimeActive, setChimeActive] = useState(true);
   const [venmoActive, setVenmoActive] = useState(true);
   const [cashappActive, setCashappActive] = useState(true);
@@ -51,6 +48,7 @@ export default function FrontendSettingsTab({ adminUser }) {
   const [lobbyFreeplayClaimBtn, setLobbyFreeplayClaimBtn] = useState('');
   const [lobbyHeroSideImage, setLobbyHeroSideImage] = useState('');
   const [lobbyHeroSideImageAlt, setLobbyHeroSideImageAlt] = useState('');
+  const [lobbyHeroSideEnabled, setLobbyHeroSideEnabled] = useState(true);
 
   // Marquee Cards
   const [marqueePayouts, setMarqueePayouts] = useState([]);
@@ -77,9 +75,6 @@ export default function FrontendSettingsTab({ adminUser }) {
       setNotificationSoundUrl(s.notificationSoundUrl || 'https://raw.githubusercontent.com/AUTOMATIC1111/stable-diffusion-webui/master/notification.mp3');
       setWithdrawNotice(s.withdrawNotice || 'Fastest Withdrawals inside 5 Minutes!');
       setCashoutNotice(s.cashoutNotice || 'Standard cashout processing hours: 9 AM - 11 PM EST');
-      setSlide1(s.slides?.[0] || '/slide1.jpg');
-      setSlide2(s.slides?.[1] || '/slide2.jpg');
-      setSlide3(s.slides?.[2] || '/slide3.jpg');
       setChimeActive(s.chimeActive !== false);
       setVenmoActive(s.venmoActive !== false);
       setCashappActive(s.cashappActive !== false);
@@ -111,6 +106,7 @@ export default function FrontendSettingsTab({ adminUser }) {
       setLobbyFreeplayClaimBtn(s.lobbyFreeplayClaimBtn || 'CLAIM FREEPLAY NOW');
       setLobbyHeroSideImage(s.lobbyHeroSideImage || '/lobby-app-download-promo.png');
       setLobbyHeroSideImageAlt(s.lobbyHeroSideImageAlt || 'Download mobile app and get $3 freeplay');
+      setLobbyHeroSideEnabled(s.lobbyHeroSideEnabled !== false);
 
       setMarqueePayouts(s.marqueePayouts || []);
       setCashoutRules(s.cashoutRules || []);
@@ -186,7 +182,6 @@ export default function FrontendSettingsTab({ adminUser }) {
           notificationSoundUrl,
           withdrawNotice,
           cashoutNotice,
-          slides: [slide1, slide2, slide3],
           chimeActive,
           venmoActive,
           cashappActive,
@@ -218,6 +213,7 @@ export default function FrontendSettingsTab({ adminUser }) {
           lobbyFreeplayClaimBtn,
           lobbyHeroSideImage,
           lobbyHeroSideImageAlt,
+          lobbyHeroSideEnabled,
 
           marqueePayouts,
           cashoutRules,
@@ -269,136 +265,211 @@ export default function FrontendSettingsTab({ adminUser }) {
             </div>
           )}
 
-          {/* Lobby Homepage copy texts section */}
+          {/* Lobby Homepage — matches live hero layout */}
           <div style={{ background: '#0b0d16', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1.5rem' }}>
             <h4 style={{ fontSize: '0.8rem', color: '#fff', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
-              Lobby Home Screen Copy Lines
+              Lobby Hero — Left Banner
             </h4>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <div className="input-group" style={{ margin: 0 }}>
-                <label>Lobby Hero Banner Promotion Title</label>
+                <label>Left Promo Headline</label>
                 <div className="input-wrapper" style={{ background: '#07090f' }}>
                   <i className="fa-solid fa-gift input-icon"></i>
                   <input type="text" value={lobbyHeroPromo} onChange={(e) => setLobbyHeroPromo(e.target.value)} required />
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
-                <div className="input-group" style={{ flex: 1, margin: 0 }}>
-                  <label>Lobby Trust Badge 1</label>
+              <div style={{ display: 'flex', gap: '0.5rem', width: '100%', flexWrap: 'wrap' }}>
+                <div className="input-group" style={{ flex: 1, minWidth: '140px', margin: 0 }}>
+                  <label>Trust Badge 1</label>
                   <div className="input-wrapper" style={{ background: '#07090f' }}>
                     <i className="fa-solid fa-shield-halved input-icon"></i>
                     <input type="text" value={lobbyTrustBadge1} onChange={(e) => setLobbyTrustBadge1(e.target.value)} required />
                   </div>
                 </div>
-                <div className="input-group" style={{ flex: 1, margin: 0 }}>
-                  <label>Lobby Trust Badge 2</label>
+                <div className="input-group" style={{ flex: 1, minWidth: '140px', margin: 0 }}>
+                  <label>Trust Badge 2</label>
                   <div className="input-wrapper" style={{ background: '#07090f' }}>
                     <i className="fa-solid fa-lock input-icon"></i>
                     <input type="text" value={lobbyTrustBadge2} onChange={(e) => setLobbyTrustBadge2(e.target.value)} required />
                   </div>
                 </div>
-                <div className="input-group" style={{ flex: 1, margin: 0 }}>
-                  <label>Lobby Trust Badge 3</label>
+                <div className="input-group" style={{ flex: 1, minWidth: '140px', margin: 0 }}>
+                  <label>Trust Badge 3</label>
                   <div className="input-wrapper" style={{ background: '#07090f' }}>
                     <i className="fa-solid fa-trophy input-icon"></i>
                     <input type="text" value={lobbyTrustBadge3} onChange={(e) => setLobbyTrustBadge3(e.target.value)} required />
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
 
-              <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
-                <div className="input-group" style={{ flex: 1, margin: 0 }}>
-                  <label>Freeplay Card Value Text</label>
-                  <div className="input-wrapper" style={{ background: '#07090f' }}>
-                    <i className="fa-solid fa-dollar-sign input-icon"></i>
-                    <input type="text" value={lobbyFreeplayValue} onChange={(e) => setLobbyFreeplayValue(e.target.value)} required />
-                  </div>
-                </div>
-                <div className="input-group" style={{ flex: 1, margin: 0 }}>
-                  <label>Freeplay Card Title Label</label>
-                  <div className="input-wrapper" style={{ background: '#07090f' }}>
-                    <i className="fa-solid fa-tag input-icon"></i>
-                    <input type="text" value={lobbyFreeplayLabel} onChange={(e) => setLobbyFreeplayLabel(e.target.value)} required />
-                  </div>
-                </div>
-                <div className="input-group" style={{ flex: 1, margin: 0 }}>
-                  <label>Freeplay Card Condition Label</label>
-                  <div className="input-wrapper" style={{ background: '#07090f' }}>
-                    <i className="fa-solid fa-circle-question input-icon"></i>
-                    <input type="text" value={lobbyFreeplayCondition} onChange={(e) => setLobbyFreeplayCondition(e.target.value)} required />
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px' }}>
-                <span style={{ fontSize: '0.725rem', color: 'var(--gold-primary)', fontWeight: 'bold' }}>Freeplay Card Step Bullets</span>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <div className="input-group" style={{ flex: 1, margin: 0 }}>
-                    <label>Bullet 1 Title</label>
-                    <input type="text" style={{ background: '#07090f', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.4rem', borderRadius: '6px', fontSize: '0.75rem' }} value={lobbyBullet1Title} onChange={(e) => setLobbyBullet1Title(e.target.value)} required />
-                  </div>
-                  <div className="input-group" style={{ flex: 2, margin: 0 }}>
-                    <label>Bullet 1 Description</label>
-                    <input type="text" style={{ background: '#07090f', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.4rem', borderRadius: '6px', fontSize: '0.75rem', width: '100%' }} value={lobbyBullet1Desc} onChange={(e) => setLobbyBullet1Desc(e.target.value)} required />
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <div className="input-group" style={{ flex: 1, margin: 0 }}>
-                    <label>Bullet 2 Title</label>
-                    <input type="text" style={{ background: '#07090f', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.4rem', borderRadius: '6px', fontSize: '0.75rem' }} value={lobbyBullet2Title} onChange={(e) => setLobbyBullet2Title(e.target.value)} required />
-                  </div>
-                  <div className="input-group" style={{ flex: 2, margin: 0 }}>
-                    <label>Bullet 2 Description</label>
-                    <input type="text" style={{ background: '#07090f', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.4rem', borderRadius: '6px', fontSize: '0.75rem', width: '100%' }} value={lobbyBullet2Desc} onChange={(e) => setLobbyBullet2Desc(e.target.value)} required />
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <div className="input-group" style={{ flex: 1, margin: 0 }}>
-                    <label>Bullet 3 Title</label>
-                    <input type="text" style={{ background: '#07090f', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.4rem', borderRadius: '6px', fontSize: '0.75rem' }} value={lobbyBullet3Title} onChange={(e) => setLobbyBullet3Title(e.target.value)} required />
-                  </div>
-                  <div className="input-group" style={{ flex: 2, margin: 0 }}>
-                    <label>Bullet 3 Description</label>
-                    <input type="text" style={{ background: '#07090f', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.4rem', borderRadius: '6px', fontSize: '0.75rem', width: '100%' }} value={lobbyBullet3Desc} onChange={(e) => setLobbyBullet3Desc(e.target.value)} required />
-                  </div>
-                </div>
-              </div>
-
-              <div className="input-group" style={{ margin: 0 }}>
-                <label>Hero Side Promo Image (Download App Banner)</label>
+          <div style={{ background: '#0b0d16', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,215,0,0.12)', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
+              <h4 style={{ fontSize: '0.8rem', color: 'var(--gold-primary)', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>
+                Lobby Hero — Right Side Flyer Card
+              </h4>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.72rem', color: '#ccc', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                 <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files[0];
-                    if (!file) return;
-                    if (file.size > 3 * 1024 * 1024) {
-                      alert('Image must be under 3MB.');
-                      e.target.value = '';
-                      return;
-                    }
-                    const reader = new FileReader();
-                    reader.onloadend = () => setLobbyHeroSideImage(reader.result);
-                    reader.readAsDataURL(file);
-                  }}
-                  style={{ color: '#888', fontSize: '0.75rem', marginBottom: '0.5rem' }}
+                  type="checkbox"
+                  checked={lobbyHeroSideEnabled}
+                  onChange={(e) => setLobbyHeroSideEnabled(e.target.checked)}
                 />
-                {lobbyHeroSideImage && (
-                  <img src={lobbyHeroSideImage} alt="Hero side preview" style={{ width: '100%', maxHeight: '180px', objectFit: 'contain', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)', marginBottom: '0.5rem' }} />
-                )}
-                <div className="input-wrapper" style={{ background: '#07090f' }}>
-                  <i className="fa-solid fa-image input-icon"></i>
-                  <input type="text" value={lobbyHeroSideImageAlt} onChange={(e) => setLobbyHeroSideImageAlt(e.target.value)} placeholder="Image alt text" />
+                Show flyer layout
+              </label>
+            </div>
+
+            <p style={{ fontSize: '0.7rem', color: '#888', margin: '0 0 0.85rem' }}>
+              Ye wahi right-side card hai: upar flyer image, neeche freeplay amount + claim button. Flyer off ho to classic freeplay card (lion + bullets) show hoga.
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.1fr) minmax(220px, 0.9fr)', gap: '1rem', alignItems: 'start' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div className="input-group" style={{ margin: 0 }}>
+                  <label>Flyer / Promo Image</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+                      if (file.size > 3 * 1024 * 1024) {
+                        alert('Image must be under 3MB.');
+                        e.target.value = '';
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onloadend = () => setLobbyHeroSideImage(reader.result);
+                      reader.readAsDataURL(file);
+                    }}
+                    style={{ color: '#888', fontSize: '0.75rem', marginBottom: '0.45rem' }}
+                  />
+                  <div className="input-wrapper" style={{ background: '#07090f', marginBottom: '0.45rem' }}>
+                    <i className="fa-solid fa-link input-icon"></i>
+                    <input
+                      type="text"
+                      value={lobbyHeroSideImage}
+                      onChange={(e) => setLobbyHeroSideImage(e.target.value)}
+                      placeholder="/lobby-app-download-promo.png or image URL"
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => setLobbyHeroSideImage('/lobby-app-download-promo.png')}
+                      style={{ background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.25)', color: '#ffe066', borderRadius: '6px', padding: '0.35rem 0.65rem', fontSize: '0.68rem', cursor: 'pointer' }}
+                    >
+                      Use default flyer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLobbyHeroSideImage('')}
+                      style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171', borderRadius: '6px', padding: '0.35rem 0.65rem', fontSize: '0.68rem', cursor: 'pointer' }}
+                    >
+                      Clear image
+                    </button>
+                  </div>
+                </div>
+
+                <div className="input-group" style={{ margin: 0 }}>
+                  <label>Image Alt Text</label>
+                  <div className="input-wrapper" style={{ background: '#07090f' }}>
+                    <i className="fa-solid fa-image input-icon"></i>
+                    <input type="text" value={lobbyHeroSideImageAlt} onChange={(e) => setLobbyHeroSideImageAlt(e.target.value)} placeholder="Download mobile app promotion" />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem', width: '100%', flexWrap: 'wrap' }}>
+                  <div className="input-group" style={{ flex: 1, minWidth: '100px', margin: 0 }}>
+                    <label>Freeplay Amount</label>
+                    <div className="input-wrapper" style={{ background: '#07090f' }}>
+                      <i className="fa-solid fa-dollar-sign input-icon"></i>
+                      <input type="text" value={lobbyFreeplayValue} onChange={(e) => setLobbyFreeplayValue(e.target.value)} required />
+                    </div>
+                  </div>
+                  <div className="input-group" style={{ flex: 1, minWidth: '100px', margin: 0 }}>
+                    <label>Freeplay Label</label>
+                    <div className="input-wrapper" style={{ background: '#07090f' }}>
+                      <i className="fa-solid fa-tag input-icon"></i>
+                      <input type="text" value={lobbyFreeplayLabel} onChange={(e) => setLobbyFreeplayLabel(e.target.value)} required />
+                    </div>
+                  </div>
+                  <div className="input-group" style={{ flex: 1, minWidth: '100px', margin: 0 }}>
+                    <label>Condition</label>
+                    <div className="input-wrapper" style={{ background: '#07090f' }}>
+                      <i className="fa-solid fa-circle-question input-icon"></i>
+                      <input type="text" value={lobbyFreeplayCondition} onChange={(e) => setLobbyFreeplayCondition(e.target.value)} required />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="input-group" style={{ margin: 0 }}>
+                  <label>Claim Button Text</label>
+                  <div className="input-wrapper" style={{ background: '#07090f' }}>
+                    <i className="fa-solid fa-gift input-icon"></i>
+                    <input type="text" value={lobbyFreeplayClaimBtn} onChange={(e) => setLobbyFreeplayClaimBtn(e.target.value)} required />
+                  </div>
                 </div>
               </div>
 
-              <div className="input-group" style={{ margin: 0 }}>
-                <label>Freeplay Claim Button CTA Text</label>
-                <div className="input-wrapper" style={{ background: '#07090f' }}>
-                  <i className="fa-solid fa-gift input-icon"></i>
-                  <input type="text" value={lobbyFreeplayClaimBtn} onChange={(e) => setLobbyFreeplayClaimBtn(e.target.value)} required />
+              <div style={{ background: '#07090f', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '0.75rem' }}>
+                <div style={{ fontSize: '0.65rem', color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.55rem' }}>Live Preview</div>
+                {lobbyHeroSideEnabled && lobbyHeroSideImage ? (
+                  <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(255,215,0,0.18)', background: '#0a0c16' }}>
+                    <img src={lobbyHeroSideImage} alt="Side flyer preview" style={{ width: '100%', aspectRatio: '16 / 10', objectFit: 'cover', display: 'block' }} />
+                    <div style={{ padding: '0.75rem', background: 'linear-gradient(180deg, #0c0e18, #120a1c)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', marginBottom: '0.65rem' }}>
+                        <strong style={{ fontSize: '1.35rem', color: '#ffe066' }}>{lobbyFreeplayValue || '$3'}</strong>
+                        <div>
+                          <div style={{ fontSize: '0.72rem', color: '#fff', fontWeight: 700 }}>{lobbyFreeplayLabel || 'FREEPLAY'}</div>
+                          <div style={{ fontSize: '0.62rem', color: '#ff6b9d', fontWeight: 700 }}>{lobbyFreeplayCondition || 'ON SIGNUP!'}</div>
+                        </div>
+                      </div>
+                      <div style={{ background: 'linear-gradient(135deg, #a855f7, #ec4899)', color: '#fff', borderRadius: '8px', padding: '0.55rem', textAlign: 'center', fontSize: '0.68rem', fontWeight: 800 }}>
+                        {lobbyFreeplayClaimBtn || 'CLAIM FREEPLAY NOW'}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ borderRadius: '12px', border: '1px dashed rgba(255,255,255,0.12)', padding: '1rem', textAlign: 'center', color: '#888', fontSize: '0.72rem' }}>
+                    Flyer off / no image — lobby pe classic freeplay card (lion + bullets) show hoga.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', marginTop: '1rem' }}>
+              <span style={{ fontSize: '0.725rem', color: 'var(--gold-primary)', fontWeight: 'bold' }}>Classic Freeplay Bullets (only when flyer is off / empty)</span>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <div className="input-group" style={{ flex: 1, minWidth: '110px', margin: 0 }}>
+                  <label>Bullet 1 Title</label>
+                  <input type="text" style={{ background: '#07090f', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.4rem', borderRadius: '6px', fontSize: '0.75rem', width: '100%' }} value={lobbyBullet1Title} onChange={(e) => setLobbyBullet1Title(e.target.value)} required />
+                </div>
+                <div className="input-group" style={{ flex: 2, minWidth: '160px', margin: 0 }}>
+                  <label>Bullet 1 Description</label>
+                  <input type="text" style={{ background: '#07090f', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.4rem', borderRadius: '6px', fontSize: '0.75rem', width: '100%' }} value={lobbyBullet1Desc} onChange={(e) => setLobbyBullet1Desc(e.target.value)} required />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <div className="input-group" style={{ flex: 1, minWidth: '110px', margin: 0 }}>
+                  <label>Bullet 2 Title</label>
+                  <input type="text" style={{ background: '#07090f', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.4rem', borderRadius: '6px', fontSize: '0.75rem', width: '100%' }} value={lobbyBullet2Title} onChange={(e) => setLobbyBullet2Title(e.target.value)} required />
+                </div>
+                <div className="input-group" style={{ flex: 2, minWidth: '160px', margin: 0 }}>
+                  <label>Bullet 2 Description</label>
+                  <input type="text" style={{ background: '#07090f', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.4rem', borderRadius: '6px', fontSize: '0.75rem', width: '100%' }} value={lobbyBullet2Desc} onChange={(e) => setLobbyBullet2Desc(e.target.value)} required />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <div className="input-group" style={{ flex: 1, minWidth: '110px', margin: 0 }}>
+                  <label>Bullet 3 Title</label>
+                  <input type="text" style={{ background: '#07090f', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.4rem', borderRadius: '6px', fontSize: '0.75rem', width: '100%' }} value={lobbyBullet3Title} onChange={(e) => setLobbyBullet3Title(e.target.value)} required />
+                </div>
+                <div className="input-group" style={{ flex: 2, minWidth: '160px', margin: 0 }}>
+                  <label>Bullet 3 Description</label>
+                  <input type="text" style={{ background: '#07090f', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.4rem', borderRadius: '6px', fontSize: '0.75rem', width: '100%' }} value={lobbyBullet3Desc} onChange={(e) => setLobbyBullet3Desc(e.target.value)} required />
                 </div>
               </div>
             </div>
@@ -789,23 +860,23 @@ export default function FrontendSettingsTab({ adminUser }) {
               Visual Media Assets & CMS Photos
             </h4>
             <p className="game-tap-tip" style={{ marginBottom: '1.25rem' }}>
-              Upload custom image files (PNG/JPG) to change the background photo, brand logo, and sliding promotional banners.
+              Upload custom images for the auth side background and brand logo.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               
-              {/* Login Left Background Photo */}
+              {/* Auth Side Image */}
               <div style={{ background: '#07090f', padding: '0.75rem', borderRadius: '8px', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
                 <div style={{ width: '80px', height: '80px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {loginBgUrl ? (
-                    <img src={loginBgUrl} alt="Login Background Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={loginBgUrl} alt="Auth Side Image Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
                     <i className="fa-solid fa-image" style={{ fontSize: '1.5rem', color: 'var(--text-muted)' }}></i>
                   )}
                 </div>
                 <div style={{ flex: 1, minWidth: '220px' }}>
                   <label style={{ fontSize: '0.725rem', color: 'var(--gold-primary)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>
-                    Login Portal Background Photo
+                    Auth Side Image (Login / Register)
                   </label>
                   <input
                     type="file"
@@ -824,7 +895,7 @@ export default function FrontendSettingsTab({ adminUser }) {
                     style={{ fontSize: '0.75rem', color: '#fff' }}
                   />
                   <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                    Recommended size: 1920x1080 (Landscape). Replaces the roulette/casino image on the left.
+                    Single side image for auth page. Recommended: 1920x1080 landscape.
                   </div>
                 </div>
               </div>
@@ -861,102 +932,6 @@ export default function FrontendSettingsTab({ adminUser }) {
                   <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
                     Recommended format: PNG transparent background logo shown on top banners.
                   </div>
-                </div>
-              </div>
-
-              {/* Slider Slide Banner 1 */}
-              <div style={{ background: '#07090f', padding: '0.75rem', borderRadius: '8px', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                <div style={{ width: '80px', height: '80px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {slide1 ? (
-                    <img src={slide1} alt="Slide 1 Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <i className="fa-solid fa-images" style={{ fontSize: '1.5rem', color: 'var(--text-muted)' }}></i>
-                  )}
-                </div>
-                <div style={{ flex: 1, minWidth: '220px' }}>
-                  <label style={{ fontSize: '0.725rem', color: 'var(--gold-primary)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>
-                    Lobby Promo Slide 1
-                  </label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      if (file.size > 8 * 1024 * 1024) {
-                        alert('Image file size must be less than 8MB.');
-                        return;
-                      }
-                      const reader = new FileReader();
-                      reader.onloadend = () => setSlide1(reader.result);
-                      reader.readAsDataURL(file);
-                    }}
-                    style={{ fontSize: '0.75rem', color: '#fff' }}
-                  />
-                </div>
-              </div>
-
-              {/* Slider Slide Banner 2 */}
-              <div style={{ background: '#07090f', padding: '0.75rem', borderRadius: '8px', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                <div style={{ width: '80px', height: '80px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {slide2 ? (
-                    <img src={slide2} alt="Slide 2 Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <i className="fa-solid fa-images" style={{ fontSize: '1.5rem', color: 'var(--text-muted)' }}></i>
-                  )}
-                </div>
-                <div style={{ flex: 1, minWidth: '220px' }}>
-                  <label style={{ fontSize: '0.725rem', color: 'var(--gold-primary)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>
-                    Lobby Promo Slide 2
-                  </label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      if (file.size > 8 * 1024 * 1024) {
-                        alert('Image file size must be less than 8MB.');
-                        return;
-                      }
-                      const reader = new FileReader();
-                      reader.onloadend = () => setSlide2(reader.result);
-                      reader.readAsDataURL(file);
-                    }}
-                    style={{ fontSize: '0.75rem', color: '#fff' }}
-                  />
-                </div>
-              </div>
-
-              {/* Slider Slide Banner 3 */}
-              <div style={{ background: '#07090f', padding: '0.75rem', borderRadius: '8px', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                <div style={{ width: '80px', height: '80px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {slide3 ? (
-                    <img src={slide3} alt="Slide 3 Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <i className="fa-solid fa-images" style={{ fontSize: '1.5rem', color: 'var(--text-muted)' }}></i>
-                  )}
-                </div>
-                <div style={{ flex: 1, minWidth: '220px' }}>
-                  <label style={{ fontSize: '0.725rem', color: 'var(--gold-primary)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>
-                    Lobby Promo Slide 3
-                  </label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      if (file.size > 8 * 1024 * 1024) {
-                        alert('Image file size must be less than 8MB.');
-                        return;
-                      }
-                      const reader = new FileReader();
-                      reader.onloadend = () => setSlide3(reader.result);
-                      reader.readAsDataURL(file);
-                    }}
-                    style={{ fontSize: '0.75rem', color: '#fff' }}
-                  />
                 </div>
               </div>
 

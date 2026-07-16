@@ -9,7 +9,6 @@ const DEFAULT_SETTINGS = {
   notificationSoundUrl: 'https://raw.githubusercontent.com/AUTOMATIC1111/stable-diffusion-webui/master/notification.mp3',
   withdrawNotice: 'Fastest Withdrawals inside 5 Minutes!',
   cashoutNotice: 'Standard cashout processing hours: 9 AM - 11 PM EST',
-  slides: ['/slide1.jpg', '/slide2.jpg', '/slide3.jpg'],
   chimeActive: true,
   venmoActive: true,
   cashappActive: true,
@@ -43,6 +42,7 @@ const DEFAULT_SETTINGS = {
   lobbyFreeplayClaimBtn: 'CLAIM FREEPLAY NOW',
   lobbyHeroSideImage: '/lobby-app-download-promo.png',
   lobbyHeroSideImageAlt: 'Download mobile app and get $3 freeplay',
+  lobbyHeroSideEnabled: true,
   
   // Marquee Cards
   marqueePayouts: [

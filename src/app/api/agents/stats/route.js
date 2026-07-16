@@ -111,6 +111,18 @@ export async function GET(req) {
 
     const commissionEarned = calcCommissionFromProfit(totalDeposits, totalWithdrawals, agent.commissionRate);
 
+    // Coins loaded into games for referred players (deposit allotments only)
+    let totalCoinsUsed = 0;
+    if (playerEmails.length > 0) {
+      const coinsNotificationsCollection = db.collection('coinsNotifications');
+      const coinDocs = await coinsNotificationsCollection.find({
+        userEmail: { $in: playerEmails },
+        status: 'COMPLETED',
+        totalCoins: { $gt: 0 }
+      }).project({ totalCoins: 1 }).toArray();
+      totalCoinsUsed = coinDocs.reduce((acc, curr) => acc + parseFloat(curr.totalCoins || 0), 0);
+    }
+
     // Sum up commission withdrawals by this agent
     const agentWithdrawDocs = await transactionsCollection.find({
       userEmail: agent.email.toLowerCase().trim(),
@@ -181,6 +193,7 @@ export async function GET(req) {
         depositingPlayers: depositingPlayersCount,
         totalDeposits,
         totalWithdrawals,
+        totalCoinsUsed,
         netProfit: Math.max(0, totalDeposits - totalWithdrawals),
         commissionEarned,
         totalWithdrawn,
