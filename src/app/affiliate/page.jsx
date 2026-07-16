@@ -808,7 +808,7 @@ function AffiliatePortal() {
       </aside>
 
       {/* MAIN CONTENT AREA */}
-      <main className="admin-main-workspace" style={{ padding: '2rem', overflowY: 'auto' }}>
+      <main className="admin-main-workspace" style={{ overflowY: 'auto' }}>
 
         {/* ============== DASHBOARD TAB ============== */}
         {activeTab === 'dashboard' && (

@@ -1463,7 +1463,7 @@ export default function DistributorPortal() {
       </aside>
 
       {/* PORTAL BODY CONTAINER */}
-      <main className="admin-main-workspace" style={{ padding: '2rem', overflowY: 'auto' }}>
+      <main className="admin-main-workspace" style={{ overflowY: 'auto' }}>
         
         {/* TAB: TRANSACTION LOGS */}
         {activeTab === 'tx_logs' && (
@@ -2096,16 +2096,16 @@ export default function DistributorPortal() {
         {/* TAB 1: OVERVIEW */}
         {activeTab === 'overview' && (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+            <div className="panel-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', gap: '1rem', flexWrap: 'wrap' }}>
               <div>
                 <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#fff' }}>Overview & Analytics</h1>
                 <p style={{ fontSize: '0.75rem', color: '#888' }}>Track your referred players, deposits, and commission summaries.</p>
               </div>
 
               {/* REFERRAL LINK COPY CARD */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#0b0d16', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#0b0d16', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap', maxWidth: '100%' }}>
                 <span style={{ fontSize: '0.7rem', color: '#888', fontWeight: 'bold' }}>Referral Link:</span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--gold-primary)', fontFamily: 'monospace' }}>?dist={distId}</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--gold-primary)', fontFamily: 'monospace', wordBreak: 'break-all' }}>?dist={distId}</span>
                 <button onClick={copyReferralLink} style={{ background: 'var(--gold-primary)', color: '#000', border: 'none', borderRadius: '4px', padding: '0.2rem 0.5rem', fontSize: '0.65rem', cursor: 'pointer', fontWeight: 'bold' }}>
                   {copiedLink ? 'COPIED!' : 'COPY'}
                 </button>
@@ -2255,10 +2255,11 @@ export default function DistributorPortal() {
                                   setPoolUpdateModalOpen(true);
                                 }}
                                 className="action-row-btn btn-edit"
-                                style={{ background: 'rgba(255,215,0,0.1)', border: '1px solid var(--gold-primary)', color: 'var(--gold-primary)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.65rem', cursor: 'pointer', fontWeight: 'bold', display: 'inline-flex', gap: '0.25rem', alignItems: 'center' }}
+                                style={{ background: 'rgba(255,215,0,0.1)', border: '1px solid var(--gold-primary)', color: 'var(--gold-primary)', padding: '0.4rem 0.75rem', borderRadius: '6px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 'bold', display: 'inline-flex', gap: '0.35rem', alignItems: 'center', whiteSpace: 'nowrap' }}
                                 title="Update Remaining Pool & Link"
                               >
-                                <i className="fa-solid fa-pen-to-square"></i> Update Pool
+                                <i className="fa-solid fa-pen-to-square"></i>
+                                <span>Update Pool</span>
                               </button>
                             </td>
                           </tr>

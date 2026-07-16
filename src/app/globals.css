@@ -2234,7 +2234,12 @@ select option {
   }
 
   .admin-main-workspace {
-    padding: calc(56px + 1.5rem) 1rem 1.5rem;
+    /* Beat inline padding on distributor/affiliate so fixed header never covers content */
+    padding-top: calc(56px + 1.25rem) !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+    padding-bottom: 1.5rem !important;
+    min-height: calc(100vh - 56px);
   }
 
   .admin-sidebar-overlay {
@@ -2310,6 +2315,7 @@ select option {
 
   .admin-main-workspace {
     overflow-x: hidden;
+    scroll-padding-top: 72px;
   }
 
   .admin-main-workspace h1 {
@@ -2636,15 +2642,22 @@ select option {
 .action-row-btn {
   background: none;
   border: 1px solid var(--border-muted);
-  width: 30px;
-  height: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  width: auto;
+  height: auto;
+  padding: 0.35rem 0.65rem;
   border-radius: 6px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.35rem;
+  white-space: nowrap;
   cursor: pointer;
   transition: all 0.2s ease;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .btn-edit {

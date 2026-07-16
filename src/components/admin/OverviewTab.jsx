@@ -419,10 +419,11 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
                             <button
                               onClick={() => triggerPoolUpdate(game)}
                               className="action-row-btn btn-edit"
-                              style={{ width: 'auto', padding: '0.35rem 0.75rem', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                              style={{ width: 'auto', padding: '0.4rem 0.75rem', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}
                               title="Update Remaining Pool & Link"
                             >
-                              <i className="fa-solid fa-pen-to-square"></i> Update Pool
+                              <i className="fa-solid fa-pen-to-square"></i>
+                              <span>Update Pool</span>
                             </button>
                           );
                         }
