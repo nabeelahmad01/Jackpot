@@ -2186,11 +2186,33 @@ select option {
 
 .admin-main-workspace {
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden;
   min-height: 100vh;
   padding: 2rem;
   display: flex;
   flex-direction: column;
+  min-width: 0;
+}
+
+.admin-workspace-scroll {
+  flex: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-height: 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-main-workspace--support {
+  overflow: hidden;
+  height: 100vh;
+  max-height: 100vh;
+}
+
+.admin-main-workspace--support .admin-workspace-scroll {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .admin-mobile-header {
@@ -2240,6 +2262,57 @@ select option {
     padding-right: 1rem !important;
     padding-bottom: 1.5rem !important;
     min-height: calc(100vh - 56px);
+    min-height: calc(100dvh - 56px);
+  }
+
+  .admin-main-workspace--support {
+    height: calc(100vh - 56px);
+    height: calc(100dvh - 56px);
+    max-height: calc(100vh - 56px);
+    max-height: calc(100dvh - 56px);
+    padding-bottom: 1rem !important;
+  }
+
+  .modal-backdrop-custom,
+  .panel-modal-overlay {
+    padding-top: calc(56px + 1rem);
+    padding-bottom: 2rem;
+  }
+
+  .modal-content {
+    width: min(100%, 400px);
+    max-height: none;
+  }
+
+  .support-chat-layout {
+    grid-template-columns: 1fr;
+    min-height: calc(100vh - 56px - 4rem);
+    min-height: calc(100dvh - 56px - 4rem);
+    max-height: none;
+  }
+
+  .support-chat-layout.support-chat-layout--active .support-chat-sidebar {
+    display: none;
+  }
+
+  .support-chat-layout.support-chat-layout--active .support-chat-window {
+    display: flex;
+    min-height: calc(100vh - 56px - 5rem);
+    min-height: calc(100dvh - 56px - 5rem);
+  }
+
+  .support-chat-back-btn {
+    display: inline-flex;
+  }
+
+  .support-chat-header .close-modal {
+    font-size: 0.75rem !important;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 0.35rem 0.75rem !important;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.02);
+    color: #fff;
+    line-height: 1.2;
   }
 
   .admin-sidebar-overlay {
@@ -2479,6 +2552,71 @@ select option {
   grid-template-columns: 1.2fr 0.8fr;
   gap: 1.5rem;
   align-items: start;
+}
+
+.support-chat-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) 1fr;
+  gap: 1rem;
+  height: 100%;
+  min-height: 520px;
+  max-height: 100%;
+  align-items: stretch;
+  animation: fade-in 0.2s ease-out;
+}
+
+.support-chat-sidebar,
+.support-chat-window {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  overflow: hidden;
+  min-height: 0;
+  min-width: 0;
+}
+
+.support-chat-window {
+  background: #07090f;
+}
+
+.support-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 1rem 0;
+  padding-right: 0.25rem;
+  min-height: 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+.support-chat-header {
+  padding: 0.75rem 1rem;
+  background: #0b0d16;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin: -1rem -1rem 0 -1rem;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  flex-wrap: wrap;
+}
+
+.support-chat-back-btn {
+  display: none;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .admin-section-card,
@@ -2809,19 +2947,48 @@ select option {
    MODALS AND LOADER OVERLAYS
    ========================================================================= */
 
-.modal-backdrop-custom {
+.modal-backdrop-custom,
+.panel-modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
+  inset: 0;
   width: 100%;
-  height: 100%;
+  min-height: 100%;
+  min-height: 100dvh;
   background: rgba(3, 4, 9, 0.85);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  z-index: 9999;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  z-index: 1100;
+  padding: 1.5rem 1rem;
+  box-sizing: border-box;
+}
+
+.panel-modal-dialog {
+  background: var(--bg-secondary, #0b0d16);
+  border: 1px solid var(--border-muted, rgba(255, 255, 255, 0.08));
+  border-radius: 12px;
+  width: min(100%, 420px);
+  max-width: 100%;
+  margin: auto;
+  flex-shrink: 0;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  animation: modal-fade-in 0.3s ease-out forwards;
+}
+
+.panel-modal-dialog--wide {
+  width: min(100%, 560px);
+}
+
+.panel-modal-dialog--proof {
+  width: min(100%, 900px);
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 dialog {

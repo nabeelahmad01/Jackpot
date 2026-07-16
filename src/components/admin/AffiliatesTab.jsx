@@ -1,5 +1,6 @@
 'use client';
 
+import PanelModalBackdrop from '../PanelModalBackdrop';
 import React, { useState } from 'react';
 import useSWR from 'swr';
 
@@ -425,7 +426,7 @@ export default function AffiliatesTab() {
 
       {/* 3. REFERRED PLAYERS VIEW MODAL */}
       {viewingAgentPlayers && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+        <PanelModalBackdrop className="panel-modal-overlay">
           <div className="section-card" style={{ width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid rgba(255,215,0,0.3)', boxShadow: 'var(--gold-box-shadow)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.75rem' }}>
               <div>
@@ -486,12 +487,12 @@ export default function AffiliatesTab() {
               </div>
             )}
           </div>
-        </div>
+        </PanelModalBackdrop>
       )}
 
       {/* 4. TEAM MEMBERS VIEW MODAL */}
       {viewingTeamMembers && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+        <PanelModalBackdrop className="panel-modal-overlay">
           <div className="section-card" style={{ width: '100%', maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid rgba(168,85,247,0.3)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.75rem' }}>
               <div>
@@ -549,7 +550,7 @@ export default function AffiliatesTab() {
               </div>
             )}
           </div>
-        </div>
+        </PanelModalBackdrop>
       )}
 
     </div>

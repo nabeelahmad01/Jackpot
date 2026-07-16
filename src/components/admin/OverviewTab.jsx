@@ -1,4 +1,5 @@
 import React from 'react';
+import PanelModalBackdrop from '../PanelModalBackdrop';
 import useSWR from 'swr';
 import usePollingSWR from '../../hooks/usePollingSWR';
 import { POLL } from '../../lib/pollingConfig';
@@ -441,30 +442,11 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
 
       {/* Update Pool Modal */}
       {updateModalOpen && selectedGame && (
-        <div 
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.85)',
-            zIndex: 99999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '1.5rem',
-            animation: 'fade-in 0.2s ease-out'
-          }}
-        >
-          <div 
-            style={{
-              background: '#0a0d16',
-              border: '1.5px solid var(--gold-primary)',
-              borderRadius: '16px',
-              maxWidth: '480px',
-              width: '100%',
-              padding: '1.5rem',
-              boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
-              position: 'relative'
-            }}
+        <PanelModalBackdrop className="panel-modal-overlay">
+          <div
+            className="panel-modal-dialog"
+            style={{ border: '1.5px solid var(--gold-primary)', padding: '1.5rem' }}
+            onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <h3 style={{ fontSize: '1rem', fontWeight: 'bold', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -545,7 +527,7 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
               </div>
             </form>
           </div>
-        </div>
+        </PanelModalBackdrop>
       )}
     </div>
   );

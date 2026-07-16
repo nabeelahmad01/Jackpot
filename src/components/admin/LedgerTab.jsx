@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import PanelModalBackdrop from '../PanelModalBackdrop';
 import usePollingSWR from '../../hooks/usePollingSWR';
 import { POLL } from '../../lib/pollingConfig';
 import { parseRoles } from '../../lib/staffGameAccess';
@@ -511,7 +512,7 @@ export default function LedgerTab({
       )}
       {/* PROCESSING WITHDRAWAL PAYOUT MODAL */}
       {payoutModalOpen && selectedPayoutTx && (
-        <div className="modal-backdrop-custom" onClick={() => setPayoutModalOpen(false)}>
+        <PanelModalBackdrop onClick={() => setPayoutModalOpen(false)}>
           <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '460px', width: '90%' }}>
             <div className="modal-header">
               <h3>
@@ -692,7 +693,7 @@ export default function LedgerTab({
               </form>
             </div>
           </div>
-        </div>
+        </PanelModalBackdrop>
       )}
     </section>
   );

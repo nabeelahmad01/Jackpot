@@ -1,5 +1,6 @@
 'use client';
 
+import PanelModalBackdrop from './PanelModalBackdrop';
 import React, { useState, useEffect, useRef } from 'react';
 
 // --- A) CUSTOMER SUPPORT MODAL ---
@@ -96,7 +97,7 @@ export function SupportModal({ isOpen, onClose, currentUser }) {
   if (!isOpen) return null;
 
   return (
-    <div className="modal-backdrop-custom" onClick={onClose}>
+    <PanelModalBackdrop onClick={onClose}>
       <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px', height: '550px', display: 'flex', flexDirection: 'column' }}>
         <div className="modal-header" style={{ padding: '1rem 1.25rem' }}>
           <h3 style={{ fontSize: '1.05rem', fontWeight: 'bold' }}>
@@ -237,7 +238,7 @@ export function SupportModal({ isOpen, onClose, currentUser }) {
           </form>
         </div>
       </div>
-    </div>
+    </PanelModalBackdrop>
   );
 }
 
@@ -246,7 +247,7 @@ export function GoogleWarningModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
-    <div className="modal-backdrop-custom" onClick={onClose}>
+    <PanelModalBackdrop onClick={onClose}>
       <div className="modal-content border-red" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>
@@ -268,7 +269,7 @@ export function GoogleWarningModal({ isOpen, onClose }) {
           </button>
         </div>
       </div>
-    </div>
+    </PanelModalBackdrop>
   );
 }
 
@@ -361,7 +362,7 @@ export function AdminGameModal({ isOpen, onClose, onSave, editGame }) {
   };
 
   return (
-    <div className="modal-backdrop-custom" onClick={onClose}>
+    <PanelModalBackdrop onClick={onClose}>
       <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>
@@ -461,7 +462,7 @@ export function AdminGameModal({ isOpen, onClose, onSave, editGame }) {
           </form>
         </div>
       </div>
-    </div>
+    </PanelModalBackdrop>
   );
 }
 
@@ -470,7 +471,7 @@ export function PaymentMethodModal({ isOpen, onClose, amount, gateways = [], onS
   if (!isOpen) return null;
 
   return (
-    <div className="modal-backdrop-custom" onClick={onClose}>
+    <PanelModalBackdrop onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px' }}>
         <div className="modal-header" style={{ borderBottom: 'none', paddingBottom: '0.25rem' }}>
           <h3 style={{ textTransform: 'uppercase', fontSize: '0.85rem', letterSpacing: '0.05em' }}>
@@ -528,7 +529,7 @@ export function PaymentMethodModal({ isOpen, onClose, amount, gateways = [], onS
           </div>
         </div>
       </div>
-    </div>
+    </PanelModalBackdrop>
   );
 }
 
@@ -592,7 +593,7 @@ export function ApproveAccountModal({ isOpen, onClose, onApprove, requestDetails
   };
 
   return (
-    <div className="modal-backdrop-custom" onClick={onClose}>
+    <PanelModalBackdrop onClick={onClose}>
       <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>
@@ -645,7 +646,7 @@ export function ApproveAccountModal({ isOpen, onClose, onApprove, requestDetails
           </form>
         </div>
       </div>
-    </div>
+    </PanelModalBackdrop>
   );
 }
 
@@ -790,7 +791,7 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
   };
 
   return (
-    <div className="modal-backdrop-custom" onClick={onClose}>
+    <PanelModalBackdrop onClick={onClose}>
       <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()} style={{ overflowY: 'auto', maxHeight: '90vh', maxWidth: '480px', width: '92%' }}>
         <div className="modal-header">
           <h3>
@@ -974,7 +975,7 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
           </form>
         </div>
       </div>
-    </div>
+    </PanelModalBackdrop>
   );
 }
 
@@ -983,7 +984,7 @@ export function ViewProofModal({ isOpen, onClose, proofUrl }) {
   if (!isOpen) return null;
 
   return (
-    <div className="modal-backdrop-custom" onClick={onClose}>
+    <PanelModalBackdrop onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px', border: '1px solid var(--gold-primary)' }}>
         <div className="modal-header">
           <h3>
@@ -1013,7 +1014,7 @@ export function ViewProofModal({ isOpen, onClose, proofUrl }) {
           </button>
         </div>
       </div>
-    </div>
+    </PanelModalBackdrop>
   );
 }
 
@@ -1062,7 +1063,7 @@ export function AdjustBalanceModal({ isOpen, onClose, onAdjust, user }) {
   };
 
   return (
-    <div className="modal-backdrop-custom" onClick={onClose}>
+    <PanelModalBackdrop onClick={onClose}>
       <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', width: '90%' }}>
         <div className="modal-header">
           <h3>
@@ -1153,7 +1154,7 @@ export function AdjustBalanceModal({ isOpen, onClose, onAdjust, user }) {
           </form>
         </div>
       </div>
-    </div>
+    </PanelModalBackdrop>
   );
 }
 
@@ -1194,7 +1195,7 @@ export function AdminResetPasswordModal({ isOpen, onClose, onReset, user }) {
   };
 
   return (
-    <div className="modal-backdrop-custom" onClick={onClose}>
+    <PanelModalBackdrop onClick={onClose}>
       <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', width: '90%' }}>
         <div className="modal-header">
           <h3>
@@ -1233,6 +1234,6 @@ export function AdminResetPasswordModal({ isOpen, onClose, onReset, user }) {
           </form>
         </div>
       </div>
-    </div>
+    </PanelModalBackdrop>
   );
 }

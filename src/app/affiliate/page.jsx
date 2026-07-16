@@ -7,6 +7,7 @@ import { POLL } from '../../lib/pollingConfig';
 import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 
 import { SupportModal, GoogleWarningModal } from '../../components/Modals';
+import PanelModalBackdrop from '../../components/PanelModalBackdrop';
 import ParticlesBackground from '../../components/ParticlesBackground';
 import RemainderClaimAction from '../../components/RemainderClaimAction';
 import { canShowClaimRemainderButton } from '../../lib/remainderClaim';
@@ -808,7 +809,8 @@ function AffiliatePortal() {
       </aside>
 
       {/* MAIN CONTENT AREA */}
-      <main className="admin-main-workspace" style={{ overflowY: 'auto' }}>
+      <main className="admin-main-workspace">
+      <div className="admin-workspace-scroll">
 
         {/* ============== DASHBOARD TAB ============== */}
         {activeTab === 'dashboard' && (
@@ -1181,8 +1183,8 @@ function AffiliatePortal() {
             </div>
 
             {viewPlayersModal && (
-              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', backdropFilter: 'blur(6px)' }}>
-                <div style={{ background: '#0b0d16', borderRadius: '16px', border: '1px solid rgba(168,85,247,0.25)', padding: '1.5rem', width: '100%', maxWidth: '700px', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
+              <PanelModalBackdrop className="panel-modal-overlay" onClick={() => setViewPlayersModal(null)}>
+                <div className="panel-modal-dialog panel-modal-dialog--wide" style={{ padding: '1.5rem', border: '1px solid rgba(168,85,247,0.25)', maxHeight: '85vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
                     <div>
                       <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: 0 }}>Players — {viewPlayersModal.name}</h3>
@@ -1214,7 +1216,7 @@ function AffiliatePortal() {
                     </div>
                   )}
                 </div>
-              </div>
+              </PanelModalBackdrop>
             )}
           </div>
         )}
@@ -1952,6 +1954,8 @@ function AffiliatePortal() {
             </div>
           </div>
         )}
+
+      </div>
 
       {agentSession && !supportOpen && (
         <button

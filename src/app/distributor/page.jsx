@@ -14,6 +14,7 @@ import RemainderClaimAction from '../../components/RemainderClaimAction';
 import { canShowClaimRemainderButton } from '../../lib/remainderClaim';
 import { filterGamesForStaff } from '../../lib/staffGameAccess';
 import { SupportModal } from '../../components/Modals';
+import PanelModalBackdrop from '../../components/PanelModalBackdrop';
 import ParticlesBackground from '../../components/ParticlesBackground';
 import { initAudioUnlock, playNotificationSound } from '../../lib/notificationSound';
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
@@ -1463,7 +1464,8 @@ export default function DistributorPortal() {
       </aside>
 
       {/* PORTAL BODY CONTAINER */}
-      <main className="admin-main-workspace" style={{ overflowY: 'auto' }}>
+      <main className={`admin-main-workspace${activeTab === 'support' ? ' admin-main-workspace--support' : ''}`}>
+      <div className="admin-workspace-scroll">
         
         {/* TAB: TRANSACTION LOGS */}
         {activeTab === 'tx_logs' && (
@@ -2513,13 +2515,11 @@ export default function DistributorPortal() {
             </div>
 
             {editingStaffMember && (
-              <div
-                onClick={() => setEditingStaffMember(null)}
-                style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}
-              >
+              <PanelModalBackdrop onClick={() => setEditingStaffMember(null)}>
                 <div
+                  className="panel-modal-dialog"
                   onClick={(e) => e.stopPropagation()}
-                  style={{ background: '#0b0d16', border: '1px solid rgba(255,215,0,0.25)', borderRadius: '12px', padding: '1.25rem', width: '100%', maxWidth: '400px', maxHeight: '90vh', overflowY: 'auto' }}
+                  style={{ padding: '1.25rem', border: '1px solid rgba(255,215,0,0.25)', maxHeight: '90vh', overflowY: 'auto' }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                     <h3 style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--gold-primary)' }}>Edit Staff Member</h3>
@@ -2578,7 +2578,7 @@ export default function DistributorPortal() {
                     </button>
                   </form>
                 </div>
-              </div>
+              </PanelModalBackdrop>
             )}
           </div>
         )}
@@ -2625,24 +2625,11 @@ export default function DistributorPortal() {
           />
         )}
 
+      </div>
+
       {proofModalUrl && (
-        <div 
-          onClick={() => setProofModalUrl('')}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.85)',
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer'
-          }}
-        >
-          <div style={{ position: 'relative', maxWidth: '90%', maxHeight: '90%' }} onClick={(e) => e.stopPropagation()}>
+        <PanelModalBackdrop onClick={() => setProofModalUrl('')} className="panel-modal-overlay" style={{ cursor: 'pointer' }}>
+          <div className="panel-modal-dialog panel-modal-dialog--proof" style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
             {proofModalUrl === 'LOADING' ? (
               <div style={{ padding: '3rem', textAlign: 'center', background: '#0e111d', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '2.5rem', color: 'var(--gold-primary)', marginBottom: '1rem', display: 'block' }}></i>
@@ -2667,13 +2654,13 @@ export default function DistributorPortal() {
               &times;
             </button>
           </div>
-        </div>
+        </PanelModalBackdrop>
       )}
 
       {/* MODAL: REGISTER PLAYER */}
       {regModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: '#0b0d16', padding: '2rem', borderRadius: '12px', border: '1px solid var(--gold-primary)', width: '380px', maxWidth: '90%' }}>
+        <PanelModalBackdrop className="panel-modal-overlay">
+          <div className="panel-modal-dialog" style={{ padding: '2rem', border: '1px solid var(--gold-primary)' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 'bold' }}><i className="fa-solid fa-user-plus gold-text"></i> Register New Player</h3>
               <button onClick={() => setRegModalOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.5rem', cursor: 'pointer' }}>&times;</button>
@@ -2721,13 +2708,13 @@ export default function DistributorPortal() {
               </button>
             </form>
           </div>
-        </div>
+        </PanelModalBackdrop>
       )}
 
       {/* MODAL: RESET PASSWORD */}
       {resetModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: '#0b0d16', padding: '2rem', borderRadius: '12px', border: '1px solid var(--gold-primary)', width: '380px', maxWidth: '90%' }}>
+        <PanelModalBackdrop className="panel-modal-overlay">
+          <div className="panel-modal-dialog" style={{ padding: '2rem', border: '1px solid var(--gold-primary)' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 'bold' }}><i className="fa-solid fa-key gold-text"></i> Reset Player Password</h3>
               <button onClick={() => setResetModalOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.5rem', cursor: 'pointer' }}>&times;</button>
@@ -2756,13 +2743,13 @@ export default function DistributorPortal() {
               </button>
             </form>
           </div>
-        </div>
+        </PanelModalBackdrop>
       )}
 
       {/* MODAL: UPDATE POOL */}
       {poolUpdateModalOpen && selectedPoolGame && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', animation: 'fade-in 0.2s ease-out' }}>
-          <div style={{ background: '#0a0d16', border: '1.5px solid var(--gold-primary)', borderRadius: '16px', maxWidth: '440px', width: '100%', padding: '1.5rem', boxShadow: '0 10px 30px rgba(0,0,0,0.5)', position: 'relative', margin: 'auto' }}>
+        <PanelModalBackdrop className="panel-modal-overlay">
+          <div className="panel-modal-dialog" style={{ border: '1.5px solid var(--gold-primary)', padding: '1.5rem' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <h3 style={{ fontSize: '1rem', fontWeight: 'bold', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <i className="fa-solid fa-pen-to-square text-gold" style={{ color: 'var(--gold-primary)' }}></i>
@@ -2817,7 +2804,7 @@ export default function DistributorPortal() {
               </div>
             </form>
           </div>
-        </div>
+        </PanelModalBackdrop>
       )}
 
       {distSession && !supportOpen && (

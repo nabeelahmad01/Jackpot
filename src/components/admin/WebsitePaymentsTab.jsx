@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import PanelModalBackdrop from '../PanelModalBackdrop';
 import usePollingSWR from '../../hooks/usePollingSWR';
 import { POLL } from '../../lib/pollingConfig';
 
@@ -538,7 +539,7 @@ export default function WebsitePaymentsTab({
 
       {/* PROCESS OUTGOING PAYOUT MODAL */}
       {payoutModalOpen && selectedTx && (
-        <div className="modal-backdrop-custom" onClick={() => setPayoutModalOpen(false)}>
+        <PanelModalBackdrop onClick={() => setPayoutModalOpen(false)}>
           <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', width: '90%' }}>
             <div className="modal-header">
               <h3><i className="fa-solid fa-paper-plane gold-text"></i> Process Outgoing Payout</h3>
@@ -636,7 +637,7 @@ export default function WebsitePaymentsTab({
               </form>
             </div>
           </div>
-        </div>
+        </PanelModalBackdrop>
       )}
     </section>
   );

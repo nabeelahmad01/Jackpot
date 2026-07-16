@@ -1,5 +1,6 @@
 'use client';
 
+import PanelModalBackdrop from '../PanelModalBackdrop';
 import React, { useState, useEffect } from 'react';
 import usePollingSWR from '../../hooks/usePollingSWR';
 import { POLL } from '../../lib/pollingConfig';
@@ -420,7 +421,7 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
       )}
       {/* ADD ACCOUNT / ALLOT CREDENTIALS MANUALLY MODAL */}
       {addAccountModalOpen && (
-        <div className="modal-backdrop-custom" onClick={() => setAddAccountModalOpen(false)}>
+        <PanelModalBackdrop onClick={() => setAddAccountModalOpen(false)}>
           <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px', width: '95%' }}>
             <div className="modal-header">
               <h3>
@@ -577,7 +578,7 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
               </form>
             </div>
           </div>
-        </div>
+        </PanelModalBackdrop>
       )}
     </section>
   );

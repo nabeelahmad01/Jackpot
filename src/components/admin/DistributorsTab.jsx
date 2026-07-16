@@ -1,5 +1,6 @@
 'use client';
 
+import PanelModalBackdrop from '../PanelModalBackdrop';
 import React, { useState } from 'react';
 import useSWR from 'swr';
 
@@ -384,7 +385,7 @@ export default function DistributorsTab() {
 
       {/* 3) EDIT DISTRIBUTOR MODAL */}
       {editingDist && (
-        <div className="modal-backdrop-custom" onClick={() => setEditingDist(null)}>
+        <PanelModalBackdrop onClick={() => setEditingDist(null)}>
           <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px' }}>
             <div className="modal-header">
               <h3><i className="fa-solid fa-user-gear gold-text"></i> Edit Distributor Details</h3>
@@ -482,12 +483,12 @@ export default function DistributorsTab() {
               </form>
             </div>
           </div>
-        </div>
+        </PanelModalBackdrop>
       )}
 
       {/* 4) REFERRED PLAYERS LIST MODAL */}
       {viewingPlayersDist && (
-        <div className="modal-backdrop-custom" onClick={() => setViewingPlayersDist(null)}>
+        <PanelModalBackdrop onClick={() => setViewingPlayersDist(null)}>
           <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '560px' }}>
             <div className="modal-header">
               <h3>
@@ -534,7 +535,7 @@ export default function DistributorsTab() {
               )}
             </div>
           </div>
-        </div>
+        </PanelModalBackdrop>
       )}
 
     </div>

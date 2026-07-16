@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import PanelModalBackdrop from '../PanelModalBackdrop';
 import useSWR from 'swr';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
@@ -461,7 +462,7 @@ export default function StaffTab({ adminUser, onCreateAdmin, onDeleteUser }) {
 
       {/* 3) EDIT STAFF MODAL OVERLAY */}
       {editingStaff && (
-        <div className="modal-backdrop-custom" onClick={() => setEditingStaff(null)}>
+        <PanelModalBackdrop onClick={() => setEditingStaff(null)}>
           <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px' }}>
             <div className="modal-header">
               <h3><i className="fa-solid fa-user-gear gold-text"></i> Edit Staff Member</h3>
@@ -547,7 +548,7 @@ export default function StaffTab({ adminUser, onCreateAdmin, onDeleteUser }) {
               </form>
             </div>
           </div>
-        </div>
+        </PanelModalBackdrop>
       )}
     </div>
   );

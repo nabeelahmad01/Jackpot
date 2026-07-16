@@ -267,9 +267,19 @@ export async function POST(req) {
 
     // Retrieve player's profile to extract distributor information
     const userDoc = await db.collection('users').findOne({ email: userEmail.toLowerCase().trim() });
-    const distId = userDoc ? (userDoc.distributorId || '') : '';
+    let distId = userDoc ? (userDoc.distributorId || '') : '';
     let distType = '';
     let distName = '';
+
+    // Inherit distributor from referrer when player was referred by another player under a distributor
+    if (!distId && userDoc?.referredBy) {
+      const referrer = await db.collection('users').findOne({
+        email: userDoc.referredBy.toLowerCase().trim()
+      });
+      if (referrer?.distributorId) {
+        distId = referrer.distributorId;
+      }
+    }
 
     if (distId) {
       const distributor = await db.collection('distributors').findOne({ id: distId });
@@ -277,6 +287,14 @@ export async function POST(req) {
         distType = distributor.type || 'A';
         distName = distributor.name || '';
       }
+    }
+
+    // Backfill distributorId on user profile when inherited from referrer
+    if (userDoc && distId && !userDoc.distributorId) {
+      await db.collection('users').updateOne(
+        { email: userEmail.toLowerCase().trim() },
+        { $set: { distributorId: distId } }
+      );
     }
 
     const newRequest = {

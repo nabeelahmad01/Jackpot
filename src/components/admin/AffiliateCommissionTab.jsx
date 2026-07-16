@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import PanelModalBackdrop from '../PanelModalBackdrop';
 import usePollingSWR from '../../hooks/usePollingSWR';
 import { POLL } from '../../lib/pollingConfig';
 import { parseAffiliatePayoutFields } from '../../lib/affiliatePayout';
@@ -287,7 +288,7 @@ export default function AffiliateCommissionTab({
       {payoutModalOpen && selectedTx && (() => {
         const payout = parseAffiliatePayoutFields(selectedTx);
         return (
-        <div className="modal-backdrop-custom" onClick={() => setPayoutModalOpen(false)}>
+        <PanelModalBackdrop onClick={() => setPayoutModalOpen(false)}>
           <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px', width: '92%' }}>
             <div className="modal-header">
               <h3><i className="fa-solid fa-paper-plane gold-text"></i> Process Affiliate Payout</h3>
@@ -353,7 +354,7 @@ export default function AffiliateCommissionTab({
               </form>
             </div>
           </div>
-        </div>
+        </PanelModalBackdrop>
         );
       })()}
     </section>

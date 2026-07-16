@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import PanelModalBackdrop from '../PanelModalBackdrop';
 import useSWR from 'swr';
 import { AdjustBalanceModal, AdminResetPasswordModal } from '../Modals';
 
@@ -397,7 +398,7 @@ export default function PlayerAccountsTab({ adminUser, onDeleteUser }) {
 
       {/* INSPECTED PLAYER HISTORY OVERLAY MODAL */}
       {inspectedUser && (
-        <div className="modal-backdrop-custom" onClick={() => setInspectedUser(null)}>
+        <PanelModalBackdrop onClick={() => setInspectedUser(null)}>
           <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '680px', width: '90%' }}>
             <div className="modal-header">
               <h3>
@@ -506,11 +507,11 @@ export default function PlayerAccountsTab({ adminUser, onDeleteUser }) {
               )}
             </div>
           </div>
-        </div>
+        </PanelModalBackdrop>
       )}
       {/* MANUAL REGISTER PLAYER MODAL */}
       {registerModalOpen && (
-        <div className="modal-backdrop-custom" onClick={resetRegisterForm}>
+        <PanelModalBackdrop onClick={resetRegisterForm}>
           <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', width: '90%' }}>
             <div className="modal-header">
               <h3>
@@ -608,7 +609,7 @@ export default function PlayerAccountsTab({ adminUser, onDeleteUser }) {
               )}
             </div>
           </div>
-        </div>
+        </PanelModalBackdrop>
       )}
 
 

@@ -906,7 +906,8 @@ export default function AdminDashboard({
       </aside>
 
       {/* Main Content Workspace Wrapper */}
-      <main className="admin-main-workspace" style={activeTab === 'support' ? { overflowY: 'hidden', height: '100vh' } : {}}>
+      <main className={`admin-main-workspace${activeTab === 'support' ? ' admin-main-workspace--support' : ''}`}>
+        <div className="admin-workspace-scroll">
         <TabErrorBoundary onBack={() => setActiveTab('dashboard')}>
         <Suspense fallback={
           <div style={{ padding: '2rem', textAlign: 'center', opacity: 0.5 }}>
@@ -1015,6 +1016,7 @@ export default function AdminDashboard({
           </AnimatePresence>
         </Suspense>
         </TabErrorBoundary>
+        </div>
       </main>
     </div>
   );
