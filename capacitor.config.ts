@@ -10,13 +10,8 @@ const config: CapacitorConfig = {
     url: 'https://jackpotroyals.com/',
     cleartext: false,
     androidScheme: 'https',
-    allowNavigation: [
-      'jackpotroyals.com',
-      '*.jackpotroyals.com',
-      'accounts.google.com',
-      '*.google.com',
-      '*.googleusercontent.com'
-    ],
+    // Keep Google off this list so OAuth opens in the system browser (works on already-installed APKs).
+    allowNavigation: ['jackpotroyals.com', '*.jackpotroyals.com'],
     errorPath: 'offline.html'
   },
   plugins: {

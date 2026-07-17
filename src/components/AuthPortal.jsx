@@ -98,8 +98,40 @@ export default function AuthPortal({
     finishGoogleLogin(ticketData);
   };
 
+  const googlePollRef = useRef(null);
+
+  const openGoogleAuthUrl = async (url) => {
+    // Prefer Browser plugin when present; otherwise navigate — Capacitor opens Google
+    // in the system browser (not allowlisted) and keeps the app WebView on login.
+    try {
+      if (window.Capacitor?.isPluginAvailable?.('Browser')) {
+        const { Browser } = await import('@capacitor/browser');
+        await Browser.open({ url, presentationStyle: 'popover' });
+        return;
+      }
+    } catch {
+      // Older APKs without Browser plugin.
+    }
+    window.location.assign(url);
+  };
+
   const startNativeGoogleLogin = async () => {
-    const { Browser } = await import('@capacitor/browser');
+    if (googlePollRef.current) {
+      window.clearInterval(googlePollRef.current);
+      googlePollRef.current = null;
+    }
+
+    const sessionRes = await fetch('/api/auth/google/ticket', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'session' })
+    });
+    const sessionData = await sessionRes.json();
+    if (!sessionRes.ok || !sessionData.sid) {
+      throw new Error(sessionData.message || 'Could not start Google sign-in.');
+    }
+
+    const sid = sessionData.sid;
     const redirectUri = `${window.location.origin}/auth/google/callback`;
     const params = new URLSearchParams({
       client_id: googleClientId,
@@ -107,13 +139,52 @@ export default function AuthPortal({
       response_type: 'token',
       scope: 'openid email profile',
       include_granted_scopes: 'true',
-      prompt: 'select_account'
+      prompt: 'select_account',
+      state: sid
     });
-    showToast('Opening Google sign-in…', 'info');
-    await Browser.open({
-      url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`,
-      presentationStyle: 'popover'
-    });
+
+    showToast('Complete Google sign-in, then return to the app.', 'info');
+    await openGoogleAuthUrl(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+
+    const startedAt = Date.now();
+    googlePollRef.current = window.setInterval(async () => {
+      if (Date.now() - startedAt > 10 * 60 * 1000) {
+        window.clearInterval(googlePollRef.current);
+        googlePollRef.current = null;
+        showToast('Google sign-in timed out. Please try again.', 'error');
+        return;
+      }
+
+      try {
+        const pollRes = await fetch(`/api/auth/google/ticket?sid=${encodeURIComponent(sid)}`, {
+          cache: 'no-store'
+        });
+        const pollData = await pollRes.json();
+        if (!pollRes.ok) {
+          if (pollRes.status === 404) {
+            window.clearInterval(googlePollRef.current);
+            googlePollRef.current = null;
+            showToast(pollData.message || 'Google sign-in expired.', 'error');
+          }
+          return;
+        }
+        if (pollData.status === 'ready' && pollData.user) {
+          window.clearInterval(googlePollRef.current);
+          googlePollRef.current = null;
+          try {
+            if (window.Capacitor?.isPluginAvailable?.('Browser')) {
+              const { Browser } = await import('@capacitor/browser');
+              await Browser.close();
+            }
+          } catch {
+            // Older APKs / already-closed browser.
+          }
+          triggerLoading(1000, () => finishGoogleLogin(pollData));
+        }
+      } catch (err) {
+        console.error('Google session poll failed:', err);
+      }
+    }, 1500);
   };
 
   const handleGoogleClick = () => {
@@ -160,63 +231,29 @@ export default function AuthPortal({
     loginWithGoogle();
   };
 
-  // Native deep-link + query ticket return from Google Custom Tab
+  // Query ticket return (web fallback) — no APK update required
   useEffect(() => {
-    let appListener;
-    let browserListener;
-
-    const takeTicket = async (ticket) => {
-      if (!ticket) return;
-      triggerLoading(1200, async () => {
-        try {
-          await redeemGoogleTicket(ticket);
-        } catch (err) {
-          showToast(err.message || 'Could not finish Google sign-in.', 'error');
-        }
-      });
-    };
-
     const fromQuery = new URLSearchParams(window.location.search).get('google_ticket');
-    if (fromQuery) {
-      const cleanUrl = window.location.pathname;
-      window.history.replaceState({}, '', cleanUrl);
-      takeTicket(fromQuery);
-    }
-
-    (async () => {
-      if (!isNativeApp()) return;
+    if (!fromQuery) return;
+    const cleanUrl = window.location.pathname;
+    window.history.replaceState({}, '', cleanUrl);
+    triggerLoading(1200, async () => {
       try {
-        const [{ App }, { Browser }] = await Promise.all([
-          import('@capacitor/app'),
-          import('@capacitor/browser')
-        ]);
-        appListener = await App.addListener('appUrlOpen', async ({ url }) => {
-          try {
-            const parsed = new URL(url.replace(/^com\.jackpotroyals\.app:/, 'https://app.local'));
-            const ticket = parsed.searchParams.get('ticket');
-            if (ticket) {
-              try {
-                await Browser.close();
-              } catch {
-                // Browser may already be closed.
-              }
-              await takeTicket(ticket);
-            }
-          } catch (err) {
-            console.error('OAuth deep link parse failed:', err);
-          }
-        });
-        browserListener = await Browser.addListener('browserFinished', () => {});
+        await redeemGoogleTicket(fromQuery);
       } catch (err) {
-        console.error('Native Google listeners failed:', err);
+        showToast(err.message || 'Could not finish Google sign-in.', 'error');
       }
-    })();
-
-    return () => {
-      appListener?.remove();
-      browserListener?.remove();
-    };
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (googlePollRef.current) {
+        window.clearInterval(googlePollRef.current);
+        googlePollRef.current = null;
+      }
+    };
   }, []);
 
   const [activeTab, setActiveTab] = useState('login'); // 'login' | 'register' | 'forgot' | 'otp'

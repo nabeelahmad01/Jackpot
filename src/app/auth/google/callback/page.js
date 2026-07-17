@@ -2,9 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-const APP_SCHEME = 'com.jackpotroyals.app';
-
-async function completeGoogleFromToken(accessToken) {
+async function completeGoogleFromToken(accessToken, sid) {
   const profileRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
     headers: { Authorization: `Bearer ${accessToken}` }
   });
@@ -30,6 +28,24 @@ async function completeGoogleFromToken(accessToken) {
     throw new Error(googleData.message || 'Google sign-in failed.');
   }
 
+  if (sid) {
+    const completeRes = await fetch('/api/auth/google/ticket', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mode: 'complete',
+        sid,
+        user: googleData.user,
+        isNewUser: googleData.isNewUser
+      })
+    });
+    const completeData = await completeRes.json();
+    if (!completeRes.ok || !completeData.success) {
+      throw new Error(completeData.message || 'Could not finish Google sign-in.');
+    }
+    return { mode: 'session', sid };
+  }
+
   const ticketRes = await fetch('/api/auth/google/ticket', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -39,13 +55,11 @@ async function completeGoogleFromToken(accessToken) {
   if (!ticketRes.ok || !ticketData.ticket) {
     throw new Error(ticketData.message || 'Could not finish Google sign-in.');
   }
-
-  return ticketData.ticket;
+  return { mode: 'ticket', ticket: ticketData.ticket };
 }
 
 export default function GoogleOAuthCallbackPage() {
   const [status, setStatus] = useState('Signing you in with Google…');
-  const [ticket, setTicket] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -56,24 +70,26 @@ export default function GoogleOAuthCallbackPage() {
         const hash = window.location.hash.startsWith('#')
           ? window.location.hash.slice(1)
           : window.location.hash;
-        const params = new URLSearchParams(hash || window.location.search);
-        const accessToken = params.get('access_token');
-        const err = params.get('error');
+        const hashParams = new URLSearchParams(hash);
+        const queryParams = new URLSearchParams(window.location.search);
+        const accessToken = hashParams.get('access_token') || queryParams.get('access_token');
+        const sid = hashParams.get('state') || queryParams.get('state') || '';
+        const err = hashParams.get('error') || queryParams.get('error');
         if (err) throw new Error('Google sign-in was cancelled.');
         if (!accessToken) throw new Error('Missing Google access token.');
 
-        const nextTicket = await completeGoogleFromToken(accessToken);
+        const result = await completeGoogleFromToken(accessToken, sid);
         if (cancelled) return;
-        setTicket(nextTicket);
+
+        if (result.mode === 'session') {
+          setStatus('Signed in! Return to the Jackpot Royals app — login will finish automatically.');
+          return;
+        }
+
         setStatus('Signed in. Returning to Jackpot Royals…');
-
-        const deepLink = `${APP_SCHEME}://oauth?ticket=${encodeURIComponent(nextTicket)}`;
-        const webFallback = `${window.location.origin}/login?google_ticket=${encodeURIComponent(nextTicket)}`;
-
-        window.location.href = deepLink;
-        window.setTimeout(() => {
-          if (!cancelled) window.location.replace(webFallback);
-        }, 700);
+        window.location.replace(
+          `${window.location.origin}/login?google_ticket=${encodeURIComponent(result.ticket)}`
+        );
       } catch (err) {
         if (cancelled) return;
         setError(err.message || 'Google sign-in failed.');
@@ -104,27 +120,13 @@ export default function GoogleOAuthCallbackPage() {
         <p style={{ color: error ? '#f87171' : '#cbd5e1', marginBottom: '1.25rem' }}>
           {error || status}
         </p>
-        {ticket && !error && (
-          <a
-            href={`com.jackpotroyals.app://oauth?ticket=${encodeURIComponent(ticket)}`}
-            style={{
-              display: 'inline-block',
-              padding: '0.85rem 1.25rem',
-              borderRadius: 999,
-              background: '#f5d76e',
-              color: '#111',
-              fontWeight: 700,
-              textDecoration: 'none'
-            }}
-          >
-            Open App
-          </a>
+        {!error && (
+          <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>
+            You can close this tab and go back to the app.
+          </p>
         )}
         {error && (
-          <a
-            href="/login"
-            style={{ color: '#f5d76e', fontWeight: 600 }}
-          >
+          <a href="/login" style={{ color: '#f5d76e', fontWeight: 600 }}>
             Back to login
           </a>
         )}
