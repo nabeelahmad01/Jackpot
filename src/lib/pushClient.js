@@ -8,7 +8,10 @@ function urlBase64ToUint8Array(value) {
 let nativeActionListenerReady = false;
 
 function isNativePlatform() {
-  return typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.() === true;
+  if (typeof window === 'undefined') return false;
+  if (window.Capacitor?.isNativePlatform?.() === true) return true;
+  // Capacitor WebView UA marker from MainActivity when bridge is slow to load
+  return /JackpotRoyalsNative/i.test(navigator.userAgent || '');
 }
 
 export function supportsWebPush() {
@@ -106,12 +109,13 @@ async function subscribeToNativePush(userEmail) {
   return { nativeToken: token };
 }
 
-export async function subscribeToPromoPush(userEmail) {
-  if (isNativePlatform()) {
-    return subscribeToNativePush(userEmail);
-  }
-
-  if (!supportsWebPush()) {
+async function subscribeToWebPush(userEmail) {
+  if (
+    typeof window === 'undefined' ||
+    !('serviceWorker' in navigator) ||
+    !('PushManager' in window) ||
+    !('Notification' in window)
+  ) {
     throw new Error('Push notifications are not supported on this device.');
   }
 
@@ -150,6 +154,21 @@ export async function subscribeToPromoPush(userEmail) {
   }
 
   return subscription;
+}
+
+export async function subscribeToPromoPush(userEmail) {
+  if (isNativePlatform()) {
+    try {
+      return await subscribeToNativePush(userEmail);
+    } catch (error) {
+      const message = String(error?.message || '');
+      // Permission denied should not silently fall back.
+      if (/permission was not allowed/i.test(message)) throw error;
+      // Until Firebase is on the APK, use Web Push inside the WebView.
+    }
+  }
+
+  return subscribeToWebPush(userEmail);
 }
 
 export async function unsubscribeFromPromoPush(userEmail) {
