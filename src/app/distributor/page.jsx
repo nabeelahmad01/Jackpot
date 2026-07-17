@@ -17,6 +17,7 @@ import { SupportModal } from '../../components/Modals';
 import PanelModalBackdrop from '../../components/PanelModalBackdrop';
 import ParticlesBackground from '../../components/ParticlesBackground';
 import { initAudioUnlock, playNotificationSound } from '../../lib/notificationSound';
+import { initDesktopNotifications, notifyStaffActivity } from '../../lib/desktopNotify';
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
 export default function DistributorPortal() {
@@ -92,9 +93,10 @@ export default function DistributorPortal() {
     }
   }, [activeTab]);
 
-  // Unlock audio on first user gesture so request alert sounds are not blocked
+  // Unlock audio + prime desktop notifications on first user gesture
   useEffect(() => {
     initAudioUnlock();
+    initDesktopNotifications();
   }, []);
 
   // Referred Players tab is owner-only; redirect staff away if they land on it
@@ -368,6 +370,20 @@ export default function DistributorPortal() {
         playNotificationSound(soundUrlRef.current);
       } catch (_) {
         // never break the panel for audio
+      }
+
+      try {
+        const parts = [];
+        if (hasNewRequest) parts.push('account request');
+        if (hasNewCoin) parts.push('coins request');
+        if (hasNewLedger) parts.push('payout/ledger update');
+        notifyStaffActivity({
+          title: 'Jackpot Royals — New activity',
+          body: `New ${parts.join(', ')} received.`,
+          url: '/distributor'
+        });
+      } catch (_) {
+        // never break the panel for notifications
       }
 
       // Refresh open queue tabs instantly so lists update even if already open

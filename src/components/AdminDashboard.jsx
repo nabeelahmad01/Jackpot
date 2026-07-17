@@ -8,6 +8,7 @@ import { POLL } from '../lib/pollingConfig';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import TabErrorBoundary from './TabErrorBoundary';
 import { initAudioUnlock, playNotificationSound } from '../lib/notificationSound';
+import { initDesktopNotifications, notifyStaffActivity } from '../lib/desktopNotify';
 
 // Lazy load tab components with automatic retry on chunk failures
 const OverviewTab = lazyWithRetry(() => import('./admin/OverviewTab'));
@@ -102,9 +103,10 @@ export default function AdminDashboard({
   const alertsReadyRef = React.useRef(false);
   const soundUrlRef = React.useRef('');
 
-  // Unlock audio on first user gesture so alert sounds are not blocked by the browser
+  // Unlock audio + prime desktop notifications on first user gesture
   useEffect(() => {
     initAudioUnlock();
+    initDesktopNotifications();
   }, []);
 
   useEffect(() => {
@@ -148,6 +150,21 @@ export default function AdminDashboard({
         playNotificationSound(soundUrlRef.current);
       } catch (_) {
         // never break dashboard for audio
+      }
+      try {
+        const parts = [];
+        if (hasNewRequest) parts.push('account request');
+        if (hasNewTx) parts.push('transaction');
+        if (hasNewCoin) parts.push('coins request');
+        if (hasNewChat) parts.push('support message');
+        if (hasNewCampaign) parts.push('campaign request');
+        notifyStaffActivity({
+          title: 'Jackpot Royals — New activity',
+          body: `New ${parts.join(', ')} received.`,
+          url: '/admin'
+        });
+      } catch (_) {
+        // never break dashboard for notifications
       }
       try {
         if (hasNewRequest) mutate((key) => typeof key === 'string' && key.includes('/api/account-requests'));
