@@ -13,6 +13,7 @@ export default function FrontendSettingsTab({ adminUser }) {
   const [notificationSoundUrl, setNotificationSoundUrl] = useState('');
   const [withdrawNotice, setWithdrawNotice] = useState('');
   const [cashoutNotice, setCashoutNotice] = useState('');
+  const [androidAppUrl, setAndroidAppUrl] = useState('/downloads/jackpot-royals.apk');
   const [chimeActive, setChimeActive] = useState(true);
   const [venmoActive, setVenmoActive] = useState(true);
   const [cashappActive, setCashappActive] = useState(true);
@@ -75,6 +76,7 @@ export default function FrontendSettingsTab({ adminUser }) {
       setNotificationSoundUrl(s.notificationSoundUrl || 'https://raw.githubusercontent.com/AUTOMATIC1111/stable-diffusion-webui/master/notification.mp3');
       setWithdrawNotice(s.withdrawNotice || 'Fastest Withdrawals inside 5 Minutes!');
       setCashoutNotice(s.cashoutNotice || 'Standard cashout processing hours: 9 AM - 11 PM EST');
+      setAndroidAppUrl(s.androidAppUrl || '/downloads/jackpot-royals.apk');
       setChimeActive(s.chimeActive !== false);
       setVenmoActive(s.venmoActive !== false);
       setCashappActive(s.cashappActive !== false);
@@ -182,6 +184,7 @@ export default function FrontendSettingsTab({ adminUser }) {
           notificationSoundUrl,
           withdrawNotice,
           cashoutNotice,
+          androidAppUrl,
           chimeActive,
           venmoActive,
           cashappActive,
@@ -264,6 +267,24 @@ export default function FrontendSettingsTab({ adminUser }) {
               <i className="fa-solid fa-circle-check"></i> Frontend settings saved and synced successfully!
             </div>
           )}
+
+          <div style={{ background: '#0b0d16', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,215,0,0.18)', marginBottom: '1.5rem' }}>
+            <h4 style={{ fontSize: '0.8rem', color: '#fff', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.75rem' }}>
+              Mobile App Download
+            </h4>
+            <div className="input-group" style={{ margin: 0 }}>
+              <label>Android APK URL</label>
+              <div className="input-wrapper" style={{ background: '#07090f' }}>
+                <i className="fa-brands fa-android input-icon"></i>
+                <input
+                  type="text"
+                  value={androidAppUrl}
+                  onChange={(event) => setAndroidAppUrl(event.target.value)}
+                  placeholder="/downloads/jackpot-royals.apk"
+                />
+              </div>
+            </div>
+          </div>
 
           {/* Lobby Homepage — matches live hero layout */}
           <div style={{ background: '#0b0d16', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1.5rem' }}>

@@ -139,6 +139,9 @@ async function seedRealMongo(db) {
     await db.collection('supportMessages').createIndex({ userEmail: 1 });
     await db.collection('supportMessages').createIndex({ timestamp: 1 });
 
+    await db.collection('pushSubscriptions').createIndex({ endpoint: 1 }, { unique: true });
+    await db.collection('pushSubscriptions').createIndex({ userEmail: 1 });
+
     await db.collection('games').createIndex({ id: 1 }, { unique: true });
     await db.collection('gateways').createIndex({ id: 1 }, { unique: true });
 

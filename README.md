@@ -93,3 +93,58 @@ The administrator and player accounts are pre-configured:
    npm run dev
    ```
 3. Open `http://localhost:3000` (Player view) or `http://localhost:3000/admin` (Admin portal).
+
+---
+
+## Mobile app delivery
+
+The player lobby includes a **Get App** picker:
+
+- Android downloads the signed APK from `/downloads/jackpot-royals.apk`.
+- iPhone shows the Safari **Share → Add to Home Screen** flow. On iOS 16.4+
+  the installed Home Screen app can receive Web Push notifications.
+- Both installed experiences load `https://jackpotroyals.com/`, so normal web
+  deployments appear without reinstalling the app.
+
+Useful commands:
+
+```bash
+npm run android:sync
+npm run android:debug
+npm run android:release
+```
+
+The release signing files `android/app/jackpot-release.keystore` and
+`android/keystore.properties` are intentionally ignored by Git. Back up both
+files securely. Future APK updates must use the same signing key or Android will
+not install them over the existing app.
+
+### Promo push configuration
+
+Web Push uses these server variables:
+
+```env
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=mailto:support@jackpotroyals.com
+```
+
+For closed-app Android APK notifications, create a free Firebase project:
+
+1. Register Android app ID `com.jackpotroyals.app`.
+2. Place `google-services.json` at `android/app/google-services.json`.
+3. Configure one of the following server credential sets:
+
+```env
+FIREBASE_SERVICE_ACCOUNT_JSON=
+```
+
+or:
+
+```env
+FIREBASE_PROJECT_ID=
+FIREBASE_CLIENT_EMAIL=
+FIREBASE_PRIVATE_KEY=
+```
+
+Run `npm run android:release` again after adding `google-services.json`.

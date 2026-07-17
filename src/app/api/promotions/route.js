@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
+import { sendPromotionPush } from '../../../lib/pushNotifications';
 
 // GET active promotions for user or all promotions for admin
 export async function GET(req) {
@@ -96,6 +97,12 @@ export async function POST(req) {
 
     const targetUsers = await db.collection('users').find(userQuery).project({ email: 1 }).toArray();
     const emails = targetUsers.map(u => u.email).filter(Boolean);
+    let pushResult = { sent: 0, failed: 0, skipped: true };
+    try {
+      pushResult = await sendPromotionPush(db, promoObject, emails);
+    } catch (pushError) {
+      console.error('Promotion push broadcast error:', pushError);
+    }
 
     const smtpUser = process.env.SMTP_USER;
     const smtpPass = process.env.SMTP_PASS;
@@ -247,7 +254,7 @@ export async function POST(req) {
       }
     }
 
-    return NextResponse.json({ success: true, promotion: promoObject });
+    return NextResponse.json({ success: true, promotion: promoObject, push: pushResult });
   } catch (err) {
     console.error('Create promotion error:', err);
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });

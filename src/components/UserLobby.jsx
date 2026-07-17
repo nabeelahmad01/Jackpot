@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PaymentMethodModal } from './Modals';
+import AppInstallModal from './AppInstallModal';
 import ReferralCenter from './ReferralCenter';
 import RemainderClaimAction from './RemainderClaimAction';
 import { canShowClaimRemainderButton } from '../lib/remainderClaim';
@@ -49,6 +50,7 @@ export default function UserLobby({
   const [claimingReferralId, setClaimingReferralId] = useState(null);
   const [claimedRemainderIds, setClaimedRemainderIds] = useState([]);
   const [isFreeplaySession, setIsFreeplaySession] = useState(false);
+  const [appInstallOpen, setAppInstallOpen] = useState(false);
   const pendingGameSlugRef = useRef(null);
 
   const toGameSlug = (title) => String(title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -837,6 +839,14 @@ export default function UserLobby({
               <i className="fa-solid fa-chevron-left"></i> <span>Back to Lobby</span>
             </button>
           )}
+          <button
+            type="button"
+            className="lobby-nav-btn get-app-btn"
+            onClick={() => setAppInstallOpen(true)}
+            aria-label="Download Jackpot Royals app"
+          >
+            <i className="fa-solid fa-mobile-screen-button"></i> <span>Get App</span>
+          </button>
           {lobbySubView !== 'referrals' && (
             <button className="lobby-nav-btn refer-btn" onClick={handleReferEarn}>
               <i className="fa-solid fa-gift"></i> <span>Refer</span>
@@ -2539,6 +2549,15 @@ export default function UserLobby({
           />
         </div>
       )}
+
+      <AppInstallModal
+        isOpen={appInstallOpen}
+        onClose={() => setAppInstallOpen(false)}
+        onInstallPwa={onInstallApp}
+        currentUserEmail={currentUserEmail}
+        androidAppUrl={frontendSettings?.androidAppUrl || '/downloads/jackpot-royals.apk'}
+        showToast={showToast}
+      />
 
       {/* Floating support */}
       <div className="support-chat-widget" onClick={onOpenSupport}>

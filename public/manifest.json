@@ -1,22 +1,42 @@
 {
+  "id": "/",
   "name": "Jackpot Royals",
   "short_name": "Jackpot",
   "description": "Premium Casino Gaming Entry Portal",
-  "start_url": "/",
+  "start_url": "/login?source=pwa",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
   "background_color": "#080a11",
   "theme_color": "#ffd700",
   "orientation": "portrait",
+  "categories": ["entertainment", "games"],
   "icons": [
     {
-      "src": "/jackpot_lion_mascot.png",
+      "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "/jackpot_lion_mascot.png",
+      "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Open Lobby",
+      "short_name": "Lobby",
+      "url": "/lobby",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ]
 }

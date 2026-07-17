@@ -9,6 +9,7 @@ const DEFAULT_SETTINGS = {
   notificationSoundUrl: 'https://raw.githubusercontent.com/AUTOMATIC1111/stable-diffusion-webui/master/notification.mp3',
   withdrawNotice: 'Fastest Withdrawals inside 5 Minutes!',
   cashoutNotice: 'Standard cashout processing hours: 9 AM - 11 PM EST',
+  androidAppUrl: '/downloads/jackpot-royals.apk',
   chimeActive: true,
   venmoActive: true,
   cashappActive: true,

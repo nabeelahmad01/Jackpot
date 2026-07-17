@@ -1,18 +1,40 @@
 import "./globals.css";
 import ClientChunkGuard from "../components/ClientChunkGuard";
+import NativeSplash from "../components/NativeSplash";
 
 export const metadata = {
   title: "Jackpot Royals - Win Big!",
   description: "Welcome to Jackpot Royals. Access sweepstakes games, grab bonuses, and win big!",
+  applicationName: "Jackpot Royals",
+  manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" }
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }]
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Jackpot Royals"
+  },
+  formatDetection: {
+    telephone: false
+  }
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#080a11"
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* PWA manifest link */}
-        <link rel="manifest" href="/manifest.json" />
-        
         {/* Google Fonts: Orbitron (headings) & Montserrat (body) */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -22,6 +44,7 @@ export default function RootLayout({ children }) {
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
       </head>
       <body suppressHydrationWarning>
+        <NativeSplash />
         <ClientChunkGuard />
         {children}
       </body>
