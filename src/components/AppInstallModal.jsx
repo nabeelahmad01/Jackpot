@@ -2,7 +2,6 @@
 
 import { useState, useSyncExternalStore } from 'react';
 import Image from 'next/image';
-import { subscribeToPromoPush, supportsWebPush } from '../lib/pushClient';
 
 const subscribe = () => () => {};
 
@@ -23,9 +22,7 @@ export default function AppInstallModal({
   isOpen,
   onClose,
   onInstallPwa,
-  currentUserEmail,
-  androidAppUrl = '/downloads/jackpot-royals.apk',
-  showToast
+  androidAppUrl = '/downloads/jackpot-royals.apk'
 }) {
   const deviceFlags = useSyncExternalStore(subscribe, getDeviceSnapshot, () => 0);
   const device = {
@@ -34,28 +31,8 @@ export default function AppInstallModal({
     isStandalone: Boolean(deviceFlags & 4)
   };
   const [selectedPlatform, setSelectedPlatform] = useState(null);
-  const [pushBusy, setPushBusy] = useState(false);
-  const [pushEnabled, setPushEnabled] = useState(false);
 
   if (!isOpen) return null;
-
-  const enablePush = async () => {
-    if (!currentUserEmail) {
-      showToast?.('Please log in before enabling promo alerts.', 'error');
-      return;
-    }
-
-    setPushBusy(true);
-    try {
-      await subscribeToPromoPush(currentUserEmail);
-      setPushEnabled(true);
-      showToast?.('Promo notifications are enabled on this device.', 'success');
-    } catch (error) {
-      showToast?.(error.message || 'Could not enable notifications.', 'error');
-    } finally {
-      setPushBusy(false);
-    }
-  };
 
   const choosePlatform = (platform) => {
     setSelectedPlatform(platform);
@@ -123,26 +100,6 @@ export default function AppInstallModal({
             <i className="fa-solid fa-mobile-screen-button" aria-hidden="true"></i>
             Use browser install
           </button>
-        )}
-
-        <div className="promo-push-panel">
-          <div>
-            <strong>Promo alerts</strong>
-            <span>Receive offers even when the app is closed.</span>
-          </div>
-          <button
-            type="button"
-            onClick={enablePush}
-            disabled={pushBusy || pushEnabled || !supportsWebPush()}
-          >
-            {pushEnabled ? 'Enabled' : pushBusy ? 'Enabling…' : 'Enable'}
-          </button>
-        </div>
-
-        {device.isIOS && !device.isStandalone && (
-          <p className="push-requirement">
-            On iPhone, install to the Home Screen first, open the app icon, then enable alerts.
-          </p>
         )}
       </div>
     </div>

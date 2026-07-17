@@ -10,7 +10,13 @@ const config: CapacitorConfig = {
     url: 'https://jackpotroyals.com/',
     cleartext: false,
     androidScheme: 'https',
-    allowNavigation: ['jackpotroyals.com', '*.jackpotroyals.com'],
+    allowNavigation: [
+      'jackpotroyals.com',
+      '*.jackpotroyals.com',
+      'accounts.google.com',
+      '*.google.com',
+      '*.googleusercontent.com'
+    ],
     errorPath: 'offline.html'
   },
   plugins: {

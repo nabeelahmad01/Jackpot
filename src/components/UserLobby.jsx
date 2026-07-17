@@ -3,7 +3,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PaymentMethodModal } from './Modals';
-import AppInstallModal from './AppInstallModal';
+// TEMPORARILY HIDDEN — uncomment with Get App button when ready
+// import AppInstallModal from './AppInstallModal';
+import { subscribeToPromoPush } from '../lib/pushClient';
 import ReferralCenter from './ReferralCenter';
 import RemainderClaimAction from './RemainderClaimAction';
 import { canShowClaimRemainderButton } from '../lib/remainderClaim';
@@ -50,8 +52,10 @@ export default function UserLobby({
   const [claimingReferralId, setClaimingReferralId] = useState(null);
   const [claimedRemainderIds, setClaimedRemainderIds] = useState([]);
   const [isFreeplaySession, setIsFreeplaySession] = useState(false);
-  const [appInstallOpen, setAppInstallOpen] = useState(false);
+  // TEMPORARILY HIDDEN — uncomment with Get App button when ready
+  // const [appInstallOpen, setAppInstallOpen] = useState(false);
   const pendingGameSlugRef = useRef(null);
+  const pushAutoTriedRef = useRef('');
 
   const toGameSlug = (title) => String(title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
@@ -277,6 +281,38 @@ export default function UserLobby({
         }
       })
       .catch(err => console.error('Failed to load promotions:', err));
+  }, [currentUserEmail]);
+
+  // Auto-register promo push for logged-in users (app + browser). No enable button.
+  useEffect(() => {
+    if (!currentUserEmail) return;
+
+    let cancelled = false;
+    let registered = false;
+
+    const register = async () => {
+      if (cancelled || registered) return;
+      try {
+        await subscribeToPromoPush(currentUserEmail);
+        registered = true;
+        pushAutoTriedRef.current = currentUserEmail;
+      } catch {
+        // Permission may need a gesture, or server push keys may still be missing.
+      }
+    };
+
+    if (pushAutoTriedRef.current !== currentUserEmail) {
+      register();
+    }
+
+    const onInteract = () => {
+      register();
+    };
+    window.addEventListener('pointerdown', onInteract, { once: true, passive: true });
+    return () => {
+      cancelled = true;
+      window.removeEventListener('pointerdown', onInteract);
+    };
   }, [currentUserEmail]);
 
   const renderFailedStatusWithTooltip = (tx) => {
@@ -839,6 +875,7 @@ export default function UserLobby({
               <i className="fa-solid fa-chevron-left"></i> <span>Back to Lobby</span>
             </button>
           )}
+          {/* TEMPORARILY HIDDEN — uncomment to restore Get App download button
           <button
             type="button"
             className="lobby-nav-btn get-app-btn"
@@ -847,6 +884,7 @@ export default function UserLobby({
           >
             <i className="fa-solid fa-mobile-screen-button"></i> <span>Get App</span>
           </button>
+          */}
           {lobbySubView !== 'referrals' && (
             <button className="lobby-nav-btn refer-btn" onClick={handleReferEarn}>
               <i className="fa-solid fa-gift"></i> <span>Refer</span>
@@ -2550,6 +2588,7 @@ export default function UserLobby({
         </div>
       )}
 
+      {/* TEMPORARILY HIDDEN — uncomment with Get App button when ready
       <AppInstallModal
         isOpen={appInstallOpen}
         onClose={() => setAppInstallOpen(false)}
@@ -2558,6 +2597,7 @@ export default function UserLobby({
         androidAppUrl={frontendSettings?.androidAppUrl || '/downloads/jackpot-royals.apk'}
         showToast={showToast}
       />
+      */}
 
       {/* Floating support */}
       <div className="support-chat-widget" onClick={onOpenSupport}>

@@ -177,6 +177,7 @@ body {
 }
 
 .auth-page-wrapper {
+  --auth-login-bg: url('/jackpot_royals_bg.png');
   display: flex;
   flex-direction: row;
   min-height: 100vh;
@@ -474,7 +475,21 @@ body {
 @media (max-width: 992px) {
   .auth-page-wrapper {
     flex-direction: column;
-    background: transparent;
+    background-color: #080a11;
+    background-image: var(--auth-login-bg);
+    background-repeat: no-repeat;
+    background-position: center center;
+    background-size: cover;
+    isolation: isolate;
+  }
+
+  .auth-page-wrapper::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(8, 10, 17, 0.5) 0%, rgba(8, 10, 17, 0.84) 100%);
   }
 
   .auth-graphic-panel {
@@ -486,6 +501,7 @@ body {
     background: transparent;
     box-shadow: none;
     padding: 2.5rem 1.25rem;
+    z-index: 1;
   }
 
   .brand-title {

@@ -4,6 +4,42 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useGoogleLogin } from '@react-oauth/google';
 import { motion, AnimatePresence } from 'framer-motion';
 
+function isNativeApp() {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.Capacitor?.isNativePlatform?.() === true ||
+    /JackpotRoyalsNative/i.test(navigator.userAgent || '')
+  );
+}
+
+async function loginWithGoogleProfile(accessToken) {
+  const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  const profile = await res.json();
+  if (!profile.email) {
+    throw new Error('Failed to fetch email profile from Google.');
+  }
+
+  const googleRes = await fetch('/api/auth/google', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: String(profile.email).toLowerCase(),
+      name: profile.name || 'Google Player',
+      referredBy: localStorage.getItem('jackpot_ref_code') || '',
+      distributorId: localStorage.getItem('jackpot_distributor_id') || '',
+      agentCode: localStorage.getItem('jackpot_agent_code') || '',
+      campaign: localStorage.getItem('jackpot_campaign') || ''
+    })
+  });
+  const googleData = await googleRes.json();
+  if (!googleRes.ok || !googleData.success) {
+    throw new Error(googleData.message || 'Google registration/login failed on server.');
+  }
+  return googleData;
+}
+
 export default function AuthPortal({
   onLoginSuccess,
   onRegisterSuccess,
@@ -14,6 +50,7 @@ export default function AuthPortal({
   frontendSettings = {}
 }) {
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || 'your_google_client_id_here';
+  const loginBgUrl = frontendSettings.loginBgUrl || '/jackpot_royals_bg.png';
 
   // Detect Facebook/Messenger In-App WebView
   const isMessengerWebView = () => {
@@ -22,56 +59,25 @@ export default function AuthPortal({
     return (ua.indexOf("FBAN") > -1) || (ua.indexOf("FBAV") > -1) || (ua.indexOf("Messenger") > -1);
   };
 
-  // Google OAuth Authentication login hook
+  const finishGoogleLogin = (googleData) => {
+    if (googleData.isNewUser) {
+      showToast(`Google account registered! Welcome, ${googleData.user?.name || 'Player'}.`, 'success');
+    } else {
+      showToast(`Welcome back, ${googleData.user?.name || 'Player'}!`, 'success');
+    }
+    onLoginSuccess(googleData.user);
+  };
+
+  // Google OAuth Authentication login hook (browser popup flow)
   const loginWithGoogle = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       triggerLoading(1500, async () => {
         try {
-          const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-            headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
-          });
-          const profile = await res.json();
-          
-          if (!profile.email) {
-            showToast('Failed to fetch email profile from Google.', 'error');
-            return;
-          }
-
-          const userEmail = profile.email.toLowerCase();
-          const userName = profile.name || 'Google Player';
-          
-          try {
-            const googleRes = await fetch('/api/auth/google', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                email: userEmail,
-                name: userName,
-                referredBy: localStorage.getItem('jackpot_ref_code') || '',
-                distributorId: localStorage.getItem('jackpot_distributor_id') || '',
-                agentCode: localStorage.getItem('jackpot_agent_code') || '',
-                campaign: localStorage.getItem('jackpot_campaign') || ''
-              })
-            });
-            const googleData = await googleRes.json();
-            
-            if (googleData.success) {
-              if (googleData.isNewUser) {
-                showToast(`Google account registered! Welcome, ${userName}.`, 'success');
-              } else {
-                showToast(`Welcome back, ${userName}!`, 'success');
-              }
-              onLoginSuccess(googleData.user);
-            } else {
-              showToast(googleData.message || 'Google registration/login failed on server.', 'error');
-            }
-          } catch (err) {
-            console.error('Google DB save failed:', err);
-            showToast('Connection error connecting Google credentials to server.', 'error');
-          }
+          const googleData = await loginWithGoogleProfile(tokenResponse.access_token);
+          finishGoogleLogin(googleData);
         } catch (err) {
-          console.error('Google profile fetch failed:', err);
-          showToast('Google Authentication succeeded, but profile fetch failed.', 'error');
+          console.error('Google Login Error:', err);
+          showToast(err.message || 'Google Sign-In failed or was cancelled.', 'error');
         }
       });
     },
@@ -81,43 +87,137 @@ export default function AuthPortal({
     }
   });
 
+  const redeemGoogleTicket = async (ticket) => {
+    const ticketRes = await fetch(`/api/auth/google/ticket?ticket=${encodeURIComponent(ticket)}`, {
+      cache: 'no-store'
+    });
+    const ticketData = await ticketRes.json();
+    if (!ticketRes.ok || !ticketData.success) {
+      throw new Error(ticketData.message || 'Google login ticket expired.');
+    }
+    finishGoogleLogin(ticketData);
+  };
+
+  const startNativeGoogleLogin = async () => {
+    const { Browser } = await import('@capacitor/browser');
+    const redirectUri = `${window.location.origin}/auth/google/callback`;
+    const params = new URLSearchParams({
+      client_id: googleClientId,
+      redirect_uri: redirectUri,
+      response_type: 'token',
+      scope: 'openid email profile',
+      include_granted_scopes: 'true',
+      prompt: 'select_account'
+    });
+    showToast('Opening Google sign-in…', 'info');
+    await Browser.open({
+      url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`,
+      presentationStyle: 'popover'
+    });
+  };
+
   const handleGoogleClick = () => {
     if (isMessengerWebView()) {
       onGoogleWarning();
-    } else {
-      if (googleClientId === 'your_google_client_id_here' || !googleClientId) {
-        // Run Simulator Fallback
-        showToast('Google OAuth Simulator triggered (Client ID not configured in .env.local).', 'info');
-        triggerLoading(1200, async () => {
-          const testUser = {
-            name: 'Google Demo Player',
-            email: 'google-player@test.com'
-          };
+      return;
+    }
+
+    if (googleClientId === 'your_google_client_id_here' || !googleClientId) {
+      // Run Simulator Fallback
+      showToast('Google OAuth Simulator triggered (Client ID not configured in .env.local).', 'info');
+      triggerLoading(1200, async () => {
+        try {
+          const googleRes = await fetch('/api/auth/google', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: 'google-player@test.com',
+              name: 'Google Demo Player',
+              referredBy: localStorage.getItem('jackpot_ref_code') || '',
+              distributorId: localStorage.getItem('jackpot_distributor_id') || '',
+              agentCode: localStorage.getItem('jackpot_agent_code') || ''
+            })
+          });
+          const googleData = await googleRes.json();
+          if (googleData.success) {
+            onLoginSuccess(googleData.user);
+          }
+        } catch (err) {
+          console.error('Google Simulator save failed:', err);
+        }
+      });
+      return;
+    }
+
+    if (isNativeApp()) {
+      startNativeGoogleLogin().catch((err) => {
+        console.error('Native Google login failed:', err);
+        showToast(err.message || 'Could not open Google sign-in.', 'error');
+      });
+      return;
+    }
+
+    loginWithGoogle();
+  };
+
+  // Native deep-link + query ticket return from Google Custom Tab
+  useEffect(() => {
+    let appListener;
+    let browserListener;
+
+    const takeTicket = async (ticket) => {
+      if (!ticket) return;
+      triggerLoading(1200, async () => {
+        try {
+          await redeemGoogleTicket(ticket);
+        } catch (err) {
+          showToast(err.message || 'Could not finish Google sign-in.', 'error');
+        }
+      });
+    };
+
+    const fromQuery = new URLSearchParams(window.location.search).get('google_ticket');
+    if (fromQuery) {
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, '', cleanUrl);
+      takeTicket(fromQuery);
+    }
+
+    (async () => {
+      if (!isNativeApp()) return;
+      try {
+        const [{ App }, { Browser }] = await Promise.all([
+          import('@capacitor/app'),
+          import('@capacitor/browser')
+        ]);
+        appListener = await App.addListener('appUrlOpen', async ({ url }) => {
           try {
-            const googleRes = await fetch('/api/auth/google', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                email: testUser.email,
-                name: testUser.name,
-                referredBy: localStorage.getItem('jackpot_ref_code') || '',
-                distributorId: localStorage.getItem('jackpot_distributor_id') || '',
-                agentCode: localStorage.getItem('jackpot_agent_code') || ''
-              })
-            });
-            const googleData = await googleRes.json();
-            if (googleData.success) {
-              onLoginSuccess(googleData.user);
+            const parsed = new URL(url.replace(/^com\.jackpotroyals\.app:/, 'https://app.local'));
+            const ticket = parsed.searchParams.get('ticket');
+            if (ticket) {
+              try {
+                await Browser.close();
+              } catch {
+                // Browser may already be closed.
+              }
+              await takeTicket(ticket);
             }
           } catch (err) {
-            console.error('Google Simulator save failed:', err);
+            console.error('OAuth deep link parse failed:', err);
           }
         });
-      } else {
-        loginWithGoogle();
+        browserListener = await Browser.addListener('browserFinished', () => {});
+      } catch (err) {
+        console.error('Native Google listeners failed:', err);
       }
-    }
-  };
+    })();
+
+    return () => {
+      appListener?.remove();
+      browserListener?.remove();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [activeTab, setActiveTab] = useState('login'); // 'login' | 'register' | 'forgot' | 'otp'
   const [showPassword, setShowPassword] = useState(false);
@@ -520,9 +620,12 @@ export default function AuthPortal({
   };
 
   return (
-    <div className="auth-page-wrapper">
+    <div
+      className="auth-page-wrapper"
+      style={{ '--auth-login-bg': `url(${loginBgUrl})` }}
+    >
       {/* Left Graphic Panel (Desktop only) */}
-      <div className="auth-graphic-panel" style={{ backgroundImage: `url(${frontendSettings.loginBgUrl || '/jackpot_royals_bg.png'})` }}></div>
+      <div className="auth-graphic-panel" style={{ backgroundImage: `url(${loginBgUrl})` }}></div>
 
       {/* Right Form Panel */}
       <div className="auth-form-panel">
