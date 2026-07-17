@@ -7,6 +7,7 @@ import { PaymentMethodModal } from './Modals';
 // TEMPORARILY HIDDEN — uncomment with Get App button when ready
 // import AppInstallModal from './AppInstallModal';
 import { subscribeToPromoPush } from '../lib/pushClient';
+import { shouldShowInfoOnLobby } from '../lib/infoPage';
 import ReferralCenter from './ReferralCenter';
 import RemainderClaimAction from './RemainderClaimAction';
 import { canShowClaimRemainderButton } from '../lib/remainderClaim';
@@ -891,9 +892,11 @@ export default function UserLobby({
               <i className="fa-solid fa-gift"></i> <span>Refer</span>
             </button>
           )}
-          <Link href="/info" className="lobby-nav-btn info-nav-btn" aria-label="Official channels and contact">
-            <i className="fa-solid fa-circle-info"></i> <span>Info</span>
-          </Link>
+          {shouldShowInfoOnLobby(frontendSettings) && (
+            <Link href="/info" className="lobby-nav-btn info-nav-btn" aria-label="Official channels and contact">
+              <i className="fa-solid fa-circle-info"></i> <span>Info</span>
+            </Link>
+          )}
           <button className="lobby-nav-btn logout-btn" onClick={onLogout}>
             <i className="fa-solid fa-right-from-bracket"></i> <span>Logout</span>
           </button>

@@ -51,6 +51,34 @@ export default function FrontendSettingsTab({ adminUser }) {
   const [lobbyHeroSideImageAlt, setLobbyHeroSideImageAlt] = useState('');
   const [lobbyHeroSideEnabled, setLobbyHeroSideEnabled] = useState(true);
 
+  // Info / Contact page
+  const [infoPageEnabled, setInfoPageEnabled] = useState(true);
+  const [infoShowOnAuth, setInfoShowOnAuth] = useState(true);
+  const [infoShowOnLobby, setInfoShowOnLobby] = useState(true);
+  const [infoTagline, setInfoTagline] = useState('');
+  const [infoLead, setInfoLead] = useState('');
+  const [infoSupportNote, setInfoSupportNote] = useState('');
+  const [infoInstagramEnabled, setInfoInstagramEnabled] = useState(true);
+  const [infoInstagramLabel, setInfoInstagramLabel] = useState('');
+  const [infoInstagramHandle, setInfoInstagramHandle] = useState('');
+  const [infoInstagramUrl, setInfoInstagramUrl] = useState('');
+  const [infoTelegramEnabled, setInfoTelegramEnabled] = useState(true);
+  const [infoTelegramLabel, setInfoTelegramLabel] = useState('');
+  const [infoTelegramHandle, setInfoTelegramHandle] = useState('');
+  const [infoTelegramUrl, setInfoTelegramUrl] = useState('');
+  const [infoFacebookEnabled, setInfoFacebookEnabled] = useState(true);
+  const [infoFacebookLabel, setInfoFacebookLabel] = useState('');
+  const [infoFacebookHandle, setInfoFacebookHandle] = useState('');
+  const [infoFacebookUrl, setInfoFacebookUrl] = useState('');
+  const [infoWhatsappEnabled, setInfoWhatsappEnabled] = useState(true);
+  const [infoWhatsappLabel, setInfoWhatsappLabel] = useState('');
+  const [infoWhatsappHandle, setInfoWhatsappHandle] = useState('');
+  const [infoWhatsappUrl, setInfoWhatsappUrl] = useState('');
+  const [infoEmailEnabled, setInfoEmailEnabled] = useState(true);
+  const [infoEmailLabel, setInfoEmailLabel] = useState('');
+  const [infoEmailHandle, setInfoEmailHandle] = useState('');
+  const [infoEmailUrl, setInfoEmailUrl] = useState('');
+
   // Marquee Cards
   const [marqueePayouts, setMarqueePayouts] = useState([]);
 
@@ -109,6 +137,42 @@ export default function FrontendSettingsTab({ adminUser }) {
       setLobbyHeroSideImage(s.lobbyHeroSideImage || '/lobby-app-download-promo.png');
       setLobbyHeroSideImageAlt(s.lobbyHeroSideImageAlt || 'Download mobile app and get $3 freeplay');
       setLobbyHeroSideEnabled(s.lobbyHeroSideEnabled !== false);
+
+      setInfoPageEnabled(s.infoPageEnabled !== false);
+      setInfoShowOnAuth(s.infoShowOnAuth !== false);
+      setInfoShowOnLobby(s.infoShowOnLobby !== false);
+      setInfoTagline(s.infoTagline || 'PLAY SMARTER. CASHOUT FASTER.');
+      setInfoLead(
+        s.infoLead ||
+          "Official channels for updates, community, and player support. Reach us anytime — we're here to help you win big."
+      );
+      setInfoSupportNote(
+        s.infoSupportNote ||
+          'For account help, deposits, or withdrawals, email support and our team will get back to you.'
+      );
+      setInfoInstagramEnabled(s.infoInstagramEnabled !== false);
+      setInfoInstagramLabel(s.infoInstagramLabel || 'Instagram');
+      setInfoInstagramHandle(s.infoInstagramHandle || '@jackpotroyals_casino');
+      setInfoInstagramUrl(
+        s.infoInstagramUrl ||
+          'https://www.instagram.com/jackpotroyals_casino?igsh=dnZjNmNwdmNzazN6'
+      );
+      setInfoTelegramEnabled(s.infoTelegramEnabled !== false);
+      setInfoTelegramLabel(s.infoTelegramLabel || 'Telegram');
+      setInfoTelegramHandle(s.infoTelegramHandle || 't.me/Jackpotroyals_casino');
+      setInfoTelegramUrl(s.infoTelegramUrl || 'https://t.me/Jackpotroyals_casino');
+      setInfoFacebookEnabled(s.infoFacebookEnabled !== false);
+      setInfoFacebookLabel(s.infoFacebookLabel || 'Facebook');
+      setInfoFacebookHandle(s.infoFacebookHandle || 'Jackpot Royals');
+      setInfoFacebookUrl(s.infoFacebookUrl || 'https://www.facebook.com/share/1KgG9SdC5N/');
+      setInfoWhatsappEnabled(s.infoWhatsappEnabled !== false);
+      setInfoWhatsappLabel(s.infoWhatsappLabel || 'WhatsApp');
+      setInfoWhatsappHandle(s.infoWhatsappHandle || '+1 929 630 8553');
+      setInfoWhatsappUrl(s.infoWhatsappUrl || 'https://wa.me/19296308553');
+      setInfoEmailEnabled(s.infoEmailEnabled !== false);
+      setInfoEmailLabel(s.infoEmailLabel || 'Email Support');
+      setInfoEmailHandle(s.infoEmailHandle || 'support@jackpotroyals.com');
+      setInfoEmailUrl(s.infoEmailUrl || 'mailto:support@jackpotroyals.com');
 
       setMarqueePayouts(s.marqueePayouts || []);
       setCashoutRules(s.cashoutRules || []);
@@ -218,6 +282,33 @@ export default function FrontendSettingsTab({ adminUser }) {
           lobbyHeroSideImageAlt,
           lobbyHeroSideEnabled,
 
+          infoPageEnabled,
+          infoShowOnAuth,
+          infoShowOnLobby,
+          infoTagline,
+          infoLead,
+          infoSupportNote,
+          infoInstagramEnabled,
+          infoInstagramLabel,
+          infoInstagramHandle,
+          infoInstagramUrl,
+          infoTelegramEnabled,
+          infoTelegramLabel,
+          infoTelegramHandle,
+          infoTelegramUrl,
+          infoFacebookEnabled,
+          infoFacebookLabel,
+          infoFacebookHandle,
+          infoFacebookUrl,
+          infoWhatsappEnabled,
+          infoWhatsappLabel,
+          infoWhatsappHandle,
+          infoWhatsappUrl,
+          infoEmailEnabled,
+          infoEmailLabel,
+          infoEmailHandle,
+          infoEmailUrl,
+
           marqueePayouts,
           cashoutRules,
           proofScreenshots,
@@ -284,6 +375,183 @@ export default function FrontendSettingsTab({ adminUser }) {
                 />
               </div>
             </div>
+          </div>
+
+          {/* Info / Contact page CMS */}
+          <div style={{ background: '#0b0d16', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(34,197,94,0.25)', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.85rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.55rem', flexWrap: 'wrap' }}>
+              <h4 style={{ fontSize: '0.8rem', color: '#4ade80', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>
+                Info Page &amp; Social Channels
+              </h4>
+              <a href="/info" target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.7rem', color: 'var(--gold-primary)' }}>
+                Open /info ↗
+              </a>
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.85rem 1.25rem', marginBottom: '1rem' }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: '#ddd', cursor: 'pointer' }}>
+                <input type="checkbox" checked={infoPageEnabled} onChange={(e) => setInfoPageEnabled(e.target.checked)} />
+                Enable info page
+              </label>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: '#ddd', cursor: 'pointer' }}>
+                <input type="checkbox" checked={infoShowOnAuth} onChange={(e) => setInfoShowOnAuth(e.target.checked)} disabled={!infoPageEnabled} />
+                Show Info button on Auth / Home
+              </label>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: '#ddd', cursor: 'pointer' }}>
+                <input type="checkbox" checked={infoShowOnLobby} onChange={(e) => setInfoShowOnLobby(e.target.checked)} disabled={!infoPageEnabled} />
+                Show Info button in Lobby header
+              </label>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginBottom: '1rem' }}>
+              <div className="input-group" style={{ margin: 0 }}>
+                <label>Tagline</label>
+                <div className="input-wrapper" style={{ background: '#07090f' }}>
+                  <input type="text" value={infoTagline} onChange={(e) => setInfoTagline(e.target.value)} />
+                </div>
+              </div>
+              <div className="input-group" style={{ margin: 0 }}>
+                <label>Intro text</label>
+                <textarea
+                  value={infoLead}
+                  onChange={(e) => setInfoLead(e.target.value)}
+                  rows={3}
+                  style={{ width: '100%', background: '#07090f', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', borderRadius: '8px', padding: '0.65rem', fontSize: '0.8rem', resize: 'vertical' }}
+                />
+              </div>
+              <div className="input-group" style={{ margin: 0 }}>
+                <label>Support note</label>
+                <textarea
+                  value={infoSupportNote}
+                  onChange={(e) => setInfoSupportNote(e.target.value)}
+                  rows={2}
+                  style={{ width: '100%', background: '#07090f', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', borderRadius: '8px', padding: '0.65rem', fontSize: '0.8rem', resize: 'vertical' }}
+                />
+              </div>
+            </div>
+
+            {[
+              {
+                key: 'instagram',
+                title: 'Instagram',
+                enabled: infoInstagramEnabled,
+                setEnabled: setInfoInstagramEnabled,
+                label: infoInstagramLabel,
+                setLabel: setInfoInstagramLabel,
+                handle: infoInstagramHandle,
+                setHandle: setInfoInstagramHandle,
+                url: infoInstagramUrl,
+                setUrl: setInfoInstagramUrl,
+                icon: 'fa-brands fa-instagram'
+              },
+              {
+                key: 'telegram',
+                title: 'Telegram',
+                enabled: infoTelegramEnabled,
+                setEnabled: setInfoTelegramEnabled,
+                label: infoTelegramLabel,
+                setLabel: setInfoTelegramLabel,
+                handle: infoTelegramHandle,
+                setHandle: setInfoTelegramHandle,
+                url: infoTelegramUrl,
+                setUrl: setInfoTelegramUrl,
+                icon: 'fa-brands fa-telegram'
+              },
+              {
+                key: 'facebook',
+                title: 'Facebook',
+                enabled: infoFacebookEnabled,
+                setEnabled: setInfoFacebookEnabled,
+                label: infoFacebookLabel,
+                setLabel: setInfoFacebookLabel,
+                handle: infoFacebookHandle,
+                setHandle: setInfoFacebookHandle,
+                url: infoFacebookUrl,
+                setUrl: setInfoFacebookUrl,
+                icon: 'fa-brands fa-facebook'
+              },
+              {
+                key: 'whatsapp',
+                title: 'WhatsApp',
+                enabled: infoWhatsappEnabled,
+                setEnabled: setInfoWhatsappEnabled,
+                label: infoWhatsappLabel,
+                setLabel: setInfoWhatsappLabel,
+                handle: infoWhatsappHandle,
+                setHandle: setInfoWhatsappHandle,
+                url: infoWhatsappUrl,
+                setUrl: setInfoWhatsappUrl,
+                icon: 'fa-brands fa-whatsapp'
+              },
+              {
+                key: 'email',
+                title: 'Email',
+                enabled: infoEmailEnabled,
+                setEnabled: setInfoEmailEnabled,
+                label: infoEmailLabel,
+                setLabel: setInfoEmailLabel,
+                handle: infoEmailHandle,
+                setHandle: setInfoEmailHandle,
+                url: infoEmailUrl,
+                setUrl: setInfoEmailUrl,
+                icon: 'fa-solid fa-envelope'
+              }
+            ].map((channel) => (
+              <div
+                key={channel.key}
+                style={{
+                  background: '#07090f',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  borderRadius: '10px',
+                  padding: '0.85rem',
+                  marginBottom: '0.65rem'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.65rem' }}>
+                  <strong style={{ fontSize: '0.78rem', color: '#fff', display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <i className={channel.icon} style={{ color: 'var(--gold-primary)' }} />
+                    {channel.title}
+                  </strong>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', color: '#bbb', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={channel.enabled} onChange={(e) => channel.setEnabled(e.target.checked)} />
+                    Show
+                  </label>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <div className="input-group" style={{ flex: 1, minWidth: '120px', margin: 0 }}>
+                    <label>Label</label>
+                    <input
+                      type="text"
+                      value={channel.label}
+                      onChange={(e) => channel.setLabel(e.target.value)}
+                      disabled={!channel.enabled}
+                      style={{ width: '100%', background: '#0b0d16', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.45rem', borderRadius: '6px', fontSize: '0.75rem' }}
+                    />
+                  </div>
+                  <div className="input-group" style={{ flex: 1, minWidth: '140px', margin: 0 }}>
+                    <label>Display text</label>
+                    <input
+                      type="text"
+                      value={channel.handle}
+                      onChange={(e) => channel.setHandle(e.target.value)}
+                      disabled={!channel.enabled}
+                      style={{ width: '100%', background: '#0b0d16', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.45rem', borderRadius: '6px', fontSize: '0.75rem' }}
+                    />
+                  </div>
+                  <div className="input-group" style={{ flex: 2, minWidth: '180px', margin: 0 }}>
+                    <label>Link / URL</label>
+                    <input
+                      type="text"
+                      value={channel.url}
+                      onChange={(e) => channel.setUrl(e.target.value)}
+                      disabled={!channel.enabled}
+                      placeholder={channel.key === 'whatsapp' ? 'https://wa.me/19296308553' : ''}
+                      style={{ width: '100%', background: '#0b0d16', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.45rem', borderRadius: '6px', fontSize: '0.75rem' }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Lobby Homepage — matches live hero layout */}

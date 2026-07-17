@@ -68,7 +68,37 @@ const DEFAULT_SETTINGS = {
     { icon: 'fa-circle-check', title: 'FAIR PLAY', description: 'Provably fair and transparent' },
     { icon: 'fa-bolt', title: 'INSTANT WITHDRAWALS', description: 'Get your winnings instantly' },
     { icon: 'fa-headset', title: '24/7 SUPPORT', description: 'Always here to help you' }
-  ]
+  ],
+
+  // Info / Contact page (Super Admin editable)
+  infoPageEnabled: true,
+  infoShowOnAuth: true,
+  infoShowOnLobby: true,
+  infoTagline: 'PLAY SMARTER. CASHOUT FASTER.',
+  infoLead:
+    'Official channels for updates, community, and player support. Reach us anytime — we\'re here to help you win big.',
+  infoSupportNote:
+    'For account help, deposits, or withdrawals, email support and our team will get back to you.',
+  infoInstagramEnabled: true,
+  infoInstagramLabel: 'Instagram',
+  infoInstagramHandle: '@jackpotroyals_casino',
+  infoInstagramUrl: 'https://www.instagram.com/jackpotroyals_casino?igsh=dnZjNmNwdmNzazN6',
+  infoTelegramEnabled: true,
+  infoTelegramLabel: 'Telegram',
+  infoTelegramHandle: 't.me/Jackpotroyals_casino',
+  infoTelegramUrl: 'https://t.me/Jackpotroyals_casino',
+  infoFacebookEnabled: true,
+  infoFacebookLabel: 'Facebook',
+  infoFacebookHandle: 'Jackpot Royals',
+  infoFacebookUrl: 'https://www.facebook.com/share/1KgG9SdC5N/',
+  infoWhatsappEnabled: true,
+  infoWhatsappLabel: 'WhatsApp',
+  infoWhatsappHandle: '+1 929 630 8553',
+  infoWhatsappUrl: 'https://wa.me/19296308553',
+  infoEmailEnabled: true,
+  infoEmailLabel: 'Email Support',
+  infoEmailHandle: 'support@jackpotroyals.com',
+  infoEmailUrl: 'mailto:support@jackpotroyals.com'
 };
 
 // GET Frontend Settings

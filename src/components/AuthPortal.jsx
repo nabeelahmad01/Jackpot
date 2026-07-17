@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useGoogleLogin } from '@react-oauth/google';
 import { motion, AnimatePresence } from 'framer-motion';
+import { shouldShowInfoOnAuth } from '../lib/infoPage';
 
 function isNativeApp() {
   if (typeof window === 'undefined') return false;
@@ -52,6 +53,7 @@ export default function AuthPortal({
 }) {
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || 'your_google_client_id_here';
   const loginBgUrl = frontendSettings.loginBgUrl || '/jackpot_royals_bg.png';
+  const showInfoLinks = shouldShowInfoOnAuth(frontendSettings);
 
   // Detect Facebook/Messenger In-App WebView
   const isMessengerWebView = () => {
@@ -674,10 +676,12 @@ export default function AuthPortal({
             <div className="banner-desc">{frontendSettings.landingGrab || 'Grab amazing bonuses and win big!'}</div>
           </div>
           <div className="header-banner-actions">
-            <Link href="/info" className="home-info-chip" aria-label="Official channels and contact">
-              <i className="fa-solid fa-circle-info" aria-hidden="true" />
-              <span>Info</span>
-            </Link>
+            {showInfoLinks && (
+              <Link href="/info" className="home-info-chip" aria-label="Official channels and contact">
+                <i className="fa-solid fa-circle-info" aria-hidden="true" />
+                <span>Info</span>
+              </Link>
+            )}
             <div className="banner-logo-container animate-float">
               <img src="/jackpot_royals_logo.png" alt="Jackpot Royals Logo" className="banner-logo" />
               <div className="logo-glow"></div>
@@ -1077,12 +1081,14 @@ export default function AuthPortal({
           </div>
         </article>
 
-        <p className="auth-info-link-wrap">
-          <Link href="/info" className="auth-info-link">
-            <i className="fa-solid fa-circle-info" aria-hidden="true" />
-            Official channels &amp; contact
-          </Link>
-        </p>
+        {showInfoLinks && (
+          <p className="auth-info-link-wrap">
+            <Link href="/info" className="auth-info-link">
+              <i className="fa-solid fa-circle-info" aria-hidden="true" />
+              Official channels &amp; contact
+            </Link>
+          </p>
+        )}
 
         {/* Floating Support Button FAB */}
         {onOpenSupport && (

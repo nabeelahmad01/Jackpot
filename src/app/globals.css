@@ -4226,6 +4226,11 @@ body::before {
   color: #fff;
 }
 
+.info-channel--whatsapp .info-channel-icon {
+  background: linear-gradient(135deg, #86efac, #22c55e 55%, #15803d);
+  color: #fff;
+}
+
 .info-channel--facebook .info-channel-icon {
   background: linear-gradient(135deg, #93c5fd, #2563eb);
   color: #fff;
