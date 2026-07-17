@@ -7,8 +7,8 @@ const config: CapacitorConfig = {
   appendUserAgent: ' JackpotRoyalsNative/1.0',
   backgroundColor: '#080a11',
   server: {
-    // No remote url at launch — local shell plays splash video first, then opens the live site.
-    // This avoids MediaPlayer + remote WebView fighting (which was crashing the app).
+    // Load the live site directly (no splash video).
+    url: 'https://jackpotroyals.com/',
     cleartext: false,
     androidScheme: 'https',
     allowNavigation: ['jackpotroyals.com', '*.jackpotroyals.com'],
@@ -16,7 +16,7 @@ const config: CapacitorConfig = {
   },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 0,
+      launchShowDuration: 400,
       launchAutoHide: true,
       backgroundColor: '#080a11',
       androidScaleType: 'CENTER_CROP',
