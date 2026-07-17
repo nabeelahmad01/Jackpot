@@ -20,16 +20,6 @@ function detectAppMode() {
   return standalone || capacitorNative || nativeUa;
 }
 
-function isAndroidNativeShell() {
-  if (typeof window === 'undefined') return false;
-  try {
-    return window.Capacitor?.getPlatform?.() === 'android';
-  } catch {
-    return /Android/i.test(window.navigator.userAgent || '') &&
-      /JackpotRoyalsNative/i.test(window.navigator.userAgent || '');
-  }
-}
-
 export default function NativeSplash() {
   const [visible, setVisible] = useState(false);
   const videoRef = useRef(null);
@@ -38,13 +28,27 @@ export default function NativeSplash() {
   const dismiss = () => {
     if (dismissedRef.current) return;
     dismissedRef.current = true;
+    try {
+      sessionStorage.setItem('jr_splash_shown', '1');
+    } catch {
+      // ignore
+    }
     setVisible(false);
   };
 
   useEffect(() => {
-    // Android APK already plays the splash video natively in MainActivity.
-    if (isAndroidNativeShell()) {
-      return undefined;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('jr_splash') === 'done') {
+        sessionStorage.setItem('jr_splash_shown', '1');
+        params.delete('jr_splash');
+        const next = `${window.location.pathname}${params.toString() ? `?${params}` : ''}${window.location.hash}`;
+        window.history.replaceState({}, '', next || '/');
+      }
+      // Show once per app/browser session so login ↔ lobby does not replay.
+      if (sessionStorage.getItem('jr_splash_shown') === '1') return undefined;
+    } catch {
+      // ignore
     }
 
     const enable = () => {
@@ -53,7 +57,7 @@ export default function NativeSplash() {
     };
 
     enable();
-    const timer = window.setTimeout(enable, 250);
+    const timer = window.setTimeout(enable, 200);
     return () => window.clearTimeout(timer);
   }, []);
 
@@ -68,16 +72,17 @@ export default function NativeSplash() {
         video.muted = true;
         video.defaultMuted = true;
         video.setAttribute('muted', '');
+        video.setAttribute('playsinline', '');
         video.playsInline = true;
+        video.currentTime = 0;
         await video.play();
       } catch {
-        // Keep overlay visible briefly; dismiss if autoplay is blocked.
-        window.setTimeout(dismiss, 1500);
+        window.setTimeout(dismiss, 1200);
       }
     };
 
     tryPlay();
-    const hardTimeout = window.setTimeout(dismiss, 12000);
+    const hardTimeout = window.setTimeout(dismiss, 10000);
     return () => window.clearTimeout(hardTimeout);
   }, [visible]);
 

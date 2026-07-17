@@ -6,17 +6,66 @@
     <meta name="theme-color" content="#080a11" />
     <title>Jackpot Royals</title>
     <style>
-      html, body { min-height: 100%; margin: 0; background: #080a11; color: #fff; }
-      body { display: grid; place-items: center; font-family: system-ui, sans-serif; text-align: center; }
-      img { width: 96px; height: 96px; border-radius: 24px; }
-      p { color: #a3a8b8; }
+      html, body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        background: #080a11;
+        overflow: hidden;
+      }
+      #splash {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center center;
+        background: #080a11;
+      }
     </style>
   </head>
   <body>
-    <main>
-      <img src="https://jackpotroyals.com/icon-192.png" alt="" />
-      <h1>Jackpot Royals</h1>
-      <p>Connecting securely…</p>
-    </main>
+    <video
+      id="splash"
+      src="./jackpot-splash.mp4"
+      autoplay
+      muted
+      playsinline
+      preload="auto"
+    ></video>
+    <script>
+      (function () {
+        var done = false;
+        var target = 'https://jackpotroyals.com/?jr_splash=done';
+
+        function go() {
+          if (done) return;
+          done = true;
+          window.location.replace(target);
+        }
+
+        var video = document.getElementById('splash');
+        if (!video) {
+          go();
+          return;
+        }
+
+        video.muted = true;
+        video.playsInline = true;
+        video.setAttribute('muted', '');
+        video.setAttribute('playsinline', '');
+
+        video.addEventListener('ended', go);
+        video.addEventListener('error', go);
+        setTimeout(go, 12000);
+
+        var playPromise = video.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+          playPromise.catch(function () {
+            setTimeout(go, 1500);
+          });
+        }
+      })();
+    </script>
   </body>
 </html>
