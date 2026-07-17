@@ -1,31 +1,51 @@
 package com.jackpotroyals.app;
 
 import android.graphics.Color;
+import android.graphics.Matrix;
+import android.graphics.SurfaceTexture;
+import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.Gravity;
+import android.view.Surface;
+import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
+import android.webkit.WebView;
 import android.widget.FrameLayout;
-import android.widget.VideoView;
 
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.getcapacitor.BridgeActivity;
 
+/**
+ * Plays the launch splash with TextureView (not VideoView/SurfaceView) so it does not
+ * fight Capacitor's WebView and crash on mid-range Android devices.
+ */
 public class MainActivity extends BridgeActivity {
     private FrameLayout splashOverlay;
+    private TextureView splashTexture;
+    private MediaPlayer splashPlayer;
+    private Surface splashSurface;
     private boolean splashDismissed = false;
+    private final Runnable splashTimeout = this::dismissSplash;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         applySolidSystemBars();
+        pauseWebViewForSplash();
         showSplashVideo();
+    }
+
+    @Override
+    public void onDestroy() {
+        releaseSplashPlayer();
+        super.onDestroy();
     }
 
     private void applySolidSystemBars() {
@@ -52,100 +72,206 @@ public class MainActivity extends BridgeActivity {
         controller.setAppearanceLightNavigationBars(false);
     }
 
-    private void showSplashVideo() {
-        ViewGroup content = findViewById(android.R.id.content);
-        if (content == null) {
-            return;
+    private void pauseWebViewForSplash() {
+        try {
+            if (getBridge() == null || getBridge().getWebView() == null) {
+                return;
+            }
+            WebView webView = getBridge().getWebView();
+            webView.onPause();
+            webView.pauseTimers();
+        } catch (Exception ignored) {
+            // Keep launch resilient.
         }
-
-        splashOverlay = new FrameLayout(this);
-        splashOverlay.setLayoutParams(new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT
-        ));
-        splashOverlay.setBackgroundColor(Color.parseColor("#080a11"));
-        splashOverlay.setClickable(true);
-        splashOverlay.setFocusable(true);
-        splashOverlay.setElevation(100f);
-
-        final VideoView videoView = new VideoView(this);
-        FrameLayout.LayoutParams videoParams = new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            Gravity.CENTER
-        );
-        videoView.setLayoutParams(videoParams);
-
-        Uri videoUri = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.jackpot_splash);
-        videoView.setVideoURI(videoUri);
-        videoView.setOnPreparedListener(mp -> {
-            mp.setLooping(false);
-            scaleVideoToFit(videoView, mp.getVideoWidth(), mp.getVideoHeight());
-            videoView.start();
-        });
-        videoView.setOnCompletionListener(mp -> dismissSplash());
-        videoView.setOnErrorListener((mp, what, extra) -> {
-            dismissSplash();
-            return true;
-        });
-
-        // Safety timeout if the video never starts/finishes.
-        splashOverlay.postDelayed(this::dismissSplash, 12000);
-
-        splashOverlay.addView(videoView);
-        content.addView(splashOverlay);
     }
 
-    /**
-     * Fit the full landscape splash into the phone screen.
-     * Uses contain-style scaling with a very light crop (~12%) so sides stay visible.
-     */
-    private void scaleVideoToFit(VideoView videoView, int videoWidth, int videoHeight) {
-        if (videoWidth <= 0 || videoHeight <= 0 || splashOverlay == null) {
-            return;
+    private void resumeWebViewAfterSplash() {
+        try {
+            if (getBridge() == null || getBridge().getWebView() == null) {
+                return;
+            }
+            WebView webView = getBridge().getWebView();
+            webView.resumeTimers();
+            webView.onResume();
+        } catch (Exception ignored) {
+            // Keep launch resilient.
         }
+    }
 
-        Runnable applyScale = () -> {
-            int viewWidth = splashOverlay.getWidth();
-            int viewHeight = splashOverlay.getHeight();
-            if (viewWidth <= 0 || viewHeight <= 0) {
+    private void showSplashVideo() {
+        try {
+            ViewGroup content = findViewById(android.R.id.content);
+            if (content == null) {
+                resumeWebViewAfterSplash();
                 return;
             }
 
-            float widthRatio = (float) viewWidth / (float) videoWidth;
-            float heightRatio = (float) viewHeight / (float) videoHeight;
-            float containScale = Math.min(widthRatio, heightRatio);
-            float coverScale = Math.max(widthRatio, heightRatio);
-            // Keep almost the full frame visible; only a mild crop.
-            float scale = containScale + (coverScale - containScale) * 0.12f;
+            splashOverlay = new FrameLayout(this);
+            splashOverlay.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            ));
+            splashOverlay.setBackgroundColor(Color.parseColor("#080a11"));
+            splashOverlay.setClickable(true);
+            splashOverlay.setFocusable(true);
+            splashOverlay.setElevation(100f);
 
-            int scaledWidth = Math.round(videoWidth * scale);
-            int scaledHeight = Math.round(videoHeight * scale);
-            FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
-                scaledWidth,
-                scaledHeight,
+            splashTexture = new TextureView(this);
+            splashTexture.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
                 Gravity.CENTER
-            );
-            videoView.setLayoutParams(params);
-        };
+            ));
 
-        if (splashOverlay.getWidth() > 0 && splashOverlay.getHeight() > 0) {
-            applyScale.run();
-        } else {
-            splashOverlay.post(applyScale);
+            splashTexture.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
+                @Override
+                public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
+                    startSplashPlayer(surface);
+                }
+
+                @Override
+                public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
+                    // no-op
+                }
+
+                @Override
+                public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
+                    releaseSplashPlayer();
+                    return true;
+                }
+
+                @Override
+                public void onSurfaceTextureUpdated(SurfaceTexture surface) {
+                    // no-op
+                }
+            });
+
+            splashOverlay.addView(splashTexture);
+            content.addView(splashOverlay);
+            splashOverlay.postDelayed(splashTimeout, 10000);
+        } catch (Exception e) {
+            dismissSplash();
         }
     }
 
+    private void startSplashPlayer(SurfaceTexture surfaceTexture) {
+        if (splashDismissed) {
+            return;
+        }
+
+        try {
+            releaseSplashPlayer();
+            splashSurface = new Surface(surfaceTexture);
+            splashPlayer = new MediaPlayer();
+            splashPlayer.setSurface(splashSurface);
+
+            Uri videoUri = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.jackpot_splash);
+            splashPlayer.setDataSource(this, videoUri);
+            splashPlayer.setOnPreparedListener(mp -> {
+                try {
+                    applyContainTransform(mp.getVideoWidth(), mp.getVideoHeight());
+                    mp.setLooping(false);
+                    mp.start();
+                } catch (Exception e) {
+                    dismissSplash();
+                }
+            });
+            splashPlayer.setOnCompletionListener(mp -> dismissSplash());
+            splashPlayer.setOnErrorListener((mp, what, extra) -> {
+                dismissSplash();
+                return true;
+            });
+            splashPlayer.prepareAsync();
+        } catch (Exception e) {
+            dismissSplash();
+        }
+    }
+
+    /** Letterbox the landscape splash so sides are not heavily cropped. */
+    private void applyContainTransform(int videoWidth, int videoHeight) {
+        if (splashTexture == null || videoWidth <= 0 || videoHeight <= 0) {
+            return;
+        }
+
+        int viewWidth = splashTexture.getWidth();
+        int viewHeight = splashTexture.getHeight();
+        if (viewWidth <= 0 || viewHeight <= 0) {
+            splashTexture.post(() -> applyContainTransform(videoWidth, videoHeight));
+            return;
+        }
+
+        float scale = Math.min(
+            (float) viewWidth / (float) videoWidth,
+            (float) viewHeight / (float) videoHeight
+        );
+        // Mild zoom so the frame fills a bit more without hard side crop.
+        scale = scale * 1.06f;
+
+        float scaledWidth = videoWidth * scale;
+        float scaledHeight = videoHeight * scale;
+        float dx = (viewWidth - scaledWidth) / 2f;
+        float dy = (viewHeight - scaledHeight) / 2f;
+
+        Matrix matrix = new Matrix();
+        matrix.setScale(scale, scale);
+        matrix.postTranslate(dx, dy);
+        splashTexture.setTransform(matrix);
+    }
+
     private void dismissSplash() {
-        if (splashDismissed || splashOverlay == null) {
+        if (splashDismissed) {
             return;
         }
         splashDismissed = true;
 
-        ViewGroup parent = (ViewGroup) splashOverlay.getParent();
-        if (parent != null) {
-            parent.removeView(splashOverlay);
+        try {
+            if (splashOverlay != null) {
+                splashOverlay.removeCallbacks(splashTimeout);
+            }
+        } catch (Exception ignored) {
         }
+
+        releaseSplashPlayer();
+
+        try {
+            if (splashOverlay != null) {
+                ViewGroup parent = (ViewGroup) splashOverlay.getParent();
+                if (parent != null) {
+                    parent.removeView(splashOverlay);
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
         splashOverlay = null;
+        splashTexture = null;
+        resumeWebViewAfterSplash();
+    }
+
+    private void releaseSplashPlayer() {
+        try {
+            if (splashPlayer != null) {
+                try {
+                    if (splashPlayer.isPlaying()) {
+                        splashPlayer.stop();
+                    }
+                } catch (Exception ignored) {
+                }
+                splashPlayer.reset();
+                splashPlayer.release();
+            }
+        } catch (Exception ignored) {
+        } finally {
+            splashPlayer = null;
+        }
+
+        try {
+            if (splashSurface != null) {
+                splashSurface.release();
+            }
+        } catch (Exception ignored) {
+        } finally {
+            splashSurface = null;
+        }
     }
 }
