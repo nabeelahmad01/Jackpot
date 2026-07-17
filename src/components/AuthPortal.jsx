@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import { useGoogleLogin } from '@react-oauth/google';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -672,9 +673,15 @@ export default function AuthPortal({
             <div className="banner-subtitle">{frontendSettings.landingWelcome || 'WELCOME TO JACKPOT ROYALS'}</div>
             <div className="banner-desc">{frontendSettings.landingGrab || 'Grab amazing bonuses and win big!'}</div>
           </div>
-          <div className="banner-logo-container animate-float">
-            <img src="/jackpot_royals_logo.png" alt="Jackpot Royals Logo" className="banner-logo" />
-            <div className="logo-glow"></div>
+          <div className="header-banner-actions">
+            <Link href="/info" className="home-info-chip" aria-label="Official channels and contact">
+              <i className="fa-solid fa-circle-info" aria-hidden="true" />
+              <span>Info</span>
+            </Link>
+            <div className="banner-logo-container animate-float">
+              <img src="/jackpot_royals_logo.png" alt="Jackpot Royals Logo" className="banner-logo" />
+              <div className="logo-glow"></div>
+            </div>
           </div>
         </div>
 
@@ -1069,6 +1076,13 @@ export default function AuthPortal({
             </AnimatePresence>
           </div>
         </article>
+
+        <p className="auth-info-link-wrap">
+          <Link href="/info" className="auth-info-link">
+            <i className="fa-solid fa-circle-info" aria-hidden="true" />
+            Official channels &amp; contact
+          </Link>
+        </p>
 
         {/* Floating Support Button FAB */}
         {onOpenSupport && (

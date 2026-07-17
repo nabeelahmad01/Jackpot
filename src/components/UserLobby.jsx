@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PaymentMethodModal } from './Modals';
 // TEMPORARILY HIDDEN — uncomment with Get App button when ready
@@ -890,6 +891,9 @@ export default function UserLobby({
               <i className="fa-solid fa-gift"></i> <span>Refer</span>
             </button>
           )}
+          <Link href="/info" className="lobby-nav-btn info-nav-btn" aria-label="Official channels and contact">
+            <i className="fa-solid fa-circle-info"></i> <span>Info</span>
+          </Link>
           <button className="lobby-nav-btn logout-btn" onClick={onLogout}>
             <i className="fa-solid fa-right-from-bracket"></i> <span>Logout</span>
           </button>
