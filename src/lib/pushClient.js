@@ -32,10 +32,15 @@ export async function getExistingPushSubscription() {
 }
 
 async function subscribeToNativePush(userEmail) {
-  const [{ PushNotifications }, { Capacitor }] = await Promise.all([
-    import('@capacitor/push-notifications'),
-    import('@capacitor/core')
-  ]);
+  // Access the native plugin through the runtime bridge instead of a static
+  // import so the web build never hard-depends on @capacitor/push-notifications.
+  // When the APK is built without Firebase, this plugin is absent and we throw,
+  // which triggers the Web Push fallback below.
+  const Capacitor = typeof window !== 'undefined' ? window.Capacitor : null;
+  const PushNotifications = Capacitor?.Plugins?.PushNotifications;
+  if (!PushNotifications) {
+    throw new Error('Native push is not available on this build.');
+  }
 
   let permission = await PushNotifications.checkPermissions();
   if (permission.receive === 'prompt') {
@@ -45,7 +50,7 @@ async function subscribeToNativePush(userEmail) {
     throw new Error('Notification permission was not allowed.');
   }
 
-  if (Capacitor.getPlatform() === 'android') {
+  if (Capacitor?.getPlatform?.() === 'android') {
     await PushNotifications.createChannel({
       id: 'jackpot_promotions',
       name: 'Promotions',
@@ -89,7 +94,7 @@ async function subscribeToNativePush(userEmail) {
     body: JSON.stringify({
       email: String(userEmail || '').trim().toLowerCase(),
       nativeToken: token,
-      platform: Capacitor.getPlatform(),
+      platform: Capacitor?.getPlatform?.() || 'android',
       userAgent: navigator.userAgent
     })
   });
