@@ -21,7 +21,17 @@ function getFirebaseMessaging() {
   if (getApps().length > 0) return getMessaging(getApps()[0]);
 
   let serviceAccount;
-  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+  // Preferred on hosting panels: base64 of the whole JSON. A single line with no
+  // quotes/newlines, so it can never get mangled when pasted into an env var box.
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_B64) {
+    try {
+      const decoded = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_B64, 'base64').toString('utf8');
+      serviceAccount = JSON.parse(decoded);
+    } catch (error) {
+      console.error('Invalid FIREBASE_SERVICE_ACCOUNT_B64:', error.message);
+      return null;
+    }
+  } else if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
     try {
       serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
     } catch (error) {
