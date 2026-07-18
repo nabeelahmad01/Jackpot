@@ -2,6 +2,7 @@
 
 import PanelModalBackdrop from './PanelModalBackdrop';
 import React, { useState, useEffect, useRef } from 'react';
+import { compressImageFile } from '../lib/imageCompress';
 
 // --- A) CUSTOMER SUPPORT MODAL ---
 export function SupportModal({ isOpen, onClose, currentUser }) {
@@ -307,22 +308,28 @@ export function AdminGameModal({ isOpen, onClose, onSave, editGame }) {
 
   if (!isOpen) return null;
 
-  const handleLogoUpload = (e) => {
+  const handleLogoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      setImageError('Logo cover image size must be less than 2MB.');
+    if (file.size > 8 * 1024 * 1024) {
+      setImageError('Logo cover image size must be less than 8MB.');
       e.target.value = '';
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImage(reader.result);
+    try {
+      const compressed = await compressImageFile(file, { maxSize: 512, quality: 0.72 });
+      setImage(compressed);
       setImageError('');
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImage(reader.result);
+        setImageError('');
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSubmit = async (e) => {
