@@ -109,13 +109,18 @@ export async function POST(req) {
 
     if (emails.length > 0) {
       if (smtpUser && smtpPass) {
-        const transporter = nodemailer.createTransport({
-          service: 'gmail',
-          auth: {
-            user: smtpUser,
-            pass: smtpPass
-          }
-        });
+        const smtpHost = process.env.SMTP_HOST;
+        const transporter = smtpHost
+          ? nodemailer.createTransport({
+              host: smtpHost,
+              port: Number(process.env.SMTP_PORT || 465),
+              secure: Number(process.env.SMTP_PORT || 465) === 465,
+              auth: { user: smtpUser, pass: smtpPass }
+            })
+          : nodemailer.createTransport({
+              service: 'gmail',
+              auth: { user: smtpUser, pass: smtpPass }
+            });
 
         const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://jackpotroyals.com').replace(/\/$/, '');
         const attachments = [];

@@ -391,45 +391,38 @@ export default function AuthPortal({
   const triggerDemoOtpCode = async (userData) => {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     setActiveOtpCode(code);
-    console.log(`[Verification Code Generated] OTP Code: ${code}`);
+    if (process.env.NODE_ENV !== 'production') {
+      // Dev-only helper so local testing works without email; never shown to users.
+      console.log(`[DEV] Verification code: ${code}`);
+    }
 
     const targetEmail = userData?.email || userData?.recoveryEmail;
     const targetName = userData?.name || 'Player';
 
-    if (targetEmail) {
-      try {
-        const response = await fetch('/api/send-otp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: targetEmail, otp: code, name: targetName })
-        });
-        const data = await response.json();
-        
-        if (data.success) {
-          if (data.simulated) {
-            // SMTP not set in env variables
-            setTimeout(() => {
-              showToast(`🚨 DEMO CODE: Enter verification OTP code ${code} to proceed.`, 'info');
-            }, 1000);
-          } else {
-            showToast('Real OTP Verification code sent to your email inbox!', 'success');
-          }
-        } else {
-          showToast('Real SMTP dispatch failed. Falling back to demo alert!', 'error');
-          setTimeout(() => {
-            showToast(`🚨 DEMO CODE: Enter verification OTP code ${code} to proceed.`, 'info');
-          }, 1500);
-        }
-      } catch (err) {
-        console.error('Mail dispatch network error:', err);
-        setTimeout(() => {
-          showToast(`🚨 DEMO CODE: Enter verification OTP code ${code} to proceed.`, 'info');
-        }, 1500);
+    if (!targetEmail) {
+      showToast('No email address found for verification.', 'error');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: targetEmail, otp: code, name: targetName })
+      });
+      const data = await response.json();
+
+      if (data.success && !data.simulated) {
+        showToast('Verification code sent to your email inbox!', 'success');
+      } else if (data.success && data.simulated) {
+        // Email service not configured (local dev only). Code is in the dev console.
+        showToast('Email service is not configured yet. Please contact support.', 'error');
+      } else {
+        showToast(data.message || 'Could not send verification email. Please try again.', 'error');
       }
-    } else {
-      setTimeout(() => {
-        showToast(`🚨 DEMO CODE: Enter verification OTP code ${code} to proceed.`, 'info');
-      }, 1500);
+    } catch (err) {
+      console.error('Mail dispatch network error:', err);
+      showToast('Could not send verification email. Please check your connection and try again.', 'error');
     }
   };
 

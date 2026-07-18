@@ -18,13 +18,18 @@ export async function POST(req) {
       });
     }
 
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: smtpUser,
-        pass: smtpPass
-      }
-    });
+    const smtpHost = process.env.SMTP_HOST;
+    const transporter = smtpHost
+      ? nodemailer.createTransport({
+          host: smtpHost,
+          port: Number(process.env.SMTP_PORT || 465),
+          secure: Number(process.env.SMTP_PORT || 465) === 465,
+          auth: { user: smtpUser, pass: smtpPass }
+        })
+      : nodemailer.createTransport({
+          service: 'gmail',
+          auth: { user: smtpUser, pass: smtpPass }
+        });
 
     // Premium dark-gold themed HTML template
     const htmlTemplate = `
