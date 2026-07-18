@@ -27,15 +27,42 @@ export default function Home() {
   const [supportOpen, setSupportOpen] = useState(false);
   const [googleWarnOpen, setGoogleWarnOpen] = useState(false);
 
+  // Last-saved frontend settings cached in localStorage so a refresh shows the
+  // correct values instantly instead of flashing the hardcoded defaults.
+  const [cachedFrontendSettings] = useState(() => {
+    if (typeof window === 'undefined') return undefined;
+    try {
+      const raw = localStorage.getItem('frontendSettingsCache');
+      return raw ? JSON.parse(raw) : undefined;
+    } catch {
+      return undefined;
+    }
+  });
+
   // Fetch static data (games and gateways catalog) with SWR (cached, no automatic polling)
   const { data: gamesData } = useSWR('/api/games', fetcher, { revalidateOnFocus: false, dedupingInterval: 60000 });
   const gatewaysQuery = session?.distributorId ? `/api/gateways?distributorId=${session.distributorId}` : '/api/gateways';
   const { data: gatewaysData } = useSWR(gatewaysQuery, fetcher, { revalidateOnFocus: false, dedupingInterval: 60000 });
-  const { data: frontendSettingsData } = useSWR('/api/settings/frontend', fetcher, { revalidateOnFocus: false, dedupingInterval: 60000 });
+  const { data: frontendSettingsData } = useSWR('/api/settings/frontend', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60000,
+    fallbackData: cachedFrontendSettings ? { success: true, settings: cachedFrontendSettings } : undefined
+  });
 
   const games = gamesData?.games || [];
   const gateways = gatewaysData?.gateways || [];
   const frontendSettings = frontendSettingsData?.settings || {};
+
+  // Persist the latest settings so the next page load can render them immediately.
+  useEffect(() => {
+    if (frontendSettingsData?.settings) {
+      try {
+        localStorage.setItem('frontendSettingsCache', JSON.stringify(frontendSettingsData.settings));
+      } catch {
+        /* ignore quota / privacy-mode errors */
+      }
+    }
+  }, [frontendSettingsData]);
 
   // Fetch user-specific queues (only when player is logged in) with SWR polling every 5s
   const emailQuery = session?.email ? encodeURIComponent(session.email) : null;

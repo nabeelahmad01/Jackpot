@@ -1140,8 +1140,8 @@ export default function UserLobby({
 
           <section className="lobby-hero">
             <div className="hero-promo-block">
-              <h2 className="hero-promo-headline" style={{ textTransform: 'uppercase' }}>
-                {frontendSettings?.lobbyHeroPromo || "GET 300% SIGNUP BONUS ON YOUR FIRST DEPOSIT"}
+              <h2 className="hero-promo-headline" style={{ textTransform: 'uppercase', visibility: frontendSettings?.lobbyHeroPromo ? 'visible' : 'hidden' }}>
+                {frontendSettings?.lobbyHeroPromo || "GET SIGNUP BONUS ON YOUR FIRST DEPOSIT"}
               </h2>
               <div className="hero-trust-badges">
                 <div className="trust-pill"><i className="fa-solid fa-shield-halved"></i> {frontendSettings?.lobbyTrustBadge1 || "Instant Withdrawals"}</div>
