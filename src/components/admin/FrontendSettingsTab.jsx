@@ -14,6 +14,7 @@ export default function FrontendSettingsTab({ adminUser }) {
   const [withdrawNotice, setWithdrawNotice] = useState('');
   const [cashoutNotice, setCashoutNotice] = useState('');
   const [androidAppUrl, setAndroidAppUrl] = useState('/downloads/jackpot-royals.apk');
+  const [getAppEnabled, setGetAppEnabled] = useState(false);
   const [chimeActive, setChimeActive] = useState(true);
   const [venmoActive, setVenmoActive] = useState(true);
   const [cashappActive, setCashappActive] = useState(true);
@@ -105,6 +106,7 @@ export default function FrontendSettingsTab({ adminUser }) {
       setWithdrawNotice(s.withdrawNotice || 'Fastest Withdrawals inside 5 Minutes!');
       setCashoutNotice(s.cashoutNotice || 'Standard cashout processing hours: 9 AM - 11 PM EST');
       setAndroidAppUrl(s.androidAppUrl || '/downloads/jackpot-royals.apk');
+      setGetAppEnabled(s.getAppEnabled === true);
       setChimeActive(s.chimeActive !== false);
       setVenmoActive(s.venmoActive !== false);
       setCashappActive(s.cashappActive !== false);
@@ -249,6 +251,7 @@ export default function FrontendSettingsTab({ adminUser }) {
           withdrawNotice,
           cashoutNotice,
           androidAppUrl,
+          getAppEnabled,
           chimeActive,
           venmoActive,
           cashappActive,
@@ -363,6 +366,10 @@ export default function FrontendSettingsTab({ adminUser }) {
             <h4 style={{ fontSize: '0.8rem', color: '#fff', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.75rem' }}>
               Mobile App Download
             </h4>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: '#ddd', cursor: 'pointer', marginBottom: '0.85rem' }}>
+              <input type="checkbox" checked={getAppEnabled} onChange={(e) => setGetAppEnabled(e.target.checked)} />
+              Show &quot;Get App&quot; button in Lobby header
+            </label>
             <div className="input-group" style={{ margin: 0 }}>
               <label>Android APK URL</label>
               <div className="input-wrapper" style={{ background: '#07090f' }}>

@@ -1962,8 +1962,8 @@ function AffiliatePortal() {
           onClick={() => setSupportOpen(true)}
           style={{
             position: 'fixed',
-            bottom: '2rem',
-            right: '2rem',
+            bottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))',
+            right: 'calc(2rem + env(safe-area-inset-right, 0px))',
             zIndex: 99999,
             width: '60px',
             height: '60px',

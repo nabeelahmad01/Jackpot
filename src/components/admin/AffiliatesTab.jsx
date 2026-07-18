@@ -196,7 +196,7 @@ export default function AffiliatesTab() {
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 380px) 1fr', gap: '1.5rem' }}>
+    <div className="panel-staff-layout">
       
       {/* 1. CREATION OR EDIT FORM PANEL */}
       <div className="section-card" style={{ height: 'fit-content' }}>

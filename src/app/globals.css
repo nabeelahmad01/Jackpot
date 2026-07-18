@@ -2110,8 +2110,8 @@ select option {
 
 .support-chat-widget {
   position: fixed;
-  bottom: 25px;
-  right: 25px;
+  bottom: calc(25px + env(safe-area-inset-bottom, 0px));
+  right: calc(25px + env(safe-area-inset-right, 0px));
   z-index: 999;
 }
 

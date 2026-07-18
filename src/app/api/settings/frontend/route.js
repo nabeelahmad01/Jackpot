@@ -10,6 +10,7 @@ const DEFAULT_SETTINGS = {
   withdrawNotice: 'Fastest Withdrawals inside 5 Minutes!',
   cashoutNotice: 'Standard cashout processing hours: 9 AM - 11 PM EST',
   androidAppUrl: '/downloads/jackpot-royals.apk',
+  getAppEnabled: false,
   chimeActive: true,
   venmoActive: true,
   cashappActive: true,
