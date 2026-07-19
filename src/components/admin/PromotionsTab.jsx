@@ -39,6 +39,9 @@ export default function PromotionsTab({ adminUser }) {
   const [promoImage, setPromoImage] = useState('');
   const [promoImageError, setPromoImageError] = useState('');
   const [promoTarget, setPromoTarget] = useState('all'); // 'all' | 'subscribed' | 'unsubscribed' | 'active'
+  const [promoType, setPromoType] = useState('message'); // 'message' | 'freeplay' | 'deposit_bonus'
+  const [promoFreeplayAmount, setPromoFreeplayAmount] = useState('');
+  const [promoBonusPercent, setPromoBonusPercent] = useState('');
   const [isBroadcasting, setIsBroadcasting] = useState(false);
 
   const handlePromoImageUpload = (e) => {
@@ -86,6 +89,14 @@ export default function PromotionsTab({ adminUser }) {
       alert('Please fill in Title and Message fields.');
       return;
     }
+    if (promoType === 'freeplay' && !(parseFloat(promoFreeplayAmount) > 0)) {
+      alert('Enter a freeplay amount greater than 0 for a freeplay offer.');
+      return;
+    }
+    if (promoType === 'deposit_bonus' && !(parseFloat(promoBonusPercent) > 0)) {
+      alert('Enter a bonus percentage greater than 0 for a deposit bonus offer.');
+      return;
+    }
 
     setIsBroadcasting(true);
     try {
@@ -96,7 +107,10 @@ export default function PromotionsTab({ adminUser }) {
           title: promoTitle.trim(),
           message: promoMessage.trim(),
           targetGroup: promoTarget,
-          image: promoImage.trim()
+          image: promoImage.trim(),
+          promoType,
+          freeplayAmount: promoType === 'freeplay' || promoType === 'deposit_bonus' ? parseFloat(promoFreeplayAmount) || 0 : 0,
+          bonusPercent: promoType === 'deposit_bonus' ? parseFloat(promoBonusPercent) || 0 : 0
         })
       });
       const data = await res.json();
@@ -106,6 +120,9 @@ export default function PromotionsTab({ adminUser }) {
         setPromoMessage('');
         setPromoImage('');
         setPromoTarget('all');
+        setPromoType('message');
+        setPromoFreeplayAmount('');
+        setPromoBonusPercent('');
         mutatePromos();
       } else {
         alert(data.message || 'Failed to send promotion.');
@@ -365,6 +382,81 @@ export default function PromotionsTab({ adminUser }) {
                 )}
               </div>
 
+              <div className="input-group">
+                <label htmlFor="promo-type">Offer Type</label>
+                <div className="input-wrapper">
+                  <i className="fa-solid fa-gift input-icon"></i>
+                  <select
+                    id="promo-type"
+                    value={promoType}
+                    onChange={(e) => setPromoType(e.target.value)}
+                    style={{ background: 'none', border: 'none', color: '#fff', width: '100%', fontSize: '0.775rem', height: '100%', outline: 'none', padding: '0 0.5rem' }}
+                  >
+                    <option value="message" style={{ background: '#0a0d16' }}>Message Only (no claim button)</option>
+                    <option value="freeplay" style={{ background: '#0a0d16' }}>Freeplay Offer (player picks a game & requests freeplay)</option>
+                    <option value="deposit_bonus" style={{ background: '#0a0d16' }}>Deposit Bonus Offer (% applied on next deposit)</option>
+                  </select>
+                </div>
+                <span className="game-tap-tip" style={{ marginTop: '0.35rem', display: 'block' }}>
+                  {promoType === 'message' && 'Just an announcement — the popup shows only a "Got it" button.'}
+                  {promoType === 'freeplay' && 'Player taps "Claim Freeplay", chooses a game, and it lands in the Coins queue like a normal freeplay.'}
+                  {promoType === 'deposit_bonus' && 'Player taps "Claim Bonus"; their next approved deposit uses this % (plus any freeplay below is auto-granted).'}
+                </span>
+              </div>
+
+              {promoType === 'freeplay' && (
+                <div className="input-group">
+                  <label htmlFor="promo-freeplay">Freeplay Amount ($)</label>
+                  <div className="input-wrapper">
+                    <i className="fa-solid fa-coins input-icon"></i>
+                    <input
+                      type="number"
+                      id="promo-freeplay"
+                      min="0"
+                      step="0.5"
+                      placeholder="e.g. 5"
+                      value={promoFreeplayAmount}
+                      onChange={(e) => setPromoFreeplayAmount(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {promoType === 'deposit_bonus' && (
+                <>
+                  <div className="input-group">
+                    <label htmlFor="promo-bonus">Deposit Bonus Percentage (%)</label>
+                    <div className="input-wrapper">
+                      <i className="fa-solid fa-percent input-icon"></i>
+                      <input
+                        type="number"
+                        id="promo-bonus"
+                        min="0"
+                        step="1"
+                        placeholder="e.g. 400"
+                        value={promoBonusPercent}
+                        onChange={(e) => setPromoBonusPercent(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="input-group">
+                    <label htmlFor="promo-bonus-freeplay">Bundled Freeplay After Deposit ($ — optional)</label>
+                    <div className="input-wrapper">
+                      <i className="fa-solid fa-coins input-icon"></i>
+                      <input
+                        type="number"
+                        id="promo-bonus-freeplay"
+                        min="0"
+                        step="0.5"
+                        placeholder="0 = none"
+                        value={promoFreeplayAmount}
+                        onChange={(e) => setPromoFreeplayAmount(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
               <div className="input-group" style={{ marginBottom: '1.5rem' }}>
                 <label htmlFor="promo-target">Target Player Group Segment</label>
                 <div className="input-wrapper">
@@ -427,6 +519,15 @@ export default function PromotionsTab({ adminUser }) {
                     <p style={{ fontSize: '0.725rem', color: 'var(--text-muted)', margin: '0.25rem 0', whiteSpace: 'normal', lineHeight: '1.4' }}>
                       {promo.message}
                     </p>
+                    {promo.promoType && promo.promoType !== 'message' && (
+                      <div style={{ marginTop: '0.35rem' }}>
+                        <span style={{ fontSize: '0.6rem', fontWeight: 'bold', textTransform: 'uppercase', padding: '0.15rem 0.45rem', borderRadius: '5px', background: 'rgba(168,85,247,0.15)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.4)' }}>
+                          {promo.promoType === 'freeplay'
+                            ? `Freeplay $${Number(promo.freeplayAmount || 0).toFixed(2)}`
+                            : `Deposit Bonus ${Number(promo.bonusPercent || 0)}%${Number(promo.freeplayAmount || 0) > 0 ? ` + $${Number(promo.freeplayAmount).toFixed(2)} FP` : ''}`}
+                        </span>
+                      </div>
+                    )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
                       <span>Target: <strong style={{ color: 'var(--gold-primary)' }}>{promo.targetGroup.toUpperCase()}</strong></span>
                       <span>{new Date(promo.timestamp).toLocaleDateString()}</span>

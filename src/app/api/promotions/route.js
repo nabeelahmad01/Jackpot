@@ -56,10 +56,24 @@ import nodemailer from 'nodemailer';
 export async function POST(req) {
   try {
     const body = await req.json();
-    const { title, message, targetGroup, image } = body;
+    const { title, message, targetGroup, image, promoType, freeplayAmount, bonusPercent } = body;
 
     if (!title || !message || !targetGroup) {
       return NextResponse.json({ success: false, message: 'Title, message, and target group are required.' }, { status: 400 });
+    }
+
+    // Offer type: 'message' (plain announcement, no claim button),
+    // 'freeplay' (user picks a game and requests freeplay), or
+    // 'deposit_bonus' (arms a bonus % applied to the user's next deposit).
+    const type = ['freeplay', 'deposit_bonus'].includes(promoType) ? promoType : 'message';
+    const fpAmount = Math.max(0, parseFloat(freeplayAmount) || 0);
+    const bPercent = Math.max(0, parseFloat(bonusPercent) || 0);
+
+    if (type === 'freeplay' && fpAmount <= 0) {
+      return NextResponse.json({ success: false, message: 'Freeplay offers need a freeplay amount greater than 0.' }, { status: 400 });
+    }
+    if (type === 'deposit_bonus' && bPercent <= 0) {
+      return NextResponse.json({ success: false, message: 'Deposit bonus offers need a bonus percentage greater than 0.' }, { status: 400 });
     }
 
     const db = await getDb();
@@ -71,6 +85,9 @@ export async function POST(req) {
       message: message.trim(),
       targetGroup, // 'all' | 'subscribed' | 'unsubscribed' | 'active'
       image: image || '',
+      promoType: type,
+      freeplayAmount: fpAmount,
+      bonusPercent: bPercent,
       timestamp: new Date().toISOString()
     };
 

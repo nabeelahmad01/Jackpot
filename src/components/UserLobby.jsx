@@ -783,6 +783,94 @@ export default function UserLobby({
     showToast(`Freeplay request of $3.00 submitted for ${activeGame.title}! Awaiting approval.`, "success");
   };
 
+  const dismissPromo = (promo) => {
+    if (!promo) return;
+    try {
+      const dismissedRaw = localStorage.getItem('dismissed_promotions');
+      const dismissedIds = dismissedRaw ? JSON.parse(dismissedRaw) : [];
+      if (!dismissedIds.includes(promo.id)) dismissedIds.push(promo.id);
+      localStorage.setItem('dismissed_promotions', JSON.stringify(dismissedIds));
+    } catch {
+      /* ignore storage errors */
+    }
+    const nextPromos = activePromos.filter((p) => p.id !== promo.id);
+    setActivePromos(nextPromos);
+    setCurrentPromoToShow(nextPromos.length > 0 ? nextPromos[0] : null);
+  };
+
+  // Claim a "freeplay" promo: player picks a game, then it is submitted as a
+  // normal freeplay request (goes to the Coins queue) — the promo simply sets
+  // the amount and bypasses the usual $25 deposit gate since the admin granted it.
+  const handlePromoFreeplayClaim = (promo) => {
+    const amount = Math.max(0, parseFloat(promo?.freeplayAmount) || 0);
+    if (amount <= 0) {
+      dismissPromo(promo);
+      return;
+    }
+
+    if (!activeGame) {
+      showToast('Please select a game first to claim your promo freeplay!', 'info');
+      document.getElementById('lobby-games-section')?.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+
+    const currentAccount = gameAccounts.find(
+      (acc) => acc.gameTitle.toLowerCase() === activeGame.title.toLowerCase()
+    );
+    if (!currentAccount) {
+      const existingRequest = (accountRequests || []).find(
+        (r) => r.gameTitle && r.gameTitle.toLowerCase() === activeGame.title.toLowerCase() && r.status !== 'REJECTED'
+      );
+      if (!existingRequest) {
+        onRequestAccount(activeGame.title);
+      }
+      showToast(`Account request submitted for ${activeGame.title}! Once created, tap Claim again to get your freeplay.`, 'info');
+      return;
+    }
+
+    if (actionLoading) return;
+    setActionLoading(true);
+    setTimeout(() => setActionLoading(false), 2500);
+
+    onSubmitTransaction({
+      gameTitle: activeGame.title,
+      type: 'BONUS',
+      amount: amount,
+      gateway: 'Freeplay',
+      code: 'FREEPLAY',
+      nameOnTag: currentUser?.name || 'Player',
+      phoneOnTag: '',
+      emailOnTag: currentUserEmail,
+      gameUsername: currentAccount.username,
+      screenshot: ''
+    });
+    showToast(`Freeplay request of $${amount.toFixed(2)} submitted for ${activeGame.title}! Awaiting approval.`, 'success');
+    dismissPromo(promo);
+  };
+
+  // Claim a "deposit bonus" promo: arm the bonus on the player's account so their
+  // next approved deposit uses this % (and any bundled freeplay is auto-granted).
+  const handlePromoBonusClaim = async (promo) => {
+    if (!promo) return;
+    try {
+      const res = await fetch('/api/promotions/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: currentUserEmail, promoId: promo.id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message || 'Bonus armed! Make a deposit to receive it.', 'success');
+        dismissPromo(promo);
+      } else {
+        showToast(data.message || 'Could not claim this offer.', 'error');
+      }
+    } catch (err) {
+      console.error('Promo bonus claim error:', err);
+      showToast('Error claiming offer. Please try again.', 'error');
+    }
+  };
+
   const handleRequestAccountWithBonus = () => {
     if (actionLoading) return;
     setActionLoading(true);
@@ -2451,55 +2539,56 @@ export default function UserLobby({
                 {currentPromoToShow.message}
               </p>
 
-              <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <button
-                  onClick={() => {
-                    const dismissedRaw = localStorage.getItem('dismissed_promotions');
-                    const dismissedIds = dismissedRaw ? JSON.parse(dismissedRaw) : [];
-                    dismissedIds.push(currentPromoToShow.id);
-                    localStorage.setItem('dismissed_promotions', JSON.stringify(dismissedIds));
+              {(() => {
+                const pType = currentPromoToShow.promoType || 'message';
+                const fp = Number(currentPromoToShow.freeplayAmount || 0);
+                const bp = Number(currentPromoToShow.bonusPercent || 0);
+                return (
+                  <>
+                    {(pType === 'freeplay' && fp > 0) && (
+                      <div style={{ display: 'inline-block', margin: '0 auto 1rem', padding: '0.4rem 0.9rem', borderRadius: '999px', background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.4)', color: '#c084fc', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                        <i className="fa-solid fa-gift" style={{ marginRight: '6px' }}></i>${fp.toFixed(2)} Freeplay
+                      </div>
+                    )}
+                    {pType === 'deposit_bonus' && (
+                      <div style={{ display: 'inline-block', margin: '0 auto 1rem', padding: '0.4rem 0.9rem', borderRadius: '999px', background: 'rgba(74,222,128,0.12)', border: '1px solid rgba(74,222,128,0.4)', color: '#4ade80', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                        <i className="fa-solid fa-coins" style={{ marginRight: '6px' }}></i>{bp}% Deposit Bonus{fp > 0 ? ` + $${fp.toFixed(2)} Freeplay` : ''}
+                      </div>
+                    )}
 
-                    const nextPromos = activePromos.filter(p => p.id !== currentPromoToShow.id);
-                    setActivePromos(nextPromos);
-                    if (nextPromos.length > 0) {
-                      setCurrentPromoToShow(nextPromos[0]);
-                    } else {
-                      setCurrentPromoToShow(null);
-                    }
-                  }}
-                  className="submit-btn"
-                  style={{
-                    background: 'var(--gold-primary)',
-                    color: '#000',
-                    fontWeight: 'bold',
-                    margin: 0
-                  }}
-                >
-                  CLAIM OFFER NOW
-                </button>
-                <button
-                  onClick={() => {
-                    const dismissedRaw = localStorage.getItem('dismissed_promotions');
-                    const dismissedIds = dismissedRaw ? JSON.parse(dismissedRaw) : [];
-                    dismissedIds.push(currentPromoToShow.id);
-                    localStorage.setItem('dismissed_promotions', JSON.stringify(dismissedIds));
-
-                    setCurrentPromoToShow(null);
-                  }}
-                  className="action-row-btn"
-                  style={{
-                    background: 'rgba(255,255,255,0.05)',
-                    color: '#fff',
-                    border: 'none',
-                    fontSize: '0.75rem',
-                    padding: '0.5rem 1rem',
-                    borderRadius: '8px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Close
-                </button>
-              </div>
+                    <div style={{ display: 'flex', gap: '0.75rem' }}>
+                      {pType === 'message' ? (
+                        <button
+                          onClick={() => dismissPromo(currentPromoToShow)}
+                          className="submit-btn"
+                          style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold', margin: 0 }}
+                        >
+                          Got it
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => (pType === 'freeplay'
+                              ? handlePromoFreeplayClaim(currentPromoToShow)
+                              : handlePromoBonusClaim(currentPromoToShow))}
+                            className="submit-btn"
+                            style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold', margin: 0 }}
+                          >
+                            {pType === 'freeplay' ? 'CLAIM FREEPLAY' : 'CLAIM BONUS'}
+                          </button>
+                          <button
+                            onClick={() => dismissPromo(currentPromoToShow)}
+                            className="action-row-btn"
+                            style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', border: 'none', fontSize: '0.75rem', padding: '0.5rem 1rem', borderRadius: '8px', cursor: 'pointer' }}
+                          >
+                            Later
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
 
           </div>

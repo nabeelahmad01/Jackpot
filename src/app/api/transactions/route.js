@@ -616,8 +616,18 @@ export async function PUT(req) {
           ? Number(frontendSettings.firstDepositBonus)
           : (settings ? Number(settings.firstDepositBonus) : 300);
 
+        // Promo deposit bonus: if the player claimed a "deposit bonus" promotion,
+        // their next approved deposit uses that promo % instead of the default
+        // first/regular bonus, and any bundled freeplay is auto-granted below.
+        const depositorForBonus = await db.collection('users').findOne({ email: userEmail });
+        const rawPromoBonus = depositorForBonus ? depositorForBonus.pendingDepositBonusPercent : undefined;
+        const promoBonusPercent = (rawPromoBonus !== undefined && rawPromoBonus !== null) ? Number(rawPromoBonus) : null;
+        const usePromoBonus = originalTx.type === 'DEPOSIT' && promoBonusPercent !== null && promoBonusPercent > 0;
+
         const isBonus = originalTx.type === 'BONUS';
-        const bonusPercentage = isBonus ? 0 : (isFirstDeposit ? firstBonusPercent : (settings ? Number(settings.regularDepositBonus) : 20));
+        const bonusPercentage = isBonus
+          ? 0
+          : (usePromoBonus ? promoBonusPercent : (isFirstDeposit ? firstBonusPercent : (settings ? Number(settings.regularDepositBonus) : 20)));
         
         // Calculate total coins to allot
         const amount = parseFloat(originalTx.amount);
@@ -656,6 +666,52 @@ export async function PUT(req) {
               read: false,
               timestamp: new Date().toISOString(),
               transactionId: originalTx.id, // Linked parent transaction!
+              distributorId: originalTx.distributorId || ''
+            });
+          }
+        }
+
+        // 3b. Consume the claimed promo deposit bonus (so it only applies once) and
+        // auto-grant any bundled freeplay for the same game — it lands in the coins
+        // queue exactly like a normal freeplay, so the player gets it automatically.
+        if (originalTx.type === 'DEPOSIT' && depositorForBonus && (usePromoBonus || Number(depositorForBonus.pendingBonusFreeplay || 0) > 0)) {
+          const freeplayAmt = Math.max(0, parseFloat(depositorForBonus.pendingBonusFreeplay) || 0);
+
+          await db.collection('users').updateOne(
+            { email: userEmail },
+            { $unset: { pendingDepositBonusPercent: '', pendingBonusFreeplay: '', pendingBonusPromoId: '', pendingBonusPromoTitle: '' } }
+          );
+
+          if (freeplayAmt > 0) {
+            const fpId = (Date.now() + Math.floor(Math.random() * 1000)).toString();
+            await transactionsCollection.insertOne({
+              id: fpId,
+              userEmail,
+              date: new Date().toLocaleString(),
+              createdAt: new Date().toISOString(),
+              status: 'COINS_LOADING',
+              type: 'BONUS',
+              code: 'FREEPLAY',
+              amount: freeplayAmt,
+              gateway: 'Freeplay',
+              gameTitle: originalTx.gameTitle || 'Lobby',
+              note: `Auto freeplay from promo${depositorForBonus.pendingBonusPromoTitle ? `: ${depositorForBonus.pendingBonusPromoTitle}` : ''}`,
+              nameOnTag: depositorForBonus.name || 'Player',
+              emailOnTag: userEmail,
+              distributorId: originalTx.distributorId || ''
+            });
+            await notificationsCollection.insertOne({
+              id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
+              userEmail,
+              gameTitle: originalTx.gameTitle || 'Lobby',
+              depositAmount: 0,
+              bonusApplied: -3,
+              isFreeplay: true,
+              totalCoins: freeplayAmt,
+              status: 'PENDING',
+              read: false,
+              timestamp: new Date().toISOString(),
+              transactionId: fpId,
               distributorId: originalTx.distributorId || ''
             });
           }
