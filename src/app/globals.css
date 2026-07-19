@@ -1314,6 +1314,55 @@ select option {
   --proof-slide-gap: 1rem;
 }
 
+/* Seamless infinite marquee for cashout proofs (never leaves empty space). */
+.proof-marquee {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  border-radius: 16px;
+  padding: 0.35rem 0 0.7rem;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
+}
+
+.proof-marquee-track {
+  display: flex;
+  gap: var(--proof-slide-gap);
+  width: max-content;
+  animation: proof-marquee-scroll var(--proof-marquee-duration, 40s) linear infinite;
+  will-change: transform;
+}
+
+.proof-marquee:hover .proof-marquee-track {
+  animation-play-state: paused;
+}
+
+.proof-marquee .proof-slide {
+  opacity: 1;
+}
+
+.proof-marquee .proof-slide:hover {
+  border-color: rgba(255, 215, 0, 0.55);
+  box-shadow: 0 12px 30px rgba(255, 215, 0, 0.16);
+  transform: translateY(-4px);
+}
+
+@keyframes proof-marquee-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    /* Shift by exactly one set (half the track) + half a gap for a seamless join. */
+    transform: translateX(calc(-50% - (var(--proof-slide-gap) / 2)));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .proof-marquee-track {
+    animation: none;
+  }
+}
+
 .proof-slider {
   position: relative;
   display: flex;

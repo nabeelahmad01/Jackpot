@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PaymentMethodModal } from './Modals';
@@ -209,8 +209,6 @@ export default function UserLobby({
   const [actionLoading, setActionLoading] = useState(false);
   const [activeTooltipId, setActiveTooltipId] = useState(null);
   const [lightboxImage, setLightboxImage] = useState(null);
-  const [proofSlideIndex, setProofSlideIndex] = useState(0);
-  const proofSliderPausedRef = useRef(false);
 
   // Subscription Alert Prompt states
   const [showSubPrompt, setShowSubPrompt] = useState(false);
@@ -227,24 +225,21 @@ export default function UserLobby({
 
   const proofScreenshots = frontendSettings?.proofScreenshots || [];
 
-  useEffect(() => {
-    if (proofScreenshots.length <= 1) return undefined;
-    const timer = setInterval(() => {
-      if (proofSliderPausedRef.current) return;
-      setProofSlideIndex((prev) => (prev + 1) % proofScreenshots.length);
-    }, 3200);
-    return () => clearInterval(timer);
-  }, [proofScreenshots.length]);
+  // Build a seamless infinite marquee: repeat the proofs enough to always fill
+  // the viewport (so there's never empty space), then duplicate that whole set
+  // once so the CSS animation can loop from 0 to -50% without any visible gap.
+  const proofMarqueeSet = useMemo(() => {
+    if (proofScreenshots.length === 0) return [];
+    const multiplier = Math.max(1, Math.ceil(8 / proofScreenshots.length));
+    const set = [];
+    for (let i = 0; i < multiplier; i += 1) set.push(...proofScreenshots);
+    return set;
+  }, [proofScreenshots]);
 
-  const goProofSlide = (direction) => {
-    if (proofScreenshots.length === 0) return;
-    setProofSlideIndex((prev) => {
-      const next = prev + direction;
-      if (next < 0) return proofScreenshots.length - 1;
-      if (next >= proofScreenshots.length) return 0;
-      return next;
-    });
-  };
+  const proofMarqueeSlides = useMemo(
+    () => [...proofMarqueeSet, ...proofMarqueeSet],
+    [proofMarqueeSet]
+  );
 
   useEffect(() => {
     if (withdrawModalOpen) {
@@ -1362,71 +1357,31 @@ export default function UserLobby({
                 </h4>
               </div>
 
-              <div
-                className="proof-slider"
-                onMouseEnter={() => { proofSliderPausedRef.current = true; }}
-                onMouseLeave={() => { proofSliderPausedRef.current = false; }}
-                onTouchStart={() => { proofSliderPausedRef.current = true; }}
-                onTouchEnd={() => { proofSliderPausedRef.current = false; }}
-              >
-                <button
-                  type="button"
-                  className="proof-slider-nav proof-slider-prev"
-                  onClick={() => goProofSlide(-1)}
-                  aria-label="Previous proof"
+              <div className="proof-marquee">
+                <div
+                  className="proof-marquee-track"
+                  style={{ '--proof-marquee-duration': `${proofMarqueeSet.length * 2.6}s` }}
                 >
-                  <i className="fa-solid fa-chevron-left"></i>
-                </button>
-
-                <div className="proof-slider-viewport">
-                  <div
-                    className="proof-slider-track"
-                    style={{
-                      transform: `translateX(calc(-${proofSlideIndex} * (var(--proof-slide-width) + var(--proof-slide-gap))))`
-                    }}
-                  >
-                    {proofScreenshots.map((proof, idx) => (
-                      <button
-                        type="button"
-                        key={proof.id || idx}
-                        className={`proof-slide ${idx === proofSlideIndex ? 'active' : ''}`}
-                        onClick={() => setLightboxImage(proof.imageUrl)}
-                      >
-                        <img
-                          src={proof.imageUrl}
-                          alt={proof.title || 'Cashout proof'}
-                        />
-                        <span className="proof-slide-caption">
-                          {proof.title || 'Cashout Completed'}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  className="proof-slider-nav proof-slider-next"
-                  onClick={() => goProofSlide(1)}
-                  aria-label="Next proof"
-                >
-                  <i className="fa-solid fa-chevron-right"></i>
-                </button>
-              </div>
-
-              {proofScreenshots.length > 1 && (
-                <div className="proof-slider-dots">
-                  {proofScreenshots.map((proof, idx) => (
+                  {proofMarqueeSlides.map((proof, idx) => (
                     <button
                       type="button"
-                      key={`dot-${proof.id || idx}`}
-                      className={`proof-slider-dot ${idx === proofSlideIndex ? 'active' : ''}`}
-                      onClick={() => setProofSlideIndex(idx)}
-                      aria-label={`Go to proof ${idx + 1}`}
-                    />
+                      key={`${proof.id || 'proof'}-${idx}`}
+                      className="proof-slide"
+                      onClick={() => setLightboxImage(proof.imageUrl)}
+                      aria-hidden={idx >= proofMarqueeSet.length ? 'true' : undefined}
+                      tabIndex={idx >= proofMarqueeSet.length ? -1 : 0}
+                    >
+                      <img
+                        src={proof.imageUrl}
+                        alt={proof.title || 'Cashout proof'}
+                      />
+                      <span className="proof-slide-caption">
+                        {proof.title || 'Cashout Completed'}
+                      </span>
+                    </button>
                   ))}
                 </div>
-              )}
+              </div>
             </section>
           )}
 
