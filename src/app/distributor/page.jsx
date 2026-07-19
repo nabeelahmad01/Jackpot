@@ -145,7 +145,10 @@ export default function DistributorPortal() {
 
   const { data: statsData, mutate: mutateStats } = usePollingSWR(
     distId ? `/api/distributors/stats?distributorId=${distId}` : null,
-    POLL.STATS
+    POLL.STATS,
+    // Keep polling even when the tab is hidden / browser is minimized so new
+    // requests still trigger the desktop notification + sound while away.
+    { refreshWhenHidden: true }
   );
 
   // Gateways SWR (For Type B)

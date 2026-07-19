@@ -89,7 +89,10 @@ export default function AdminDashboard({
   // Use SWR to poll counts/stats for the sidebar badges
   const { data: statsData } = usePollingSWR(
     `/api/admin/stats?adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
-    POLL.STATS
+    POLL.STATS,
+    // Keep polling even when the tab is hidden / Chrome is minimized so new
+    // requests still trigger the desktop notification + sound while away.
+    { refreshWhenHidden: true }
   );
 
   const { data: settingsData } = useSWR('/api/settings/frontend', fetcher, { revalidateOnFocus: false, dedupingInterval: 60000 });
