@@ -22,9 +22,6 @@ const CLAIMABLE_TYPES = ['WITHDRAW', 'COMMISSION_WITHDRAW', 'AFFILIATE_COMMISSIO
 
 export function canShowClaimRemainderButton(tx, claimedIds = [], now = Date.now()) {
   if (!CLAIMABLE_TYPES.includes(tx.type) || tx.status !== 'SUCCESS') return false;
-  // A remainder request (child tx) is tracked on its ORIGINAL withdrawal (parent).
-  // Never show a second claim button on the child request itself.
-  if (tx.parentTxId) return false;
   if (isRemainderFullyPaid(tx)) return false;
   if (parseFloat(tx.payoutHold || 0) <= 0) return false;
   if (isRemainderClaimPending(tx, claimedIds)) return false;

@@ -2,6 +2,7 @@ import "./globals.css";
 import ClientChunkGuard from "../components/ClientChunkGuard";
 import NativeSplash from "../components/NativeSplash";
 import NativeChrome from "../components/NativeChrome";
+import MetaPixel from "../components/MetaPixel";
 
 export const metadata = {
   title: "Jackpot Royals - Win Big!",
@@ -45,6 +46,7 @@ export default function RootLayout({ children }) {
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
       </head>
       <body suppressHydrationWarning>
+        <MetaPixel />
         <NativeChrome />
         <NativeSplash />
         <ClientChunkGuard />

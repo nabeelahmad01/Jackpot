@@ -516,30 +516,31 @@ export async function PUT(req) {
     if (status === 'SUCCESS' && originalTx.parentTxId) {
       try {
         const finalChildHold = payoutHold !== undefined ? Number(payoutHold) : parseFloat(originalTx.payoutHold || 0);
-        if (finalChildHold > 0) {
-          const parentUpdate = {
-            payoutHold: finalChildHold,
-            remainderPaid: false,
-            remainderRequested: false,
-            remainderStatus: ''
-          };
-          const hours = remainderWaitHours !== undefined ? Math.max(0, Number(remainderWaitHours) || 0) : 0;
-          const minutes = remainderWaitMinutes !== undefined ? Math.max(0, Number(remainderWaitMinutes) || 0) : 0;
-          if (hours > 0 || minutes > 0) {
-            parentUpdate.remainderWaitHours = hours;
-            parentUpdate.remainderWaitMinutes = minutes;
-            parentUpdate.remainderClaimAvailableAt = buildRemainderClaimAvailableAt(hours, minutes);
-          } else {
-            parentUpdate.remainderClaimAvailableAt = new Date().toISOString();
+
+        // The claim button lives on the LATEST request line (this child). When it
+        // is only partially paid, the child keeps the remaining hold + its own
+        // timer (set above) and shows the next claim button — we must NOT revive
+        // the ancestor's button. When it is fully paid, settle the whole ancestor
+        // chain so no button or "Remainder Requested" label lingers anywhere.
+        if (finalChildHold <= 0) {
+          let ancestorId = originalTx.parentTxId;
+          let guard = 0;
+          while (ancestorId && guard < 25) {
+            const ancestor = await transactionsCollection.findOne({ id: ancestorId });
+            if (!ancestor) break;
+            await transactionsCollection.updateOne(
+              { id: ancestorId },
+              { $set: { remainderPaid: true, remainderStatus: 'SUCCESS', payoutHold: 0, remainderRequested: false } }
+            );
+            ancestorId = ancestor.parentTxId;
+            guard += 1;
           }
-          await transactionsCollection.updateOne(
-            { id: originalTx.parentTxId },
-            { $set: parentUpdate }
-          );
         } else {
+          // Keep the immediate parent flagged as requested so it shows no button
+          // (its remainder has been handed down to this child).
           await transactionsCollection.updateOne(
             { id: originalTx.parentTxId },
-            { $set: { remainderPaid: true, remainderStatus: 'SUCCESS', payoutHold: 0, remainderRequested: false } }
+            { $set: { remainderRequested: true, remainderStatus: '' } }
           );
         }
       } catch (err) {
