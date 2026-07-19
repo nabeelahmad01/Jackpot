@@ -257,6 +257,9 @@ export default function UserLobby({
   // Targeted Promotions states
   const [activePromos, setActivePromos] = useState([]);
   const [currentPromoToShow, setCurrentPromoToShow] = useState(null);
+  // A freeplay offer the player started claiming but still needs to pick a game
+  // (and have an account) for. Kept here so they don't lose the offer.
+  const [pendingPromoFreeplay, setPendingPromoFreeplay] = useState(null);
 
   useEffect(() => {
     if (!currentUserEmail) return;
@@ -783,37 +786,52 @@ export default function UserLobby({
     showToast(`Freeplay request of $3.00 submitted for ${activeGame.title}! Awaiting approval.`, "success");
   };
 
-  const dismissPromo = (promo) => {
+  // Close a promo popup. `permanent` (default) also remembers it so it never
+  // shows again — used once the offer is actually claimed or an announcement is
+  // acknowledged. For "Later" on a claimable offer we pass permanent=false so it
+  // can gently remind the player next visit until they claim it.
+  const dismissPromo = (promo, permanent = true) => {
     if (!promo) return;
-    try {
-      const dismissedRaw = localStorage.getItem('dismissed_promotions');
-      const dismissedIds = dismissedRaw ? JSON.parse(dismissedRaw) : [];
-      if (!dismissedIds.includes(promo.id)) dismissedIds.push(promo.id);
-      localStorage.setItem('dismissed_promotions', JSON.stringify(dismissedIds));
-    } catch {
-      /* ignore storage errors */
+    if (permanent) {
+      try {
+        const dismissedRaw = localStorage.getItem('dismissed_promotions');
+        const dismissedIds = dismissedRaw ? JSON.parse(dismissedRaw) : [];
+        if (!dismissedIds.includes(promo.id)) dismissedIds.push(promo.id);
+        localStorage.setItem('dismissed_promotions', JSON.stringify(dismissedIds));
+      } catch {
+        /* ignore storage errors */
+      }
     }
     const nextPromos = activePromos.filter((p) => p.id !== promo.id);
     setActivePromos(nextPromos);
     setCurrentPromoToShow(nextPromos.length > 0 ? nextPromos[0] : null);
   };
 
-  // Claim a "freeplay" promo: player picks a game, then it is submitted as a
-  // normal freeplay request (goes to the Coins queue) — the promo simply sets
-  // the amount and bypasses the usual $25 deposit gate since the admin granted it.
+  // Claim a "freeplay" promo. The player must pick a game (and have an account)
+  // first, so if they aren't ready we KEEP the offer pending (a small banner lets
+  // them finish later) instead of losing it. Once ready it is submitted as a
+  // normal freeplay request — goes to the Coins queue exactly like existing
+  // freeplay — and bypasses the usual $25 gate because the admin granted it.
   const handlePromoFreeplayClaim = (promo) => {
     const amount = Math.max(0, parseFloat(promo?.freeplayAmount) || 0);
     if (amount <= 0) {
-      dismissPromo(promo);
+      setPendingPromoFreeplay(null);
+      dismissPromo(promo, true);
       return;
     }
 
+    // Step 1 — need a game selected. Stash the offer, close the popup (so the
+    // lobby/games are usable), scroll to games, and let them tap the banner.
     if (!activeGame) {
-      showToast('Please select a game first to claim your promo freeplay!', 'info');
+      setPendingPromoFreeplay(promo);
+      dismissPromo(promo, false);
+      showToast(`Select a game below, then tap "Claim" to get your $${amount.toFixed(2)} freeplay.`, 'info');
       document.getElementById('lobby-games-section')?.scrollIntoView({ behavior: 'smooth' });
       return;
     }
 
+    // Step 2 — game chosen but no account yet: request one and keep the offer
+    // pending so they can claim as soon as the account is created.
     const currentAccount = gameAccounts.find(
       (acc) => acc.gameTitle.toLowerCase() === activeGame.title.toLowerCase()
     );
@@ -824,10 +842,13 @@ export default function UserLobby({
       if (!existingRequest) {
         onRequestAccount(activeGame.title);
       }
-      showToast(`Account request submitted for ${activeGame.title}! Once created, tap Claim again to get your freeplay.`, 'info');
+      setPendingPromoFreeplay(promo);
+      dismissPromo(promo, false);
+      showToast(`Account requested for ${activeGame.title}. Once it's ready, tap "Claim" to get your $${amount.toFixed(2)} freeplay.`, 'info');
       return;
     }
 
+    // Step 3 — everything is ready: submit the freeplay request.
     if (actionLoading) return;
     setActionLoading(true);
     setTimeout(() => setActionLoading(false), 2500);
@@ -838,6 +859,7 @@ export default function UserLobby({
       amount: amount,
       gateway: 'Freeplay',
       code: 'FREEPLAY',
+      note: `Promo freeplay claim ($${amount.toFixed(2)}) — ${promo?.title || 'Promotion'}`,
       nameOnTag: currentUser?.name || 'Player',
       phoneOnTag: '',
       emailOnTag: currentUserEmail,
@@ -845,7 +867,8 @@ export default function UserLobby({
       screenshot: ''
     });
     showToast(`Freeplay request of $${amount.toFixed(2)} submitted for ${activeGame.title}! Awaiting approval.`, 'success');
-    dismissPromo(promo);
+    setPendingPromoFreeplay(null);
+    dismissPromo(promo, true);
   };
 
   // Claim a "deposit bonus" promo: arm the bonus on the player's account so their
@@ -861,7 +884,7 @@ export default function UserLobby({
       const data = await res.json();
       if (data.success) {
         showToast(data.message || 'Bonus armed! Make a deposit to receive it.', 'success');
-        dismissPromo(promo);
+        dismissPromo(promo, true);
       } else {
         showToast(data.message || 'Could not claim this offer.', 'error');
       }
@@ -2495,6 +2518,52 @@ export default function UserLobby({
         </div>
       )}
 
+      {/* Pending freeplay claim banner — lets the player finish claiming after
+          they pick a game, so the offer is never lost when they close the popup. */}
+      {pendingPromoFreeplay && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 'calc(12px + env(safe-area-inset-top, 0px))',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 2500,
+            width: 'min(94%, 460px)',
+            background: 'linear-gradient(135deg, #1a1030 0%, #0a0d16 100%)',
+            border: '1px solid rgba(168,85,247,0.5)',
+            borderRadius: '12px',
+            padding: '0.7rem 0.85rem',
+            boxShadow: '0 12px 32px rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem'
+          }}
+        >
+          <i className="fa-solid fa-gift" style={{ color: '#c084fc', fontSize: '1.1rem' }}></i>
+          <div style={{ flex: 1, fontSize: '0.72rem', color: '#e2e8f0', lineHeight: 1.35 }}>
+            {activeGame ? (
+              <>Tap claim to get your <strong style={{ color: '#c084fc' }}>${Number(pendingPromoFreeplay.freeplayAmount || 0).toFixed(2)} freeplay</strong> on <strong>{activeGame.title}</strong>.</>
+            ) : (
+              <>Select a game below to claim your <strong style={{ color: '#c084fc' }}>${Number(pendingPromoFreeplay.freeplayAmount || 0).toFixed(2)} freeplay</strong>.</>
+            )}
+          </div>
+          <button
+            onClick={() => handlePromoFreeplayClaim(pendingPromoFreeplay)}
+            className="submit-btn"
+            style={{ margin: 0, width: 'auto', padding: '0.45rem 0.85rem', fontSize: '0.7rem', background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold', whiteSpace: 'nowrap' }}
+          >
+            Claim
+          </button>
+          <button
+            onClick={() => { dismissPromo(pendingPromoFreeplay, true); setPendingPromoFreeplay(null); }}
+            aria-label="Dismiss offer"
+            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1, padding: '0 0.2rem' }}
+          >
+            &times;
+          </button>
+        </div>
+      )}
+
       {/* Targeted Promotion Announcement Modal Popup */}
       {currentPromoToShow && (
         <div className="modal-backdrop-custom" style={{ zIndex: 3000 }}>
@@ -2559,7 +2628,7 @@ export default function UserLobby({
                     <div style={{ display: 'flex', gap: '0.75rem' }}>
                       {pType === 'message' ? (
                         <button
-                          onClick={() => dismissPromo(currentPromoToShow)}
+                          onClick={() => dismissPromo(currentPromoToShow, true)}
                           className="submit-btn"
                           style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold', margin: 0 }}
                         >
@@ -2577,7 +2646,7 @@ export default function UserLobby({
                             {pType === 'freeplay' ? 'CLAIM FREEPLAY' : 'CLAIM BONUS'}
                           </button>
                           <button
-                            onClick={() => dismissPromo(currentPromoToShow)}
+                            onClick={() => dismissPromo(currentPromoToShow, false)}
                             className="action-row-btn"
                             style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', border: 'none', fontSize: '0.75rem', padding: '0.5rem 1rem', borderRadius: '8px', cursor: 'pointer' }}
                           >
