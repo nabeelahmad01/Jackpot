@@ -333,12 +333,12 @@ export default function AffiliatesTab() {
             placeholder="Search agents..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: '#fff', padding: '0.4rem 0.75rem', fontSize: '0.75rem', outline: 'none', width: '200px' }}
+            style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: '#fff', padding: '0.4rem 0.75rem', fontSize: '0.75rem', outline: 'none', flex: '1 1 160px', maxWidth: '240px', minWidth: 0 }}
           />
         </div>
 
         <div className="table-responsive">
-          <table className="admin-table">
+          <table className="admin-table admin-cards-table">
             <thead>
               <tr>
                 <th>Agent Info</th>
@@ -361,11 +361,11 @@ export default function AffiliatesTab() {
               ) : (
                 filteredAgents.map(agent => (
                   <tr key={agent.id}>
-                    <td>
+                    <td data-label="Agent Info">
                       <div style={{ fontWeight: 'bold' }}>{agent.name}</div>
                       <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{agent.email}</div>
                     </td>
-                    <td>
+                    <td data-label="Role / Parent">
                       <div style={{ fontSize: '0.7rem' }}>
                         <span style={{ background: 'rgba(168,85,247,0.12)', color: '#a855f7', padding: '0.1rem 0.35rem', borderRadius: '4px', fontSize: '0.6rem', fontWeight: 'bold' }}>
                           {agent.role || 'Agent'}
@@ -376,18 +376,18 @@ export default function AffiliatesTab() {
                         </div>
                       </div>
                     </td>
-                    <td>
+                    <td data-label="Invite Code">
                       <code style={{ background: 'rgba(255,255,255,0.04)', padding: '0.15rem 0.35rem', borderRadius: '4px', color: 'var(--gold-primary)', fontWeight: 'bold' }}>
                         {agent.agentCode}
                       </code>
                     </td>
-                    <td>
+                    <td data-label="Status">
                       <span className={`admin-badge-preview b-${(agent.status || 'ACTIVE').toLowerCase() === 'active' ? 'ready' : 'none'}`}>
                         {agent.status || 'ACTIVE'}
                       </span>
                     </td>
-                    <td style={{ fontWeight: 'bold' }}>{agent.commissionRate}%</td>
-                    <td>
+                    <td data-label="Comm. Rate" style={{ fontWeight: 'bold' }}>{agent.commissionRate}%</td>
+                    <td data-label="Stats">
                       <div style={{ fontSize: '0.7rem' }}>
                         <div>Players: <strong style={{ color: 'var(--gold-primary)', cursor: 'pointer' }} onClick={() => handleViewPlayers(agent)}>{agent.playersCount || 0}</strong></div>
                         <div>Team: <strong style={{ color: '#a855f7', cursor: 'pointer' }} onClick={() => handleViewTeam(agent)}>{agent.teamMembersCount || 0}</strong></div>
@@ -396,14 +396,14 @@ export default function AffiliatesTab() {
                         <div>Profit: <strong>${parseFloat(agent.netProfit ?? Math.max(0, (agent.totalDeposits || 0) - (agent.totalWithdrawals || 0))).toFixed(2)}</strong></div>
                       </div>
                     </td>
-                    <td>
+                    <td data-label="Balance">
                       <div style={{ fontSize: '0.7rem' }}>
                         <div>Commission: <strong style={{ color: '#2ecc71' }}>${parseFloat(agent.commissionEarned || 0).toFixed(2)}</strong> <span style={{ color: '#666', fontSize: '0.6rem' }}>(on profit)</span></div>
                         <div>Withdrawn: <strong>${parseFloat(agent.totalWithdrawn || 0).toFixed(2)}</strong></div>
                         <div>Available: <strong style={{ color: 'var(--gold-primary)' }}>${parseFloat(agent.availableBalance || 0).toFixed(2)}</strong></div>
                       </div>
                     </td>
-                    <td>
+                    <td data-label="Actions">
                       <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
                         <button onClick={() => handleViewTeam(agent)} style={{ border: '1px solid rgba(168,85,247,0.2)', padding: '0.2rem 0.4rem', fontSize: '0.65rem', borderRadius: '4px', background: 'none', color: '#a855f7', cursor: 'pointer' }}>
                           Team

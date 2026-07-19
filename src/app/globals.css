@@ -3486,6 +3486,67 @@ dialog::backdrop {
   }
 }
 
+/* Dense admin tables become stacked cards on phones (no horizontal scroll). */
+@media (max-width: 640px) {
+  .admin-cards-table,
+  .admin-cards-table tbody {
+    display: block;
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  .admin-cards-table thead {
+    display: none;
+  }
+
+  .admin-cards-table tr {
+    display: block;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 10px;
+    padding: 0.35rem 0.85rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .admin-cards-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.9rem;
+    width: 100%;
+    padding: 0.45rem 0 !important;
+    border: none !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+    text-align: right;
+  }
+
+  .admin-cards-table td:last-child {
+    border-bottom: none !important;
+  }
+
+  .admin-cards-table td::before {
+    content: attr(data-label);
+    flex: 0 0 38%;
+    text-align: left;
+    font-size: 0.6rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: 700;
+  }
+
+  /* Full-width empty-state cell should not show a label or split layout. */
+  .admin-cards-table td[colspan] {
+    display: block;
+    text-align: center;
+  }
+
+  .admin-cards-table td[colspan]::before {
+    content: none;
+  }
+}
+
 @media (max-width: 480px) {
   .page-container {
     padding: 4.5rem 0.75rem 2rem 0.75rem;
