@@ -24,7 +24,9 @@ export default function RemainderClaimAction({
     return () => clearInterval(timer);
   }, []);
 
-  if (!tx || isRemainderFullyPaid(tx) || parseFloat(tx.payoutHold || 0) <= 0) {
+  // A remainder request (child tx) is tracked on its original withdrawal (parent),
+  // so the child request line never shows any claim/countdown UI of its own.
+  if (!tx || tx.parentTxId || isRemainderFullyPaid(tx) || parseFloat(tx.payoutHold || 0) <= 0) {
     return null;
   }
 
