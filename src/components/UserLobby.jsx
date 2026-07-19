@@ -2621,7 +2621,7 @@ export default function UserLobby({
                     )}
                     {pType === 'deposit_bonus' && (
                       <div style={{ display: 'inline-block', margin: '0 auto 1rem', padding: '0.4rem 0.9rem', borderRadius: '999px', background: 'rgba(74,222,128,0.12)', border: '1px solid rgba(74,222,128,0.4)', color: '#4ade80', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                        <i className="fa-solid fa-coins" style={{ marginRight: '6px' }}></i>{bp}% Deposit Bonus{fp > 0 ? ` + $${fp.toFixed(2)} Freeplay` : ''}
+                        <i className="fa-solid fa-coins" style={{ marginRight: '6px' }}></i>{bp}% Deposit Bonus
                       </div>
                     )}
 

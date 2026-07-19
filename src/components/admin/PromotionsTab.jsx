@@ -109,7 +109,7 @@ export default function PromotionsTab({ adminUser }) {
           targetGroup: promoTarget,
           image: promoImage.trim(),
           promoType,
-          freeplayAmount: promoType === 'freeplay' || promoType === 'deposit_bonus' ? parseFloat(promoFreeplayAmount) || 0 : 0,
+          freeplayAmount: promoType === 'freeplay' ? parseFloat(promoFreeplayAmount) || 0 : 0,
           bonusPercent: promoType === 'deposit_bonus' ? parseFloat(promoBonusPercent) || 0 : 0
         })
       });
@@ -400,7 +400,7 @@ export default function PromotionsTab({ adminUser }) {
                 <span className="game-tap-tip" style={{ marginTop: '0.35rem', display: 'block' }}>
                   {promoType === 'message' && 'Just an announcement — the popup shows only a "Got it" button.'}
                   {promoType === 'freeplay' && 'Player taps "Claim Freeplay", chooses a game, and it lands in the Coins queue like a normal freeplay.'}
-                  {promoType === 'deposit_bonus' && 'Player taps "Claim Bonus"; their next approved deposit uses this % (plus any freeplay below is auto-granted).'}
+                  {promoType === 'deposit_bonus' && 'Player taps "Claim Bonus"; their next approved deposit gets this bonus % in coins. No freeplay is included.'}
                 </span>
               </div>
 
@@ -423,38 +423,21 @@ export default function PromotionsTab({ adminUser }) {
               )}
 
               {promoType === 'deposit_bonus' && (
-                <>
-                  <div className="input-group">
-                    <label htmlFor="promo-bonus">Deposit Bonus Percentage (%)</label>
-                    <div className="input-wrapper">
-                      <i className="fa-solid fa-percent input-icon"></i>
-                      <input
-                        type="number"
-                        id="promo-bonus"
-                        min="0"
-                        step="1"
-                        placeholder="e.g. 400"
-                        value={promoBonusPercent}
-                        onChange={(e) => setPromoBonusPercent(e.target.value)}
-                      />
-                    </div>
+                <div className="input-group">
+                  <label htmlFor="promo-bonus">Deposit Bonus Percentage (%)</label>
+                  <div className="input-wrapper">
+                    <i className="fa-solid fa-percent input-icon"></i>
+                    <input
+                      type="number"
+                      id="promo-bonus"
+                      min="0"
+                      step="1"
+                      placeholder="e.g. 400"
+                      value={promoBonusPercent}
+                      onChange={(e) => setPromoBonusPercent(e.target.value)}
+                    />
                   </div>
-                  <div className="input-group">
-                    <label htmlFor="promo-bonus-freeplay">Bundled Freeplay After Deposit ($ — optional)</label>
-                    <div className="input-wrapper">
-                      <i className="fa-solid fa-coins input-icon"></i>
-                      <input
-                        type="number"
-                        id="promo-bonus-freeplay"
-                        min="0"
-                        step="0.5"
-                        placeholder="0 = none"
-                        value={promoFreeplayAmount}
-                        onChange={(e) => setPromoFreeplayAmount(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </>
+                </div>
               )}
 
               <div className="input-group" style={{ marginBottom: '1.5rem' }}>
@@ -524,7 +507,7 @@ export default function PromotionsTab({ adminUser }) {
                         <span style={{ fontSize: '0.6rem', fontWeight: 'bold', textTransform: 'uppercase', padding: '0.15rem 0.45rem', borderRadius: '5px', background: 'rgba(168,85,247,0.15)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.4)' }}>
                           {promo.promoType === 'freeplay'
                             ? `Freeplay $${Number(promo.freeplayAmount || 0).toFixed(2)}`
-                            : `Deposit Bonus ${Number(promo.bonusPercent || 0)}%${Number(promo.freeplayAmount || 0) > 0 ? ` + $${Number(promo.freeplayAmount).toFixed(2)} FP` : ''}`}
+                            : `Deposit Bonus ${Number(promo.bonusPercent || 0)}%`}
                         </span>
                       </div>
                     )}

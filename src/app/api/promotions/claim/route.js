@@ -35,17 +35,17 @@ export async function POST(req) {
     }
 
     const percent = Math.max(0, parseFloat(promo.bonusPercent) || 0);
-    const freeplay = Math.max(0, parseFloat(promo.freeplayAmount) || 0);
 
     await db.collection('users').updateOne(
       { email: cleanEmail },
       {
         $set: {
           pendingDepositBonusPercent: percent,
-          pendingBonusFreeplay: freeplay,
           pendingBonusPromoId: promo.id,
           pendingBonusPromoTitle: promo.title || ''
-        }
+        },
+        // Clear any legacy bundled freeplay from an older offer.
+        $unset: { pendingBonusFreeplay: '' }
       }
     );
 
@@ -55,8 +55,7 @@ export async function POST(req) {
       success: true,
       armed: true,
       bonusPercent: percent,
-      freeplayAmount: freeplay,
-      message: `Bonus armed! Make a deposit to receive ${percent}% bonus coins${freeplay > 0 ? ` plus $${freeplay.toFixed(2)} freeplay` : ''}.`
+      message: `Bonus armed! Make a deposit to receive ${percent}% bonus coins.`
     });
   } catch (err) {
     console.error('Claim promotion error:', err);

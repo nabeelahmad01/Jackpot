@@ -671,50 +671,13 @@ export async function PUT(req) {
           }
         }
 
-        // 3b. Consume the claimed promo deposit bonus (so it only applies once) and
-        // auto-grant any bundled freeplay for the same game — it lands in the coins
-        // queue exactly like a normal freeplay, so the player gets it automatically.
-        if (originalTx.type === 'DEPOSIT' && depositorForBonus && (usePromoBonus || Number(depositorForBonus.pendingBonusFreeplay || 0) > 0)) {
-          const freeplayAmt = Math.max(0, parseFloat(depositorForBonus.pendingBonusFreeplay) || 0);
-
+        // 3b. Consume the claimed promo deposit bonus so it only applies to this
+        // one deposit (the bonus % was already used above). No freeplay is granted.
+        if (usePromoBonus) {
           await db.collection('users').updateOne(
             { email: userEmail },
             { $unset: { pendingDepositBonusPercent: '', pendingBonusFreeplay: '', pendingBonusPromoId: '', pendingBonusPromoTitle: '' } }
           );
-
-          if (freeplayAmt > 0) {
-            const fpId = (Date.now() + Math.floor(Math.random() * 1000)).toString();
-            await transactionsCollection.insertOne({
-              id: fpId,
-              userEmail,
-              date: new Date().toLocaleString(),
-              createdAt: new Date().toISOString(),
-              status: 'COINS_LOADING',
-              type: 'BONUS',
-              code: 'FREEPLAY',
-              amount: freeplayAmt,
-              gateway: 'Freeplay',
-              gameTitle: originalTx.gameTitle || 'Lobby',
-              note: `Auto freeplay from promo${depositorForBonus.pendingBonusPromoTitle ? `: ${depositorForBonus.pendingBonusPromoTitle}` : ''}`,
-              nameOnTag: depositorForBonus.name || 'Player',
-              emailOnTag: userEmail,
-              distributorId: originalTx.distributorId || ''
-            });
-            await notificationsCollection.insertOne({
-              id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
-              userEmail,
-              gameTitle: originalTx.gameTitle || 'Lobby',
-              depositAmount: 0,
-              bonusApplied: -3,
-              isFreeplay: true,
-              totalCoins: freeplayAmt,
-              status: 'PENDING',
-              read: false,
-              timestamp: new Date().toISOString(),
-              transactionId: fpId,
-              distributorId: originalTx.distributorId || ''
-            });
-          }
         }
 
         // 4. Referral System Bonus: Check if this depositor was referred by someone
