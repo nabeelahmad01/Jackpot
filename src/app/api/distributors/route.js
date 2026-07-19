@@ -107,7 +107,12 @@ export async function PUT(req) {
   }
 }
 
-// DELETE a distributor (referred players remain unaffected)
+// DELETE a distributor.
+// The distributor's players are handed over to the super admin: their
+// distributorId is cleared (so they become direct players), their existing game
+// accounts are removed so they must re-request fresh accounts, and all of their
+// records (requests, transactions, coins notifications) are reassigned to the
+// super admin. The distributor's own staff logins are removed too.
 export async function DELETE(req) {
   try {
     const { searchParams } = new URL(req.url);
@@ -126,10 +131,50 @@ export async function DELETE(req) {
       return NextResponse.json({ success: false, message: 'Distributor not found.' }, { status: 404 });
     }
 
+    const usersCollection = db.collection('users');
+
+    // Players belonging to this distributor.
+    const players = await usersCollection
+      .find({ distributorId: id, role: 'user' }, { projection: { email: 1 } })
+      .toArray();
+    const playerEmails = players.map((p) => p.email).filter(Boolean);
+
+    // Remove their game accounts so each player must request a new one, which
+    // will then route to the super admin (their distributorId is now cleared).
+    if (playerEmails.length > 0) {
+      await db.collection('gameAccounts').deleteMany({ userEmail: { $in: playerEmails } });
+    }
+
+    // Hand players (and all their records) over to the super admin.
+    await usersCollection.updateMany(
+      { distributorId: id, role: 'user' },
+      { $set: { distributorId: '' } }
+    );
+    await db.collection('transactions').updateMany(
+      { distributorId: id },
+      { $set: { distributorId: '' } }
+    );
+    await db.collection('accountRequests').updateMany(
+      { distributorId: id },
+      { $set: { distributorId: '', distributorType: '', distributorName: '' } }
+    );
+    await db.collection('coinsNotifications').updateMany(
+      { distributorId: id },
+      { $set: { distributorId: '' } }
+    );
+
+    // Remove the distributor's own staff logins and gateways (they belong to the
+    // now-deleted distributor and would otherwise be orphaned).
+    await usersCollection.deleteMany({ distributorId: id, role: { $ne: 'user' } });
+    await db.collection('gateways').deleteMany({ distributorId: id });
+
     cache.del('admin_stats');
     cache.del('distributors_enriched');
     invalidateTypeBDistributorCache();
-    return NextResponse.json({ success: true, message: 'Distributor deleted successfully!' });
+    return NextResponse.json({
+      success: true,
+      message: `Distributor deleted. ${playerEmails.length} player(s) moved to super admin; their game accounts were reset.`
+    });
   } catch (err) {
     console.error('Delete Distributor API Error:', err);
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });

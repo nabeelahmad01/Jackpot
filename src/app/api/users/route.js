@@ -31,11 +31,16 @@ export async function GET(req) {
     let query = {};
 
     const adminDistributorId = searchParams.get('adminDistributorId');
+    // The super-admin Player Accounts tab passes this to also surface Type B
+    // distributor players (so they can be seen/kept even if the distributor is
+    // later deleted). Other callers (promo targeting, etc.) omit it and keep the
+    // original Type B exclusion, so nothing else changes.
+    const includeDistributorPlayers = searchParams.get('includeDistributorPlayers') === '1';
 
     if (adminDistributorId) {
       query.distributorId = adminDistributorId;
       query.role = 'user';
-    } else if (segment !== 'staff') {
+    } else if (segment !== 'staff' && !includeDistributorPlayers) {
       const typeBDistIds = await getTypeBDistributorIds(db);
       if (typeBDistIds.length > 0) {
         query.$or = [
