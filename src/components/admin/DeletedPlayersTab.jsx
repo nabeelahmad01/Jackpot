@@ -5,6 +5,32 @@ import useSWR from 'swr';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
+// Human-friendly label + colour for the deleted account's type.
+const ROLE_LABELS = {
+  admin: 'Super Admin',
+  operation_admin: 'Operation Staff',
+  financial_admin: 'Financial Staff',
+  coins_admin: 'Coins Staff',
+  support_admin: 'Support Staff',
+  distributor_staff: 'Distributor Staff',
+  distributor: 'Distributor',
+  user: 'Player'
+};
+
+function getAccountType(record) {
+  if (record.deletedEntityType === 'distributor' || record.role === 'distributor') {
+    return { label: 'Distributor', color: '#c084fc', bg: 'rgba(168,85,247,0.15)', border: 'rgba(168,85,247,0.4)' };
+  }
+  const role = record.role || 'user';
+  if (role === 'user') {
+    return { label: 'Player', color: '#38bdf8', bg: 'rgba(56,189,248,0.12)', border: 'rgba(56,189,248,0.4)' };
+  }
+  if (role === 'admin') {
+    return { label: 'Super Admin', color: '#f87171', bg: 'rgba(248,113,113,0.12)', border: 'rgba(248,113,113,0.4)' };
+  }
+  return { label: ROLE_LABELS[role] || 'Staff', color: '#fbbf24', bg: 'rgba(251,191,36,0.12)', border: 'rgba(251,191,36,0.4)' };
+}
+
 export default function DeletedPlayersTab() {
   const { data, error, mutate } = useSWR('/api/admin/deleted-players', fetcher);
   const [restoringEmail, setRestoringEmail] = useState(null);
@@ -59,9 +85,9 @@ export default function DeletedPlayersTab() {
     <section className="admin-section-card" style={{ animation: 'fade-in 0.2s ease-out' }}>
       <div className="section-card-header" style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h3><i className="fa-solid fa-trash-arrow-up gold-text"></i> Deleted Player Accounts</h3>
+          <h3><i className="fa-solid fa-trash-arrow-up gold-text"></i> Deleted Accounts</h3>
           <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-            These accounts have been deleted. You can restore them with the "Undo" button. If not restored, they will be permanently purged after 30 days.
+            Deleted players, distributors and staff. You can restore them with the "Undo" button. If not restored, they will be permanently purged after 30 days.
           </p>
         </div>
         <span style={{ fontSize: '0.7rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.25)', padding: '0.35rem 0.6rem', borderRadius: '6px', fontWeight: 'bold' }}>
@@ -74,6 +100,7 @@ export default function DeletedPlayersTab() {
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#888' }}>
               <th style={{ padding: '0.75rem 0.5rem' }}>NAME</th>
+              <th style={{ padding: '0.75rem 0.5rem' }}>TYPE</th>
               <th style={{ padding: '0.75rem 0.5rem' }}>EMAIL</th>
               <th style={{ padding: '0.75rem 0.5rem' }}>COINS</th>
               <th style={{ padding: '0.75rem 0.5rem' }}>DELETED DATE</th>
@@ -83,20 +110,23 @@ export default function DeletedPlayersTab() {
           <tbody>
             {deletedPlayers.length === 0 ? (
               <tr>
-                <td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: '#666' }}>
-                  No deleted player accounts recorded in the archive.
+                <td colSpan="6" style={{ textAlign: 'center', padding: '3rem', color: '#666' }}>
+                  No deleted accounts recorded in the archive.
                 </td>
               </tr>
             ) : (
               deletedPlayers.map((player) => (
                 <tr key={player.email} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                  <td style={{ padding: '0.75rem 0.5rem', fontWeight: 'bold' }}>
-                    {player.name}
-                    {(player.deletedEntityType === 'distributor' || player.role === 'distributor') && (
-                      <span style={{ marginLeft: '0.5rem', fontSize: '0.55rem', background: 'rgba(168,85,247,0.15)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.4)', padding: '0.15rem 0.4rem', borderRadius: '5px', fontWeight: 'bold', textTransform: 'uppercase' }}>
-                        Distributor
-                      </span>
-                    )}
+                  <td style={{ padding: '0.75rem 0.5rem', fontWeight: 'bold' }}>{player.name}</td>
+                  <td style={{ padding: '0.75rem 0.5rem' }}>
+                    {(() => {
+                      const t = getAccountType(player);
+                      return (
+                        <span style={{ fontSize: '0.6rem', background: t.bg, color: t.color, border: `1px solid ${t.border}`, padding: '0.2rem 0.5rem', borderRadius: '5px', fontWeight: 'bold', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+                          {t.label}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td style={{ padding: '0.75rem 0.5rem' }}>{player.email}</td>
                   <td style={{ padding: '0.75rem 0.5rem', color: 'var(--gold-primary)', fontWeight: 'bold' }}>
