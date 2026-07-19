@@ -9,13 +9,29 @@ function getDeviceSnapshot() {
   if (typeof window === 'undefined') return 0;
 
   const userAgent = window.navigator.userAgent;
-  const isIOS = /iPad|iPhone|iPod/.test(userAgent);
+  const isIOS =
+    /iPad|iPhone|iPod/.test(userAgent) ||
+    // iPadOS 13+ reports as Mac; detect via touch support.
+    (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1);
   const isAndroid = /Android/i.test(userAgent);
   const isStandalone =
     window.matchMedia?.('(display-mode: standalone)').matches ||
     window.navigator.standalone === true ||
     window.Capacitor?.isNativePlatform?.() === true;
-  return (isIOS ? 1 : 0) | (isAndroid ? 2 : 0) | (isStandalone ? 4 : 0);
+  // Real iOS browsers (Safari, Chrome, Firefox, Edge...) all expose an
+  // "Add to Home Screen" option in their Share menu. Only embedded in-app
+  // webviews (Instagram, Facebook, TikTok, etc.) hide it, so there we must
+  // send the user out to a real browser first.
+  const isInAppWebview =
+    /FBAN|FBAV|Instagram|Line|Twitter|Snapchat|TikTok|Pinterest|LinkedInApp|MicroMessenger/i.test(
+      userAgent
+    );
+  return (
+    (isIOS ? 1 : 0) |
+    (isAndroid ? 2 : 0) |
+    (isStandalone ? 4 : 0) |
+    (isInAppWebview ? 8 : 0)
+  );
 }
 
 export default function AppInstallModal({
@@ -28,9 +44,11 @@ export default function AppInstallModal({
   const device = {
     isIOS: Boolean(deviceFlags & 1),
     isAndroid: Boolean(deviceFlags & 2),
-    isStandalone: Boolean(deviceFlags & 4)
+    isStandalone: Boolean(deviceFlags & 4),
+    isInAppWebview: Boolean(deviceFlags & 8)
   };
   const [selectedPlatform, setSelectedPlatform] = useState(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   if (!isOpen) return null;
 
@@ -38,6 +56,16 @@ export default function AppInstallModal({
     setSelectedPlatform(platform);
     if (platform === 'android') {
       window.location.assign(androidAppUrl);
+    }
+  };
+
+  const copyPageLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2500);
+    } catch {
+      /* clipboard blocked — user can copy from the address bar */
     }
   };
 
@@ -85,13 +113,43 @@ export default function AppInstallModal({
 
         {selectedPlatform === 'ios' && !device.isStandalone && (
           <div className="ios-install-steps">
-            <strong>Install on iPhone</strong>
-            <ol>
-              <li>Open this page in Safari.</li>
-              <li>Tap the Share button in Safari.</li>
-              <li>Choose “Add to Home Screen”, then tap Add.</li>
-            </ol>
-            <p>Open Jackpot Royals from its new Home Screen icon.</p>
+            {device.isInAppWebview ? (
+              <>
+                <strong>Open in your browser first</strong>
+                <p>
+                  You’re inside another app’s browser (like Instagram or Facebook),
+                  which hides the install option. Open this page in <b>Safari</b> or
+                  <b> Chrome</b> to add the app.
+                </p>
+                <ol>
+                  <li>Copy the link below.</li>
+                  <li>Open the <b>Safari</b> or <b>Chrome</b> app and paste the link.</li>
+                  <li>Then follow the “Add to Home Screen” steps.</li>
+                </ol>
+                <button type="button" className="pwa-install-fallback" onClick={copyPageLink}>
+                  <i className="fa-solid fa-link" aria-hidden="true"></i>
+                  {linkCopied ? 'Link copied!' : 'Copy link'}
+                </button>
+              </>
+            ) : (
+              <>
+                <strong>Install on iPhone / iPad</strong>
+                <ol>
+                  <li>
+                    Tap the <b>Share</b> button{' '}
+                    <i className="fa-solid fa-arrow-up-from-bracket" aria-hidden="true"></i>
+                    {' '}(in Safari it’s at the bottom; in Chrome it’s at the top-right).
+                  </li>
+                  <li>Scroll and tap <b>“Add to Home Screen”</b>.</li>
+                  <li>Tap <b>Add</b> in the top-right corner.</li>
+                </ol>
+                <p>
+                  Open Jackpot Royals from its new Home Screen icon — it launches
+                  fullscreen, like a native app. <b>Tip:</b> Safari gives the most
+                  app-like result.
+                </p>
+              </>
+            )}
           </div>
         )}
 

@@ -6,6 +6,8 @@ import android.os.Bundle;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
 
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
@@ -17,6 +19,24 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         applySolidSystemBars();
+        lockWebViewZoom();
+    }
+
+    /**
+     * Keep the app rendering at a consistent 100% on every device. Without this,
+     * phones with a larger "Font size" / "Display size" accessibility setting make
+     * the WebView zoom in, so the app looks bigger on some devices than others.
+     */
+    private void lockWebViewZoom() {
+        WebView webView = getBridge() != null ? getBridge().getWebView() : null;
+        if (webView == null) {
+            return;
+        }
+        WebSettings settings = webView.getSettings();
+        settings.setTextZoom(100);
+        settings.setSupportZoom(false);
+        settings.setBuiltInZoomControls(false);
+        settings.setDisplayZoomControls(false);
     }
 
     private void applySolidSystemBars() {
