@@ -27,6 +27,9 @@
 # db backups (contain user data)
 /backups
 
+# generated secret helper (Firebase service account)
+/firebase-b64-correct.txt
+
 # debug
 npm-debug.log*
 yarn-debug.log*

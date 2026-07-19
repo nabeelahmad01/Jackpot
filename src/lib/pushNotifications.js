@@ -1,4 +1,5 @@
 import webpush from 'web-push';
+import { createPrivateKey } from 'crypto';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
 
@@ -17,40 +18,62 @@ export function getVapidPublicKey() {
   return process.env.VAPID_PUBLIC_KEY || '';
 }
 
+function normalizeServiceAccount(sa) {
+  if (sa && typeof sa.private_key === 'string') {
+    // Node/OpenSSL 3 rejects keys whose newlines are still escaped as "\n".
+    sa.private_key = sa.private_key.replace(/\\n/g, '\n');
+  }
+  return sa;
+}
+
+function serviceAccountHasValidKey(sa) {
+  const key = sa?.private_key || sa?.privateKey;
+  if (!key) return true; // individual-var form is validated by cert() later
+  try {
+    createPrivateKey(key);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function getFirebaseMessaging() {
   if (getApps().length > 0) return getMessaging(getApps()[0]);
 
-  let serviceAccount;
-  // Preferred on hosting panels: base64 of the whole JSON. A single line with no
-  // quotes/newlines, so it can never get mangled when pasted into an env var box.
+  // Collect every configured credential source, then pick the FIRST one whose
+  // private key actually parses. This protects us when e.g. the base64 env var
+  // got corrupted on paste but the plain JSON var is still good.
+  const candidates = [];
+
   if (process.env.FIREBASE_SERVICE_ACCOUNT_B64) {
     try {
       const decoded = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_B64, 'base64').toString('utf8');
-      serviceAccount = JSON.parse(decoded);
+      candidates.push(normalizeServiceAccount(JSON.parse(decoded)));
     } catch (error) {
       console.error('Invalid FIREBASE_SERVICE_ACCOUNT_B64:', error.message);
-      return null;
     }
-  } else if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+  }
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
     try {
-      serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+      candidates.push(normalizeServiceAccount(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON)));
     } catch (error) {
       console.error('Invalid FIREBASE_SERVICE_ACCOUNT_JSON:', error.message);
-      return null;
     }
-  } else if (
+  }
+  if (
     process.env.FIREBASE_PROJECT_ID &&
     process.env.FIREBASE_CLIENT_EMAIL &&
     process.env.FIREBASE_PRIVATE_KEY
   ) {
-    serviceAccount = {
+    candidates.push({
       projectId: process.env.FIREBASE_PROJECT_ID,
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
       privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-    };
-  } else {
-    return null;
+    });
   }
+
+  if (candidates.length === 0) return null;
+  const serviceAccount = candidates.find(serviceAccountHasValidKey) || candidates[0];
 
   const app = initializeApp({ credential: cert(serviceAccount) });
   return getMessaging(app);
