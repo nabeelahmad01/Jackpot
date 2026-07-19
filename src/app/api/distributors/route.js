@@ -125,10 +125,24 @@ export async function DELETE(req) {
     const db = await getDb();
     const distributorsCollection = db.collection('distributors');
 
+    const distDoc = await distributorsCollection.findOne({ id });
     const result = await distributorsCollection.deleteOne({ id });
 
     if (result.deletedCount === 0) {
       return NextResponse.json({ success: false, message: 'Distributor not found.' }, { status: 404 });
+    }
+
+    // Archive the deleted distributor so it shows in the "Deleted Accounts" view
+    // and is auto-purged after 30 days (TTL index on the Date `deletedAt`).
+    if (distDoc) {
+      const deletedCollection = db.collection('deletedUsers');
+      await deletedCollection.createIndex({ deletedAt: 1 }, { expireAfterSeconds: 2592000 });
+      const { _id, ...distFields } = distDoc;
+      await deletedCollection.insertOne({
+        ...distFields,
+        deletedEntityType: 'distributor',
+        deletedAt: new Date()
+      });
     }
 
     const usersCollection = db.collection('users');
@@ -139,13 +153,16 @@ export async function DELETE(req) {
       .toArray();
     const playerEmails = players.map((p) => p.email).filter(Boolean);
 
-    // Remove their game accounts so each player must request a new one, which
-    // will then route to the super admin (their distributorId is now cleared).
+    // Remove their game accounts AND their old account requests so each player
+    // starts fresh: the lobby will show the "Request / Create Account" option
+    // again, and the new request will route to the super admin (their
+    // distributorId is now cleared).
     if (playerEmails.length > 0) {
       await db.collection('gameAccounts').deleteMany({ userEmail: { $in: playerEmails } });
+      await db.collection('accountRequests').deleteMany({ userEmail: { $in: playerEmails } });
     }
 
-    // Hand players (and all their records) over to the super admin.
+    // Hand players (and their financial records) over to the super admin.
     await usersCollection.updateMany(
       { distributorId: id, role: 'user' },
       { $set: { distributorId: '' } }
@@ -153,10 +170,6 @@ export async function DELETE(req) {
     await db.collection('transactions').updateMany(
       { distributorId: id },
       { $set: { distributorId: '' } }
-    );
-    await db.collection('accountRequests').updateMany(
-      { distributorId: id },
-      { $set: { distributorId: '', distributorType: '', distributorName: '' } }
     );
     await db.collection('coinsNotifications').updateMany(
       { distributorId: id },

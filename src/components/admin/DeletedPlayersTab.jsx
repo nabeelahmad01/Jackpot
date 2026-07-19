@@ -90,7 +90,14 @@ export default function DeletedPlayersTab() {
             ) : (
               deletedPlayers.map((player) => (
                 <tr key={player.email} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                  <td style={{ padding: '0.75rem 0.5rem', fontWeight: 'bold' }}>{player.name}</td>
+                  <td style={{ padding: '0.75rem 0.5rem', fontWeight: 'bold' }}>
+                    {player.name}
+                    {(player.deletedEntityType === 'distributor' || player.role === 'distributor') && (
+                      <span style={{ marginLeft: '0.5rem', fontSize: '0.55rem', background: 'rgba(168,85,247,0.15)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.4)', padding: '0.15rem 0.4rem', borderRadius: '5px', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                        Distributor
+                      </span>
+                    )}
+                  </td>
                   <td style={{ padding: '0.75rem 0.5rem' }}>{player.email}</td>
                   <td style={{ padding: '0.75rem 0.5rem', color: 'var(--gold-primary)', fontWeight: 'bold' }}>
                     ${(player.coins || 0).toFixed(2)}

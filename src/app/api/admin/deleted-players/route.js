@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/mongodb';
 import { cache } from '../../../../lib/cache';
+import { invalidateTypeBDistributorCache } from '../../../../lib/typeBDistributors';
 
 // GET deleted players list (Super Admin only)
 export async function GET(req) {
@@ -32,10 +33,28 @@ export async function POST(req) {
     const cleanEmail = email.toLowerCase().trim();
     const db = await getDb();
     
-    // Find player in deleted collection
-    const deletedPlayer = await db.collection('deletedUsers').findOne({ email: cleanEmail });
-    if (!deletedPlayer) {
-      return NextResponse.json({ success: false, message: 'Deleted player account not found.' }, { status: 404 });
+    // Find the deleted record (player or distributor)
+    const deletedRecord = await db.collection('deletedUsers').findOne({ email: cleanEmail });
+    if (!deletedRecord) {
+      return NextResponse.json({ success: false, message: 'Deleted account not found.' }, { status: 404 });
+    }
+
+    const { deletedAt, _id, deletedEntityType, ...original } = deletedRecord;
+
+    // Restore a deleted distributor back into the distributors collection.
+    if (deletedEntityType === 'distributor' || original.role === 'distributor') {
+      const clash = await db.collection('distributors').findOne({
+        $or: [{ id: original.id }, { email: cleanEmail }]
+      });
+      if (clash) {
+        return NextResponse.json({ success: false, message: 'An active distributor with this id/email already exists now. Cannot restore.' }, { status: 400 });
+      }
+      await db.collection('distributors').insertOne(original);
+      await db.collection('deletedUsers').deleteOne({ email: cleanEmail });
+      cache.del('admin_stats');
+      cache.del('distributors_enriched');
+      invalidateTypeBDistributorCache();
+      return NextResponse.json({ success: true, message: 'Distributor account restored successfully! (Its former players are not re-linked.)' });
     }
 
     // Check if player email already occupied in active users in the meantime
@@ -44,11 +63,8 @@ export async function POST(req) {
       return NextResponse.json({ success: false, message: 'An active user account with this email already exists now. Cannot restore.' }, { status: 400 });
     }
 
-    // Extract the original fields, excluding deletedAt
-    const { deletedAt, _id, ...originalUser } = deletedPlayer;
-
     // Restore to users collection
-    await db.collection('users').insertOne(originalUser);
+    await db.collection('users').insertOne(original);
 
     // Delete from deleted collection
     await db.collection('deletedUsers').deleteOne({ email: cleanEmail });
