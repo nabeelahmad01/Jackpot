@@ -709,26 +709,32 @@ export default function UserLobby({
     } else {
       const mostRecentFreeplay = freeplayClaims[0];
 
-      // Check if there's ANY deposit >= $25 or withdrawal >= $25 AFTER the last freeplay claim
-      const qualifyingTxAfterFreeplay = sortedTxs.filter((t) => {
-        const isDeposit = t.type === 'DEPOSIT' && t.status === 'SUCCESS' && parseFloat(t.amount || 0) >= 25;
-        const isWithdraw = t.type === 'WITHDRAW' && t.status === 'SUCCESS' && !t.parentTxId && parseFloat(t.amount || 0) >= 25;
-        if (!isDeposit && !isWithdraw) return false;
+      const isAfterFreeplay = (t) => {
         if (t.id && mostRecentFreeplay.id) {
           return parseFloat(t.id) > parseFloat(mostRecentFreeplay.id);
         }
         return new Date(t.date || 0).getTime() > new Date(mostRecentFreeplay.date || 0).getTime();
-      });
+      };
 
-      if (qualifyingTxAfterFreeplay.length > 0) {
+      // Sum ALL successful deposits made AFTER the last freeplay claim. Small
+      // deposits add up (e.g. 10 + 10 + 10), so cumulative >= $25 qualifies —
+      // but a single small deposit (e.g. $10) alone does not.
+      const depositTotalAfterFreeplay = sortedTxs.reduce((sum, t) => {
+        if (t.type === 'DEPOSIT' && t.status === 'SUCCESS' && isAfterFreeplay(t)) {
+          return sum + parseFloat(t.amount || 0);
+        }
+        return sum;
+      }, 0);
+
+      if (depositTotalAfterFreeplay >= 25) {
         isEligible = true;
       } else {
-        toastMessage = "Deposit or withdraw at least $25.00 to claim another Freeplay.";
+        toastMessage = "Deposit at least $25.00 in total (small deposits add up) to claim another Freeplay.";
       }
     }
 
     if (!isEligible) {
-      showToast(toastMessage || "You are not eligible for Freeplay yet. Deposit or withdraw at least $25.00 first.", "error");
+      showToast(toastMessage || "You are not eligible for Freeplay yet. Deposit at least $25.00 in total first.", "error");
       return;
     }
 
