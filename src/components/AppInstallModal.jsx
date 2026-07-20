@@ -229,11 +229,9 @@ export default function AppInstallModal({
                 <p className="app-install-hint">
                   Open the downloaded file → Install. Lock-screen notifications work in the APK.
                 </p>
-                {typeof onInstallPwa === 'function' && (
-                  <button type="button" className="pwa-install-fallback" onClick={onInstallPwa}>
-                    Or install from Chrome (optional)
-                  </button>
-                )}
+                <button type="button" className="pwa-install-fallback" onClick={installIos}>
+                  Download iOS app
+                </button>
               </div>
             )}
 
