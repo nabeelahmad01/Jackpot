@@ -14,8 +14,29 @@ function isNativePlatform() {
   return /JackpotRoyalsNative/i.test(navigator.userAgent || '');
 }
 
+export function isIosDevice() {
+  if (typeof window === 'undefined') return false;
+  const ua = window.navigator.userAgent || '';
+  return (
+    /iPad|iPhone|iPod/.test(ua) ||
+    (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1)
+  );
+}
+
+export function isStandaloneDisplay() {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.matchMedia?.('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true ||
+    isNativePlatform()
+  );
+}
+
 export function supportsWebPush() {
   if (isNativePlatform()) return true;
+  // iOS only exposes PushManager after the site is added to the Home Screen
+  // and opened from that icon (standalone). Asking earlier always fails.
+  if (isIosDevice() && !isStandaloneDisplay()) return false;
   return (
     typeof window !== 'undefined' &&
     'serviceWorker' in navigator &&
@@ -115,6 +136,11 @@ async function subscribeToNativePush(userEmail) {
 }
 
 async function subscribeToWebPush(userEmail) {
+  if (isIosDevice() && !isStandaloneDisplay()) {
+    throw new Error(
+      'On iPhone, open Jackpot Royals from the Home Screen icon first, then enable notifications.'
+    );
+  }
   if (
     typeof window === 'undefined' ||
     !('serviceWorker' in navigator) ||

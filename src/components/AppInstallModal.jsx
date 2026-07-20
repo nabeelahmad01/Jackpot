@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import Image from 'next/image';
+import { subscribeToPromoPush } from '../lib/pushClient';
 
 const subscribe = () => () => {};
 
@@ -11,26 +12,23 @@ function getDeviceSnapshot() {
   const userAgent = window.navigator.userAgent;
   const isIOS =
     /iPad|iPhone|iPod/.test(userAgent) ||
-    // iPadOS 13+ reports as Mac; detect via touch support.
     (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1);
   const isAndroid = /Android/i.test(userAgent);
   const isStandalone =
     window.matchMedia?.('(display-mode: standalone)').matches ||
     window.navigator.standalone === true ||
     window.Capacitor?.isNativePlatform?.() === true;
-  // Real iOS browsers (Safari, Chrome, Firefox, Edge...) all expose an
-  // "Add to Home Screen" option in their Share menu. Only embedded in-app
-  // webviews (Instagram, Facebook, TikTok, etc.) hide it, so there we must
-  // send the user out to a real browser first.
   const isInAppWebview =
     /FBAN|FBAV|Instagram|Line|Twitter|Snapchat|TikTok|Pinterest|LinkedInApp|MicroMessenger/i.test(
       userAgent
     );
+  const canShare = typeof window.navigator.share === 'function';
   return (
     (isIOS ? 1 : 0) |
     (isAndroid ? 2 : 0) |
     (isStandalone ? 4 : 0) |
-    (isInAppWebview ? 8 : 0)
+    (isInAppWebview ? 8 : 0) |
+    (canShare ? 16 : 0)
   );
 }
 
@@ -38,34 +36,118 @@ export default function AppInstallModal({
   isOpen,
   onClose,
   onInstallPwa,
-  androidAppUrl = '/downloads/jackpot-royals.apk'
+  androidAppUrl = '/downloads/jackpot-royals.apk',
+  currentUserEmail = '',
+  showToast
 }) {
   const deviceFlags = useSyncExternalStore(subscribe, getDeviceSnapshot, () => 0);
   const device = {
     isIOS: Boolean(deviceFlags & 1),
     isAndroid: Boolean(deviceFlags & 2),
     isStandalone: Boolean(deviceFlags & 4),
-    isInAppWebview: Boolean(deviceFlags & 8)
+    isInAppWebview: Boolean(deviceFlags & 8),
+    canShare: Boolean(deviceFlags & 16)
   };
+
   const [selectedPlatform, setSelectedPlatform] = useState(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [shareTried, setShareTried] = useState(false);
+
+  // Auto-pick the right platform when the modal opens on a phone.
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedPlatform(null);
+      setShareTried(false);
+      setBusy(false);
+      return;
+    }
+    if (device.isStandalone) {
+      setSelectedPlatform(null);
+      return;
+    }
+    if (device.isIOS) setSelectedPlatform('ios');
+    else if (device.isAndroid) setSelectedPlatform('android');
+    else setSelectedPlatform(null);
+  }, [isOpen, device.isIOS, device.isAndroid, device.isStandalone]);
 
   if (!isOpen) return null;
 
-  const choosePlatform = (platform) => {
-    setSelectedPlatform(platform);
-    if (platform === 'android') {
-      window.location.assign(androidAppUrl);
-    }
+  const toast = (msg, type = 'info') => {
+    if (typeof showToast === 'function') showToast(msg, type);
   };
 
   const copyPageLink = async () => {
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      await navigator.clipboard.writeText(window.location.origin);
       setLinkCopied(true);
+      toast('Link copied — open it in Safari, then install.', 'success');
       setTimeout(() => setLinkCopied(false), 2500);
     } catch {
-      /* clipboard blocked — user can copy from the address bar */
+      toast('Copy the site link from the address bar.', 'info');
+    }
+  };
+
+  const installAndroid = () => {
+    setSelectedPlatform('android');
+    window.location.assign(androidAppUrl);
+    toast('Android APK download started. Open the file to install.', 'success');
+    setTimeout(() => onClose?.(), 600);
+  };
+
+  // Closest thing Apple allows to "direct install": open the native Share sheet
+  // so the user can tap "Add to Home Screen" in one place — no long guide.
+  const installIos = async () => {
+    setSelectedPlatform('ios');
+    setBusy(true);
+    try {
+      if (device.isInAppWebview) {
+        await copyPageLink();
+        setShareTried(true);
+        return;
+      }
+
+      if (device.canShare) {
+        try {
+          await navigator.share({
+            title: 'Jackpot Royals',
+            text: 'Add Jackpot Royals to your Home Screen',
+            url: window.location.origin
+          });
+          setShareTried(true);
+          toast('In the share sheet, tap “Add to Home Screen”, then open the new icon.', 'success');
+          return;
+        } catch (err) {
+          // User cancelled share — stay quiet, show the short fallback below.
+          if (String(err?.name || '').includes('Abort')) {
+            setShareTried(true);
+            return;
+          }
+        }
+      }
+
+      setShareTried(true);
+      toast('Tap Share → Add to Home Screen to install.', 'info');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const enableLockScreenPush = async () => {
+    if (!currentUserEmail) {
+      toast('Log in first, then enable notifications.', 'info');
+      return;
+    }
+    setPushBusy(true);
+    try {
+      await subscribeToPromoPush(currentUserEmail);
+      toast('Lock-screen notifications enabled!', 'success');
+      onClose?.();
+    } catch (err) {
+      toast(err?.message || 'Could not enable notifications. Allow them when prompted.', 'error');
+    } finally {
+      setPushBusy(false);
     }
   };
 
@@ -84,80 +166,120 @@ export default function AppInstallModal({
 
         <Image className="app-install-logo" src="/icon-192.png" alt="" width={84} height={84} />
         <h2 id="app-install-title">Get Jackpot Royals</h2>
-        <p className="app-install-lead">
-          Install once for a fullscreen app experience and automatic website updates.
-        </p>
 
-        {!device.isStandalone && (
-          <div className="app-platform-grid">
+        {device.isStandalone ? (
+          <>
+            <p className="app-install-lead">
+              App is installed. Enable notifications so promo offers also show on your lock screen.
+            </p>
             <button
               type="button"
-              className={`app-platform-card ${device.isAndroid ? 'recommended' : ''}`}
-              onClick={() => choosePlatform('android')}
+              className="app-install-primary"
+              onClick={enableLockScreenPush}
+              disabled={pushBusy}
             >
-              <i className="fa-brands fa-android" aria-hidden="true"></i>
-              <strong>Android</strong>
-              <span>Download APK</span>
+              <i className="fa-solid fa-bell" aria-hidden="true"></i>
+              {pushBusy ? 'Enabling…' : 'Enable Lock Screen Notifications'}
             </button>
-            <button
-              type="button"
-              className={`app-platform-card ${device.isIOS ? 'recommended' : ''}`}
-              onClick={() => setSelectedPlatform('ios')}
-            >
-              <i className="fa-brands fa-apple" aria-hidden="true"></i>
-              <strong>iPhone</strong>
-              <span>Add to Home Screen</span>
-            </button>
-          </div>
-        )}
+          </>
+        ) : (
+          <>
+            <p className="app-install-lead">
+              {device.isIOS
+                ? 'Install on your iPhone — opens as a full-screen app with lock-screen offers.'
+                : device.isAndroid
+                  ? 'Download the Android app for lock-screen notifications and a native experience.'
+                  : 'Choose your phone to install Jackpot Royals.'}
+            </p>
 
-        {selectedPlatform === 'ios' && !device.isStandalone && (
-          <div className="ios-install-steps">
-            {device.isInAppWebview ? (
-              <>
-                <strong>Open in your browser first</strong>
-                <p>
-                  You’re inside another app’s browser (like Instagram or Facebook),
-                  which hides the install option. Open this page in <b>Safari</b> or
-                  <b> Chrome</b> to add the app.
-                </p>
-                <ol>
-                  <li>Copy the link below.</li>
-                  <li>Open the <b>Safari</b> or <b>Chrome</b> app and paste the link.</li>
-                  <li>Then follow the “Add to Home Screen” steps.</li>
-                </ol>
-                <button type="button" className="pwa-install-fallback" onClick={copyPageLink}>
-                  <i className="fa-solid fa-link" aria-hidden="true"></i>
-                  {linkCopied ? 'Link copied!' : 'Copy link'}
+            {/* Desktop / unknown: show both. Phones auto-select and show the CTA. */}
+            {!device.isIOS && !device.isAndroid && (
+              <div className="app-platform-grid">
+                <button
+                  type="button"
+                  className="app-platform-card"
+                  onClick={installAndroid}
+                >
+                  <i className="fa-brands fa-android" aria-hidden="true"></i>
+                  <strong>Android</strong>
+                  <span>Download APK</span>
                 </button>
-              </>
-            ) : (
-              <>
-                <strong>Install on iPhone / iPad</strong>
-                <ol>
-                  <li>
-                    Tap the <b>Share</b> button{' '}
-                    <i className="fa-solid fa-arrow-up-from-bracket" aria-hidden="true"></i>
-                    {' '}(in Safari it’s at the bottom; in Chrome it’s at the top-right).
-                  </li>
-                  <li>Scroll and tap <b>“Add to Home Screen”</b>.</li>
-                  <li>Tap <b>Add</b> in the top-right corner.</li>
-                </ol>
-                <p>
-                  Open Jackpot Royals from its new Home Screen icon — it launches
-                  fullscreen, like a native app. <b>Tip:</b> Safari gives the most
-                  app-like result.
-                </p>
-              </>
+                <button
+                  type="button"
+                  className="app-platform-card"
+                  onClick={installIos}
+                >
+                  <i className="fa-brands fa-apple" aria-hidden="true"></i>
+                  <strong>iPhone</strong>
+                  <span>Add to Home Screen</span>
+                </button>
+              </div>
             )}
-          </div>
-        )}
 
-        {!selectedPlatform && !device.isStandalone && (
-          <button type="button" className="pwa-install-fallback" onClick={onInstallPwa}>
-            <i className="fa-solid fa-mobile-screen-button" aria-hidden="true"></i>
-            Use browser install
-          </button>
+            {selectedPlatform === 'android' && (
+              <div className="app-install-action-block">
+                <button
+                  type="button"
+                  className="app-install-primary"
+                  onClick={installAndroid}
+                >
+                  <i className="fa-brands fa-android" aria-hidden="true"></i>
+                  Download Android App (APK)
+                </button>
+                <p className="app-install-hint">
+                  Open the downloaded file → Install. Lock-screen notifications work in the APK.
+                </p>
+                {typeof onInstallPwa === 'function' && (
+                  <button type="button" className="pwa-install-fallback" onClick={onInstallPwa}>
+                    Or install from Chrome (optional)
+                  </button>
+                )}
+              </div>
+            )}
+
+            {selectedPlatform === 'ios' && (
+              <div className="app-install-action-block">
+                {device.isInAppWebview ? (
+                  <>
+                    <p className="app-install-hint" style={{ marginBottom: '0.85rem' }}>
+                      You’re inside another app’s browser. Open this site in <b>Safari</b> (best) or Chrome, then install.
+                    </p>
+                    <button type="button" className="app-install-primary" onClick={copyPageLink}>
+                      <i className="fa-solid fa-link" aria-hidden="true"></i>
+                      {linkCopied ? 'Link copied!' : 'Copy link to open in Safari'}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="app-install-primary"
+                      onClick={installIos}
+                      disabled={busy}
+                    >
+                      <i className="fa-brands fa-apple" aria-hidden="true"></i>
+                      {busy ? 'Opening…' : 'Install on iPhone'}
+                    </button>
+                    <p className="app-install-hint">
+                      {shareTried
+                        ? 'In the share menu tap Add to Home Screen → Add. Then open the new icon and allow notifications.'
+                        : 'One tap opens your phone’s share menu — choose Add to Home Screen.'}
+                    </p>
+                    {shareTried && (
+                      <ol className="ios-mini-steps">
+                        <li>
+                          Tap <b>Add to Home Screen</b>{' '}
+                          <i className="fa-solid fa-plus-square" aria-hidden="true"></i>
+                        </li>
+                        <li>Tap <b>Add</b>, then open the Jackpot icon</li>
+                        <li>Allow notifications for lock-screen offers</li>
+                      </ol>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

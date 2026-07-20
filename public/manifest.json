@@ -6,11 +6,14 @@
   "start_url": "/login?source=pwa",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["window-controls-overlay", "standalone"],
+  "display_override": ["standalone", "fullscreen"],
   "background_color": "#080a11",
-  "theme_color": "#ffd700",
+  "theme_color": "#080a11",
   "orientation": "portrait",
   "categories": ["entertainment", "games"],
+  "lang": "en",
+  "dir": "ltr",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icon-192.png",

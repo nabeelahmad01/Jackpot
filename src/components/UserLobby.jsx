@@ -281,7 +281,7 @@ export default function UserLobby({
       .catch(err => console.error('Failed to load promotions:', err));
   }, [currentUserEmail]);
 
-  // Auto-register promo push for logged-in users (app + browser). No enable button.
+  // Auto-register promo push for logged-in users (APK / Chrome / iOS Home Screen app).
   useEffect(() => {
     if (!currentUserEmail) return;
 
@@ -295,7 +295,8 @@ export default function UserLobby({
         registered = true;
         pushAutoTriedRef.current = currentUserEmail;
       } catch {
-        // Permission may need a gesture, or server push keys may still be missing.
+        // Permission may need a gesture, or iOS may still be in a browser tab
+        // (push only works after Add to Home Screen).
       }
     };
 
@@ -306,10 +307,16 @@ export default function UserLobby({
     const onInteract = () => {
       register();
     };
+    // When user opens the iOS Home Screen app, retry push once it is standalone.
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') register();
+    };
     window.addEventListener('pointerdown', onInteract, { once: true, passive: true });
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
       cancelled = true;
       window.removeEventListener('pointerdown', onInteract);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [currentUserEmail]);
 
