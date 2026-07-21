@@ -37,6 +37,7 @@ export default function AppInstallModal({
   onClose,
   onInstallPwa,
   androidAppUrl = '/downloads/jackpot-royals.apk',
+  iosAppUrl = '',
   currentUserEmail = '',
   showToast
 }) {
@@ -96,10 +97,18 @@ export default function AppInstallModal({
     setTimeout(() => onClose?.(), 600);
   };
 
-  // Closest thing Apple allows to "direct install": open the native Share sheet
-  // so the user can tap "Add to Home Screen" in one place — no long guide.
+  // Prefer TestFlight / App Store link when configured (real native iOS app).
+  // Fallback: Share → Add to Home Screen (only if no iosAppUrl yet).
   const installIos = async () => {
     setSelectedPlatform('ios');
+    const testFlightUrl = String(iosAppUrl || '').trim();
+    if (testFlightUrl) {
+      window.location.assign(testFlightUrl);
+      toast('Opening TestFlight / install link…', 'success');
+      setTimeout(() => onClose?.(), 600);
+      return;
+    }
+
     setBusy(true);
     try {
       if (device.isInAppWebview) {
@@ -119,7 +128,6 @@ export default function AppInstallModal({
           toast('In the share sheet, tap “Add to Home Screen”, then open the new icon.', 'success');
           return;
         } catch (err) {
-          // User cancelled share — stay quiet, show the short fallback below.
           if (String(err?.name || '').includes('Abort')) {
             setShareTried(true);
             return;
@@ -211,7 +219,7 @@ export default function AppInstallModal({
                 >
                   <i className="fa-brands fa-apple" aria-hidden="true"></i>
                   <strong>iPhone</strong>
-                  <span>Add to Home Screen</span>
+                  <span>{iosAppUrl ? 'Get iOS App' : 'Add to Home Screen'}</span>
                 </button>
               </div>
             )}
@@ -237,7 +245,21 @@ export default function AppInstallModal({
 
             {selectedPlatform === 'ios' && (
               <div className="app-install-action-block">
-                {device.isInAppWebview ? (
+                {String(iosAppUrl || '').trim() ? (
+                  <>
+                    <button
+                      type="button"
+                      className="app-install-primary"
+                      onClick={installIos}
+                    >
+                      <i className="fa-brands fa-apple" aria-hidden="true"></i>
+                      Install iPhone App
+                    </button>
+                    <p className="app-install-hint">
+                      Opens Apple TestFlight (or your install link). Install TestFlight if asked, then Install Jackpot Royals. Lock-screen notifications work in the native app.
+                    </p>
+                  </>
+                ) : device.isInAppWebview ? (
                   <>
                     <p className="app-install-hint" style={{ marginBottom: '0.85rem' }}>
                       You’re inside another app’s browser. Open this site in <b>Safari</b> (best) or Chrome, then install.
@@ -261,7 +283,7 @@ export default function AppInstallModal({
                     <p className="app-install-hint">
                       {shareTried
                         ? 'In the share menu tap Add to Home Screen → Add. Then open the new icon and allow notifications.'
-                        : 'One tap opens your phone’s share menu — choose Add to Home Screen.'}
+                        : 'One tap opens your phone’s share menu — choose Add to Home Screen. (After TestFlight is ready, set iOS App URL in admin settings for one-tap native install.)'}
                     </p>
                     {shareTried && (
                       <ol className="ios-mini-steps">

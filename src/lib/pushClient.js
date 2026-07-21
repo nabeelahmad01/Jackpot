@@ -92,7 +92,7 @@ async function subscribeToNativePush(userEmail) {
     resolveToken(result.value);
   });
   const errorHandle = await PushNotifications.addListener('registrationError', () => {
-    rejectToken(new Error('This Android build is not connected to Firebase yet.'));
+    rejectToken(new Error('This native build is not connected to Firebase/APNs yet.'));
   });
   const timeout = window.setTimeout(
     () => rejectToken(new Error('Push registration timed out.')),

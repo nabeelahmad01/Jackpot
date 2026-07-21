@@ -11,6 +11,7 @@ const config: CapacitorConfig = {
     url: 'https://jackpotroyals.com/',
     cleartext: false,
     androidScheme: 'https',
+    iosScheme: 'https',
     allowNavigation: ['jackpotroyals.com', '*.jackpotroyals.com'],
     errorPath: 'offline.html'
   },

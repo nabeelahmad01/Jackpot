@@ -9,7 +9,9 @@
     "lint": "eslint",
     "android:sync": "cap sync android",
     "android:debug": "JAVA_HOME=/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home PATH=/usr/local/opt/openjdk@21/bin:$PATH ./android/gradlew -p android assembleDebug",
-    "android:release": "npm run android:sync && JAVA_HOME=/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home PATH=/usr/local/opt/openjdk@21/bin:$PATH ./android/gradlew -p android assembleRelease && cp android/app/build/outputs/apk/release/app-release.apk public/downloads/jackpot-royals.apk"
+    "android:release": "npm run android:sync && JAVA_HOME=/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home PATH=/usr/local/opt/openjdk@21/bin:$PATH ./android/gradlew -p android assembleRelease && cp android/app/build/outputs/apk/release/app-release.apk public/downloads/jackpot-royals.apk",
+    "ios:sync": "cap sync ios",
+    "ios:open": "cap open ios"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.2",
@@ -17,6 +19,7 @@
     "@capacitor/browser": "^8.0.4",
     "@capacitor/cli": "^8.4.1",
     "@capacitor/core": "^8.4.1",
+    "@capacitor/ios": "^8.4.2",
     "@capacitor/push-notifications": "^8.1.2",
     "@capacitor/splash-screen": "^8.0.2",
     "@capacitor/status-bar": "^8.0.3",

@@ -2726,6 +2726,7 @@ export default function UserLobby({
           onInstallPwa={onInstallApp}
           currentUserEmail={currentUserEmail}
           androidAppUrl={frontendSettings?.androidAppUrl || '/downloads/jackpot-royals.apk'}
+          iosAppUrl={frontendSettings?.iosAppUrl || ''}
           showToast={showToast}
         />
       )}

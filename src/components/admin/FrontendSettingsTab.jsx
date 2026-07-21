@@ -14,6 +14,7 @@ export default function FrontendSettingsTab({ adminUser }) {
   const [withdrawNotice, setWithdrawNotice] = useState('');
   const [cashoutNotice, setCashoutNotice] = useState('');
   const [androidAppUrl, setAndroidAppUrl] = useState('/downloads/jackpot-royals.apk');
+  const [iosAppUrl, setIosAppUrl] = useState('');
   const [getAppEnabled, setGetAppEnabled] = useState(false);
   const [chimeActive, setChimeActive] = useState(true);
   const [venmoActive, setVenmoActive] = useState(true);
@@ -106,6 +107,7 @@ export default function FrontendSettingsTab({ adminUser }) {
       setWithdrawNotice(s.withdrawNotice || 'Fastest Withdrawals inside 5 Minutes!');
       setCashoutNotice(s.cashoutNotice || 'Standard cashout processing hours: 9 AM - 11 PM EST');
       setAndroidAppUrl(s.androidAppUrl || '/downloads/jackpot-royals.apk');
+      setIosAppUrl(s.iosAppUrl || '');
       setGetAppEnabled(s.getAppEnabled === true);
       setChimeActive(s.chimeActive !== false);
       setVenmoActive(s.venmoActive !== false);
@@ -251,6 +253,7 @@ export default function FrontendSettingsTab({ adminUser }) {
           withdrawNotice,
           cashoutNotice,
           androidAppUrl,
+          iosAppUrl,
           getAppEnabled,
           chimeActive,
           venmoActive,
@@ -381,6 +384,21 @@ export default function FrontendSettingsTab({ adminUser }) {
                   placeholder="/downloads/jackpot-royals.apk"
                 />
               </div>
+            </div>
+            <div className="input-group" style={{ margin: '0.85rem 0 0' }}>
+              <label>iOS Install URL (TestFlight public link)</label>
+              <div className="input-wrapper" style={{ background: '#07090f' }}>
+                <i className="fa-brands fa-apple input-icon"></i>
+                <input
+                  type="text"
+                  value={iosAppUrl}
+                  onChange={(event) => setIosAppUrl(event.target.value)}
+                  placeholder="https://testflight.apple.com/join/XXXXXXXX"
+                />
+              </div>
+              <span className="game-tap-tip" style={{ display: 'block', marginTop: '0.35rem' }}>
+                After TestFlight is ready, paste the public join link here. Get App → iPhone will open it.
+              </span>
             </div>
           </div>
 
