@@ -10,6 +10,7 @@
     "android:sync": "cap sync android",
     "android:debug": "JAVA_HOME=/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home PATH=/usr/local/opt/openjdk@21/bin:$PATH ./android/gradlew -p android assembleDebug",
     "android:release": "npm run android:sync && JAVA_HOME=/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home PATH=/usr/local/opt/openjdk@21/bin:$PATH ./android/gradlew -p android assembleRelease && cp android/app/build/outputs/apk/release/app-release.apk public/downloads/jackpot-royals.apk",
+    "android:aab": "npm run android:sync && JAVA_HOME=/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home PATH=/usr/local/opt/openjdk@21/bin:$PATH ./android/gradlew -p android bundleRelease && mkdir -p public/downloads && cp android/app/build/outputs/bundle/release/app-release.aab public/downloads/jackpot-royals.aab",
     "ios:sync": "cap sync ios",
     "ios:open": "cap open ios",
     "portal:sync": "cp capacitor.config.ts .capacitor.player.config.bak.ts && cp capacitor.portal.config.ts capacitor.config.ts && npx cap sync android; STATUS=$?; mv .capacitor.player.config.bak.ts capacitor.config.ts; exit $STATUS",
