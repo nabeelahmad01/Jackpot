@@ -3908,6 +3908,17 @@ body {
   padding-left: env(safe-area-inset-left);
 }
 
+/* Capacitor APKs (player + Portal): StatusBar does not overlay the WebView, so
+   the system already insets content. Applying env(safe-area-*) again pushes the
+   admin header / content far down and can hide the fixed mobile header under
+   body::before. Browser / PWA keep the safe-area padding above. */
+html.capacitor-native body {
+  padding-top: 0;
+  padding-right: 0;
+  padding-bottom: 0;
+  padding-left: 0;
+}
+
 /* Solid top strip so content never peeks behind battery/clock on scroll */
 body::before {
   content: '';
@@ -3919,6 +3930,10 @@ body::before {
   background: #080a11;
   z-index: 100001;
   pointer-events: none;
+}
+
+html.capacitor-native body::before {
+  display: none;
 }
 
 .native-launch-screen {
