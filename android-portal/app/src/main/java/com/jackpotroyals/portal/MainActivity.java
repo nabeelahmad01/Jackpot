@@ -3,6 +3,7 @@ package com.jackpotroyals.portal;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.DisplayMetrics;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -23,26 +24,20 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         applySolidSystemBars();
 
-        // Bridge WebView is ready after layout — re-apply bars + insets so the
-        // admin header never draws under the battery / signal status bar.
         View decor = getWindow() != null ? getWindow().getDecorView() : null;
         if (decor != null) {
             decor.post(this::finishNativeChromeSetup);
             decor.postDelayed(this::finishNativeChromeSetup, 400);
+            decor.postDelayed(this::finishNativeChromeSetup, 1200);
         }
     }
 
     private void finishNativeChromeSetup() {
         applySolidSystemBars();
         lockWebViewZoom();
-        applyWebViewSystemBarPadding();
+        bindStatusBarCssVar();
     }
 
-    /**
-     * Keep the app rendering at a consistent 100% on every device. Without this,
-     * phones with a larger "Font size" / "Display size" accessibility setting make
-     * the WebView zoom in, so the app looks bigger on some devices than others.
-     */
     private void lockWebViewZoom() {
         WebView webView = getBridge() != null ? getBridge().getWebView() : null;
         if (webView == null) {
@@ -53,33 +48,72 @@ public class MainActivity extends BridgeActivity {
         settings.setSupportZoom(false);
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
-        // Guarantee Portal UA even if capacitor appendUserAgent is slow/missing,
-        // so the live site can apply admin-native-shell CSS only for this APK.
         String ua = settings.getUserAgentString();
         if (ua != null && !ua.contains("JackpotPortalNative")) {
-            settings.setUserAgentString(ua + " JackpotPortalNative/1.1");
-        } else if (ua != null && ua.contains("JackpotPortalNative/1.0")) {
-            settings.setUserAgentString(ua.replace("JackpotPortalNative/1.0", "JackpotPortalNative/1.1"));
+            settings.setUserAgentString(ua + " JackpotPortalNative/1.2");
+        } else if (ua != null && ua.matches(".*JackpotPortalNative/\\d+\\.\\d+.*")) {
+            settings.setUserAgentString(
+                ua.replaceAll("JackpotPortalNative/\\d+\\.\\d+", "JackpotPortalNative/1.2")
+            );
         }
     }
 
     /**
-     * Android 14/15 edge-to-edge often lets the WebView draw under the status bar
-     * even when CSS safe-area is 0. Pad the WebView by the real system bar insets
-     * so "JACKPOT ROYALS" header sits fully below battery/wifi/signal icons.
+     * WebView padding/margin does not reliably move position:fixed HTML out from
+     * under the status bar. Push the real status-bar height into --admin-sat so
+     * the admin header CSS can sit below battery / wifi / signal icons.
      */
-    private void applyWebViewSystemBarPadding() {
+    private void bindStatusBarCssVar() {
         WebView webView = getBridge() != null ? getBridge().getWebView() : null;
         if (webView == null) {
             return;
         }
 
+        injectAdminSafeAreaCss(cssPxFromDevicePx(statusBarFallbackPx()));
+
         ViewCompat.setOnApplyWindowInsetsListener(webView, (v, windowInsets) -> {
-            Insets bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+            Insets bars = windowInsets.getInsets(
+                WindowInsetsCompat.Type.statusBars() | WindowInsetsCompat.Type.displayCutout()
+            );
+            int topPx = bars.top > 0 ? bars.top : statusBarFallbackPx();
+            injectAdminSafeAreaCss(cssPxFromDevicePx(topPx));
             return windowInsets;
         });
         ViewCompat.requestApplyInsets(webView);
+    }
+
+    private void injectAdminSafeAreaCss(int cssTop) {
+        WebView webView = getBridge() != null ? getBridge().getWebView() : null;
+        if (webView == null) {
+            return;
+        }
+        int safe = Math.max(cssTop, 40);
+        String js =
+            "(function(){"
+                + "var r=document.documentElement;"
+                + "r.classList.add('admin-native-shell');"
+                + "r.style.setProperty('--admin-sat','"
+                + safe
+                + "px');"
+                + "})();";
+        webView.evaluateJavascript(js, null);
+    }
+
+    private int statusBarFallbackPx() {
+        int resId = getResources().getIdentifier("status_bar_height", "dimen", "android");
+        if (resId > 0) {
+            return getResources().getDimensionPixelSize(resId);
+        }
+        DisplayMetrics metrics = getResources().getDisplayMetrics();
+        return Math.round(24 * metrics.density);
+    }
+
+    private int cssPxFromDevicePx(int devicePx) {
+        float density = getResources().getDisplayMetrics().density;
+        if (density <= 0f) {
+            return Math.max(40, devicePx);
+        }
+        return Math.max(40, Math.round(devicePx / density));
     }
 
     private void applySolidSystemBars() {
@@ -89,9 +123,9 @@ public class MainActivity extends BridgeActivity {
         }
 
         int barColor = Color.parseColor("#080a11");
-        // Content must NOT draw under the status bar (header was hiding behind it).
         WindowCompat.setDecorFitsSystemWindows(window, true);
         window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+        window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
         window.setStatusBarColor(barColor);
         window.setNavigationBarColor(barColor);
@@ -102,8 +136,11 @@ public class MainActivity extends BridgeActivity {
         }
 
         View decor = window.getDecorView();
+        decor.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
         WindowInsetsControllerCompat controller = new WindowInsetsControllerCompat(window, decor);
         controller.setAppearanceLightStatusBars(false);
         controller.setAppearanceLightNavigationBars(false);
+        controller.show(WindowInsetsCompat.Type.statusBars());
+        controller.show(WindowInsetsCompat.Type.navigationBars());
     }
 }

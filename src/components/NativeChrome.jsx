@@ -7,12 +7,6 @@ function isPortalApp() {
   return /JackpotPortalNative/i.test(navigator.userAgent || '');
 }
 
-function portalNativeVersion() {
-  const m = String(navigator.userAgent || '').match(/JackpotPortalNative\/(\d+)\.(\d+)/);
-  if (!m) return null;
-  return { major: Number(m[1]), minor: Number(m[2]) };
-}
-
 function probeSafeAreaTop() {
   if (typeof document === 'undefined') return 0;
   const el = document.createElement('div');
@@ -26,9 +20,8 @@ function probeSafeAreaTop() {
 
 /**
  * Keep Android/iOS system bars solid so content never shows behind the clock/battery.
- * Portal: keep admin header BELOW the status bar (battery/wifi/signal).
- *  - Portal APK 1.1+ pads the WebView natively → --admin-sat: 0
- *  - Older Portal builds get a CSS fallback (~32px) when safe-area reports 0
+ * Portal: header MUST sit below the status bar. WebView padding is unreliable on
+ * Android 14/15, so we always apply a real --admin-sat (never force 0).
  */
 export default function NativeChrome() {
   useEffect(() => {
@@ -41,9 +34,6 @@ export default function NativeChrome() {
     const syncAdminSat = () => {
       if (cancelled) return;
       const probed = probeSafeAreaTop();
-      const ver = portalNativeVersion();
-      // 1.1+ MainActivity applies real system-bar padding on the WebView.
-      const nativeInsetsHandled = ver && (ver.major > 1 || ver.minor >= 1);
       const onAdmin =
         window.location.pathname.startsWith('/admin') ||
         document.querySelector('.admin-dashboard-layout');
@@ -52,11 +42,10 @@ export default function NativeChrome() {
         (isPortalApp() || window.Capacitor?.isNativePlatform?.() === true);
 
       let px = probed;
-      if (nativeInsetsHandled) {
-        px = 0;
-      } else if (probed < 1 && androidNative && onAdmin) {
-        // Legacy Portal / overlay WebView with no CSS safe-area support.
-        px = 32;
+      // Portal / Android admin: env(safe-area) is often 0 while the status bar
+      // still overlays the WebView — force a real offset so the logo is visible.
+      if (probed < 1 && androidNative && (isPortalApp() || onAdmin)) {
+        px = 40;
       }
       document.documentElement.style.setProperty('--admin-sat', `${Math.round(px)}px`);
     };
@@ -74,6 +63,8 @@ export default function NativeChrome() {
         await StatusBar.setOverlaysWebView({ overlay: false });
         await StatusBar.setBackgroundColor({ color: '#080a11' });
         await StatusBar.setStyle({ style: Style.Dark });
+        // Plugin may settle after first paint — re-apply offset.
+        syncAdminSat();
       } catch {
         // Browser / missing plugin — nothing to do.
       }
@@ -84,11 +75,13 @@ export default function NativeChrome() {
     configure();
     const t1 = window.setTimeout(syncAdminSat, 300);
     const t2 = window.setTimeout(syncAdminSat, 1000);
+    const t3 = window.setTimeout(syncAdminSat, 2500);
 
     return () => {
       cancelled = true;
       window.clearTimeout(t1);
       window.clearTimeout(t2);
+      window.clearTimeout(t3);
     };
   }, []);
 

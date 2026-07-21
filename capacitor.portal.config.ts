@@ -9,7 +9,7 @@ const config: CapacitorConfig = {
   appId: 'com.jackpotroyals.portal',
   appName: 'Jackpot Portal',
   webDir: 'capacitor-shell',
-  appendUserAgent: ' JackpotPortalNative/1.1',
+  appendUserAgent: ' JackpotPortalNative/1.2',
   backgroundColor: '#080a11',
   android: {
     path: 'android-portal'
@@ -29,8 +29,9 @@ const config: CapacitorConfig = {
       backgroundColor: '#080a11',
       androidScaleType: 'CENTER_CROP',
       showSpinner: false,
-      splashFullScreen: true,
-      splashImmersive: true
+      // Immersive/fullscreen splash leaves content under the status bar on Android.
+      splashFullScreen: false,
+      splashImmersive: false
     },
     StatusBar: {
       style: 'DARK',

@@ -2298,12 +2298,31 @@ select option {
     border-bottom: 1.5px solid rgba(255, 215, 0, 0.3);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
     position: fixed;
-    /* Sit below notch/status bar when it overlays; 0 when WebView is already inset */
+    /* Portal Android often reports safe-area 0 while status bar still overlays */
     top: var(--admin-sat, env(safe-area-inset-top, 0px));
     left: 0;
     width: 100%;
     height: 56px;
     z-index: 1010; /* above body::before safe-area strip (z-index 1000) */
+  }
+
+  /* Jackpot Portal APK: never allow header under battery/wifi/signal icons */
+  html.admin-native-shell .admin-mobile-header {
+    top: max(var(--admin-sat, 40px), 40px);
+  }
+
+  html.admin-native-shell .admin-sidebar {
+    top: calc(56px + max(var(--admin-sat, 40px), 40px));
+    height: calc(100dvh - 56px - max(var(--admin-sat, 40px), 40px));
+  }
+
+  html.admin-native-shell .admin-main-workspace {
+    padding-top: calc(56px + max(var(--admin-sat, 40px), 40px) + 1.25rem) !important;
+  }
+
+  html.admin-native-shell .admin-main-workspace--support {
+    height: calc(100dvh - 56px - max(var(--admin-sat, 40px), 40px));
+    max-height: calc(100dvh - 56px - max(var(--admin-sat, 40px), 40px));
   }
 
   .admin-sidebar {
