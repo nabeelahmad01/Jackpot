@@ -2298,7 +2298,8 @@ select option {
     border-bottom: 1.5px solid rgba(255, 215, 0, 0.3);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
     position: fixed;
-    top: 0;
+    /* Sit below notch/status bar when it overlays; 0 when WebView is already inset */
+    top: var(--admin-sat, env(safe-area-inset-top, 0px));
     left: 0;
     width: 100%;
     height: 56px;
@@ -2307,9 +2308,10 @@ select option {
 
   .admin-sidebar {
     position: fixed;
-    top: 56px;
+    top: calc(56px + var(--admin-sat, env(safe-area-inset-top, 0px)));
     left: 0;
-    height: calc(100vh - 56px);
+    height: calc(100vh - 56px - var(--admin-sat, env(safe-area-inset-top, 0px)));
+    height: calc(100dvh - 56px - var(--admin-sat, env(safe-area-inset-top, 0px)));
     width: 260px;
     transform: translateX(-100%);
     box-shadow: 10px 0 30px rgba(0, 0, 0, 0.6);
@@ -2322,7 +2324,7 @@ select option {
 
   .admin-main-workspace {
     /* Beat inline padding on distributor/affiliate so fixed header never covers content */
-    padding-top: calc(56px + 1.25rem) !important;
+    padding-top: calc(56px + var(--admin-sat, env(safe-area-inset-top, 0px)) + 1.25rem) !important;
     padding-left: 1rem !important;
     padding-right: 1rem !important;
     padding-bottom: 1.5rem !important;
@@ -2331,10 +2333,10 @@ select option {
   }
 
   .admin-main-workspace--support {
-    height: calc(100vh - 56px);
-    height: calc(100dvh - 56px);
-    max-height: calc(100vh - 56px);
-    max-height: calc(100dvh - 56px);
+    height: calc(100vh - 56px - var(--admin-sat, env(safe-area-inset-top, 0px)));
+    height: calc(100dvh - 56px - var(--admin-sat, env(safe-area-inset-top, 0px)));
+    max-height: calc(100vh - 56px - var(--admin-sat, env(safe-area-inset-top, 0px)));
+    max-height: calc(100dvh - 56px - var(--admin-sat, env(safe-area-inset-top, 0px)));
     padding-bottom: 1rem !important;
   }
 
@@ -3922,33 +3924,31 @@ body::before {
   pointer-events: none;
 }
 
-/* Jackpot Portal / admin opened inside Capacitor: system bars already inset the
-   WebView. Extra body safe-area padding only pushes the admin chrome down.
-   Class is toggled only while AdminDashboard is mounted — player lobby untouched. */
-html.admin-native-shell body {
+/* Admin dashboard: body safe-area is handled by the fixed mobile header.
+   Without this, body padding + header top:0 stacks and the bar looks "pushed down". */
+body:has(.admin-dashboard-layout) {
   padding-top: 0;
-  padding-right: 0;
-  padding-bottom: 0;
-  padding-left: 0;
 }
 
-html.admin-native-shell body::before {
+body:has(.admin-dashboard-layout)::before {
   display: none;
 }
 
-html.admin-native-shell .admin-mobile-header {
-  top: 0 !important;
-  z-index: 1010;
+/* Jackpot Portal APK only (UA marker). System bars already inset the WebView —
+   force safe-area contribution to 0 so header sits flush at the top. */
+html.admin-native-shell {
+  --admin-sat: 0px;
 }
 
-html.admin-native-shell .admin-sidebar {
-  top: 56px !important;
-  height: calc(100vh - 56px) !important;
-  height: calc(100dvh - 56px) !important;
+html.admin-native-shell body {
+  padding-top: 0 !important;
+  padding-right: 0 !important;
+  padding-bottom: 0 !important;
+  padding-left: 0 !important;
 }
 
-html.admin-native-shell .admin-main-workspace {
-  padding-top: calc(56px + 1.25rem) !important;
+html.admin-native-shell body::before {
+  display: none !important;
 }
 
 .native-launch-screen {

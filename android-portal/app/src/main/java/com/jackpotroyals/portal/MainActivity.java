@@ -37,6 +37,12 @@ public class MainActivity extends BridgeActivity {
         settings.setSupportZoom(false);
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
+        // Guarantee Portal UA even if capacitor appendUserAgent is slow/missing,
+        // so the live site can apply admin-native-shell CSS only for this APK.
+        String ua = settings.getUserAgentString();
+        if (ua != null && !ua.contains("JackpotPortalNative")) {
+            settings.setUserAgentString(ua + " JackpotPortalNative/1.0");
+        }
     }
 
     private void applySolidSystemBars() {

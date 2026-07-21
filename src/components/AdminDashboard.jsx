@@ -113,19 +113,32 @@ export default function AdminDashboard({
     initDesktopNotifications();
   }, []);
 
-  // Portal / Capacitor admin only: avoid double safe-area inset that pushes the
-  // mobile header down. Removed on unmount so the player lobby is never affected.
+  // Portal / Capacitor admin: avoid double safe-area inset. Retry briefly because
+  // the Capacitor bridge / UA marker can appear after the first paint.
   useEffect(() => {
-    const isNative =
-      /JackpotRoyalsNative|JackpotPortalNative/i.test(
-        typeof navigator !== 'undefined' ? navigator.userAgent || '' : ''
-      ) ||
-      (typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.() === true);
+    const apply = () => {
+      const isNative =
+        /JackpotRoyalsNative|JackpotPortalNative/i.test(navigator.userAgent || '') ||
+        window.Capacitor?.isNativePlatform?.() === true ||
+        // Portal APK always opens /admin — treat Capacitor WebView on admin as native shell
+        (window.Capacitor != null && window.location.pathname.startsWith('/admin'));
 
-    if (!isNative) return undefined;
+      if (isNative) {
+        document.documentElement.classList.add('admin-native-shell');
+        return true;
+      }
+      return false;
+    };
 
-    document.documentElement.classList.add('admin-native-shell');
+    apply();
+    const interval = window.setInterval(() => {
+      if (apply()) window.clearInterval(interval);
+    }, 300);
+    const stop = window.setTimeout(() => window.clearInterval(interval), 6000);
+
     return () => {
+      window.clearInterval(interval);
+      window.clearTimeout(stop);
       document.documentElement.classList.remove('admin-native-shell');
     };
   }, []);
