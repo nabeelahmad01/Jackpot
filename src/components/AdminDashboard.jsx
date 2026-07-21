@@ -113,6 +113,23 @@ export default function AdminDashboard({
     initDesktopNotifications();
   }, []);
 
+  // Portal / Capacitor admin only: avoid double safe-area inset that pushes the
+  // mobile header down. Removed on unmount so the player lobby is never affected.
+  useEffect(() => {
+    const isNative =
+      /JackpotRoyalsNative|JackpotPortalNative/i.test(
+        typeof navigator !== 'undefined' ? navigator.userAgent || '' : ''
+      ) ||
+      (typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.() === true);
+
+    if (!isNative) return undefined;
+
+    document.documentElement.classList.add('admin-native-shell');
+    return () => {
+      document.documentElement.classList.remove('admin-native-shell');
+    };
+  }, []);
+
   // Register this device for Jackpot Portal lock-screen request alerts
   // (native Portal APK + optional browser staff push). Player APK tokens are separate.
   useEffect(() => {

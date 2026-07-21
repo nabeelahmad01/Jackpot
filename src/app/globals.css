@@ -2302,7 +2302,7 @@ select option {
     left: 0;
     width: 100%;
     height: 56px;
-    z-index: 1010;
+    z-index: 1010; /* above body::before safe-area strip (z-index 1000) */
   }
 
   .admin-sidebar {
@@ -3908,18 +3908,8 @@ body {
   padding-left: env(safe-area-inset-left);
 }
 
-/* Capacitor APKs (player + Portal): StatusBar does not overlay the WebView, so
-   the system already insets content. Applying env(safe-area-*) again pushes the
-   admin header / content far down and can hide the fixed mobile header under
-   body::before. Browser / PWA keep the safe-area padding above. */
-html.capacitor-native body {
-  padding-top: 0;
-  padding-right: 0;
-  padding-bottom: 0;
-  padding-left: 0;
-}
-
-/* Solid top strip so content never peeks behind battery/clock on scroll */
+/* Solid top strip so content never peeks behind battery/clock on scroll.
+   Keep BELOW admin/lobby headers (do not cover the mobile top bar). */
 body::before {
   content: '';
   position: fixed;
@@ -3928,12 +3918,37 @@ body::before {
   right: 0;
   height: env(safe-area-inset-top, 0px);
   background: #080a11;
-  z-index: 100001;
+  z-index: 1000;
   pointer-events: none;
 }
 
-html.capacitor-native body::before {
+/* Jackpot Portal / admin opened inside Capacitor: system bars already inset the
+   WebView. Extra body safe-area padding only pushes the admin chrome down.
+   Class is toggled only while AdminDashboard is mounted — player lobby untouched. */
+html.admin-native-shell body {
+  padding-top: 0;
+  padding-right: 0;
+  padding-bottom: 0;
+  padding-left: 0;
+}
+
+html.admin-native-shell body::before {
   display: none;
+}
+
+html.admin-native-shell .admin-mobile-header {
+  top: 0 !important;
+  z-index: 1010;
+}
+
+html.admin-native-shell .admin-sidebar {
+  top: 56px !important;
+  height: calc(100vh - 56px) !important;
+  height: calc(100dvh - 56px) !important;
+}
+
+html.admin-native-shell .admin-main-workspace {
+  padding-top: calc(56px + 1.25rem) !important;
 }
 
 .native-launch-screen {
