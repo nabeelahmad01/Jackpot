@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
-import { getVapidPublicKey } from '../../../lib/pushNotifications';
+import { getVapidPublicKey, isStaffRole } from '../../../lib/pushNotifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,12 +19,17 @@ export async function POST(req) {
     const userEmail = String(body.email || '').trim().toLowerCase();
     const subscription = body.subscription;
     const nativeToken = String(body.nativeToken || '').trim();
+    const platform = String(body.platform || '').trim().toLowerCase() || 'web';
+    const audience = String(body.audience || 'player').trim().toLowerCase() === 'staff'
+      ? 'staff'
+      : 'player';
     const endpoint = subscription?.endpoint || (nativeToken ? `native:${nativeToken}` : '');
 
     const hasWebSubscription = Boolean(
       subscription?.endpoint && subscription?.keys?.p256dh && subscription?.keys?.auth
     );
-    const hasNativeSubscription = nativeToken.length >= 20 && body.platform === 'android';
+    const hasNativeSubscription =
+      nativeToken.length >= 20 && (platform === 'android' || platform === 'ios');
     if (!userEmail || (!hasWebSubscription && !hasNativeSubscription)) {
       return NextResponse.json(
         { success: false, message: 'A valid user and push subscription are required.' },
@@ -45,9 +50,30 @@ export async function POST(req) {
     }
 
     const db = await getDb();
-    const user = await db.collection('users').findOne({ email: userEmail }, { projection: { _id: 1 } });
-    if (!user) {
+
+    const envAdminEmail = (process.env.ADMIN_EMAIL || process.env.NEXT_PUBLIC_ADMIN_EMAIL || '')
+      .toLowerCase()
+      .trim();
+    const isEnvAdmin = Boolean(envAdminEmail) && userEmail === envAdminEmail;
+
+    const user = await db.collection('users').findOne(
+      { email: userEmail },
+      { projection: { _id: 1, role: 1, distributorId: 1 } }
+    );
+
+    if (!isEnvAdmin && !user) {
       return NextResponse.json({ success: false, message: 'User account was not found.' }, { status: 404 });
+    }
+
+    if (audience === 'staff') {
+      const roleOk = isEnvAdmin || isStaffRole(user?.role);
+      const isDistributorStaff = Boolean(user?.distributorId);
+      if (!roleOk || isDistributorStaff) {
+        return NextResponse.json(
+          { success: false, message: 'Only Jackpot Portal admin/staff can register for staff alerts.' },
+          { status: 403 }
+        );
+      }
     }
 
     const now = new Date().toISOString();
@@ -57,8 +83,9 @@ export async function POST(req) {
         $set: {
           endpoint,
           userEmail,
+          audience,
           type: hasNativeSubscription ? 'native' : 'web',
-          platform: hasNativeSubscription ? 'android' : 'web',
+          platform: hasNativeSubscription ? platform : 'web',
           subscription: hasWebSubscription ? subscription : null,
           nativeToken: hasNativeSubscription ? nativeToken : null,
           userAgent: String(body.userAgent || '').slice(0, 500),
@@ -69,7 +96,7 @@ export async function POST(req) {
       { upsert: true }
     );
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, audience });
   } catch (error) {
     console.error('Push subscription save error:', error);
     return NextResponse.json(

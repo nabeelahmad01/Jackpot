@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
+import { notifyStaffAsync } from '../../../lib/pushNotifications';
 
 async function getAdBudgetLimit(db) {
   const settings = await db.collection('settings').findOne({ id: 'global_settings' });
@@ -98,6 +99,13 @@ export async function POST(req) {
 
     await campaignsCollection.insertOne(newRequest);
     cache.del('admin_stats');
+
+    notifyStaffAsync(db, {
+      title: 'New Campaign Request',
+      body: `${cleanEmail} · $${budgetVal.toFixed(2)} · ${campaignName.trim()}`,
+      url: '/admin',
+      tag: `campaign-${newRequest.id}`
+    });
 
     return NextResponse.json({
       success: true,

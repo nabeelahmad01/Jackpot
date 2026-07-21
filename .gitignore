@@ -39,6 +39,9 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# temporary swap file used by portal:sync scripts
+.capacitor.player.config.bak.ts
+
 # vercel
 .vercel
 

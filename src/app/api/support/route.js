@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
+import { notifyStaffAsync } from '../../../lib/pushNotifications';
 
 // GET support chat messages
 export async function GET(req) {
@@ -98,6 +99,15 @@ export async function POST(req) {
 
     // Invalidate stats cache
     cache.del('admin_stats');
+
+    if (senderType === 'player') {
+      notifyStaffAsync(db, {
+        title: 'New Support Message',
+        body: `${userName || userEmail}: ${(message || 'Attachment').slice(0, 100)}`,
+        url: '/admin',
+        tag: `support-${newMsg.id}`
+      });
+    }
 
     return NextResponse.json({ success: true, message: newMsg });
   } catch (err) {

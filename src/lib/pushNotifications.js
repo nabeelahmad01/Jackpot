@@ -188,3 +188,132 @@ export async function sendPromotionPush(db, promotion, targetEmails) {
 
   return { sent, failed, skipped: false };
 }
+
+const STAFF_PUSH_ROLES = [
+  'admin',
+  'financial_admin',
+  'coins_admin',
+  'support_admin',
+  'operation_admin'
+];
+
+/**
+ * Lock-screen / native alerts for the Jackpot Portal (admin + staff) APK.
+ * Only devices registered with audience: 'staff' receive these — the player APK
+ * subscriptions are never touched.
+ */
+export async function sendStaffPush(db, { title, body, url = '/admin', tag = 'staff-alert' } = {}) {
+  try {
+    const subscriptions = await db.collection('pushSubscriptions')
+      .find({ audience: 'staff' })
+      .toArray();
+
+    if (subscriptions.length === 0) {
+      return { sent: 0, failed: 0, skipped: true };
+    }
+
+    const webSubscriptions = subscriptions.filter(
+      (record) => record.type !== 'native' && record.subscription
+    );
+    const nativeSubscriptions = subscriptions.filter(
+      (record) => record.type === 'native' && record.nativeToken
+    );
+
+    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://jackpotroyals.com')
+      .replace(/\/$/, '');
+    const safeTitle = String(title || 'Jackpot Portal').slice(0, 80);
+    const safeBody = String(body || 'New request waiting in the portal.').slice(0, 180);
+    const safeUrl = String(url || '/admin');
+    const payload = JSON.stringify({
+      title: safeTitle,
+      body: safeBody,
+      icon: `${siteUrl}/icon-192.png`,
+      badge: `${siteUrl}/icon-192.png`,
+      tag,
+      url: safeUrl
+    });
+
+    let sent = 0;
+    let failed = 0;
+    const expiredEndpoints = [];
+
+    if (configureWebPush()) {
+      for (const record of webSubscriptions) {
+        try {
+          await webpush.sendNotification(record.subscription, payload);
+          sent += 1;
+        } catch (error) {
+          failed += 1;
+          const statusCode = error?.statusCode;
+          if (statusCode === 404 || statusCode === 410) {
+            expiredEndpoints.push(record.endpoint);
+          }
+        }
+      }
+    }
+
+    const messaging = getFirebaseMessaging();
+    if (messaging && nativeSubscriptions.length > 0) {
+      for (let index = 0; index < nativeSubscriptions.length; index += 500) {
+        const batch = nativeSubscriptions.slice(index, index + 500);
+        const response = await messaging.sendEachForMulticast({
+          tokens: batch.map((record) => record.nativeToken),
+          notification: {
+            title: safeTitle,
+            body: safeBody
+          },
+          data: {
+            url: safeUrl,
+            tag: String(tag)
+          },
+          android: {
+            priority: 'high',
+            notification: {
+              channelId: 'jackpot_portal_alerts',
+              sound: 'default'
+            }
+          }
+        });
+
+        sent += response.successCount;
+        failed += response.failureCount;
+        response.responses.forEach((result, resultIndex) => {
+          const code = result.error?.code;
+          if (
+            code === 'messaging/registration-token-not-registered' ||
+            code === 'messaging/invalid-registration-token'
+          ) {
+            expiredEndpoints.push(batch[resultIndex].endpoint);
+          }
+        });
+      }
+    }
+
+    if (expiredEndpoints.length > 0) {
+      await db.collection('pushSubscriptions').deleteMany({
+        endpoint: { $in: expiredEndpoints }
+      });
+    }
+
+    return { sent, failed, skipped: false };
+  } catch (error) {
+    console.error('Staff push error:', error);
+    return { sent: 0, failed: 0, skipped: true, error: error.message };
+  }
+}
+
+export function isStaffRole(role) {
+  const roles = String(role || '')
+    .toLowerCase()
+    .split(',')
+    .map((r) => r.trim())
+    .filter(Boolean);
+  return roles.some((r) => STAFF_PUSH_ROLES.includes(r));
+}
+
+/** Fire-and-forget helper so API handlers never block on push delivery. */
+export function notifyStaffAsync(db, alert) {
+  Promise.resolve()
+    .then(() => sendStaffPush(db, alert))
+    .catch((err) => console.error('notifyStaffAsync failed:', err));
+}

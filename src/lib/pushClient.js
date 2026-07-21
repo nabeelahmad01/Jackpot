@@ -7,11 +7,16 @@ function urlBase64ToUint8Array(value) {
 
 let nativeActionListenerReady = false;
 
+function isPortalNative() {
+  if (typeof window === 'undefined') return false;
+  return /JackpotPortalNative/i.test(navigator.userAgent || '');
+}
+
 function isNativePlatform() {
   if (typeof window === 'undefined') return false;
   if (window.Capacitor?.isNativePlatform?.() === true) return true;
-  // Capacitor WebView UA marker from MainActivity when bridge is slow to load
-  return /JackpotRoyalsNative/i.test(navigator.userAgent || '');
+  // Capacitor WebView UA markers (player APK + staff Portal APK).
+  return /JackpotRoyalsNative|JackpotPortalNative/i.test(navigator.userAgent || '');
 }
 
 export function isIosDevice() {
@@ -52,11 +57,9 @@ export async function getExistingPushSubscription() {
   return registration.pushManager.getSubscription();
 }
 
-async function subscribeToNativePush(userEmail) {
+async function subscribeToNativePush(userEmail, { audience = 'player' } = {}) {
   // Access the native plugin through the runtime bridge instead of a static
   // import so the web build never hard-depends on @capacitor/push-notifications.
-  // When the APK is built without Firebase, this plugin is absent and we throw,
-  // which triggers the Web Push fallback below.
   const Capacitor = typeof window !== 'undefined' ? window.Capacitor : null;
   const PushNotifications = Capacitor?.Plugins?.PushNotifications;
   if (!PushNotifications) {
@@ -71,11 +74,16 @@ async function subscribeToNativePush(userEmail) {
     throw new Error('Notification permission was not allowed.');
   }
 
+  const portal = audience === 'staff' || isPortalNative();
+  const channelId = portal ? 'jackpot_portal_alerts' : 'jackpot_promotions';
+
   if (Capacitor?.getPlatform?.() === 'android') {
     await PushNotifications.createChannel({
-      id: 'jackpot_promotions',
-      name: 'Promotions',
-      description: 'Jackpot Royals offers and promotions',
+      id: channelId,
+      name: portal ? 'Portal Alerts' : 'Promotions',
+      description: portal
+        ? 'Jackpot Portal request alerts'
+        : 'Jackpot Royals offers and promotions',
       importance: 4,
       visibility: 1,
       vibration: true
@@ -116,6 +124,7 @@ async function subscribeToNativePush(userEmail) {
       email: String(userEmail || '').trim().toLowerCase(),
       nativeToken: token,
       platform: Capacitor?.getPlatform?.() || 'android',
+      audience: portal ? 'staff' : 'player',
       userAgent: navigator.userAgent
     })
   });
@@ -127,7 +136,7 @@ async function subscribeToNativePush(userEmail) {
   if (!nativeActionListenerReady) {
     nativeActionListenerReady = true;
     await PushNotifications.addListener('pushNotificationActionPerformed', ({ notification }) => {
-      const url = notification?.data?.url || '/lobby';
+      const url = notification?.data?.url || (portal ? '/admin' : '/lobby');
       window.location.assign(url);
     });
   }
@@ -135,7 +144,7 @@ async function subscribeToNativePush(userEmail) {
   return { nativeToken: token };
 }
 
-async function subscribeToWebPush(userEmail) {
+async function subscribeToWebPush(userEmail, { audience = 'player' } = {}) {
   if (isIosDevice() && !isStandaloneDisplay()) {
     throw new Error(
       'On iPhone, open Jackpot Royals from the Home Screen icon first, then enable notifications.'
@@ -176,6 +185,7 @@ async function subscribeToWebPush(userEmail) {
     body: JSON.stringify({
       email: String(userEmail || '').trim().toLowerCase(),
       subscription: subscription.toJSON(),
+      audience: audience === 'staff' ? 'staff' : 'player',
       userAgent: navigator.userAgent
     })
   });
@@ -190,7 +200,9 @@ async function subscribeToWebPush(userEmail) {
 export async function subscribeToPromoPush(userEmail) {
   if (isNativePlatform()) {
     try {
-      return await subscribeToNativePush(userEmail);
+      return await subscribeToNativePush(userEmail, {
+        audience: isPortalNative() ? 'staff' : 'player'
+      });
     } catch (error) {
       const message = String(error?.message || '');
       // Permission denied should not silently fall back.
@@ -199,7 +211,20 @@ export async function subscribeToPromoPush(userEmail) {
     }
   }
 
-  return subscribeToWebPush(userEmail);
+  return subscribeToWebPush(userEmail, { audience: 'player' });
+}
+
+/** Jackpot Portal (admin/staff) — lock-screen alerts for new requests. */
+export async function subscribeToStaffPush(userEmail) {
+  if (isNativePlatform()) {
+    try {
+      return await subscribeToNativePush(userEmail, { audience: 'staff' });
+    } catch (error) {
+      const message = String(error?.message || '');
+      if (/permission was not allowed/i.test(message)) throw error;
+    }
+  }
+  return subscribeToWebPush(userEmail, { audience: 'staff' });
 }
 
 export async function unsubscribeFromPromoPush(userEmail) {

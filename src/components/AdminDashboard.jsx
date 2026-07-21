@@ -9,6 +9,7 @@ import { lazyWithRetry } from '../lib/lazyWithRetry';
 import TabErrorBoundary from './TabErrorBoundary';
 import { initAudioUnlock, playNotificationSound } from '../lib/notificationSound';
 import { initDesktopNotifications, notifyStaffActivity } from '../lib/desktopNotify';
+import { subscribeToStaffPush } from '../lib/pushClient';
 
 // Lazy load tab components with automatic retry on chunk failures
 const OverviewTab = lazyWithRetry(() => import('./admin/OverviewTab'));
@@ -111,6 +112,26 @@ export default function AdminDashboard({
     initAudioUnlock();
     initDesktopNotifications();
   }, []);
+
+  // Register this device for Jackpot Portal lock-screen request alerts
+  // (native Portal APK + optional browser staff push). Player APK tokens are separate.
+  useEffect(() => {
+    const email = adminUser?.email;
+    if (!email) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        await subscribeToStaffPush(email);
+      } catch (err) {
+        if (!cancelled) {
+          console.warn('Staff push registration:', err?.message || err);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [adminUser?.email]);
 
   useEffect(() => {
     soundUrlRef.current = settingsData?.settings?.notificationSoundUrl || '';

@@ -11,7 +11,11 @@
     "android:debug": "JAVA_HOME=/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home PATH=/usr/local/opt/openjdk@21/bin:$PATH ./android/gradlew -p android assembleDebug",
     "android:release": "npm run android:sync && JAVA_HOME=/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home PATH=/usr/local/opt/openjdk@21/bin:$PATH ./android/gradlew -p android assembleRelease && cp android/app/build/outputs/apk/release/app-release.apk public/downloads/jackpot-royals.apk",
     "ios:sync": "cap sync ios",
-    "ios:open": "cap open ios"
+    "ios:open": "cap open ios",
+    "portal:sync": "cp capacitor.config.ts .capacitor.player.config.bak.ts && cp capacitor.portal.config.ts capacitor.config.ts && npx cap sync android; STATUS=$?; mv .capacitor.player.config.bak.ts capacitor.config.ts; exit $STATUS",
+    "portal:open": "cp capacitor.config.ts .capacitor.player.config.bak.ts && cp capacitor.portal.config.ts capacitor.config.ts && npx cap open android; STATUS=$?; mv .capacitor.player.config.bak.ts capacitor.config.ts; exit $STATUS",
+    "portal:debug": "JAVA_HOME=/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home PATH=/usr/local/opt/openjdk@21/bin:$PATH ./android-portal/gradlew -p android-portal assembleDebug",
+    "portal:release": "npm run portal:sync && JAVA_HOME=/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home PATH=/usr/local/opt/openjdk@21/bin:$PATH ./android-portal/gradlew -p android-portal assembleRelease && mkdir -p public/downloads && cp android-portal/app/build/outputs/apk/release/app-release.apk public/downloads/jackpot-portal.apk"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.2",
