@@ -3934,12 +3934,8 @@ body:has(.admin-dashboard-layout)::before {
   display: none;
 }
 
-/* Jackpot Portal APK only (UA marker). System bars already inset the WebView —
-   force safe-area contribution to 0 so header sits flush at the top. */
-html.admin-native-shell {
-  --admin-sat: 0px;
-}
-
+/* Jackpot Portal / Capacitor admin: body safe-area handled by layout; do NOT
+   force --admin-sat:0 (that put the header under the Android status bar). */
 html.admin-native-shell body {
   padding-top: 0 !important;
   padding-right: 0 !important;

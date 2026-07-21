@@ -9,7 +9,10 @@ import android.view.WindowManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.getcapacitor.BridgeActivity;
@@ -19,7 +22,20 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         applySolidSystemBars();
+
+        // Bridge WebView is ready after layout — re-apply bars + insets so the
+        // admin header never draws under the battery / signal status bar.
+        View decor = getWindow() != null ? getWindow().getDecorView() : null;
+        if (decor != null) {
+            decor.post(this::finishNativeChromeSetup);
+            decor.postDelayed(this::finishNativeChromeSetup, 400);
+        }
+    }
+
+    private void finishNativeChromeSetup() {
+        applySolidSystemBars();
         lockWebViewZoom();
+        applyWebViewSystemBarPadding();
     }
 
     /**
@@ -41,8 +57,29 @@ public class MainActivity extends BridgeActivity {
         // so the live site can apply admin-native-shell CSS only for this APK.
         String ua = settings.getUserAgentString();
         if (ua != null && !ua.contains("JackpotPortalNative")) {
-            settings.setUserAgentString(ua + " JackpotPortalNative/1.0");
+            settings.setUserAgentString(ua + " JackpotPortalNative/1.1");
+        } else if (ua != null && ua.contains("JackpotPortalNative/1.0")) {
+            settings.setUserAgentString(ua.replace("JackpotPortalNative/1.0", "JackpotPortalNative/1.1"));
         }
+    }
+
+    /**
+     * Android 14/15 edge-to-edge often lets the WebView draw under the status bar
+     * even when CSS safe-area is 0. Pad the WebView by the real system bar insets
+     * so "JACKPOT ROYALS" header sits fully below battery/wifi/signal icons.
+     */
+    private void applyWebViewSystemBarPadding() {
+        WebView webView = getBridge() != null ? getBridge().getWebView() : null;
+        if (webView == null) {
+            return;
+        }
+
+        ViewCompat.setOnApplyWindowInsetsListener(webView, (v, windowInsets) -> {
+            Insets bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+            v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+            return windowInsets;
+        });
+        ViewCompat.requestApplyInsets(webView);
     }
 
     private void applySolidSystemBars() {
@@ -52,6 +89,7 @@ public class MainActivity extends BridgeActivity {
         }
 
         int barColor = Color.parseColor("#080a11");
+        // Content must NOT draw under the status bar (header was hiding behind it).
         WindowCompat.setDecorFitsSystemWindows(window, true);
         window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);

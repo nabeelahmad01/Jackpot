@@ -9,7 +9,7 @@ const config: CapacitorConfig = {
   appId: 'com.jackpotroyals.portal',
   appName: 'Jackpot Portal',
   webDir: 'capacitor-shell',
-  appendUserAgent: ' JackpotPortalNative/1.0',
+  appendUserAgent: ' JackpotPortalNative/1.1',
   backgroundColor: '#080a11',
   android: {
     path: 'android-portal'
