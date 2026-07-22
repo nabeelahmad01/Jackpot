@@ -368,6 +368,66 @@ export async function POST(req) {
 
     const isFreeplayBonus = newTx.type === 'BONUS' && (newTx.code === 'SIGNUP-FREE3' || newTx.code === 'FREEPLAY');
 
+    if (isFreeplayBonus) {
+      const pendingFreeplay = await transactionsCollection.findOne({
+        userEmail,
+        type: 'BONUS',
+        code: { $in: ['SIGNUP-FREE3', 'FREEPLAY'] },
+        status: { $in: ['COINS_LOADING', 'PENDING', 'PENDING_COINS'] }
+      });
+      if (pendingFreeplay) {
+        return NextResponse.json({
+          success: false,
+          message: 'You already have a freeplay request pending. Please wait for it to be processed.'
+        }, { status: 400 });
+      }
+
+      const isPromoFreeplay = /promo freeplay/i.test(String(newTx.note || ''));
+
+      if (!isPromoFreeplay) {
+        const successFreeplays = await transactionsCollection
+          .find({
+            userEmail,
+            type: 'BONUS',
+            code: { $in: ['SIGNUP-FREE3', 'FREEPLAY'] },
+            status: 'SUCCESS'
+          })
+          .sort({ id: -1 })
+          .toArray();
+
+        if (successFreeplays.length > 0) {
+          const lastFp = successFreeplays[0];
+          const depositsAfter = await transactionsCollection
+            .find({
+              userEmail,
+              type: 'DEPOSIT',
+              status: 'SUCCESS',
+              id: { $gt: lastFp.id }
+            })
+            .toArray();
+          const depositTotal = depositsAfter.reduce((s, t) => s + parseFloat(t.amount || 0), 0);
+          if (depositTotal < 25) {
+            return NextResponse.json({
+              success: false,
+              message: `Deposit at least $25.00 after your last freeplay to claim again. Current: $${depositTotal.toFixed(2)}.`
+            }, { status: 400 });
+          }
+          newTx.code = 'FREEPLAY';
+          newTx.gateway = newTx.gateway || 'Freeplay';
+        } else {
+          newTx.code = 'SIGNUP-FREE3';
+          newTx.gateway = newTx.gateway || 'Signup Bonus';
+        }
+      }
+
+      if (!newTx.gameTitle || String(newTx.gameTitle).trim() === '') {
+        return NextResponse.json({
+          success: false,
+          message: 'Select a game to claim freeplay.'
+        }, { status: 400 });
+      }
+    }
+
     const txObject = {
       id: (Date.now() + Math.floor(Math.random() * 100)).toString(),
       userEmail,

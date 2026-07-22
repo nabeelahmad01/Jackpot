@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
-import { applyStaffGameFilter, staffCanAccessGame } from '../../../lib/staffGameAccess';
+import { applyStaffGameFilter, getStaffAllowedGameTitles, staffCanAccessGame } from '../../../lib/staffGameAccess';
 import { notifyStaffAsync } from '../../../lib/pushNotifications';
 
 // GET requests (supports filtering by email for users, or returning all for admins)
@@ -21,8 +21,16 @@ export async function GET(req) {
     const adminDistributorId = searchParams.get('adminDistributorId');
     const adminEmail = searchParams.get('adminEmail');
 
-    // 1. FAST PATH: No Search Active (Only fetch actual requests)
+    // 1. FAST PATH: No Search Active
+    // Show PENDING requests on top + all created game accounts (READY), including
+    // accounts added manually that may not have an accountRequests row.
     if (!search) {
+      const statuses = status
+        ? status.split(',').map((s) => s.toUpperCase().trim()).filter(Boolean)
+        : [];
+      const wantPending = statuses.length === 0 || statuses.includes('PENDING');
+      const wantReady = statuses.length === 0 || statuses.includes('READY');
+
       let query = {};
       if (email) {
         query.userEmail = email.toLowerCase().trim();
@@ -30,52 +38,147 @@ export async function GET(req) {
 
       // Player self-view (?email=) must see their own requests even under Type B distributors.
       // Type B exclusion only applies to global admin list views (no email, no adminDistributorId).
+      let typeBDistIds = [];
       if (adminDistributorId) {
         query.distributorId = adminDistributorId;
       } else if (!email) {
         const typeBDists = await db.collection('distributors').find({ type: 'B' }).project({ id: 1 }).toArray();
-        const typeBDistIds = typeBDists.map(d => d.id).filter(Boolean);
+        typeBDistIds = typeBDists.map(d => d.id).filter(Boolean);
         if (typeBDistIds.length > 0) {
           query.distributorId = { $nin: typeBDistIds };
         }
       }
 
-      if (status) {
-        query.status = status.toUpperCase().trim();
+      let requestQuery = { ...query };
+      if (statuses.length === 1) {
+        requestQuery.status = statuses[0];
+      } else if (statuses.length > 1) {
+        requestQuery.status = { $in: statuses };
       }
 
       if (adminEmail) {
-        query = await applyStaffGameFilter(db, query, adminEmail);
+        requestQuery = await applyStaffGameFilter(db, requestQuery, adminEmail);
       }
 
-      const totalRequests = await requestsCollection.countDocuments(query);
+      const realRequests = await requestsCollection.find(requestQuery).toArray();
+
+      // Build synthetic READY rows from gameAccounts when READY is requested
+      let syntheticFromAccounts = [];
+      if (wantReady) {
+        let accountQuery = {};
+        if (email) {
+          accountQuery.userEmail = email.toLowerCase().trim();
+        }
+
+        let accounts = await db.collection('gameAccounts').find(accountQuery).toArray();
+
+        // Restrict by distributor / Type B same as requests
+        if (accounts.length > 0) {
+          const accEmails = Array.from(new Set(accounts.map(a => (a.userEmail || '').toLowerCase().trim()).filter(Boolean)));
+          const usersForAcc = await db.collection('users').find({ email: { $in: accEmails } }).project({ email: 1, distributorId: 1 }).toArray();
+          const distByEmail = {};
+          usersForAcc.forEach((u) => {
+            if (u.email) distByEmail[u.email.toLowerCase().trim()] = u.distributorId || '';
+          });
+
+          accounts = accounts.filter((acc) => {
+            const emailKey = (acc.userEmail || '').toLowerCase().trim();
+            const userDistId = distByEmail[emailKey] || '';
+            if (adminDistributorId) return userDistId === adminDistributorId;
+            if (!email && typeBDistIds.length > 0) return !typeBDistIds.includes(userDistId);
+            return true;
+          });
+        }
+
+        // Staff game filter
+        if (adminEmail && accounts.length > 0) {
+          const allowedTitles = await getStaffAllowedGameTitles(db, adminEmail);
+          if (allowedTitles) {
+            const allowedSet = new Set(allowedTitles.map((t) => t.toLowerCase()));
+            accounts = accounts.filter((acc) => allowedSet.has(String(acc.gameTitle || '').toLowerCase()));
+          }
+        }
+
+        // Skip accounts already represented by a real READY/PENDING request for same email+game
+        const covered = new Set(
+          realRequests.map((r) => {
+            const e = (r.userEmail || '').toLowerCase().trim();
+            const g = String(r.gameTitle || '').toLowerCase().trim();
+            return `${e}||${g}`;
+          })
+        );
+
+        syntheticFromAccounts = accounts
+          .filter((acc) => {
+            const e = (acc.userEmail || '').toLowerCase().trim();
+            const g = String(acc.gameTitle || '').toLowerCase().trim();
+            return e && g && !covered.has(`${e}||${g}`);
+          })
+          .map((acc) => ({
+            id: `account-${acc._id || acc.id || `${acc.userEmail}-${acc.gameTitle}`}`,
+            gameTitle: acc.gameTitle,
+            userEmail: (acc.userEmail || '').toLowerCase().trim(),
+            status: 'READY',
+            date: acc.createdAt ? new Date(acc.createdAt).toLocaleString() : '—',
+            createdAt: acc.createdAt || new Date(0).toISOString(),
+            gameAccountUsername: acc.username || '',
+            isSynthetic: true,
+            fromGameAccount: true
+          }));
+      }
+
+      // If only PENDING was requested, drop synthetics (wantReady false already skips them)
+      const combined = [
+        ...(wantPending || wantReady ? realRequests : []),
+        ...syntheticFromAccounts
+      ];
+
+      combined.sort((a, b) => {
+        if (a.status === 'PENDING' && b.status !== 'PENDING') return -1;
+        if (a.status !== 'PENDING' && b.status === 'PENDING') return 1;
+        const idA = typeof a.id === 'number' ? a.id : 0;
+        const idB = typeof b.id === 'number' ? b.id : 0;
+        if (idA || idB) return idB - idA;
+        const dateA = a.createdAt || a.date || '';
+        const dateB = b.createdAt || b.date || '';
+        return String(dateB).localeCompare(String(dateA));
+      });
+
+      const totalRequests = combined.length;
       const skip = (page - 1) * limit;
+      const requests = combined.slice(skip, skip + limit);
 
-      const requests = await requestsCollection.find(query)
-        .sort({ id: -1 })
-        .skip(skip)
-        .limit(limit)
-        .toArray();
-
-      // Batch look up existing game accounts for the unique request emails
       let enrichedRequests = [];
       if (requests.length > 0) {
         const uniqueEmails = Array.from(new Set(requests.map(r => r.userEmail.toLowerCase().trim())));
-        const gameAccounts = await db.collection('gameAccounts').find({ userEmail: { $in: uniqueEmails } }).toArray();
-        
+        const [gameAccounts, userDocs] = await Promise.all([
+          db.collection('gameAccounts').find({ userEmail: { $in: uniqueEmails } }).toArray(),
+          db.collection('users').find({ email: { $in: uniqueEmails } }).project({ email: 1, name: 1 }).toArray()
+        ]);
+
         const accountsByEmail = {};
         gameAccounts.forEach(acc => {
           const emailKey = acc.userEmail.toLowerCase().trim();
           if (!accountsByEmail[emailKey]) {
             accountsByEmail[emailKey] = [];
           }
-          accountsByEmail[emailKey].push({ gameTitle: acc.gameTitle, username: acc.username });
+          accountsByEmail[emailKey].push({
+            gameTitle: acc.gameTitle,
+            username: acc.username,
+            status: acc.status || 'READY'
+          });
+        });
+
+        const nameByEmail = {};
+        userDocs.forEach((u) => {
+          if (u.email) nameByEmail[u.email.toLowerCase().trim()] = u.name || '';
         });
 
         enrichedRequests = requests.map(r => {
           const emailKey = r.userEmail.toLowerCase().trim();
           return {
             ...r,
+            userName: nameByEmail[emailKey] || r.userName || '',
             existingAccounts: accountsByEmail[emailKey] || []
           };
         });
@@ -85,7 +188,7 @@ export async function GET(req) {
         success: true,
         accountRequests: enrichedRequests,
         totalRequests,
-        totalPages: Math.ceil(totalRequests / limit),
+        totalPages: Math.ceil(totalRequests / limit) || 1,
         currentPage: page
       });
     }
@@ -187,17 +290,77 @@ export async function GET(req) {
     }
 
     // Retrieve real requests for these filtered user emails
-    const realRequests = await requestsCollection.find({
+    let realRequests = await requestsCollection.find({
       userEmail: { $in: filteredEmails }
     }).toArray();
 
-    const emailsWithRequests = new Set(realRequests.map(r => r.userEmail.toLowerCase().trim()));
+    if (status) {
+      const statuses = status.split(',').map((s) => s.toUpperCase().trim()).filter(Boolean);
+      if (statuses.length > 0) {
+        realRequests = realRequests.filter((r) => statuses.includes(String(r.status || '').toUpperCase()));
+      }
+    }
 
-    // Synthesize pseudo-requests for matching users who do not have any requests record
+    if (adminEmail) {
+      const allowedTitles = await getStaffAllowedGameTitles(db, adminEmail);
+      if (allowedTitles) {
+        const allowedSet = new Set(allowedTitles.map((t) => t.toLowerCase()));
+        realRequests = realRequests.filter((r) => allowedSet.has(String(r.gameTitle || '').toLowerCase()));
+      }
+    }
+
+    // All created game accounts for these emails (as READY rows if not already covered)
+    let gameAccountsForSearch = await db.collection('gameAccounts').find({
+      userEmail: { $in: filteredEmails }
+    }).toArray();
+
+    if (adminEmail && gameAccountsForSearch.length > 0) {
+      const allowedTitles = await getStaffAllowedGameTitles(db, adminEmail);
+      if (allowedTitles) {
+        const allowedSet = new Set(allowedTitles.map((t) => t.toLowerCase()));
+        gameAccountsForSearch = gameAccountsForSearch.filter((acc) =>
+          allowedSet.has(String(acc.gameTitle || '').toLowerCase())
+        );
+      }
+    }
+
+    const covered = new Set(
+      realRequests.map((r) => {
+        const e = (r.userEmail || '').toLowerCase().trim();
+        const g = String(r.gameTitle || '').toLowerCase().trim();
+        return `${e}||${g}`;
+      })
+    );
+
+    const wantReady = !status || status.toUpperCase().includes('READY');
     const syntheticRequests = [];
-    filteredEmails.forEach(emailKey => {
-      if (!emailsWithRequests.has(emailKey)) {
-        const userDoc = usersForEmails.find(u => u.email.toLowerCase().trim() === emailKey);
+    if (wantReady) {
+      gameAccountsForSearch.forEach((acc) => {
+        const e = (acc.userEmail || '').toLowerCase().trim();
+        const g = String(acc.gameTitle || '').toLowerCase().trim();
+        if (!e || !g || covered.has(`${e}||${g}`)) return;
+        syntheticRequests.push({
+          id: `account-${acc._id || acc.id || `${acc.userEmail}-${acc.gameTitle}`}`,
+          gameTitle: acc.gameTitle,
+          userEmail: e,
+          status: 'READY',
+          date: acc.createdAt ? new Date(acc.createdAt).toLocaleString() : '—',
+          createdAt: acc.createdAt || new Date(0).toISOString(),
+          gameAccountUsername: acc.username || '',
+          isSynthetic: true,
+          fromGameAccount: true
+        });
+      });
+    }
+
+    // Also include users found by name/email who have no requests and no accounts yet
+    const emailsRepresented = new Set([
+      ...realRequests.map((r) => (r.userEmail || '').toLowerCase().trim()),
+      ...syntheticRequests.map((r) => (r.userEmail || '').toLowerCase().trim())
+    ]);
+    filteredEmails.forEach((emailKey) => {
+      if (!emailsRepresented.has(emailKey) && wantReady) {
+        const userDoc = usersForEmails.find((u) => u.email.toLowerCase().trim() === emailKey);
         syntheticRequests.push({
           id: 'synthetic-' + emailKey + '-' + Date.now(),
           gameTitle: '—',
@@ -218,7 +381,7 @@ export async function GET(req) {
       if (a.status !== 'PENDING' && b.status === 'PENDING') return 1;
       const dateA = a.createdAt || a.date || '';
       const dateB = b.createdAt || b.date || '';
-      return dateB.localeCompare(dateA);
+      return String(dateB).localeCompare(String(dateA));
     });
 
     const totalRequests = combined.length;
@@ -229,7 +392,10 @@ export async function GET(req) {
     let enrichedRequests = [];
     if (paginated.length > 0) {
       const paginatedEmails = Array.from(new Set(paginated.map(r => r.userEmail.toLowerCase().trim())));
-      const gameAccounts = await db.collection('gameAccounts').find({ userEmail: { $in: paginatedEmails } }).toArray();
+      const [gameAccounts, userDocs] = await Promise.all([
+        db.collection('gameAccounts').find({ userEmail: { $in: paginatedEmails } }).toArray(),
+        db.collection('users').find({ email: { $in: paginatedEmails } }).project({ email: 1, name: 1 }).toArray()
+      ]);
 
       const accountsByEmail = {};
       gameAccounts.forEach(acc => {
@@ -237,13 +403,23 @@ export async function GET(req) {
         if (!accountsByEmail[emailKey]) {
           accountsByEmail[emailKey] = [];
         }
-        accountsByEmail[emailKey].push({ gameTitle: acc.gameTitle, username: acc.username });
+        accountsByEmail[emailKey].push({
+          gameTitle: acc.gameTitle,
+          username: acc.username,
+          status: acc.status || 'READY'
+        });
+      });
+
+      const nameByEmail = {};
+      userDocs.forEach((u) => {
+        if (u.email) nameByEmail[u.email.toLowerCase().trim()] = u.name || '';
       });
 
       enrichedRequests = paginated.map(r => {
         const emailKey = r.userEmail.toLowerCase().trim();
         return {
           ...r,
+          userName: nameByEmail[emailKey] || r.userName || '',
           existingAccounts: accountsByEmail[emailKey] || []
         };
       });

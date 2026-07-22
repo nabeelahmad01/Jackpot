@@ -155,9 +155,9 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
     }
   }, [playerSearchQuery, addAccountModalOpen]);
 
-  // SWR automatically refreshes every 4s for requests tab (real-time lobby queue)
+  // SWR: pending requests first, then created (READY) accounts — not PENDING-only
   const { data, error, mutate } = usePollingSWR(
-    `/api/account-requests?status=PENDING&page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
+    `/api/account-requests?status=PENDING,READY&page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
     POLL.QUEUES
   );
 
@@ -213,7 +213,7 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
     <section className="admin-section-card" style={{ animation: 'fade-in 0.2s ease-out' }}>
       <div className="section-card-header" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <h3><i className="fa-solid fa-user-plus gold-text"></i> Pending Lobby Game Account Requests</h3>
+          <h3><i className="fa-solid fa-user-plus gold-text"></i> Game Account Requests &amp; Created Accounts</h3>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             {canUpdateCredentials && (
               <button
@@ -235,7 +235,7 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
                 <i className="fa-solid fa-key"></i> Add Account
               </button>
             )}
-            <span className="game-tap-tip">Allot player login credentials</span>
+            <span className="game-tap-tip">Pending requests stay on top · created accounts below</span>
           </div>
         </div>
         
@@ -255,8 +255,9 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
           <thead>
             <tr>
               <th>#</th>
-              <th>User Email</th>
+              <th>Player</th>
               <th>Requested Game</th>
+              <th>All Game Accounts</th>
               <th>Request Timestamp</th>
               <th>Status</th>
               <th>Actions</th>
@@ -265,48 +266,63 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan="6" className="text-center text-muted" style={{ padding: '2rem' }}>
+                <td colSpan="7" className="text-center text-muted" style={{ padding: '2rem' }}>
                   <i className="fa-solid fa-spinner fa-spin" style={{ color: 'var(--gold-primary)', marginRight: '6px' }}></i> Loading requests...
                 </td>
               </tr>
             ) : requests.length === 0 ? (
               <tr>
-                <td colSpan="6" className="text-center text-muted" style={{ padding: '2rem' }}>
-                  No pending game account requests match criteria.
+                <td colSpan="7" className="text-center text-muted" style={{ padding: '2rem' }}>
+                  No pending requests or created accounts match criteria.
                 </td>
               </tr>
             ) : (
               requests.map((req, idx) => (
                 <tr key={req.id}>
-                  <td>{(page - 1) * limit + idx + 1}</td>
-                  <td>
-                    <strong>{req.userEmail}</strong>
-                    {req.existingAccounts && req.existingAccounts.length > 0 && (() => {
-                      // For regular requests, only show the account for the requested game
-                      // For synthetic (search) results, show all accounts
-                      const accsToShow = req.isSynthetic
-                        ? req.existingAccounts
-                        : req.existingAccounts.filter(acc => acc.gameTitle === req.gameTitle);
-                      if (accsToShow.length === 0) return null;
-                      return (
-                        <div style={{ fontSize: '0.65rem', color: '#888', marginTop: '0.2rem', display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
-                          {accsToShow.map((acc, idx) => (
-                            <span key={idx} style={{ background: 'rgba(255, 215, 0, 0.08)', border: '1px solid rgba(255, 215, 0, 0.15)', color: '#fff', padding: '0.05rem 0.3rem', borderRadius: '4px' }}>
-                              {acc.gameTitle}: <strong style={{ color: 'var(--gold-primary)' }}>{acc.username}</strong>
-                            </span>
-                          ))}
-                        </div>
-                      );
-                    })()}
+                  <td data-label="#">{(page - 1) * limit + idx + 1}</td>
+                  <td data-label="Player">
+                    <div className="requests-player-cell">
+                      {req.userName ? (
+                        <strong className="requests-player-name">{req.userName}</strong>
+                      ) : null}
+                      <span className="requests-player-email">{req.userEmail}</span>
+                    </div>
                   </td>
-                  <td><span className="admin-badge-preview b-hot">{req.gameTitle}</span></td>
-                  <td>{req.date}</td>
-                  <td>
+                  <td data-label="Requested Game">
+                    <span className="admin-badge-preview b-hot">{req.gameTitle}</span>
+                  </td>
+                  <td data-label="All Game Accounts">
+                    {req.existingAccounts && req.existingAccounts.length > 0 ? (
+                      <div className="requests-games-list">
+                        {req.existingAccounts.map((acc, accIdx) => {
+                          const isRequested =
+                            req.gameTitle &&
+                            req.gameTitle !== '—' &&
+                            acc.gameTitle?.toLowerCase() === String(req.gameTitle).toLowerCase();
+                          return (
+                            <span
+                              key={`${acc.gameTitle}-${accIdx}`}
+                              className={`requests-game-chip${isRequested ? ' is-requested' : ''}`}
+                              title={isRequested ? 'This request’s game' : 'Existing game account'}
+                            >
+                              <strong>{acc.gameTitle}</strong>
+                              <span className="requests-game-user">{acc.username || '—'}</span>
+                              {isRequested ? <em>requested</em> : null}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <span className="requests-games-empty">No game accounts yet</span>
+                    )}
+                  </td>
+                  <td data-label="Timestamp">{req.date}</td>
+                  <td data-label="Status">
                     <span className={`admin-badge-preview b-${req.status.toLowerCase() === 'ready' ? 'ready' : req.status.toLowerCase()}`}>
                       {req.status}
                     </span>
                   </td>
-                  <td>
+                  <td data-label="Actions">
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                       {req.status === 'PENDING' && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
@@ -348,39 +364,31 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
                           >
                             <i className="fa-solid fa-pen-to-square"></i> Edit
                           </button>
-                          <button
-                            onClick={() => handleDeleteGameAccount(req.userEmail, req.gameTitle)}
-                            className="action-row-btn btn-delete"
-                            style={{ background: '#ef4444', color: '#fff', padding: '0.35rem 0.65rem', margin: 0, width: 'auto', fontSize: '0.65rem', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
-                            title="Delete Credentials"
-                          >
-                            <i className="fa-solid fa-trash"></i> Delete
-                          </button>
+                          {canUpdateCredentials && (
+                            <button
+                              onClick={() => handleDeleteGameAccount(req.userEmail, req.gameTitle)}
+                              className="action-row-btn"
+                              style={{ background: '#ef4444', color: '#fff', padding: '0.35rem 0.65rem', margin: 0, width: 'auto', fontSize: '0.65rem', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                              title="Delete Credentials"
+                            >
+                              <i className="fa-solid fa-trash"></i>
+                            </button>
+                          )}
                         </div>
                       )}
 
-                      {req.status === 'READY' && (!req.gameTitle || req.gameTitle === '—') && req.existingAccounts && req.existingAccounts.length > 0 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', width: '100%', minWidth: '150px' }}>
-                          {req.existingAccounts.map((acc, idx) => (
-                            <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.25rem 0.5rem', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.04)' }}>
-                              <span style={{ fontSize: '0.65rem', fontWeight: 'bold' }}>{acc.gameTitle}</span>
-                              <div style={{ display: 'flex', gap: '0.35rem' }}>
-                                <button
-                                  onClick={() => handleEditGameAccount(req.userEmail, acc.gameTitle)}
-                                  style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer', padding: '2px', fontSize: '0.75rem' }}
-                                  title="Edit"
-                                >
-                                  <i className="fa-solid fa-pen"></i>
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteGameAccount(req.userEmail, acc.gameTitle)}
-                                  style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px', fontSize: '0.75rem' }}
-                                  title="Delete"
-                                >
-                                  <i className="fa-solid fa-trash-can"></i>
-                                </button>
-                              </div>
-                            </div>
+                      {req.status === 'READY' && (!req.gameTitle || req.gameTitle === '—') && req.existingAccounts?.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                          {req.existingAccounts.map((acc, i) => (
+                            <button
+                              key={`${acc.gameTitle}-edit-${i}`}
+                              onClick={() => handleEditGameAccount(req.userEmail, acc.gameTitle)}
+                              className="action-row-btn btn-edit"
+                              style={{ background: '#3b82f6', color: '#fff', padding: '0.3rem 0.55rem', margin: 0, width: 'auto', fontSize: '0.6rem' }}
+                              title={`Edit ${acc.gameTitle}`}
+                            >
+                              <i className="fa-solid fa-pen-to-square"></i> {acc.gameTitle}
+                            </button>
                           ))}
                         </div>
                       )}
