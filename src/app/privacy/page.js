@@ -149,7 +149,11 @@ export default function PrivacyPolicyPage() {
             <p style={paraStyle}>
               We keep your information for as long as your account is active or as needed to provide
               the Service and meet legal obligations. You may request deletion of your account and
-              associated data at any time (see contact below).
+              associated data at any time via{' '}
+              <Link href="/account-deletion" style={{ color: '#ffd700' }}>
+                Account Deletion
+              </Link>{' '}
+              or the contact below.
             </p>
           </div>
 
