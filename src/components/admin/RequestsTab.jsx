@@ -257,7 +257,7 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
               <th>#</th>
               <th>Player</th>
               <th>Requested Game</th>
-              <th>All Game Accounts</th>
+              <th>Game Account</th>
               <th>Request Timestamp</th>
               <th>Status</th>
               <th>Actions</th>
@@ -291,30 +291,65 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
                   <td data-label="Requested Game">
                     <span className="admin-badge-preview b-hot">{req.gameTitle}</span>
                   </td>
-                  <td data-label="All Game Accounts">
-                    {req.existingAccounts && req.existingAccounts.length > 0 ? (
-                      <div className="requests-games-list">
-                        {req.existingAccounts.map((acc, accIdx) => {
-                          const isRequested =
-                            req.gameTitle &&
-                            req.gameTitle !== '—' &&
-                            acc.gameTitle?.toLowerCase() === String(req.gameTitle).toLowerCase();
-                          return (
-                            <span
-                              key={`${acc.gameTitle}-${accIdx}`}
-                              className={`requests-game-chip${isRequested ? ' is-requested' : ''}`}
-                              title={isRequested ? 'This request’s game' : 'Existing game account'}
-                            >
-                              <strong>{acc.gameTitle}</strong>
-                              <span className="requests-game-user">{acc.username || '—'}</span>
-                              {isRequested ? <em>requested</em> : null}
+                  <td data-label="Game Account">
+                    {(() => {
+                      const accounts = req.existingAccounts || [];
+                      const requestedTitle = String(req.gameTitle || '').trim();
+                      const match =
+                        requestedTitle && requestedTitle !== '—'
+                          ? accounts.find(
+                              (acc) =>
+                                String(acc.gameTitle || '').toLowerCase() === requestedTitle.toLowerCase()
+                            )
+                          : null;
+
+                      // One row = one game: show only that game's username
+                      if (match) {
+                        return (
+                          <div className="requests-games-list requests-games-list-single">
+                            <span className="requests-game-chip is-requested" title={match.gameTitle}>
+                              <strong>{match.gameTitle}</strong>
+                              <span className="requests-game-user">{match.username || '—'}</span>
                             </span>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <span className="requests-games-empty">No game accounts yet</span>
-                    )}
+                          </div>
+                        );
+                      }
+
+                      if (req.gameAccountUsername) {
+                        return (
+                          <div className="requests-games-list requests-games-list-single">
+                            <span className="requests-game-chip is-requested">
+                              <strong>{requestedTitle !== '—' ? requestedTitle : 'Account'}</strong>
+                              <span className="requests-game-user">{req.gameAccountUsername}</span>
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      if (requestedTitle && requestedTitle !== '—') {
+                        return <span className="requests-games-empty">No account yet</span>;
+                      }
+
+                      // Fallback synthetic row with no specific game: list each account on its own line
+                      if (accounts.length > 0) {
+                        return (
+                          <div className="requests-games-list requests-games-list-stack">
+                            {accounts.map((acc, accIdx) => (
+                              <span
+                                key={`${acc.gameTitle}-${accIdx}`}
+                                className="requests-game-chip"
+                                title={acc.gameTitle}
+                              >
+                                <strong>{acc.gameTitle}</strong>
+                                <span className="requests-game-user">{acc.username || '—'}</span>
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      }
+
+                      return <span className="requests-games-empty">No game accounts yet</span>;
+                    })()}
                   </td>
                   <td data-label="Timestamp">{req.date}</td>
                   <td data-label="Status">

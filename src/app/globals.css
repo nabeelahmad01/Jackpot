@@ -2832,6 +2832,16 @@ select option {
   max-width: 280px;
 }
 
+.requests-games-list-single {
+  flex-wrap: nowrap;
+}
+
+.requests-games-list-stack {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+}
+
 .requests-game-chip {
   display: inline-flex;
   flex-direction: column;
