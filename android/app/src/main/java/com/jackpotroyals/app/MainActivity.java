@@ -3,6 +3,7 @@ package com.jackpotroyals.app;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -19,13 +20,24 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         applySolidSystemBars();
-        lockWebViewZoom();
+
+        // Bridge WebView is ready after layout — re-apply zoom lock so pinch /
+        // system font scaling cannot re-enable zoom after first paint.
+        View decor = getWindow() != null ? getWindow().getDecorView() : null;
+        if (decor != null) {
+            decor.post(this::lockWebViewZoom);
+            decor.postDelayed(this::lockWebViewZoom, 400);
+            decor.postDelayed(this::lockWebViewZoom, 1200);
+        } else {
+            lockWebViewZoom();
+        }
     }
 
     /**
      * Keep the app rendering at a consistent 100% on every device. Without this,
      * phones with a larger "Font size" / "Display size" accessibility setting make
      * the WebView zoom in, so the app looks bigger on some devices than others.
+     * Also blocks pinch / double-tap zoom.
      */
     private void lockWebViewZoom() {
         WebView webView = getBridge() != null ? getBridge().getWebView() : null;
@@ -37,6 +49,8 @@ public class MainActivity extends BridgeActivity {
         settings.setSupportZoom(false);
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
+        // Block multi-touch pinch zoom that some Android WebViews still allow.
+        webView.setOnTouchListener((v, event) -> event.getPointerCount() > 1);
     }
 
     private void applySolidSystemBars() {

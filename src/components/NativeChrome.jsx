@@ -22,6 +22,7 @@ function probeSafeAreaTop() {
  * Keep Android/iOS system bars solid so content never shows behind the clock/battery.
  * Portal: header MUST sit below the status bar. WebView padding is unreliable on
  * Android 14/15, so we always apply a real --admin-sat (never force 0).
+ * Native apps: disable pinch / double-tap zoom for a stable layout.
  */
 export default function NativeChrome() {
   useEffect(() => {
@@ -30,6 +31,33 @@ export default function NativeChrome() {
     if (isPortalApp()) {
       document.documentElement.classList.add('admin-native-shell');
     }
+
+    const lockPageZoom = () => {
+      if (cancelled || typeof document === 'undefined') return;
+      const native =
+        isPortalApp() ||
+        /JackpotRoyalsNative/i.test(navigator.userAgent || '') ||
+        window.Capacitor?.isNativePlatform?.() === true;
+      if (!native) return;
+
+      document.documentElement.classList.add('native-no-zoom');
+      let meta = document.querySelector('meta[name="viewport"]');
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute('name', 'viewport');
+        document.head.appendChild(meta);
+      }
+      meta.setAttribute(
+        'content',
+        'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover'
+      );
+    };
+
+    const blockGestureZoom = (e) => {
+      if (e.touches && e.touches.length > 1) {
+        e.preventDefault();
+      }
+    };
 
     const syncAdminSat = () => {
       if (cancelled) return;
@@ -65,23 +93,32 @@ export default function NativeChrome() {
         await StatusBar.setStyle({ style: Style.Dark });
         // Plugin may settle after first paint — re-apply offset.
         syncAdminSat();
+        lockPageZoom();
       } catch {
         // Browser / missing plugin — nothing to do.
       }
       syncAdminSat();
+      lockPageZoom();
     };
 
+    lockPageZoom();
     syncAdminSat();
     configure();
+    document.addEventListener('touchmove', blockGestureZoom, { passive: false });
     const t1 = window.setTimeout(syncAdminSat, 300);
     const t2 = window.setTimeout(syncAdminSat, 1000);
     const t3 = window.setTimeout(syncAdminSat, 2500);
+    const z1 = window.setTimeout(lockPageZoom, 300);
+    const z2 = window.setTimeout(lockPageZoom, 1000);
 
     return () => {
       cancelled = true;
+      document.removeEventListener('touchmove', blockGestureZoom);
       window.clearTimeout(t1);
       window.clearTimeout(t2);
       window.clearTimeout(t3);
+      window.clearTimeout(z1);
+      window.clearTimeout(z2);
     };
   }, []);
 
