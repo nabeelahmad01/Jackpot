@@ -303,45 +303,25 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
                             )
                           : null;
 
-                      // One row = one game: show only that game's username
-                      if (match) {
-                        return (
-                          <div className="requests-games-list requests-games-list-single">
-                            <span className="requests-game-chip is-requested" title={match.gameTitle}>
-                              <strong>{match.gameTitle}</strong>
-                              <span className="requests-game-user">{match.username || '—'}</span>
-                            </span>
-                          </div>
-                        );
-                      }
+                      const username =
+                        match?.username ||
+                        req.gameAccountUsername ||
+                        '';
 
-                      if (req.gameAccountUsername) {
-                        return (
-                          <div className="requests-games-list requests-games-list-single">
-                            <span className="requests-game-chip is-requested">
-                              <strong>{requestedTitle !== '—' ? requestedTitle : 'Account'}</strong>
-                              <span className="requests-game-user">{req.gameAccountUsername}</span>
-                            </span>
-                          </div>
-                        );
+                      if (username) {
+                        return <span className="requests-account-username">{username}</span>;
                       }
 
                       if (requestedTitle && requestedTitle !== '—') {
                         return <span className="requests-games-empty">No account yet</span>;
                       }
 
-                      // Fallback synthetic row with no specific game: list each account on its own line
                       if (accounts.length > 0) {
                         return (
-                          <div className="requests-games-list requests-games-list-stack">
+                          <div className="requests-games-list-stack">
                             {accounts.map((acc, accIdx) => (
-                              <span
-                                key={`${acc.gameTitle}-${accIdx}`}
-                                className="requests-game-chip"
-                                title={acc.gameTitle}
-                              >
-                                <strong>{acc.gameTitle}</strong>
-                                <span className="requests-game-user">{acc.username || '—'}</span>
+                              <span key={`${acc.gameTitle}-${accIdx}`} className="requests-account-username">
+                                {acc.username || '—'}
                               </span>
                             ))}
                           </div>

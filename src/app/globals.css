@@ -2883,7 +2883,13 @@ select option {
 .requests-games-empty {
   font-size: 0.68rem;
   color: var(--text-muted);
-  opacity: 0.75;
+}
+
+.requests-account-username {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #fff;
+  word-break: break-all;
 }
 
 .panel-staff-layout {
