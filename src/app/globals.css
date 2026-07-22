@@ -2640,6 +2640,172 @@ select option {
   align-items: start;
 }
 
+/* Promotions tab — desktop defaults */
+.promotions-subtabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 0.35rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.promotions-subtabs::-webkit-scrollbar {
+  display: none;
+}
+
+.promotions-subtab {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  border-bottom: 2px solid transparent;
+  font-size: 0.85rem;
+  font-weight: bold;
+  padding: 0.5rem 0.85rem;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.promotions-subtab.is-active {
+  color: var(--gold-primary);
+  border-bottom-color: var(--gold-primary);
+}
+
+.promotions-segments-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+.promotions-segment-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  background: #07090f;
+  padding: 0.25rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  max-width: 100%;
+}
+
+.promotions-segment-pill {
+  background: none;
+  color: #fff;
+  border: none;
+  font-size: 0.7rem;
+  font-weight: bold;
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: background 0.2s, color 0.2s;
+}
+
+.promotions-segment-pill.is-active {
+  background: var(--gold-primary);
+  color: #000;
+}
+
+.promotions-broadcast-grid > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.promotions-message-field {
+  background: none;
+  border: none;
+  color: #fff;
+  width: 100%;
+  min-width: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.775rem;
+  outline: none;
+  resize: vertical;
+  min-height: 5.5rem;
+  line-height: 1.45;
+}
+
+.promotions-select {
+  background: none;
+  border: none;
+  color: #fff;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 0.775rem;
+  height: 100%;
+  outline: none;
+  padding: 0 0.5rem;
+}
+
+.promotions-file-input {
+  border: none;
+  background: none;
+  color: #fff;
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 0.4rem 0 0.4rem 2.5rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.promotions-image-preview {
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.promotions-image-thumb {
+  width: 80px;
+  height: 45px;
+  overflow: hidden;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+
+.promotions-image-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.promotions-remove-image {
+  background: none;
+  border: none;
+  color: #f87171;
+  font-size: 0.7rem;
+  cursor: pointer;
+  text-decoration: underline;
+  margin-left: auto;
+}
+
+.promotions-past-list {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.promotions-past-item {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 0.85rem;
+}
+
 .panel-staff-layout {
   display: grid;
   grid-template-columns: minmax(280px, 360px) 1fr;
@@ -3544,6 +3710,49 @@ dialog::backdrop {
   .admin-layout-split,
   .panel-staff-layout {
     grid-template-columns: 1fr;
+  }
+
+  .promotions-tab {
+    gap: 1rem;
+    padding-bottom: 4.5rem; /* room above support FAB */
+  }
+
+  .promotions-subtab {
+    font-size: 0.72rem;
+    padding: 0.45rem 0.65rem;
+  }
+
+  .promotions-segments-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .promotions-segment-pills {
+    width: 100%;
+  }
+
+  .promotions-segment-pill {
+    flex: 1 1 auto;
+    justify-content: center;
+    font-size: 0.65rem;
+    padding: 0.45rem 0.5rem;
+  }
+
+  .promotions-broadcast-grid {
+    gap: 1rem;
+  }
+
+  .promotions-past-list {
+    max-height: none;
+  }
+
+  .promotions-broadcast-form .input-wrapper,
+  .promotions-broadcast-form .input-group {
+    max-width: 100%;
+  }
+
+  .promotions-select {
+    font-size: 0.7rem;
   }
 
   .panel-staff-layout .table-responsive,

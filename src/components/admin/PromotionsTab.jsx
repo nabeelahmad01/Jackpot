@@ -154,55 +154,39 @@ export default function PromotionsTab({ adminUser }) {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', animation: 'fade-in 0.2s ease-out' }}>
+    <div className="promotions-tab" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', animation: 'fade-in 0.2s ease-out' }}>
       
       {/* Tab Navigation header */}
-      <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
+      <div className="promotions-subtabs">
         <button
+          type="button"
           onClick={() => setActiveSubTab('segments')}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: activeSubTab === 'segments' ? 'var(--gold-primary)' : 'rgba(255,255,255,0.6)',
-            borderBottom: activeSubTab === 'segments' ? '2px solid var(--gold-primary)' : 'none',
-            fontSize: '0.85rem',
-            fontWeight: 'bold',
-            padding: '0.5rem 1rem',
-            cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}
+          className={`promotions-subtab${activeSubTab === 'segments' ? ' is-active' : ''}`}
         >
-          <i className="fa-solid fa-users-gear" style={{ marginRight: '6px' }}></i> Player Databases & Segments
+          <i className="fa-solid fa-users-gear" aria-hidden="true"></i>
+          <span>Player Databases & Segments</span>
         </button>
         <button
+          type="button"
           onClick={() => setActiveSubTab('broadcast')}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: activeSubTab === 'broadcast' ? 'var(--gold-primary)' : 'rgba(255,255,255,0.6)',
-            borderBottom: activeSubTab === 'broadcast' ? '2px solid var(--gold-primary)' : 'none',
-            fontSize: '0.85rem',
-            fontWeight: 'bold',
-            padding: '0.5rem 1rem',
-            cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}
+          className={`promotions-subtab${activeSubTab === 'broadcast' ? ' is-active' : ''}`}
         >
-          <i className="fa-solid fa-bullhorn" style={{ marginRight: '6px' }}></i> Send Promotion / Broadcast
+          <i className="fa-solid fa-bullhorn" aria-hidden="true"></i>
+          <span>Send Promotion / Broadcast</span>
         </button>
       </div>
 
       {/* VIEW A: PLAYER SEGMENTS */}
       {activeSubTab === 'segments' && (
         <section className="admin-section-card" style={{ background: '#0a0d16', border: '1px solid rgba(255,255,255,0.05)' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+          <div className="promotions-segments-toolbar">
             <div>
               <h3 style={{ fontSize: '0.95rem', color: '#fff', fontWeight: 'bold' }}>Player Database Segmentation</h3>
               <span className="game-tap-tip">Filter players by subscription status or active deposits.</span>
             </div>
             
             {/* Segment selectors */}
-            <div style={{ display: 'flex', gap: '0.5rem', background: '#07090f', padding: '0.25rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div className="promotions-segment-pills">
               {[
                 { id: 'subscribed', label: 'Subscribed List', icon: 'fa-envelope-open-text' },
                 { id: 'unsubscribed', label: 'Unsubscribed List', icon: 'fa-envelope' },
@@ -210,23 +194,12 @@ export default function PromotionsTab({ adminUser }) {
               ].map((s) => (
                 <button
                   key={s.id}
+                  type="button"
                   onClick={() => { setSegment(s.id); setPage(1); }}
-                  style={{
-                    background: segment === s.id ? 'var(--gold-primary)' : 'none',
-                    color: segment === s.id ? '#000' : '#fff',
-                    border: 'none',
-                    fontSize: '0.7rem',
-                    fontWeight: 'bold',
-                    padding: '0.4rem 0.85rem',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.35rem',
-                    transition: 'all 0.2s'
-                  }}
+                  className={`promotions-segment-pill${segment === s.id ? ' is-active' : ''}`}
                 >
-                  <i className={`fa-solid ${s.icon}`}></i> {s.label}
+                  <i className={`fa-solid ${s.icon}`} aria-hidden="true"></i>
+                  <span>{s.label}</span>
                 </button>
               ))}
             </div>
@@ -319,15 +292,15 @@ export default function PromotionsTab({ adminUser }) {
 
       {/* VIEW B: BROADCAST PROMOTION */}
       {activeSubTab === 'broadcast' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
+        <div className="admin-layout-split promotions-broadcast-grid">
           
           {/* Send Promo Form */}
-          <section className="admin-section-card" style={{ background: '#0a0d16', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <section className="admin-section-card promotions-broadcast-form" style={{ background: '#0a0d16', border: '1px solid rgba(255,255,255,0.05)' }}>
             <h3 style={{ fontSize: '0.95rem', color: '#fff', fontWeight: 'bold', marginBottom: '1rem' }}>
               <i className="fa-solid fa-paper-plane gold-text"></i> Broadcast New Promotion Flyer
             </h3>
 
-            <form onSubmit={handleBroadcastSubmit} noValidate>
+            <form onSubmit={handleBroadcastSubmit} noValidate className="promotions-broadcast-form-fields">
               <div className="input-group">
                 <label htmlFor="promo-title">Promotion Title</label>
                 <div className="input-wrapper">
@@ -352,7 +325,7 @@ export default function PromotionsTab({ adminUser }) {
                     placeholder="Describe the offer rules or coupon details here..."
                     value={promoMessage}
                     onChange={(e) => setPromoMessage(e.target.value)}
-                    style={{ background: 'none', border: 'none', color: '#fff', width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.775rem', outline: 'none', resize: 'none' }}
+                    className="promotions-message-field"
                     required
                   />
                 </div>
@@ -360,24 +333,24 @@ export default function PromotionsTab({ adminUser }) {
 
               <div className="input-group">
                 <label htmlFor="promo-image-uploader">Upload Promotion Banner Image (Optional)</label>
-                <div className="input-wrapper" style={{ background: '#07090f' }}>
+                <div className="input-wrapper promotions-file-wrapper" style={{ background: '#07090f' }}>
                   <i className="fa-solid fa-file-image input-icon" style={{ color: 'var(--gold-primary)' }}></i>
                   <input
                     type="file"
                     id="promo-image-uploader"
                     accept="image/*"
                     onChange={handlePromoImageUpload}
-                    style={{ border: 'none', background: 'none', color: '#fff', fontSize: '0.75rem', cursor: 'pointer', padding: '0.4rem 0 0.4rem 2.5rem', width: '100%' }}
+                    className="promotions-file-input"
                   />
                 </div>
                 {promoImageError && <span className="error-msg">{promoImageError}</span>}
                 {promoImage && (
-                  <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <div style={{ width: '80px', height: '45px', overflow: 'hidden', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)' }}>
-                      <img src={promoImage} alt="Promo Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <div className="promotions-image-preview">
+                    <div className="promotions-image-thumb">
+                      <img src={promoImage} alt="Promo Preview" />
                     </div>
                     <span style={{ fontSize: '0.7rem', color: '#4ade80', fontWeight: 'bold' }}>Banner flyer selected ✓</span>
-                    <button type="button" onClick={() => setPromoImage('')} style={{ background: 'none', border: 'none', color: '#f87171', fontSize: '0.7rem', cursor: 'pointer', textDecoration: 'underline', marginLeft: 'auto' }}>Remove</button>
+                    <button type="button" onClick={() => setPromoImage('')} className="promotions-remove-image">Remove</button>
                   </div>
                 )}
               </div>
@@ -390,7 +363,7 @@ export default function PromotionsTab({ adminUser }) {
                     id="promo-type"
                     value={promoType}
                     onChange={(e) => setPromoType(e.target.value)}
-                    style={{ background: 'none', border: 'none', color: '#fff', width: '100%', fontSize: '0.775rem', height: '100%', outline: 'none', padding: '0 0.5rem' }}
+                    className="promotions-select"
                   >
                     <option value="message" style={{ background: '#0a0d16' }}>Message Only (no claim button)</option>
                     <option value="freeplay" style={{ background: '#0a0d16' }}>Freeplay Offer (player picks a game & requests freeplay)</option>
@@ -448,7 +421,7 @@ export default function PromotionsTab({ adminUser }) {
                     id="promo-target"
                     value={promoTarget}
                     onChange={(e) => setPromoTarget(e.target.value)}
-                    style={{ background: 'none', border: 'none', color: '#fff', width: '100%', fontSize: '0.775rem', height: '100%', outline: 'none', padding: '0 0.5rem' }}
+                    className="promotions-select"
                   >
                     <option value="all" style={{ background: '#0a0d16' }}>Both Groups (All Registered Players)</option>
                     <option value="subscribed" style={{ background: '#0a0d16' }}>Subscribed Players Only</option>
@@ -462,7 +435,7 @@ export default function PromotionsTab({ adminUser }) {
                 type="submit"
                 disabled={isBroadcasting}
                 className="submit-btn"
-                style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold' }}
+                style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold', width: '100%' }}
               >
                 {isBroadcasting ? 'Broadcasting...' : 'Broadcast Promo Live'}
               </button>
@@ -470,7 +443,7 @@ export default function PromotionsTab({ adminUser }) {
           </section>
 
           {/* Past Broadcasts List */}
-          <section className="admin-section-card" style={{ background: '#0a0d16', border: '1px solid rgba(255,255,255,0.05)', maxHeight: '600px', overflowY: 'auto' }}>
+          <section className="admin-section-card promotions-past-list" style={{ background: '#0a0d16', border: '1px solid rgba(255,255,255,0.05)' }}>
             <h3 style={{ fontSize: '0.95rem', color: '#fff', fontWeight: 'bold', marginBottom: '1rem' }}>
               <i className="fa-solid fa-clock-rotate-left gold-text"></i> Past Promotional Campaigns
             </h3>
@@ -482,24 +455,20 @@ export default function PromotionsTab({ adminUser }) {
                 {pastPromotions.map((promo) => (
                   <div
                     key={promo.id}
-                    style={{
-                      background: 'rgba(255,255,255,0.02)',
-                      border: '1px solid rgba(255,255,255,0.05)',
-                      borderRadius: '8px',
-                      padding: '0.85rem'
-                    }}
+                    className="promotions-past-item"
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.35rem' }}>
-                      <strong style={{ color: '#fff', fontSize: '0.8rem' }}>{promo.title}</strong>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                      <strong style={{ color: '#fff', fontSize: '0.8rem', minWidth: 0, wordBreak: 'break-word' }}>{promo.title}</strong>
                       <button
+                        type="button"
                         onClick={() => handleDeletePromo(promo.id)}
-                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.8rem' }}
+                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.8rem', flexShrink: 0 }}
                         title="Delete Promotion"
                       >
                         <i className="fa-solid fa-trash-can"></i>
                       </button>
                     </div>
-                    <p style={{ fontSize: '0.725rem', color: 'var(--text-muted)', margin: '0.25rem 0', whiteSpace: 'normal', lineHeight: '1.4' }}>
+                    <p style={{ fontSize: '0.725rem', color: 'var(--text-muted)', margin: '0.25rem 0', whiteSpace: 'normal', lineHeight: '1.4', wordBreak: 'break-word' }}>
                       {promo.message}
                     </p>
                     {promo.promoType && promo.promoType !== 'message' && (
@@ -511,7 +480,7 @@ export default function PromotionsTab({ adminUser }) {
                         </span>
                       </div>
                     )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.5rem', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
                       <span>Target: <strong style={{ color: 'var(--gold-primary)' }}>{promo.targetGroup.toUpperCase()}</strong></span>
                       <span>{new Date(promo.timestamp).toLocaleDateString()}</span>
                     </div>
