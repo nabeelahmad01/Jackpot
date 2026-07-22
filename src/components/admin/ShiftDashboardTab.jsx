@@ -171,7 +171,9 @@ export default function ShiftDashboardTab({ adminUser }) {
               ) : (
                 pendingRequests.map((req) => (
                   <tr key={req.id}>
-                    <td><strong>{req.userEmail}</strong></td>
+                    <td>
+                      <strong>{req.userName || '—'}</strong>
+                    </td>
                     <td><span className="admin-badge-preview b-new" style={{ fontSize: '0.65rem' }}>{req.gameTitle}</span></td>
                     <td>
                       <input
@@ -252,8 +254,7 @@ export default function ShiftDashboardTab({ adminUser }) {
                 pendingCoins.filter(n => n.totalCoins >= 0).map((noti) => (
                   <tr key={noti.id}>
                     <td>
-                      <strong>{noti.userEmail}</strong>
-                      {noti.gameUsername && <div style={{ fontSize: '0.65rem', color: 'var(--gold-primary)' }}>({noti.gameUsername})</div>}
+                      <strong>{noti.gameUsername || '—'}</strong>
                     </td>
                     <td><span className="admin-badge-preview b-hot" style={{ fontSize: '0.65rem' }}>{noti.gameTitle}</span></td>
                     <td>
@@ -338,8 +339,7 @@ export default function ShiftDashboardTab({ adminUser }) {
                 pendingCoins.filter(n => n.totalCoins < 0).map((noti) => (
                   <tr key={noti.id}>
                     <td>
-                      <strong>{noti.userEmail}</strong>
-                      {noti.gameUsername && <div style={{ fontSize: '0.65rem', color: 'var(--gold-primary)' }}>({noti.gameUsername})</div>}
+                      <strong>{noti.gameUsername || '—'}</strong>
                     </td>
                     <td>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.2rem' }}>
