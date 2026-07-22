@@ -3,7 +3,7 @@
 Package: `com.jackpotroyals.app`  
 App name: **Jackpot Royals**  
 Upload file: `public/downloads/jackpot-royals.aab` (Android App Bundle)  
-Version in this build: **1.2** (`versionCode` 3)
+Version in this build: **1.3** (`versionCode` 4)
 
 > Portal APK (`com.jackpotroyals.portal`) is separate — do **not** upload that to this Play listing.
 
@@ -55,12 +55,12 @@ Complete the tasks Play shows. Use the copy/paste text below.
 2. **Create new release**
 3. If asked about **Play App Signing** → **Continue** / enroll (recommended). Keep your keystore backup.
 4. Upload: `jackpot-royals.aab`
-5. **Release name:** `1.2 (3)`
+5. **Release name:** `1.3 (4)`
 6. **Release notes** (en-US):
 
 ```
-First Play testing build of Jackpot Royals.
-Play games, manage your wallet, and get promotions in the official player app.
+Jackpot Royals 1.3 — latest player app build for Play testing.
+Play games, manage your wallet, and get promotions in the official app.
 ```
 
 7. **Next** → **Save** → **Review release** → **Start rollout to Internal testing**
@@ -225,8 +225,8 @@ Every new Play upload needs a **higher `versionCode`** in `android/app/build.gra
 |---|---|
 | Application ID | `com.jackpotroyals.app` |
 | AAB path | `public/downloads/jackpot-royals.aab` |
-| Version name | `1.2` |
-| Version code | `3` |
+| Version name | `1.3` |
+| Version code | `4` |
 | Keystore | `android/app/jackpot-release.keystore` |
 | Privacy | https://jackpotroyals.com/privacy |
 | Support | support@jackpotroyals.com |
