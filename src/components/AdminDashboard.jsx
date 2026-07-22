@@ -10,6 +10,7 @@ import TabErrorBoundary from './TabErrorBoundary';
 import { initAudioUnlock, playNotificationSound } from '../lib/notificationSound';
 import { initDesktopNotifications, notifyStaffActivity } from '../lib/desktopNotify';
 import { subscribeToStaffPush } from '../lib/pushClient';
+import { registerNativeBackHandler } from '../lib/nativeBack';
 
 // Lazy load tab components with automatic retry on chunk failures
 const OverviewTab = lazyWithRetry(() => import('./admin/OverviewTab'));
@@ -76,14 +77,23 @@ export default function AdminDashboard({
     return () => window.removeEventListener('popstate', syncFromPath);
   }, []);
 
-  // Keep URL in sync when user switches tabs (replaceState avoids history spam & refresh races)
+  // Keep URL in sync when user switches tabs (pushState so Android back can undo)
   useEffect(() => {
     if (suppressUrlSyncRef.current) return;
     const targetPath = `/admin/${activeTab}`;
     if (window.location.pathname !== targetPath) {
-      window.history.replaceState({}, '', targetPath);
+      window.history.pushState({ adminTab: activeTab }, '', targetPath);
     }
   }, [activeTab]);
+
+  // Android / Portal system back: close mobile sidebar first
+  useEffect(() => {
+    return registerNativeBackHandler(() => {
+      if (!sidebarOpen) return false;
+      setSidebarOpen(false);
+      return true;
+    });
+  }, [sidebarOpen]);
 
   const [processingIds, setProcessingIds] = useState({});
 

@@ -2,6 +2,7 @@ import "./globals.css";
 import ClientChunkGuard from "../components/ClientChunkGuard";
 import NativeSplash from "../components/NativeSplash";
 import NativeChrome from "../components/NativeChrome";
+import NativeBackButton from "../components/NativeBackButton";
 import MetaPixel from "../components/MetaPixel";
 
 export const metadata = {
@@ -48,6 +49,7 @@ export default function RootLayout({ children }) {
       <body suppressHydrationWarning>
         <MetaPixel />
         <NativeChrome />
+        <NativeBackButton />
         <NativeSplash />
         <ClientChunkGuard />
         {children}

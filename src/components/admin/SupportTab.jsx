@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import usePollingSWR from '../../hooks/usePollingSWR';
 import { POLL } from '../../lib/pollingConfig';
+import { registerNativeBackHandler } from '../../lib/nativeBack';
 
 export default function SupportTab({ adminUser }) {
   const [chatSearch, setChatSearch] = useState('');
@@ -9,6 +10,15 @@ export default function SupportTab({ adminUser }) {
   const chatEndRef = useRef(null);
 
   const distQueryParam = adminUser?.distributorId ? `&adminDistributorId=${adminUser.distributorId}` : '';
+
+  // Android back closes open support chat before leaving the tab
+  useEffect(() => {
+    return registerNativeBackHandler(() => {
+      if (!activeChatEmail) return false;
+      setActiveChatEmail(null);
+      return true;
+    });
+  }, [activeChatEmail]);
 
   const { data: convData, mutate: mutateConversations } = usePollingSWR(`/api/support?limit=100${distQueryParam}`, POLL.SUPPORT);
 
