@@ -36,7 +36,18 @@ const DEFAULT_SEEDS = {
       tag: '$Autumn-King-34',
       phone: '3239902704',
       theme: 'cashapp',
+      redirectUrl: 'https://cash.app/$Autumn-King-34/{amount}',
       qrImage: 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=CashApp-Autumn-King-34'
+    },
+    {
+      id: '4',
+      name: 'Stripe',
+      subtitle: 'Pay securely with card via Stripe',
+      tag: 'stripe-checkout',
+      phone: 'Card payment',
+      theme: 'stripe',
+      redirectUrl: '',
+      qrImage: 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=Stripe-Checkout'
     },
     {
       id: '3',

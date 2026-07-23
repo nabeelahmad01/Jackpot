@@ -26,7 +26,7 @@ export async function GET(req) {
 // POST create distributor gateway
 export async function POST(req) {
   try {
-    const { name, subtitle, tag, phone, theme, qrImage, isWithdrawActive, requireNameOnTag, requireTag, requirePhoneOnTag, requireEmailOnTag, distributorId } = await req.json();
+    const { name, subtitle, tag, phone, theme, qrImage, redirectUrl, isWithdrawActive, requireNameOnTag, requireTag, requirePhoneOnTag, requireEmailOnTag, distributorId } = await req.json();
 
     if (!distributorId) {
       return NextResponse.json({ success: false, message: 'Distributor ID is required.' }, { status: 400 });
@@ -46,6 +46,7 @@ export async function POST(req) {
       phone: phone || '',
       theme: theme || 'cashapp',
       qrImage: qrImage || `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(name + '-' + tag)}`,
+      redirectUrl: String(redirectUrl || '').trim(),
       isWithdrawActive: Boolean(isWithdrawActive),
       requireNameOnTag: isWithdrawActive ? requireNameOnTag !== false : false,
       requireTag: isWithdrawActive ? requireTag !== false : false,
@@ -67,7 +68,7 @@ export async function POST(req) {
 // PUT edit distributor gateway
 export async function PUT(req) {
   try {
-    const { id, name, subtitle, tag, phone, theme, qrImage, isWithdrawActive, requireNameOnTag, requireTag, requirePhoneOnTag, requireEmailOnTag, distributorId } = await req.json();
+    const { id, name, subtitle, tag, phone, theme, qrImage, redirectUrl, isWithdrawActive, requireNameOnTag, requireTag, requirePhoneOnTag, requireEmailOnTag, distributorId } = await req.json();
 
     if (!id || !distributorId) {
       return NextResponse.json({ success: false, message: 'Gateway ID and Distributor ID are required.' }, { status: 400 });
@@ -83,6 +84,7 @@ export async function PUT(req) {
       phone,
       theme,
       qrImage,
+      redirectUrl: redirectUrl !== undefined ? String(redirectUrl || '').trim() : undefined,
       isWithdrawActive: isWithdrawActive !== undefined ? Boolean(isWithdrawActive) : undefined,
       requireNameOnTag: requireNameOnTag !== undefined ? Boolean(requireNameOnTag) : undefined,
       requireTag: requireTag !== undefined ? Boolean(requireTag) : undefined,

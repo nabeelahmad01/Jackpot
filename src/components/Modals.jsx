@@ -583,7 +583,9 @@ export function PaymentMethodModal({ isOpen, onClose, amount, gateways = [], onS
                 if (g.theme === 'chime') {
                   btnStyle = { background: '#2ecc71' };
                 } else if (g.theme === 'cashapp') {
-                  btnStyle = { background: '#111320', border: '1px solid rgba(255,255,255,0.1)' };
+                  btnStyle = { background: '#00d632', color: '#000' };
+                } else if (g.theme === 'stripe') {
+                  btnStyle = { background: '#635bff' };
                 } else if (g.theme === 'crypto') {
                   btnStyle = { background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)' };
                 } else if (g.theme === 'zelle') {
@@ -742,6 +744,7 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
   const [phone, setPhone] = useState('');
   const [theme, setTheme] = useState('chime');
   const [qrImage, setQrImage] = useState('');
+  const [redirectUrl, setRedirectUrl] = useState('');
 
   // Withdrawal configurations
   const [isWithdrawActive, setIsWithdrawActive] = useState(false);
@@ -764,6 +767,7 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
         setPhone(editGateway.phone);
         setTheme(editGateway.theme);
         setQrImage(editGateway.qrImage);
+        setRedirectUrl(editGateway.redirectUrl || '');
         setIsWithdrawActive(editGateway.isWithdrawActive === true);
         setRequireNameOnTag(editGateway.requireNameOnTag !== false);
         setRequireTag(editGateway.requireTag !== false);
@@ -776,6 +780,7 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
         setPhone('');
         setTheme('chime');
         setQrImage('');
+        setRedirectUrl('');
         setIsWithdrawActive(false);
         setRequireNameOnTag(true);
         setRequireTag(true);
@@ -846,8 +851,8 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
       isValid = false;
     }
 
-    if (qrImage.trim() === '') {
-      setQrError('Please upload the QR Code Image Graphic.');
+    if (qrImage.trim() === '' && !redirectUrl.trim()) {
+      setQrError('Upload a QR image, or set a Pay Redirect URL (Cash App / Stripe).');
       isValid = false;
     }
 
@@ -861,7 +866,8 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
           tag: tag.trim(),
           phone: phone.trim(),
           theme,
-          qrImage: qrImage,
+          qrImage: qrImage || `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(name.trim() + '-' + tag.trim())}`,
+          redirectUrl: redirectUrl.trim(),
           isWithdrawActive,
           requireNameOnTag: isWithdrawActive ? requireNameOnTag : false,
           requireTag: isWithdrawActive ? requireTag : false,
@@ -960,12 +966,30 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
                 >
                   <option value="chime">Chime Green</option>
                   <option value="cashapp">Cash App Outline</option>
+                  <option value="stripe">Stripe Purple</option>
                   <option value="crypto">Crypto Pink-Purple Gradient</option>
                   <option value="zelle">Zelle Purple</option>
                   <option value="paypal">PayPal Blue</option>
                   <option value="venmo">Venmo Cyan</option>
                 </select>
               </div>
+            </div>
+
+            <div className="input-group">
+              <label htmlFor="gt-redirect">Pay Button Redirect URL (Cash App / Stripe)</label>
+              <div className="input-wrapper">
+                <i className="fa-solid fa-link input-icon"></i>
+                <input
+                  type="url"
+                  id="gt-redirect"
+                  placeholder="e.g. https://cash.app/$YourTag or Stripe payment link"
+                  value={redirectUrl}
+                  onChange={(e) => { setRedirectUrl(e.target.value); setQrError(''); }}
+                />
+              </div>
+              <span className="game-tap-tip" style={{ display: 'block', marginTop: '0.35rem', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                Player taps Continue / Pay and opens this link. Optional placeholders: {'{amount}'} {'{code}'} {'{tag}'}
+              </span>
             </div>
 
             {/* Withdrawal CMS Configuration Settings */}
@@ -1038,7 +1062,7 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
                   accept="image/*"
                   onChange={handleQrUpload}
                   style={{ border: 'none', background: 'none', color: '#fff', fontSize: '0.75rem', cursor: 'pointer', padding: '0.4rem 0', width: '100%' }}
-                  required={!editGateway}
+                  required={!editGateway && !redirectUrl.trim()}
                 />
               </div>
               <span className="error-msg">{qrError}</span>

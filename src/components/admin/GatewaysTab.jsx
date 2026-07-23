@@ -57,6 +57,7 @@ export default function GatewaysTab({ onAddGatewayClick, onEditGatewayClick, onD
               <th>Payment Handle Tag</th>
               <th>Phone / Contact Info</th>
               <th>Visual Theme</th>
+              <th>Pay Redirect URL</th>
               <th>QR Image Link</th>
               <th>Actions</th>
             </tr>
@@ -64,7 +65,7 @@ export default function GatewaysTab({ onAddGatewayClick, onEditGatewayClick, onD
           <tbody>
             {filteredGateways.length === 0 ? (
               <tr>
-                <td colSpan="7" className="text-center text-muted" style={{ padding: '2rem' }}>
+                <td colSpan="8" className="text-center text-muted" style={{ padding: '2rem' }}>
                   No gateways configured. Click Add to create one.
                 </td>
               </tr>
@@ -76,13 +77,22 @@ export default function GatewaysTab({ onAddGatewayClick, onEditGatewayClick, onD
                   <td><code style={{ color: '#00d2ff' }}>{gt.tag}</code></td>
                   <td>{gt.phone || '—'}</td>
                   <td>
-                    <span className={`admin-badge-preview b-${gt.theme === 'chime' ? 'ready' : gt.theme === 'cashapp' ? 'none' : gt.theme === 'crypto' ? 'hot' : 'new'}`} style={{ textTransform: 'uppercase' }}>
+                    <span className={`admin-badge-preview b-${gt.theme === 'chime' ? 'ready' : gt.theme === 'cashapp' ? 'none' : gt.theme === 'stripe' ? 'vip' : gt.theme === 'crypto' ? 'hot' : 'new'}`} style={{ textTransform: 'uppercase' }}>
                       {gt.theme}
                     </span>
                   </td>
                   <td>
+                    {gt.redirectUrl ? (
+                      <a href={gt.redirectUrl} target="_blank" rel="noopener noreferrer" className="gold-text" style={{ fontSize: '0.7rem', textDecoration: 'none' }} title={gt.redirectUrl}>
+                        {String(gt.redirectUrl).slice(0, 36)}{String(gt.redirectUrl).length > 36 ? '…' : ''}
+                      </a>
+                    ) : (
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>—</span>
+                    )}
+                  </td>
+                  <td>
                     <a href={gt.qrImage} target="_blank" rel="noopener noreferrer" className="gold-text" style={{ fontSize: '0.7rem', textDecoration: 'none' }} title={gt.qrImage}>
-                      {gt.qrImage.slice(0, 30)}...
+                      {(gt.qrImage || '').slice(0, 30)}...
                     </a>
                   </td>
                   <td>

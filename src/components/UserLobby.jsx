@@ -601,6 +601,30 @@ export default function UserLobby({
     setPaymentModalOpen(true);
   };
 
+  const buildGatewayRedirectUrl = (gatewayObj, amount, noteCode) => {
+    const raw = String(gatewayObj?.redirectUrl || '').trim();
+    if (!raw) return '';
+    const amt = parseFloat(amount || 0);
+    return raw
+      .replace(/\{amount\}/gi, Number.isFinite(amt) ? amt.toFixed(2) : '')
+      .replace(/\{code\}/gi, String(noteCode || ''))
+      .replace(/\{tag\}/gi, String(gatewayObj?.tag || ''));
+  };
+
+  const openGatewayPaymentLink = async (url) => {
+    if (!url) return;
+    try {
+      const Browser = typeof window !== 'undefined' ? window.Capacitor?.Plugins?.Browser : null;
+      if (Browser?.open) {
+        await Browser.open({ url });
+        return;
+      }
+    } catch (_) {
+      // fall through to window.open
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
   const handleSelectGateway = (gatewayObj) => {
     setPaymentModalOpen(false);
 
@@ -617,14 +641,21 @@ export default function UserLobby({
 
     setScreenshotBase64('');
 
+    const amountVal = parseFloat(depositAmount);
     setActiveInvoice({
-      amount: parseFloat(depositAmount),
+      amount: amountVal,
       gateway: gatewayObj, // Keep gateway reference
       noteCode: code,
       timeRemaining: 600, // 10 minutes
     });
 
     setDepositAmount('');
+
+    // Cash App / Stripe style: Continue opens admin-configured payment link
+    const payUrl = buildGatewayRedirectUrl(gatewayObj, amountVal, code);
+    if (payUrl) {
+      openGatewayPaymentLink(payUrl);
+    }
   };
 
   const handleCancelInvoice = () => {
@@ -1745,6 +1776,43 @@ export default function UserLobby({
                     <i className="fa-solid fa-triangle-exclamation"></i>
                     <span>Don't forget to write the Payment Note Code in the note while sending payment.</span>
                   </div>
+
+                  {activeInvoice.gateway?.redirectUrl ? (
+                    <div style={{ marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const payUrl = buildGatewayRedirectUrl(
+                            activeInvoice.gateway,
+                            activeInvoice.amount,
+                            activeInvoice.noteCode
+                          );
+                          if (!payUrl) {
+                            showToast('Payment link is not configured. Contact support.', 'error');
+                            return;
+                          }
+                          openGatewayPaymentLink(payUrl);
+                        }}
+                        className="submit-btn"
+                        style={{
+                          marginTop: 0,
+                          background: activeInvoice.gateway.theme === 'stripe' ? '#635bff' : '#00d632',
+                          color: activeInvoice.gateway.theme === 'stripe' ? '#fff' : '#000',
+                          boxShadow: 'none',
+                          padding: '0.9rem 1rem'
+                        }}
+                      >
+                        <span style={{ fontSize: '0.9rem', fontWeight: '900' }}>
+                          {activeInvoice.gateway.theme === 'stripe'
+                            ? `Pay with ${activeInvoice.gateway.name}`
+                            : `💵 Pay with ${activeInvoice.gateway.name}`}
+                        </span>
+                      </button>
+                      <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0, textAlign: 'center' }}>
+                        Waiting for payment confirmation… After paying, upload screenshot and tap I HAVE PAID.
+                      </p>
+                    </div>
+                  ) : null}
 
                   <div className="tag-details-box" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
 
