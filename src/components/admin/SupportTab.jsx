@@ -24,7 +24,10 @@ export default function SupportTab({ adminUser }) {
     });
   }, [activeChatEmail]);
 
-  const { data: convData, mutate: mutateConversations } = usePollingSWR(`/api/support?limit=100${distQueryParam}`, POLL.SUPPORT);
+  const { data: convData, mutate: mutateConversations, error: convError } = usePollingSWR(
+    `/api/support?limit=200${distQueryParam}`,
+    POLL.SUPPORT
+  );
 
   const { data: activeChatData, mutate: mutateActiveChat } = usePollingSWR(
     activeChatEmail ? `/api/support?email=${encodeURIComponent(activeChatEmail)}${distQueryParam}` : null,
@@ -100,59 +103,76 @@ export default function SupportTab({ adminUser }) {
     return emailKey.split('@')[0] || 'Guest';
   };
 
-  const groups = {};
-  allMessages.forEach((msg) => {
-    const email = (msg.userEmail || '').toLowerCase();
-    if (!email) return;
+  // Prefer server-built conversation list (includes unread threads that raw
+  // message windows used to drop). Fall back to grouping messages.
+  let conversations = [];
+  if (Array.isArray(convData?.conversations)) {
+    conversations = convData.conversations.map((c) => ({
+      email: String(c.email || c.userEmail || '').toLowerCase().trim(),
+      name: resolveDisplayName(c.email || c.userEmail, c.name || c.playerName),
+      lastMessage: c.lastMessage || '',
+      timestamp: c.timestamp,
+      unread: !!c.unread
+    })).filter((c) => c.email);
+  } else {
+    const groups = {};
+    allMessages.forEach((msg) => {
+      const email = (msg.userEmail || '').toLowerCase();
+      if (!email) return;
 
-    if (!groups[email]) {
-      groups[email] = {
-        email: msg.userEmail,
-        name: null,
-        lastMessage: msg.message || (msg.attachment ? '[Image]' : ''),
-        timestamp: msg.timestamp,
-        unread: false
-      };
-    }
+      if (!groups[email]) {
+        groups[email] = {
+          email: msg.userEmail,
+          name: null,
+          lastMessage: msg.message || (msg.attachment ? '[Image]' : ''),
+          timestamp: msg.timestamp,
+          unread: false
+        };
+      }
 
-    const g = groups[email];
+      const g = groups[email];
+      const candidate =
+        msg.playerName ||
+        (msg.senderType === 'player' ? msg.userName : '') ||
+        '';
+      if (candidate && !/^support\s*agent$/i.test(String(candidate))) {
+        g.name = candidate;
+      }
+      if (msg.senderType === 'player' && msg.read === false) {
+        g.unread = true;
+      }
+    });
 
-    // Prefer playerName from API, then player-sent userName (never agent label)
-    const candidate =
-      msg.playerName ||
-      (msg.senderType === 'player' ? msg.userName : '') ||
-      '';
-    if (candidate && !/^support\s*agent$/i.test(String(candidate))) {
-      g.name = candidate;
-    }
-
-    if (msg.senderType === 'player' && msg.read === false) {
-      g.unread = true;
-    }
-  });
+    conversations = Object.values(groups).map((c) => ({
+      ...c,
+      email: String(c.email || '').toLowerCase().trim(),
+      name: resolveDisplayName(c.email, c.name)
+    }));
+  }
 
   // Keep manually opened registered players in the list even before first message
   Object.values(openedPlayers).forEach((p) => {
     const email = (p.email || '').toLowerCase();
-    if (!email || groups[email]) return;
-    groups[email] = {
-      email: p.email,
-      name: p.name,
+    if (!email || conversations.some((c) => c.email === email)) return;
+    conversations.push({
+      email,
+      name: resolveDisplayName(email, p.name),
       lastMessage: 'No messages yet — start the chat',
       timestamp: p.openedAt || new Date().toISOString(),
       unread: false,
       isNewThread: true
-    };
+    });
   });
 
-  const conversations = Object.values(groups)
-    .map((c) => ({
-      ...c,
-      name: resolveDisplayName(c.email, c.name || openedPlayers[c.email?.toLowerCase()]?.name)
-    }))
-    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  conversations = conversations.sort((a, b) => {
+    if (a.unread && !b.unread) return -1;
+    if (!a.unread && b.unread) return 1;
+    return new Date(b.timestamp || 0) - new Date(a.timestamp || 0);
+  });
+
   const filteredConversations = conversations.filter(
     (c) =>
+      !chatSearch.trim() ||
       c.email.toLowerCase().includes(chatSearch.toLowerCase()) ||
       (c.name && c.name.toLowerCase().includes(chatSearch.toLowerCase()))
   );
@@ -363,7 +383,15 @@ export default function SupportTab({ adminUser }) {
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem', minHeight: 0 }}>
-          {filteredConversations.length === 0 ? (
+          {!convData && !convError ? (
+            <p style={{ fontSize: '0.75rem', opacity: 0.5, textAlign: 'center', margin: 'auto' }}>
+              <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: '6px' }}></i> Loading chats...
+            </p>
+          ) : convError ? (
+            <p style={{ fontSize: '0.75rem', color: '#f87171', textAlign: 'center', margin: 'auto' }}>
+              Could not load chats. Pull to refresh or reopen this tab.
+            </p>
+          ) : filteredConversations.length === 0 ? (
             <p style={{ fontSize: '0.75rem', opacity: 0.5, textAlign: 'center', margin: 'auto' }}>No chats found.</p>
           ) : (
             filteredConversations.map((chat) => (

@@ -113,7 +113,21 @@ export async function GET(req) {
         type: { $nin: ['WEBSITE_COMMISSION_PAYMENT', 'COMMISSION_WITHDRAW', 'AFFILIATE_COMMISSION_WITHDRAW'] }
       }),
       db.collection('coinsNotifications').countDocuments(coinsQuery),
-      db.collection('supportMessages').distinct('userEmail', adminDistributorId ? { distributorId: adminDistributorId, senderType: 'player', read: false } : { distributorType: { $ne: 'B' }, senderType: 'player', read: false }),
+      db.collection('supportMessages').distinct(
+        'userEmail',
+        adminDistributorId
+          ? { distributorId: adminDistributorId, senderType: 'player', read: false }
+          : {
+              senderType: 'player',
+              read: false,
+              $or: [
+                { distributorType: { $exists: false } },
+                { distributorType: null },
+                { distributorType: '' },
+                { distributorType: { $nin: ['B'] } }
+              ]
+            }
+      ),
       db.collection('transactions').countDocuments({ type: { $in: ['WEBSITE_COMMISSION_PAYMENT', 'COMMISSION_WITHDRAW'] }, distributorId: adminDistributorId || { $exists: true }, status: 'PENDING' }),
       db.collection('transactions').countDocuments({ type: 'AFFILIATE_COMMISSION_WITHDRAW', status: 'PENDING' }),
       db.collection('campaignRequests').countDocuments({ status: 'PENDING' }),

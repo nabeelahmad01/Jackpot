@@ -81,53 +81,189 @@ export async function GET(req) {
       return NextResponse.json({ success: true, messages, playerName });
     }
 
-    // Admin view: recent messages for conversation list
+    // Admin / distributor conversation list — group by player so unread chats
+    // are never dropped just because other threads filled a raw message limit.
     const skip = (page - 1) * limit;
-    const messages = await supportCollection
-      .find(baseQuery)
-      .sort({ timestamp: -1 })
-      .skip(skip)
-      .limit(limit)
-      .toArray();
 
-    // Enrich with real player names so list never sticks on "Support Agent"
+    // Treat missing/empty distributorType as non-B (guest + normal players)
+    const listMatch = adminDistributorId
+      ? { distributorId: adminDistributorId }
+      : {
+          $or: [
+            { distributorType: { $exists: false } },
+            { distributorType: null },
+            { distributorType: '' },
+            { distributorType: { $nin: ['B'] } }
+          ]
+        };
+
+    const unreadMatch = {
+      ...listMatch,
+      senderType: 'player',
+      read: false
+    };
+
+    const [grouped, unreadEmails, totalConversations] = await Promise.all([
+      supportCollection
+        .aggregate([
+          { $match: listMatch },
+          { $sort: { timestamp: -1 } },
+          {
+            $group: {
+              _id: { $toLower: { $ifNull: ['$userEmail', ''] } },
+              userEmail: { $first: '$userEmail' },
+              userName: { $first: '$userName' },
+              lastMessage: { $first: '$message' },
+              lastAttachment: { $first: '$attachment' },
+              timestamp: { $first: '$timestamp' },
+              senderType: { $first: '$senderType' },
+              unread: {
+                $max: {
+                  $cond: [
+                    {
+                      $and: [
+                        { $eq: ['$senderType', 'player'] },
+                        { $eq: ['$read', false] }
+                      ]
+                    },
+                    true,
+                    false
+                  ]
+                }
+              },
+              playerMsgName: {
+                $first: {
+                  $cond: [{ $eq: ['$senderType', 'player'] }, '$userName', null]
+                }
+              }
+            }
+          },
+          { $match: { _id: { $ne: '' } } },
+          {
+            $addFields: {
+              unreadRank: { $cond: ['$unread', 0, 1] }
+            }
+          },
+          { $sort: { unreadRank: 1, timestamp: -1 } },
+          { $skip: skip },
+          { $limit: limit }
+        ])
+        .toArray(),
+      supportCollection.distinct('userEmail', unreadMatch),
+      supportCollection
+        .aggregate([
+          { $match: listMatch },
+          { $group: { _id: { $toLower: { $ifNull: ['$userEmail', ''] } } } },
+          { $match: { _id: { $ne: '' } } },
+          { $count: 'total' }
+        ])
+        .toArray()
+    ]);
+
+    // If an unread thread fell outside this page window, still surface it on page 1
+    if (page === 1 && unreadEmails.length > 0) {
+      const present = new Set(grouped.map((g) => String(g._id || '').toLowerCase()));
+      const missingUnread = unreadEmails
+        .map((e) => String(e || '').toLowerCase().trim())
+        .filter((e) => e && !present.has(e));
+
+      if (missingUnread.length > 0) {
+        const extras = await supportCollection
+          .aggregate([
+            { $match: { ...listMatch, userEmail: { $in: missingUnread } } },
+            { $sort: { timestamp: -1 } },
+            {
+              $group: {
+                _id: { $toLower: { $ifNull: ['$userEmail', ''] } },
+                userEmail: { $first: '$userEmail' },
+                userName: { $first: '$userName' },
+                lastMessage: { $first: '$message' },
+                lastAttachment: { $first: '$attachment' },
+                timestamp: { $first: '$timestamp' },
+                senderType: { $first: '$senderType' },
+                unread: { $literal: true },
+                playerMsgName: {
+                  $first: {
+                    $cond: [{ $eq: ['$senderType', 'player'] }, '$userName', null]
+                  }
+                }
+              }
+            }
+          ])
+          .toArray();
+
+        grouped.unshift(...extras);
+        grouped.sort((a, b) => {
+          if (a.unread && !b.unread) return -1;
+          if (!a.unread && b.unread) return 1;
+          return new Date(b.timestamp || 0) - new Date(a.timestamp || 0);
+        });
+      }
+    }
+
     const emails = Array.from(
-      new Set(messages.map((m) => (m.userEmail || '').toLowerCase().trim()).filter(Boolean))
+      new Set(grouped.map((g) => String(g.userEmail || '').toLowerCase().trim()).filter(Boolean))
     );
+
+    const nameByEmail = {};
     if (emails.length > 0) {
       const users = await db
         .collection('users')
         .find({ email: { $in: emails } })
         .project({ email: 1, name: 1 })
         .toArray();
-      const nameByEmail = {};
       users.forEach((u) => {
         if (u.email) nameByEmail[u.email.toLowerCase().trim()] = (u.name || '').trim();
       });
-
-      for (const msg of messages) {
-        const emailKey = (msg.userEmail || '').toLowerCase().trim();
-        const isGuest =
-          emailKey.includes('@jackpotguest.com') || emailKey.startsWith('guest_');
-        if (isGuest) {
-          msg.playerName = 'Guest';
-          continue;
-        }
-        const fromDb = nameByEmail[emailKey];
-        if (fromDb) {
-          msg.playerName = fromDb;
-          continue;
-        }
-        const raw = String(msg.userName || '').trim();
-        if (raw && !/^support\s*agent$/i.test(raw) && !/^player$/i.test(raw)) {
-          msg.playerName = /^guest(\s*#?\d+)?$/i.test(raw) ? 'Guest' : raw;
-        } else {
-          msg.playerName = emailKey.split('@')[0] || 'Guest';
-        }
-      }
     }
 
-    return NextResponse.json({ success: true, messages });
+    const resolvePlayerName = (emailKey, fallbackName) => {
+      if (!emailKey) return 'Guest';
+      if (emailKey.includes('@jackpotguest.com') || emailKey.startsWith('guest_')) return 'Guest';
+      if (nameByEmail[emailKey]) return nameByEmail[emailKey];
+      const raw = String(fallbackName || '').trim();
+      if (raw && !/^support\s*agent$/i.test(raw) && !/^player$/i.test(raw)) {
+        return /^guest(\s*#?\d+)?$/i.test(raw) ? 'Guest' : raw;
+      }
+      return emailKey.split('@')[0] || 'Guest';
+    };
+
+    const conversations = grouped.map((g) => {
+      const emailKey = String(g.userEmail || '').toLowerCase().trim();
+      const playerName = resolvePlayerName(emailKey, g.playerMsgName || g.userName);
+      const preview =
+        (g.lastMessage && String(g.lastMessage).trim()) ||
+        (g.lastAttachment ? '[Image]' : '');
+      return {
+        email: emailKey,
+        userEmail: emailKey,
+        name: playerName,
+        playerName,
+        lastMessage: preview,
+        timestamp: g.timestamp,
+        unread: !!g.unread
+      };
+    });
+
+    // Keep legacy `messages` shape so older clients still group something
+    const messages = conversations.map((c) => ({
+      id: `conv-${c.email}`,
+      userEmail: c.email,
+      userName: c.name,
+      playerName: c.name,
+      message: c.lastMessage,
+      timestamp: c.timestamp,
+      senderType: c.unread ? 'player' : 'admin',
+      read: !c.unread
+    }));
+
+    return NextResponse.json({
+      success: true,
+      conversations,
+      messages,
+      totalConversations: totalConversations[0]?.total || conversations.length,
+      unreadCount: unreadEmails.length
+    });
   } catch (err) {
     console.error('Fetch Support Messages Error:', err);
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
