@@ -4,6 +4,7 @@ import { cache } from '../../../lib/cache';
 import { enrichDistributorsWithStats } from '../../../lib/entityStats';
 import { invalidateTypeBDistributorCache } from '../../../lib/typeBDistributors';
 import { jsonOk } from '../../../lib/apiResponse';
+import { purgeAccountAccess } from '../../../lib/sessionRevoke';
 
 // GET list of distributors (with dynamic statistics)
 export async function GET() {
@@ -177,9 +178,20 @@ export async function DELETE(req) {
     );
 
     // Remove the distributor's own staff logins and gateways (they belong to the
-    // now-deleted distributor and would otherwise be orphaned).
+    // now-deleted distributor and would otherwise be orphaned). Force-logout
+    // owner + staff so any open portal session dies immediately.
+    const staffToKick = await usersCollection
+      .find({ distributorId: id, role: { $ne: 'user' } }, { projection: { email: 1 } })
+      .toArray();
     await usersCollection.deleteMany({ distributorId: id, role: { $ne: 'user' } });
     await db.collection('gateways').deleteMany({ distributorId: id });
+
+    if (distDoc?.email) {
+      await purgeAccountAccess(db, distDoc.email, distDoc);
+    }
+    for (const staff of staffToKick) {
+      if (staff?.email) await purgeAccountAccess(db, staff.email, staff);
+    }
 
     cache.del('admin_stats');
     cache.del('distributors_enriched');

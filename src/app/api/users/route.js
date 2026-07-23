@@ -3,6 +3,7 @@ import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
 import { isCoinsAdminRole } from '../../../lib/staffGameAccess';
 import { getTypeBDistributorIds } from '../../../lib/typeBDistributors';
+import { purgeAccountAccess } from '../../../lib/sessionRevoke';
 
 // GET users (Admin listing, or referrals query)
 export async function GET(req) {
@@ -190,7 +191,7 @@ export async function PUT(req) {
   }
 }
 
-// DELETE a user account (Admin action)
+// DELETE a user account (Admin action) — also force-logs out any live session
 export async function DELETE(req) {
   try {
     const { searchParams } = new URL(req.url);
@@ -206,16 +207,12 @@ export async function DELETE(req) {
 
     const userDoc = await usersCollection.findOne({ email: cleanEmail });
     if (userDoc) {
-      const deletedCollection = db.collection('deletedUsers');
-      await deletedCollection.createIndex({ deletedAt: 1 }, { expireAfterSeconds: 2592000 }); // 30-day TTL
-      await deletedCollection.insertOne({
-        ...userDoc,
-        deletedAt: new Date().toISOString()
-      });
       await usersCollection.deleteOne({ email: cleanEmail });
     }
-    
-    // Invalidate caches
+
+    // Revoke even if already missing from users (idempotent force-logout)
+    await purgeAccountAccess(db, cleanEmail, userDoc);
+
     cache.del('admin_stats');
 
     return NextResponse.json({ success: true, message: 'User account deleted successfully.' });

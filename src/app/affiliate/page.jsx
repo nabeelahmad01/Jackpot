@@ -12,6 +12,7 @@ import ParticlesBackground from '../../components/ParticlesBackground';
 import RemainderClaimAction from '../../components/RemainderClaimAction';
 import { canShowClaimRemainderButton } from '../../lib/remainderClaim';
 import { parseAffiliatePayoutFields } from '../../lib/affiliatePayout';
+import useSessionGuard from '../../hooks/useSessionGuard';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -28,6 +29,12 @@ function AffiliatePortal() {
   const [mounted, setMounted] = useState(false);
   const [agentSession, setAgentSession] = useState(null);
   const [supportOpen, setSupportOpen] = useState(false);
+
+  // Kick deleted affiliate out even if they never click Logout.
+  useSessionGuard(agentSession?.email, {
+    redirectTo: '/affiliate',
+    intervalMs: 2000
+  });
 
   // Login & Registration credentials
   const [email, setEmail] = useState('');

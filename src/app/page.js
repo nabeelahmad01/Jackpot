@@ -10,6 +10,7 @@ import AuthPortal from '../components/AuthPortal';
 import UserLobby from '../components/UserLobby';
 import LoadingOverlay from '../components/LoadingOverlay';
 import { SupportModal, GoogleWarningModal } from '../components/Modals';
+import useSessionGuard from '../hooks/useSessionGuard';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -18,6 +19,12 @@ export default function Home() {
   const [session, setSession] = useState(null);
   const [view, setView] = useState('loading');
   const [deferredPrompt, setDeferredPrompt] = useState(null);
+
+  // Player / any deleted account: force logout while lobby is open.
+  useSessionGuard(view === 'lobby' ? session?.email : null, {
+    redirectTo: '/login',
+    intervalMs: 3000
+  });
 
   // Overlay states
   const [loadingActive, setLoadingActive] = useState(false);

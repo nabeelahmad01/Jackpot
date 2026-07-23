@@ -6,6 +6,7 @@ import ParticlesBackground from '../../components/ParticlesBackground';
 import AdminDashboard from '../../components/AdminDashboard';
 import LoadingOverlay from '../../components/LoadingOverlay';
 import { AdminGameModal, ApproveAccountModal, AdminGatewayModal, ViewProofModal, SupportModal } from '../../components/Modals';
+import useSessionGuard from '../../hooks/useSessionGuard';
 
 export default function AdminPage({ portalName, forcedRole }) {
   const [authenticated, setAuthenticated] = useState(false);
@@ -32,6 +33,19 @@ export default function AdminPage({ portalName, forcedRole }) {
 
   const [proofModalOpen, setProofModalOpen] = useState(false);
   const [proofImageUrl, setProofImageUrl] = useState('');
+
+  // If this staff account is deleted while they are still online, kick them out.
+  const staffLoginPath =
+    forcedRole === 'financial_admin' ? '/finance'
+    : forcedRole === 'operation_admin' ? '/operations'
+    : forcedRole === 'coins_admin' ? '/coins-staff'
+    : forcedRole === 'support_admin' ? '/support-staff'
+    : forcedRole === 'admin' && portalName?.includes('Boss') ? '/boss'
+    : '/admin';
+  useSessionGuard(authenticated ? adminUser?.email : null, {
+    redirectTo: staffLoginPath,
+    intervalMs: 2000
+  });
 
   useEffect(() => {
     // Check local session

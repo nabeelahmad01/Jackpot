@@ -3,6 +3,7 @@ import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
 import { enrichAgentsWithStats } from '../../../lib/entityStats';
 import { jsonOk } from '../../../lib/apiResponse';
+import { purgeAccountAccess } from '../../../lib/sessionRevoke';
 
 // GET all agents with dynamic statistics
 export async function GET() {
@@ -144,7 +145,11 @@ export async function DELETE(req) {
     }
 
     const db = await getDb();
+    const agentDoc = await db.collection('agents').findOne({ id });
     await db.collection('agents').deleteOne({ id });
+    if (agentDoc?.email) {
+      await purgeAccountAccess(db, agentDoc.email, agentDoc);
+    }
     cache.del('admin_stats');
     cache.del('agents_enriched');
 

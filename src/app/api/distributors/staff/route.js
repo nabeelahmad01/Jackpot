@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/mongodb';
+import { purgeAccountAccess } from '../../../../lib/sessionRevoke';
 
 // GET distributor staff list
 export async function GET(req) {
@@ -122,7 +123,7 @@ export async function PUT(req) {
   }
 }
 
-// DELETE distributor staff
+// DELETE distributor staff — also force-logs out their live session
 export async function DELETE(req) {
   try {
     const { searchParams } = new URL(req.url);
@@ -135,15 +136,23 @@ export async function DELETE(req) {
 
     const db = await getDb();
     const usersCollection = db.collection('users');
+    const cleanEmail = email.toLowerCase().trim();
+
+    const userDoc = await usersCollection.findOne({
+      email: cleanEmail,
+      distributorId
+    });
 
     const result = await usersCollection.deleteOne({
-      email: email.toLowerCase().trim(),
+      email: cleanEmail,
       distributorId
     });
 
     if (result.deletedCount === 0) {
       return NextResponse.json({ success: false, message: 'Staff member not found or access denied.' }, { status: 404 });
     }
+
+    await purgeAccountAccess(db, cleanEmail, userDoc);
 
     return NextResponse.json({ success: true, message: 'Staff member deleted successfully!' });
   } catch (err) {

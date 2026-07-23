@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/mongodb';
 import { cache } from '../../../../lib/cache';
+import { purgeAccountAccess } from '../../../../lib/sessionRevoke';
 
 // GET players for a distributor (Fallback or direct list)
 export async function GET(req) {
@@ -121,16 +122,9 @@ export async function DELETE(req) {
       return NextResponse.json({ success: false, message: 'Player not found or does not belong to your distributor panel.' }, { status: 404 });
     }
 
-    // Archive / Soft Delete player
-    const deletedCollection = db.collection('deletedUsers');
-    await deletedCollection.createIndex({ deletedAt: 1 }, { expireAfterSeconds: 2592000 }); // 30-day TTL
-
-    await deletedCollection.insertOne({
-      ...player,
-      deletedAt: new Date().toISOString()
-    });
-
+    // Archive + revoke live session so the player is kicked out immediately
     await db.collection('users').deleteOne({ email: cleanEmail });
+    await purgeAccountAccess(db, cleanEmail, player);
     cache.del('admin_stats');
 
     return NextResponse.json({ success: true, message: 'Player account deleted successfully.' });

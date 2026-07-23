@@ -19,6 +19,7 @@ import ParticlesBackground from '../../components/ParticlesBackground';
 import { initAudioUnlock, playNotificationSound } from '../../lib/notificationSound';
 import { initDesktopNotifications, notifyStaffActivity } from '../../lib/desktopNotify';
 import { subscribeToDistributorPush } from '../../lib/pushClient';
+import useSessionGuard from '../../hooks/useSessionGuard';
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
 export default function DistributorPortal() {
@@ -27,6 +28,12 @@ export default function DistributorPortal() {
   const [proofModalUrl, setProofModalUrl] = useState('');
   const [supportOpen, setSupportOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Kick deleted distributor / staff out even if they never click Logout.
+  useSessionGuard(distSession?.email, {
+    redirectTo: '/distributor',
+    intervalMs: 2000
+  });
 
   const handleInspectProof = async (url, txId, preferredField = null) => {
     const isValidUrl = typeof url === 'string' && (url.startsWith('data:') || url.startsWith('http') || url.startsWith('/'));
