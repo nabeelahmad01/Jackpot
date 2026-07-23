@@ -301,8 +301,11 @@ export default function DistributorPortal() {
   const [gwPhone, setGwPhone] = useState('');
   const [gwTheme, setGwTheme] = useState('cashapp');
   const [gwQr, setGwQr] = useState('');
+  const [gwRedirectUrl, setGwRedirectUrl] = useState('');
   const [gwWithdraw, setGwWithdraw] = useState(false);
   const [isSubmittingGateway, setIsSubmittingGateway] = useState(false);
+
+  const isGwLinkPay = gwTheme === 'cashapp' || gwTheme === 'stripe';
 
   // Form states for creating Staff (Type B)
   const [staffName, setStaffName] = useState('');
@@ -791,7 +794,16 @@ export default function DistributorPortal() {
   // Add Gateway (Type B)
   const handleAddGateway = async (e) => {
     e.preventDefault();
-    if (!gwName.trim() || !gwTag.trim()) {
+    if (!gwName.trim()) {
+      alert('Gateway Name is required.');
+      return;
+    }
+    if (isGwLinkPay) {
+      if (!gwRedirectUrl.trim()) {
+        alert('Pay Redirect URL is required for Cash App / Stripe.');
+        return;
+      }
+    } else if (!gwTag.trim()) {
       alert('Gateway Name and tag are required.');
       return;
     }
@@ -803,10 +815,11 @@ export default function DistributorPortal() {
         body: JSON.stringify({
           name: gwName.trim(),
           subtitle: gwSubtitle.trim(),
-          tag: gwTag.trim(),
-          phone: gwPhone.trim(),
+          tag: isGwLinkPay ? `${gwTheme}-pay` : gwTag.trim(),
+          phone: isGwLinkPay ? '' : gwPhone.trim(),
           theme: gwTheme,
-          qrImage: gwQr.trim() || undefined,
+          qrImage: isGwLinkPay ? '' : (gwQr.trim() || undefined),
+          redirectUrl: isGwLinkPay ? gwRedirectUrl.trim() : '',
           isWithdrawActive: gwWithdraw,
           requireNameOnTag: true,
           requireTag: true,
@@ -821,6 +834,7 @@ export default function DistributorPortal() {
         setGwTag('');
         setGwPhone('');
         setGwQr('');
+        setGwRedirectUrl('');
         setGwWithdraw(false);
         mutateGateways();
         alert('Gateway created successfully!');
@@ -2372,87 +2386,109 @@ export default function DistributorPortal() {
                 <form onSubmit={handleAddGateway}>
                   <div style={{ marginBottom: '0.75rem' }}>
                     <label style={{ fontSize: '0.65rem', color: '#aaa', display: 'block', marginBottom: '0.2rem' }}>Gateway Name</label>
-                    <input type="text" placeholder="Cash App, Venmo..." value={gwName} onChange={(e) => setGwName(e.target.value)} style={{ width: '100%', background: '#040509', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', padding: '0.4rem 0.6rem', color: '#fff', fontSize: '0.75rem', outline: 'none' }} required />
+                    <input type="text" placeholder="Cash App, Stripe, Venmo..." value={gwName} onChange={(e) => setGwName(e.target.value)} style={{ width: '100%', background: '#040509', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', padding: '0.4rem 0.6rem', color: '#fff', fontSize: '0.75rem', outline: 'none' }} required />
                   </div>
                   <div style={{ marginBottom: '0.75rem' }}>
                     <label style={{ fontSize: '0.65rem', color: '#aaa', display: 'block', marginBottom: '0.2rem' }}>Subtitle</label>
-                    <input type="text" placeholder="Instantly Loaded sweepstakes..." value={gwSubtitle} onChange={(e) => setGwSubtitle(e.target.value)} style={{ width: '100%', background: '#040509', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', padding: '0.4rem 0.6rem', color: '#fff', fontSize: '0.75rem', outline: 'none' }} />
+                    <input type="text" placeholder="Pay with Cash App link..." value={gwSubtitle} onChange={(e) => setGwSubtitle(e.target.value)} style={{ width: '100%', background: '#040509', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', padding: '0.4rem 0.6rem', color: '#fff', fontSize: '0.75rem', outline: 'none' }} />
                   </div>
                   <div style={{ marginBottom: '0.75rem' }}>
-                    <label style={{ fontSize: '0.65rem', color: '#aaa', display: 'block', marginBottom: '0.2rem' }}>Payment Tag/Handle</label>
-                    <input type="text" placeholder="$username" value={gwTag} onChange={(e) => setGwTag(e.target.value)} style={{ width: '100%', background: '#040509', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', padding: '0.4rem 0.6rem', color: '#fff', fontSize: '0.75rem', outline: 'none' }} required />
-                  </div>
-                  <div style={{ marginBottom: '0.75rem' }}>
-                    <label style={{ fontSize: '0.65rem', color: '#aaa', display: 'block', marginBottom: '0.2rem' }}>Phone Number (Optional)</label>
-                    <input type="text" placeholder="+1234..." value={gwPhone} onChange={(e) => setGwPhone(e.target.value)} style={{ width: '100%', background: '#040509', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', padding: '0.4rem 0.6rem', color: '#fff', fontSize: '0.75rem', outline: 'none' }} />
-                  </div>
-                  <div style={{ marginBottom: '0.75rem' }}>
-                    <label style={{ fontSize: '0.65rem', color: '#aaa', display: 'block', marginBottom: '0.2rem' }}>QR Code Image (Optional)</label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        onChange={(e) => {
-                          const file = e.target.files[0];
-                          if (file) {
-                            if (file.size > 3 * 1024 * 1024) {
-                              alert('Image is too large. Please select a file smaller than 3MB.');
-                              e.target.value = '';
-                              return;
-                            }
-                            const reader = new FileReader();
-                            reader.onload = (event) => {
-                              setGwQr(event.target.result);
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                        style={{ display: 'none' }}
-                        id="dist-gw-qr-file"
-                      />
-                      <label 
-                        htmlFor="dist-gw-qr-file"
-                        style={{
-                          background: '#040509',
-                          border: '1px dashed rgba(255,255,255,0.15)',
-                          borderRadius: '6px',
-                          padding: '0.6rem',
-                          color: 'var(--gold-primary)',
-                          fontSize: '0.75rem',
-                          textAlign: 'center',
-                          cursor: 'pointer',
-                          fontWeight: 'bold',
-                          display: 'block'
-                        }}
-                      >
-                        <i className="fa-solid fa-cloud-arrow-up" style={{ marginRight: '0.4rem' }}></i>
-                        {gwQr ? 'CHANGE QR IMAGE' : 'CHOOSE QR IMAGE'}
-                      </label>
-                      {gwQr && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.4rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                          <img src={gwQr} alt="QR Preview" style={{ width: '40px', height: '40px', objectFit: 'contain', borderRadius: '4px' }} />
-                          <span style={{ fontSize: '0.625rem', color: '#888', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>QR Image Selected</span>
-                          <button 
-                            type="button" 
-                            onClick={() => setGwQr('')}
-                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.8rem' }}
-                          >
-                            <i className="fa-solid fa-trash-can"></i>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div style={{ marginBottom: '0.75rem' }}>
-                    <label style={{ fontSize: '0.65rem', color: '#aaa', display: 'block', marginBottom: '0.2rem' }}>Theme Color</label>
+                    <label style={{ fontSize: '0.65rem', color: '#aaa', display: 'block', marginBottom: '0.2rem' }}>Theme / Type</label>
                     <select value={gwTheme} onChange={(e) => setGwTheme(e.target.value)} style={{ width: '100%', background: '#040509', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', padding: '0.4rem 0.6rem', color: '#fff', fontSize: '0.75rem', outline: 'none' }}>
-                      <option value="cashapp">Green (Cash App)</option>
+                      <option value="cashapp">Cash App (Pay Link)</option>
+                      <option value="stripe">Stripe (Pay Link)</option>
                       <option value="venmo">Blue (Venmo)</option>
                       <option value="chime">Lime (Chime)</option>
                       <option value="zelle">Purple (Zelle)</option>
-                      <option value="apple">Dark/White (Apple Pay)</option>
+                      <option value="paypal">PayPal Blue</option>
                     </select>
                   </div>
+
+                  {isGwLinkPay ? (
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <label style={{ fontSize: '0.65rem', color: '#aaa', display: 'block', marginBottom: '0.2rem' }}>Pay Redirect URL (Required)</label>
+                      <input
+                        type="url"
+                        placeholder="https://cash.app/$YourTag or Stripe payment link"
+                        value={gwRedirectUrl}
+                        onChange={(e) => setGwRedirectUrl(e.target.value)}
+                        style={{ width: '100%', background: '#040509', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', padding: '0.4rem 0.6rem', color: '#fff', fontSize: '0.75rem', outline: 'none' }}
+                        required
+                      />
+                      <span style={{ display: 'block', marginTop: '0.35rem', fontSize: '0.6rem', color: '#666' }}>
+                        Players only get this pay link — no tag / phone / QR. Optional: {'{amount}'} {'{code}'}
+                      </span>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ marginBottom: '0.75rem' }}>
+                        <label style={{ fontSize: '0.65rem', color: '#aaa', display: 'block', marginBottom: '0.2rem' }}>Payment Tag/Handle</label>
+                        <input type="text" placeholder="$username" value={gwTag} onChange={(e) => setGwTag(e.target.value)} style={{ width: '100%', background: '#040509', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', padding: '0.4rem 0.6rem', color: '#fff', fontSize: '0.75rem', outline: 'none' }} required />
+                      </div>
+                      <div style={{ marginBottom: '0.75rem' }}>
+                        <label style={{ fontSize: '0.65rem', color: '#aaa', display: 'block', marginBottom: '0.2rem' }}>Phone Number (Optional)</label>
+                        <input type="text" placeholder="+1234..." value={gwPhone} onChange={(e) => setGwPhone(e.target.value)} style={{ width: '100%', background: '#040509', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', padding: '0.4rem 0.6rem', color: '#fff', fontSize: '0.75rem', outline: 'none' }} />
+                      </div>
+                      <div style={{ marginBottom: '0.75rem' }}>
+                        <label style={{ fontSize: '0.65rem', color: '#aaa', display: 'block', marginBottom: '0.2rem' }}>QR Code Image (Optional)</label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files[0];
+                              if (file) {
+                                if (file.size > 3 * 1024 * 1024) {
+                                  alert('Image is too large. Please select a file smaller than 3MB.');
+                                  e.target.value = '';
+                                  return;
+                                }
+                                const reader = new FileReader();
+                                reader.onload = (event) => {
+                                  setGwQr(event.target.result);
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                            style={{ display: 'none' }}
+                            id="dist-gw-qr-file"
+                          />
+                          <label
+                            htmlFor="dist-gw-qr-file"
+                            style={{
+                              background: '#040509',
+                              border: '1px dashed rgba(255,255,255,0.15)',
+                              borderRadius: '6px',
+                              padding: '0.6rem',
+                              color: 'var(--gold-primary)',
+                              fontSize: '0.75rem',
+                              textAlign: 'center',
+                              cursor: 'pointer',
+                              fontWeight: 'bold',
+                              display: 'block'
+                            }}
+                          >
+                            <i className="fa-solid fa-cloud-arrow-up" style={{ marginRight: '0.4rem' }}></i>
+                            {gwQr ? 'CHANGE QR IMAGE' : 'CHOOSE QR IMAGE'}
+                          </label>
+                          {gwQr && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.4rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                              <img src={gwQr} alt="QR Preview" style={{ width: '40px', height: '40px', objectFit: 'contain', borderRadius: '4px' }} />
+                              <span style={{ fontSize: '0.625rem', color: '#888', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>QR Image Selected</span>
+                              <button
+                                type="button"
+                                onClick={() => setGwQr('')}
+                                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.8rem' }}
+                              >
+                                <i className="fa-solid fa-trash-can"></i>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
                   <div style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <input type="checkbox" checked={gwWithdraw} onChange={(e) => setGwWithdraw(e.target.checked)} style={{ cursor: 'pointer' }} />
                     <label style={{ fontSize: '0.7rem', cursor: 'pointer' }}>Active for Withdrawals</label>
@@ -2472,12 +2508,19 @@ export default function DistributorPortal() {
                   ) : (
                     gatewaysData.gateways.map(g => (
                       <div key={g.id} style={{ border: '1px solid rgba(255,255,255,0.05)', background: '#040509', padding: '1rem', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
+                        <div style={{ minWidth: 0, flex: 1, paddingRight: '0.5rem' }}>
                           <strong style={{ fontSize: '0.85rem' }}>{g.name}</strong>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--gold-primary)', fontFamily: 'monospace', marginTop: '0.15rem' }}>{g.tag}</div>
+                          <div style={{ fontSize: '0.65rem', color: '#888', marginTop: '0.15rem', textTransform: 'uppercase' }}>{g.theme || '—'}</div>
+                          {g.redirectUrl ? (
+                            <div style={{ fontSize: '0.65rem', color: 'var(--gold-primary)', marginTop: '0.25rem', wordBreak: 'break-all' }}>
+                              Link: {g.redirectUrl}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: '0.7rem', color: 'var(--gold-primary)', fontFamily: 'monospace', marginTop: '0.15rem' }}>{g.tag}</div>
+                          )}
                           <div style={{ fontSize: '0.625rem', color: '#666', marginTop: '0.25rem' }}>Withdrawals: {g.isWithdrawActive ? 'ACTIVE' : 'INACTIVE'}</div>
                         </div>
-                        <button onClick={() => handleDeleteGateway(g.id)} style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', border: 'none', borderRadius: '4px', padding: '0.2rem 0.4rem', fontSize: '0.65rem', cursor: 'pointer' }}>
+                        <button onClick={() => handleDeleteGateway(g.id)} style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', borderRadius: '4px', padding: '0.2rem 0.4rem', fontSize: '0.65rem', cursor: 'pointer', flexShrink: 0 }}>
                           Delete
                         </button>
                       </div>

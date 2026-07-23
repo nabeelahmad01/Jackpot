@@ -31,8 +31,20 @@ export async function POST(req) {
     if (!distributorId) {
       return NextResponse.json({ success: false, message: 'Distributor ID is required.' }, { status: 400 });
     }
-    if (!name || !tag) {
+    if (!name) {
+      return NextResponse.json({ success: false, message: 'Gateway name is required.' }, { status: 400 });
+    }
+
+    const resolvedTheme = theme || 'cashapp';
+    const isLinkPay = resolvedTheme === 'cashapp' || resolvedTheme === 'stripe' || Boolean(String(redirectUrl || '').trim());
+    const resolvedTag = String(tag || '').trim() || (isLinkPay ? `${resolvedTheme}-pay` : '');
+    const resolvedRedirect = String(redirectUrl || '').trim();
+
+    if (!isLinkPay && !resolvedTag) {
       return NextResponse.json({ success: false, message: 'Name and tag/handle are required.' }, { status: 400 });
+    }
+    if (isLinkPay && !resolvedRedirect) {
+      return NextResponse.json({ success: false, message: 'Pay redirect URL is required for Cash App / Stripe.' }, { status: 400 });
     }
 
     const db = await getDb();
@@ -42,11 +54,13 @@ export async function POST(req) {
       id: Date.now().toString(),
       name,
       subtitle: subtitle || '',
-      tag,
-      phone: phone || '',
-      theme: theme || 'cashapp',
-      qrImage: qrImage || `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(name + '-' + tag)}`,
-      redirectUrl: String(redirectUrl || '').trim(),
+      tag: resolvedTag,
+      phone: isLinkPay ? '' : (phone || ''),
+      theme: resolvedTheme,
+      qrImage: isLinkPay
+        ? ''
+        : (qrImage || `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(name + '-' + resolvedTag)}`),
+      redirectUrl: resolvedRedirect,
       isWithdrawActive: Boolean(isWithdrawActive),
       requireNameOnTag: isWithdrawActive ? requireNameOnTag !== false : false,
       requireTag: isWithdrawActive ? requireTag !== false : false,
@@ -57,6 +71,7 @@ export async function POST(req) {
 
     await gatewaysCollection.insertOne(newGateway);
     cache.del('gateways_all');
+    cache.del(`gateways_dist_${distributorId}`);
 
     return NextResponse.json({ success: true, gateway: newGateway, message: 'Gateway created successfully!' });
   } catch (err) {
@@ -105,6 +120,7 @@ export async function PUT(req) {
     }
 
     cache.del('gateways_all');
+    cache.del(`gateways_dist_${distributorId}`);
     return NextResponse.json({ success: true, message: 'Gateway updated successfully!' });
   } catch (err) {
     console.error('Update Distributor Gateway API Error:', err);
@@ -133,6 +149,7 @@ export async function DELETE(req) {
     }
 
     cache.del('gateways_all');
+    cache.del(`gateways_dist_${distributorId}`);
     return NextResponse.json({ success: true, message: 'Gateway deleted successfully!' });
   } catch (err) {
     console.error('Delete Distributor Gateway API Error:', err);
