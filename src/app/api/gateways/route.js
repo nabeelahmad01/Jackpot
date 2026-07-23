@@ -47,8 +47,18 @@ export async function GET(req) {
 export async function POST(req) {
   try {
     const gateway = await req.json();
-    if (!gateway.name || !gateway.tag) {
+    if (!gateway.name) {
+      return NextResponse.json({ success: false, message: 'Gateway name is required.' }, { status: 400 });
+    }
+
+    const theme = gateway.theme || 'cashapp';
+    const isLinkPay = theme === 'cashapp' || theme === 'stripe' || Boolean(String(gateway.redirectUrl || '').trim());
+    const tag = String(gateway.tag || '').trim() || (isLinkPay ? `${theme}-pay` : '');
+    if (!isLinkPay && !tag) {
       return NextResponse.json({ success: false, message: 'Name and payment tag/handle are required.' }, { status: 400 });
+    }
+    if (isLinkPay && !String(gateway.redirectUrl || '').trim()) {
+      return NextResponse.json({ success: false, message: 'Pay redirect URL is required for Cash App / Stripe.' }, { status: 400 });
     }
 
     const db = await getDb();
@@ -58,10 +68,12 @@ export async function POST(req) {
       id: gateway.id || Date.now().toString(),
       name: gateway.name,
       subtitle: gateway.subtitle || '',
-      tag: gateway.tag,
-      phone: gateway.phone || '',
-      theme: gateway.theme || 'cashapp',
-      qrImage: gateway.qrImage || `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(gateway.name + '-' + gateway.tag)}`,
+      tag,
+      phone: isLinkPay ? '' : (gateway.phone || ''),
+      theme,
+      qrImage: isLinkPay
+        ? ''
+        : (gateway.qrImage || `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(gateway.name + '-' + tag)}`),
       redirectUrl: String(gateway.redirectUrl || '').trim(),
       isWithdrawActive: Boolean(gateway.isWithdrawActive),
       requireNameOnTag: Boolean(gateway.requireNameOnTag),

@@ -756,7 +756,10 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
   const [nameError, setNameError] = useState('');
   const [tagError, setTagError] = useState('');
   const [qrError, setQrError] = useState('');
+  const [redirectError, setRedirectError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const isLinkPayTheme = theme === 'cashapp' || theme === 'stripe';
 
   useEffect(() => {
     if (isOpen) {
@@ -790,6 +793,7 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
       setNameError('');
       setTagError('');
       setQrError('');
+      setRedirectError('');
     }
   }, [isOpen, editGateway]);
 
@@ -846,28 +850,41 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
       setNameError('Gateway Name is required');
       isValid = false;
     }
-    if (tag.trim() === '') {
-      setTagError('Payment Tag/Address is required');
-      isValid = false;
-    }
 
-    if (qrImage.trim() === '' && !redirectUrl.trim()) {
-      setQrError('Upload a QR image, or set a Pay Redirect URL (Cash App / Stripe).');
-      isValid = false;
+    if (isLinkPayTheme) {
+      if (!redirectUrl.trim()) {
+        setRedirectError('Pay redirect URL is required for Cash App / Stripe.');
+        isValid = false;
+      }
+    } else {
+      if (tag.trim() === '') {
+        setTagError('Payment Tag/Address is required');
+        isValid = false;
+      }
+      if (qrImage.trim() === '') {
+        setQrError('Please upload the QR Code Image Graphic.');
+        isValid = false;
+      }
     }
 
     if (isValid) {
       setIsSubmitting(true);
       try {
+        const safeName = name.trim();
+        const safeTag = isLinkPayTheme
+          ? (tag.trim() || `${theme}-pay`)
+          : tag.trim();
         await onSave({
           id: editGateway ? editGateway.id : null,
-          name: name.trim(),
+          name: safeName,
           subtitle: subtitle.trim(),
-          tag: tag.trim(),
-          phone: phone.trim(),
+          tag: safeTag,
+          phone: isLinkPayTheme ? '' : phone.trim(),
           theme,
-          qrImage: qrImage || `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(name.trim() + '-' + tag.trim())}`,
-          redirectUrl: redirectUrl.trim(),
+          qrImage: isLinkPayTheme
+            ? ''
+            : (qrImage || `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(safeName + '-' + safeTag)}`),
+          redirectUrl: isLinkPayTheme ? redirectUrl.trim() : redirectUrl.trim(),
           isWithdrawActive,
           requireNameOnTag: isWithdrawActive ? requireNameOnTag : false,
           requireTag: isWithdrawActive ? requireTag : false,
@@ -901,7 +918,7 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
                 <input
                   type="text"
                   id="gt-name"
-                  placeholder="e.g. Zelle, Venmo"
+                  placeholder="e.g. Cash App, Stripe, Chime"
                   value={name}
                   onChange={(e) => { setName(e.target.value); setNameError(''); }}
                   required
@@ -917,39 +934,9 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
                 <input
                   type="text"
                   id="gt-sub"
-                  placeholder="e.g. Pay using bank transfer"
+                  placeholder="e.g. Pay using Cash App link"
                   value={subtitle}
                   onChange={(e) => setSubtitle(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="input-group">
-              <label htmlFor="gt-tag">Payment Tag / ID Address</label>
-              <div className="input-wrapper">
-                <i className="fa-solid fa-at input-icon"></i>
-                <input
-                  type="text"
-                  id="gt-tag"
-                  placeholder="e.g. $MyTag, name@email.com"
-                  value={tag}
-                  onChange={(e) => { setTag(e.target.value); setTagError(''); }}
-                  required
-                />
-              </div>
-              <span className="error-msg">{tagError}</span>
-            </div>
-
-            <div className="input-group">
-              <label htmlFor="gt-phone">Linked Phone / Info Details</label>
-              <div className="input-wrapper">
-                <i className="fa-solid fa-phone input-icon"></i>
-                <input
-                  type="text"
-                  id="gt-phone"
-                  placeholder="e.g. 555-123-4567, USDT TRC20"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
                 />
               </div>
             </div>
@@ -961,12 +948,17 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
                 <select
                   id="gt-theme"
                   value={theme}
-                  onChange={(e) => setTheme(e.target.value)}
+                  onChange={(e) => {
+                    setTheme(e.target.value);
+                    setTagError('');
+                    setQrError('');
+                    setRedirectError('');
+                  }}
                   required
                 >
                   <option value="chime">Chime Green</option>
-                  <option value="cashapp">Cash App Outline</option>
-                  <option value="stripe">Stripe Purple</option>
+                  <option value="cashapp">Cash App</option>
+                  <option value="stripe">Stripe</option>
                   <option value="crypto">Crypto Pink-Purple Gradient</option>
                   <option value="zelle">Zelle Purple</option>
                   <option value="paypal">PayPal Blue</option>
@@ -975,22 +967,58 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
               </div>
             </div>
 
-            <div className="input-group">
-              <label htmlFor="gt-redirect">Pay Button Redirect URL (Cash App / Stripe)</label>
-              <div className="input-wrapper">
-                <i className="fa-solid fa-link input-icon"></i>
-                <input
-                  type="url"
-                  id="gt-redirect"
-                  placeholder="e.g. https://cash.app/$YourTag or Stripe payment link"
-                  value={redirectUrl}
-                  onChange={(e) => { setRedirectUrl(e.target.value); setQrError(''); }}
-                />
+            {isLinkPayTheme ? (
+              <div className="input-group">
+                <label htmlFor="gt-redirect">Pay Redirect URL (Required)</label>
+                <div className="input-wrapper">
+                  <i className="fa-solid fa-link input-icon"></i>
+                  <input
+                    type="url"
+                    id="gt-redirect"
+                    placeholder="e.g. https://cash.app/$YourTag or Stripe payment link"
+                    value={redirectUrl}
+                    onChange={(e) => { setRedirectUrl(e.target.value); setRedirectError(''); }}
+                    required
+                  />
+                </div>
+                <span className="error-msg">{redirectError}</span>
+                <span className="game-tap-tip" style={{ display: 'block', marginTop: '0.35rem', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                  Cash App / Stripe only need this link. No payment tag, phone, or QR. Optional: {'{amount}'} {'{code}'}
+                </span>
               </div>
-              <span className="game-tap-tip" style={{ display: 'block', marginTop: '0.35rem', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                Player taps Continue / Pay and opens this link. Optional placeholders: {'{amount}'} {'{code}'} {'{tag}'}
-              </span>
-            </div>
+            ) : (
+              <>
+                <div className="input-group">
+                  <label htmlFor="gt-tag">Payment Tag / ID Address</label>
+                  <div className="input-wrapper">
+                    <i className="fa-solid fa-at input-icon"></i>
+                    <input
+                      type="text"
+                      id="gt-tag"
+                      placeholder="e.g. $MyTag, name@email.com"
+                      value={tag}
+                      onChange={(e) => { setTag(e.target.value); setTagError(''); }}
+                      required
+                    />
+                  </div>
+                  <span className="error-msg">{tagError}</span>
+                </div>
+
+                <div className="input-group">
+                  <label htmlFor="gt-phone">Linked Phone / Info Details</label>
+                  <div className="input-wrapper">
+                    <i className="fa-solid fa-phone input-icon"></i>
+                    <input
+                      type="text"
+                      id="gt-phone"
+                      placeholder="e.g. 555-123-4567, USDT TRC20"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Withdrawal CMS Configuration Settings */}
             <div style={{ background: 'rgba(255,255,255,0.02)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
@@ -1051,7 +1079,8 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
               )}
             </div>
 
-            {/* QR Graphic File Uploader */}
+            {/* QR Graphic File Uploader — not needed for Cash App / Stripe link pay */}
+            {!isLinkPayTheme && (
             <div className="input-group">
               <label htmlFor="gt-qr-uploader">Upload QR Code Image</label>
               <div className="input-wrapper">
@@ -1062,7 +1091,7 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
                   accept="image/*"
                   onChange={handleQrUpload}
                   style={{ border: 'none', background: 'none', color: '#fff', fontSize: '0.75rem', cursor: 'pointer', padding: '0.4rem 0', width: '100%' }}
-                  required={!editGateway && !redirectUrl.trim()}
+                  required={!editGateway}
                 />
               </div>
               <span className="error-msg">{qrError}</span>
@@ -1075,6 +1104,7 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
                 </div>
               )}
             </div>
+            )}
 
             <button type="submit" className="submit-btn" disabled={isSubmitting}>
               <span>{isSubmitting ? 'SAVING...' : (editGateway ? 'UPDATE GATEWAY' : 'SAVE GATEWAY')}</span>

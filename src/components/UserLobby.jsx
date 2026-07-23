@@ -650,12 +650,36 @@ export default function UserLobby({
     });
 
     setDepositAmount('');
+  };
 
-    // Cash App / Stripe style: Continue opens admin-configured payment link
-    const payUrl = buildGatewayRedirectUrl(gatewayObj, amountVal, code);
-    if (payUrl) {
-      openGatewayPaymentLink(payUrl);
+  const isLinkPayGateway = (gatewayObj) => {
+    const theme = String(gatewayObj?.theme || '').toLowerCase();
+    return Boolean(String(gatewayObj?.redirectUrl || '').trim()) || theme === 'cashapp' || theme === 'stripe';
+  };
+
+  const handleOpenActiveInvoicePayLink = () => {
+    if (!activeInvoice?.gateway) return;
+    const payUrl = buildGatewayRedirectUrl(
+      activeInvoice.gateway,
+      activeInvoice.amount,
+      activeInvoice.noteCode
+    );
+    if (!payUrl) {
+      showToast('Payment link is not configured in admin. Contact support.', 'error');
+      return;
     }
+    openGatewayPaymentLink(payUrl);
+  };
+
+  const handleCopyInvoiceSummary = () => {
+    if (!activeInvoice) return;
+    const text = [
+      `Gateway: ${activeInvoice.gateway?.name || ''}`,
+      `Game: ${activeGame?.title || ''}`,
+      `Amount: $${parseFloat(activeInvoice.amount).toFixed(2)}`,
+      `Memo / Code: ${activeInvoice.noteCode}`
+    ].join('\n');
+    handleCopyText(text);
   };
 
   const handleCancelInvoice = () => {
@@ -1744,6 +1768,182 @@ export default function UserLobby({
 
           {/* ACTIVE INVOICE SCREEN */}
           {activeInvoice ? (
+            isLinkPayGateway(activeInvoice.gateway) ? (
+              /* Cash App / Stripe — video-style: pay link only (no tag / phone / QR) */
+              <div className="invoice-container" style={{ animation: 'fade-in 0.3s ease-out', maxWidth: '440px', margin: '0 auto' }}>
+                <div
+                  className="invoice-card"
+                  style={{
+                    background: '#111318',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '18px',
+                    padding: '1.35rem 1.25rem 1.5rem',
+                    boxShadow: '0 12px 40px rgba(0,0,0,0.35)'
+                  }}
+                >
+                  <h3 style={{ textAlign: 'center', fontSize: '1.15rem', fontWeight: '800', color: '#fff', margin: '0 0 1.15rem' }}>
+                    {String(activeInvoice.gateway?.theme || '').toLowerCase() === 'stripe' ? '💳' : '💵'}{' '}
+                    Pay with {activeInvoice.gateway?.name || 'Link'}
+                  </h3>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', marginBottom: '1.15rem', fontSize: '0.85rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Game</span>
+                      <strong style={{ color: '#fff', textAlign: 'right' }}>{activeGame?.title || '—'}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Username</span>
+                      <strong style={{ color: '#fff', textAlign: 'right' }}>
+                        {(gameAccounts || []).find((a) => a.gameTitle === activeGame?.title)?.username
+                          || currentUser?.name
+                          || currentUserEmail
+                          || '—'}
+                      </strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Amount USD</span>
+                      <strong style={{ color: '#fff' }}>${parseFloat(activeInvoice.amount).toFixed(2)}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Status</span>
+                      <strong style={{ color: '#f59e0b' }}>UNPAID</strong>
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '1rem' }}>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.45rem', textAlign: 'center' }}>
+                      Unique Code / Memo
+                    </div>
+                    <div
+                      style={{
+                        border: '1px dashed rgba(34,197,94,0.55)',
+                        borderRadius: '12px',
+                        padding: '0.85rem 1rem',
+                        textAlign: 'center',
+                        background: 'rgba(34,197,94,0.06)'
+                      }}
+                    >
+                      <code style={{ fontSize: '1.35rem', color: '#4ade80', fontWeight: '900', letterSpacing: '1px' }}>
+                        {activeInvoice.noteCode}
+                      </code>
+                    </div>
+                    <p style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.55)', textAlign: 'center', margin: '0.45rem 0 0', lineHeight: 1.35 }}>
+                      Put this code in the payment note / memo when you pay.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenActiveInvoicePayLink}
+                    className="submit-btn"
+                    style={{
+                      marginTop: 0,
+                      marginBottom: '0.65rem',
+                      width: '100%',
+                      background: String(activeInvoice.gateway?.theme || '').toLowerCase() === 'stripe' ? '#635bff' : '#00d632',
+                      color: String(activeInvoice.gateway?.theme || '').toLowerCase() === 'stripe' ? '#fff' : '#000',
+                      boxShadow: 'none',
+                      padding: '0.95rem 1rem',
+                      borderRadius: '12px'
+                    }}
+                  >
+                    <span style={{ fontSize: '0.95rem', fontWeight: '900' }}>
+                      {String(activeInvoice.gateway?.theme || '').toLowerCase() === 'stripe' ? '💳' : '💵'}{' '}
+                      Pay with {activeInvoice.gateway?.name || 'Link'}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleCopyInvoiceSummary}
+                    className="submit-btn"
+                    style={{
+                      marginTop: 0,
+                      marginBottom: '1rem',
+                      width: '100%',
+                      background: '#1c1f2b',
+                      color: '#fff',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      boxShadow: 'none',
+                      padding: '0.75rem 1rem',
+                      borderRadius: '12px'
+                    }}
+                  >
+                    <span style={{ fontSize: '0.8rem', fontWeight: '700' }}>📋 Copy Invoice</span>
+                  </button>
+
+                  <p style={{ textAlign: 'center', fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)', margin: '0 0 0.85rem' }}>
+                    Waiting for payment confirmation…
+                  </p>
+
+                  <div
+                    className="tag-field-row"
+                    style={{
+                      background: '#0b0c16',
+                      border: '1px solid rgba(255,255,255,0.05)',
+                      borderRadius: '12px',
+                      padding: '0.75rem 1rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'flex-start',
+                      gap: '0.5rem',
+                      marginBottom: '1rem'
+                    }}
+                  >
+                    <label htmlFor="screenshot-receipt-linkpay" style={{ fontSize: '0.55rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                      Upload Payment Screenshot (Required)
+                    </label>
+                    <input
+                      type="file"
+                      id="screenshot-receipt-linkpay"
+                      accept="image/*"
+                      onChange={handleScreenshotChange}
+                      style={{ border: 'none', background: 'none', color: '#fff', fontSize: '0.75rem', cursor: 'pointer', width: '100%' }}
+                      required
+                    />
+                    {screenshotBase64 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <i className="fa-solid fa-circle-check text-green" style={{ fontSize: '0.8rem' }}></i>
+                        <span style={{ fontSize: '0.65rem', color: '#4ade80', fontWeight: 'bold' }}>Screenshot proof selected.</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <button
+                      type="button"
+                      onClick={handleCancelInvoice}
+                      className="submit-btn"
+                      style={{ flex: 1, marginTop: 0, background: '#ef4444', borderRadius: '10px', padding: '0.8rem' }}
+                    >
+                      <span style={{ fontSize: '0.85rem', fontWeight: '900' }}>Cancel</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handlePaidConfirm}
+                      className="submit-btn"
+                      disabled={!screenshotBase64}
+                      style={{
+                        flex: 1,
+                        marginTop: 0,
+                        background: '#fff',
+                        color: '#111',
+                        borderRadius: '10px',
+                        padding: '0.8rem',
+                        opacity: screenshotBase64 ? 1 : 0.5,
+                        cursor: screenshotBase64 ? 'pointer' : 'not-allowed'
+                      }}
+                    >
+                      <span style={{ fontSize: '0.85rem', fontWeight: '900' }}>✅ I Paid</span>
+                    </button>
+                  </div>
+
+                  <p style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.45)', textAlign: 'center', margin: '0.85rem 0 0', lineHeight: 1.4 }}>
+                    After making the payment, click <strong style={{ color: '#fff' }}>I Paid</strong>. To stop this payment, click <strong style={{ color: '#fff' }}>Cancel</strong>.
+                  </p>
+                </div>
+              </div>
+            ) : (
             <div className="invoice-container" style={{ animation: 'fade-in 0.3s ease-out' }}>
               <div className="recorded-toast-banner" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1.25rem', background: '#d1fae5', border: '1px solid #10b981', color: '#065f46', borderRadius: '12px', fontSize: '0.8rem', marginBottom: '1.25rem', fontWeight: '500' }}>
                 <span><i className="fa-solid fa-circle-check"></i> Deposit recorded. Use the tag shown below to send your payment.</span>
@@ -1777,46 +1977,8 @@ export default function UserLobby({
                     <span>Don't forget to write the Payment Note Code in the note while sending payment.</span>
                   </div>
 
-                  {activeInvoice.gateway?.redirectUrl ? (
-                    <div style={{ marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const payUrl = buildGatewayRedirectUrl(
-                            activeInvoice.gateway,
-                            activeInvoice.amount,
-                            activeInvoice.noteCode
-                          );
-                          if (!payUrl) {
-                            showToast('Payment link is not configured. Contact support.', 'error');
-                            return;
-                          }
-                          openGatewayPaymentLink(payUrl);
-                        }}
-                        className="submit-btn"
-                        style={{
-                          marginTop: 0,
-                          background: activeInvoice.gateway.theme === 'stripe' ? '#635bff' : '#00d632',
-                          color: activeInvoice.gateway.theme === 'stripe' ? '#fff' : '#000',
-                          boxShadow: 'none',
-                          padding: '0.9rem 1rem'
-                        }}
-                      >
-                        <span style={{ fontSize: '0.9rem', fontWeight: '900' }}>
-                          {activeInvoice.gateway.theme === 'stripe'
-                            ? `Pay with ${activeInvoice.gateway.name}`
-                            : `💵 Pay with ${activeInvoice.gateway.name}`}
-                        </span>
-                      </button>
-                      <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0, textAlign: 'center' }}>
-                        Waiting for payment confirmation… After paying, upload screenshot and tap I HAVE PAID.
-                      </p>
-                    </div>
-                  ) : null}
-
                   <div className="tag-details-box" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
 
-                    {/* Copy actions styled with blue copy icon - NO COPY TEXT */}
                     <div className="tag-field-row" style={{ background: '#0b0c16', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
                         <span style={{ fontSize: '0.55rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.15rem' }}>PAYMENT TAG ({activeInvoice.gateway.name})</span>
@@ -1859,7 +2021,6 @@ export default function UserLobby({
                       <strong style={{ fontSize: '1rem', color: '#eab308', fontFamily: 'var(--font-heading)' }}>{formatTimer(activeInvoice.timeRemaining)}</strong>
                     </div>
 
-                    {/* Screenshot Receipt uploader */}
                     <div className="tag-field-row" style={{ background: '#0b0c16', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.5rem' }}>
                       <label htmlFor="screenshot-receipt" style={{ fontSize: '0.55rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                         Upload Payment Screenshot (Required)
@@ -1902,7 +2063,6 @@ export default function UserLobby({
                   </div>
                 </div>
 
-                {/* Right QR card - ALWAYS loads image tag (No Fallback) */}
                 <div className="invoice-card" style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                   <div className="qr-container" style={{ background: '#fff', padding: '0.5rem', borderRadius: '14px', marginBottom: '1rem', width: '220px', height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                     <img
@@ -1917,6 +2077,7 @@ export default function UserLobby({
                 </div>
               </div>
             </div>
+            )
           ) : (
 
             /* NORMAL ACCOUNT VIEWS */
