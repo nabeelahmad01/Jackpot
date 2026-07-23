@@ -7,6 +7,10 @@ export default function SupportTab({ adminUser }) {
   const [chatSearch, setChatSearch] = useState('');
   const [activeChatEmail, setActiveChatEmail] = useState(null);
   const [adminReplyText, setAdminReplyText] = useState('');
+  const [adminAttachment, setAdminAttachment] = useState('');
+  const [playerHits, setPlayerHits] = useState([]);
+  const [playerSearchLoading, setPlayerSearchLoading] = useState(false);
+  const [openedPlayers, setOpenedPlayers] = useState({}); // email -> { email, name }
   const chatEndRef = useRef(null);
 
   const distQueryParam = adminUser?.distributorId ? `&adminDistributorId=${adminUser.distributorId}` : '';
@@ -26,6 +30,58 @@ export default function SupportTab({ adminUser }) {
     activeChatEmail ? `/api/support?email=${encodeURIComponent(activeChatEmail)}${distQueryParam}` : null,
     POLL.CHAT
   );
+
+  // Search registered players by Gmail/name so staff can message before player texts first
+  useEffect(() => {
+    const q = chatSearch.trim();
+    if (q.length < 2) {
+      setPlayerHits([]);
+      setPlayerSearchLoading(false);
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    setPlayerSearchLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const distParam = adminUser?.distributorId
+          ? `&adminDistributorId=${encodeURIComponent(adminUser.distributorId)}`
+          : '';
+        const res = await fetch(
+          `/api/users?search=${encodeURIComponent(q)}&limit=8&page=1${distParam}`,
+          { signal: controller.signal }
+        );
+        const data = await res.json();
+        if (!data.success) {
+          setPlayerHits([]);
+          return;
+        }
+        const hits = (data.users || [])
+          .filter((u) => {
+            const role = String(u.role || 'user').toLowerCase();
+            return !role || role === 'user';
+          })
+          .map((u) => ({
+            email: String(u.email || '').toLowerCase().trim(),
+            name: (u.name || '').trim() || String(u.email || '').split('@')[0]
+          }))
+          .filter((u) => u.email);
+        setPlayerHits(hits);
+      } catch (err) {
+        if (err?.name !== 'AbortError') {
+          console.error('Support player search failed:', err);
+          setPlayerHits([]);
+        }
+      } finally {
+        setPlayerSearchLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [chatSearch, adminUser?.distributorId]);
 
   const allMessages = convData?.messages || [];
   const activeChatMessages = activeChatData?.messages || [];
@@ -75,10 +131,24 @@ export default function SupportTab({ adminUser }) {
     }
   });
 
+  // Keep manually opened registered players in the list even before first message
+  Object.values(openedPlayers).forEach((p) => {
+    const email = (p.email || '').toLowerCase();
+    if (!email || groups[email]) return;
+    groups[email] = {
+      email: p.email,
+      name: p.name,
+      lastMessage: 'No messages yet — start the chat',
+      timestamp: p.openedAt || new Date().toISOString(),
+      unread: false,
+      isNewThread: true
+    };
+  });
+
   const conversations = Object.values(groups)
     .map((c) => ({
       ...c,
-      name: resolveDisplayName(c.email, c.name)
+      name: resolveDisplayName(c.email, c.name || openedPlayers[c.email?.toLowerCase()]?.name)
     }))
     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   const filteredConversations = conversations.filter(
@@ -91,11 +161,30 @@ export default function SupportTab({ adminUser }) {
     ? resolveDisplayName(
         activeChatEmail,
         activeChatData?.playerName ||
+          openedPlayers[activeChatEmail.toLowerCase()]?.name ||
           conversations.find((c) => c.email.toLowerCase() === activeChatEmail.toLowerCase())?.name ||
           activeChatMessages.find((m) => m.playerName)?.playerName ||
           activeChatMessages.find((m) => m.senderType === 'player' && m.userName)?.userName
       )
     : '';
+
+  const openPlayerChat = (player) => {
+    const email = String(player.email || '').toLowerCase().trim();
+    if (!email) return;
+    setOpenedPlayers((prev) => ({
+      ...prev,
+      [email]: {
+        email,
+        name: resolveDisplayName(email, player.name),
+        openedAt: new Date().toISOString()
+      }
+    }));
+    setActiveChatEmail(email);
+    setChatSearch('');
+    setPlayerHits([]);
+    setAdminReplyText('');
+    setAdminAttachment('');
+  };
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -119,8 +208,6 @@ export default function SupportTab({ adminUser }) {
 
     markAsRead();
   }, [activeChatEmail, activeChatMessages.length, mutateConversations]);
-
-  const [adminAttachment, setAdminAttachment] = useState('');
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -168,7 +255,7 @@ export default function SupportTab({ adminUser }) {
     };
 
     mutateActiveChat(
-      { success: true, messages: [...activeChatMessages, tempMessage] },
+      { success: true, messages: [...activeChatMessages, tempMessage], playerName: activeChatDisplayName },
       false
     );
 
@@ -205,12 +292,74 @@ export default function SupportTab({ adminUser }) {
           <div className="input-wrapper search-wrapper" style={{ background: '#0b0d16', padding: '0.35rem 0.75rem' }}>
             <input
               type="text"
-              placeholder="Search chats..."
+              placeholder="Search chats or player Gmail..."
               value={chatSearch}
               onChange={(e) => setChatSearch(e.target.value)}
               style={{ fontSize: '0.75rem' }}
             />
           </div>
+          <p style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: '0.4rem', lineHeight: 1.35 }}>
+            Search a registered player&apos;s Gmail to message them even if they never opened support.
+          </p>
+
+          {(playerSearchLoading || playerHits.length > 0 || chatSearch.trim().length >= 2) && chatSearch.trim().length >= 2 && (
+            <div
+              style={{
+                marginTop: '0.5rem',
+                background: '#070912',
+                border: '1px solid rgba(255,215,0,0.18)',
+                borderRadius: '10px',
+                overflow: 'hidden'
+              }}
+            >
+              <div
+                style={{
+                  padding: '0.4rem 0.65rem',
+                  fontSize: '0.62rem',
+                  fontWeight: 700,
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                  color: 'var(--gold-primary)',
+                  borderBottom: '1px solid rgba(255,255,255,0.06)'
+                }}
+              >
+                Registered players
+              </div>
+              {playerSearchLoading && playerHits.length === 0 ? (
+                <p style={{ fontSize: '0.7rem', opacity: 0.55, padding: '0.65rem', margin: 0 }}>Searching...</p>
+              ) : playerHits.length > 0 ? (
+                playerHits.map((p) => (
+                  <button
+                    key={p.email}
+                    type="button"
+                    onClick={() => openPlayerChat(p)}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      background: 'transparent',
+                      border: 'none',
+                      borderBottom: '1px solid rgba(255,255,255,0.04)',
+                      padding: '0.65rem 0.75rem',
+                      cursor: 'pointer',
+                      color: '#fff'
+                    }}
+                  >
+                    <strong style={{ display: 'block', fontSize: '0.75rem' }}>{p.name}</strong>
+                    <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                      {p.email}
+                    </span>
+                    <span style={{ display: 'inline-block', marginTop: '0.35rem', fontSize: '0.6rem', color: '#86efac', fontWeight: 700 }}>
+                      Message player →
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <p style={{ fontSize: '0.7rem', opacity: 0.55, padding: '0.65rem', margin: 0 }}>
+                  No registered player found for that search.
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem', minHeight: 0 }}>
@@ -278,18 +427,18 @@ export default function SupportTab({ adminUser }) {
               >
                 <i className="fa-solid fa-chevron-left"></i> Chats
               </button>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: 0 }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(255,215,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-primary)', border: '1px solid rgba(255,215,0,0.2)', flexShrink: 0 }}>
-                  <i className="fa-solid fa-user" style={{ fontSize: '1.1rem' }}></i>
+              <div className="support-chat-player-meta" style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flex: 1, minWidth: 0 }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,215,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-primary)', border: '1px solid rgba(255,215,0,0.2)', flexShrink: 0 }}>
+                  <i className="fa-solid fa-user" style={{ fontSize: '1rem' }}></i>
                 </div>
-                <div style={{ minWidth: 0 }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
                   <h4 style={{ fontSize: '0.85rem', color: '#fff', fontWeight: 'bold', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {activeChatDisplayName}
                   </h4>
                   <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {activeChatEmail}
                   </span>
-                  <span style={{ fontSize: '0.65rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  <span className="support-chat-player-status">
                     <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }}></span> Active Live Chat Support
                   </span>
                 </div>
@@ -304,48 +453,57 @@ export default function SupportTab({ adminUser }) {
             </div>
 
             <div className="support-chat-messages">
-              {activeChatMessages.map((msg) => {
-                const isMe = msg.senderType === 'admin';
-                return (
-                  <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
-                    <div style={{
-                      background: isMe ? 'var(--gold-primary)' : 'rgba(255,255,255,0.08)',
-                      color: isMe ? '#000' : '#fff',
-                      padding: '0.55rem 0.8rem',
-                      borderRadius: '12px',
-                      borderBottomRightRadius: isMe ? '2px' : '12px',
-                      borderBottomLeftRadius: isMe ? '12px' : '2px',
-                      fontSize: '0.8rem',
-                      maxWidth: 'min(75%, 100%)',
-                      fontWeight: isMe ? '600' : 'normal',
-                      wordBreak: 'break-word'
-                    }}>
-                      {msg.message}
-                      {msg.attachment && (
-                        <div style={{ marginTop: '0.5rem' }}>
-                          <img
-                            src={msg.attachment}
-                            alt="User Attachment"
-                            style={{
-                              maxWidth: '100%',
-                              maxHeight: '180px',
-                              borderRadius: '6px',
-                              cursor: 'zoom-in',
-                              border: '1px solid rgba(255,255,255,0.1)',
-                              display: 'block'
-                            }}
-                            onClick={() => window.open(msg.attachment, '_blank')}
-                            title="Click to view full-size image proof"
-                          />
-                        </div>
-                      )}
+              {activeChatMessages.length === 0 ? (
+                <div style={{ margin: 'auto', textAlign: 'center', opacity: 0.55, padding: '1.25rem', maxWidth: '280px' }}>
+                  <i className="fa-solid fa-paper-plane" style={{ fontSize: '1.6rem', color: 'var(--gold-primary)', display: 'block', marginBottom: '0.55rem' }}></i>
+                  <p style={{ fontSize: '0.8rem', margin: 0, lineHeight: 1.4 }}>
+                    No messages yet with <strong style={{ color: '#fff' }}>{activeChatDisplayName}</strong>. Send the first message below.
+                  </p>
+                </div>
+              ) : (
+                activeChatMessages.map((msg) => {
+                  const isMe = msg.senderType === 'admin';
+                  return (
+                    <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
+                      <div style={{
+                        background: isMe ? 'var(--gold-primary)' : 'rgba(255,255,255,0.08)',
+                        color: isMe ? '#000' : '#fff',
+                        padding: '0.55rem 0.8rem',
+                        borderRadius: '12px',
+                        borderBottomRightRadius: isMe ? '2px' : '12px',
+                        borderBottomLeftRadius: isMe ? '12px' : '2px',
+                        fontSize: '0.8rem',
+                        maxWidth: 'min(75%, 100%)',
+                        fontWeight: isMe ? '600' : 'normal',
+                        wordBreak: 'break-word'
+                      }}>
+                        {msg.message}
+                        {msg.attachment && (
+                          <div style={{ marginTop: '0.5rem' }}>
+                            <img
+                              src={msg.attachment}
+                              alt="User Attachment"
+                              style={{
+                                maxWidth: '100%',
+                                maxHeight: '180px',
+                                borderRadius: '6px',
+                                cursor: 'zoom-in',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                display: 'block'
+                              }}
+                              onClick={() => window.open(msg.attachment, '_blank')}
+                              title="Click to view full-size image proof"
+                            />
+                          </div>
+                        )}
+                      </div>
+                      <span style={{ fontSize: '0.55rem', opacity: 0.5, marginTop: '0.15rem' }}>
+                        {isMe ? 'You (Agent)' : (msg.userName && !/^support\s*agent$/i.test(msg.userName) ? msg.userName : activeChatDisplayName || 'Player')} • {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
                     </div>
-                    <span style={{ fontSize: '0.55rem', opacity: 0.5, marginTop: '0.15rem' }}>
-                      {isMe ? 'You (Agent)' : (msg.userName && !/^support\s*agent$/i.test(msg.userName) ? msg.userName : activeChatDisplayName || 'Player')} • {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
               <div ref={chatEndRef} />
             </div>
 
@@ -423,7 +581,7 @@ export default function SupportTab({ adminUser }) {
 
                     <input
                       type="text"
-                      placeholder="Type reply to player..."
+                      placeholder={activeChatMessages.length === 0 ? 'Write first message to player...' : 'Type reply to player...'}
                       value={adminReplyText}
                       onChange={(e) => setAdminReplyText(e.target.value)}
                       style={{
@@ -440,7 +598,7 @@ export default function SupportTab({ adminUser }) {
                       required={!adminAttachment}
                     />
                     <button type="submit" className="submit-btn" style={{ margin: 0, padding: '0.65rem 1.25rem', width: 'auto', background: 'linear-gradient(135deg, #ffd700 0%, #cca000 100%)', color: '#000', fontWeight: 'bold', flexShrink: 0 }}>
-                      Reply
+                      {activeChatMessages.length === 0 ? 'Send' : 'Reply'}
                     </button>
                   </div>
                 );
@@ -450,7 +608,7 @@ export default function SupportTab({ adminUser }) {
         ) : (
           <div style={{ margin: 'auto', textAlign: 'center', opacity: 0.5, padding: '1rem' }}>
             <i className="fa-solid fa-headset" style={{ fontSize: '3rem', color: 'var(--gold-primary)', display: 'block', marginBottom: '0.5rem' }}></i>
-            <p style={{ fontSize: '0.85rem' }}>Select a conversation from the sidebar to text live with players.</p>
+            <p style={{ fontSize: '0.85rem' }}>Select a conversation or search a player Gmail to start chatting.</p>
           </div>
         )}
       </div>

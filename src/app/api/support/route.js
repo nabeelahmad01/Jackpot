@@ -26,11 +26,29 @@ export async function GET(req) {
     }
 
     if (email) {
-      // Return full conversation history for a specific player (usually small, but paginated/limited to protect DB)
+      // Return full conversation history for a specific player
       const skip = (page - 1) * limit;
       const emailKey = email.toLowerCase().trim();
+
+      // Distributor may open a chat even if the player never messaged yet
+      if (adminDistributorId) {
+        const owner = await db.collection('users').findOne(
+          { email: emailKey },
+          { projection: { email: 1, name: 1, distributorId: 1, role: 1 } }
+        );
+        if (!owner || owner.distributorId !== adminDistributorId || (owner.role && owner.role !== 'user')) {
+          return NextResponse.json({
+            success: false,
+            message: 'Player not found under your distributor account.',
+            messages: [],
+            playerName: ''
+          }, { status: 404 });
+        }
+      }
+
+      // Full thread by email (do not require distributorId on each message)
       const messages = await supportCollection
-        .find({ ...baseQuery, userEmail: emailKey })
+        .find({ userEmail: emailKey })
         .sort({ timestamp: 1 })
         .skip(skip)
         .limit(limit)

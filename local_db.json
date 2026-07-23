@@ -5,7 +5,7 @@
       "email": "admin@jackpot.com",
       "password": "admin123",
       "role": "admin",
-      "lastActive": "2026-07-13T11:37:12.561Z"
+      "lastActive": "2026-07-23T02:37:09.416Z"
     },
     {
       "name": "Demo Player",
@@ -248,10 +248,86 @@
         }
       ],
       "proofScreenshots": [],
-      "_id": "zyanmqd2326"
+      "_id": "zyanmqd2326",
+      "loginBgUrl": "/jackpot_royals_bg.png",
+      "androidAppUrl": "/downloads/jackpot-royals.apk",
+      "iosAppUrl": "",
+      "getAppEnabled": false,
+      "lobbyHeroSideImage": "/lobby-app-download-promo.png",
+      "lobbyHeroSideImageAlt": "Download mobile app and get $3 freeplay",
+      "lobbyHeroSideEnabled": true,
+      "lobbyCashoutTrustItems": [
+        {
+          "icon": "fa-shield-halved",
+          "title": "100% SECURE",
+          "description": "Your data is always protected"
+        },
+        {
+          "icon": "fa-circle-check",
+          "title": "FAIR PLAY",
+          "description": "Provably fair and transparent"
+        },
+        {
+          "icon": "fa-bolt",
+          "title": "INSTANT WITHDRAWALS",
+          "description": "Get your winnings instantly"
+        },
+        {
+          "icon": "fa-headset",
+          "title": "24/7 SUPPORT",
+          "description": "Always here to help you"
+        }
+      ],
+      "infoPageEnabled": true,
+      "infoShowOnAuth": true,
+      "infoShowOnLobby": true,
+      "infoTagline": "PLAY SMARTER. CASHOUT FASTER.",
+      "infoLead": "Official channels for updates, community, and player support. Reach us anytime — we're here to help you win big.",
+      "infoSupportNote": "For account help, deposits, or withdrawals, email support and our team will get back to you.",
+      "infoInstagramEnabled": true,
+      "infoInstagramLabel": "Instagram",
+      "infoInstagramHandle": "@jackpotroyals_casino",
+      "infoInstagramUrl": "https://www.instagram.com/jackpotroyals_casino?igsh=dnZjNmNwdmNzazN6",
+      "infoTelegramEnabled": true,
+      "infoTelegramLabel": "Telegram",
+      "infoTelegramHandle": "t.me/Jackpotroyals_casino",
+      "infoTelegramUrl": "https://t.me/Jackpotroyals_casino",
+      "infoFacebookEnabled": true,
+      "infoFacebookLabel": "Facebook",
+      "infoFacebookHandle": "Jackpot Royals",
+      "infoFacebookUrl": "https://www.facebook.com/share/1KgG9SdC5N/",
+      "infoWhatsappEnabled": true,
+      "infoWhatsappLabel": "WhatsApp",
+      "infoWhatsappHandle": "+1 929 630 8553",
+      "infoWhatsappUrl": "https://wa.me/19296308553",
+      "infoEmailEnabled": true,
+      "infoEmailLabel": "Email Support",
+      "infoEmailHandle": "support@jackpotroyals.com",
+      "infoEmailUrl": "mailto:support@jackpotroyals.com"
     }
   ],
   "coinsNotifications": [],
   "pendingReferrals": [],
-  "distributors": []
+  "distributors": [],
+  "pushSubscriptions": [
+    {
+      "endpoint": "https://fcm.googleapis.com/fcm/send/dYvLw8FFHIA:APA91bHguS6CmdTyqEYYPm_fG2cspdOLj4CJsRl_SPT7YlktS1W-0liA1JSErsJTEUWIagSSb7Meo-R6jI_Gc7d7Esd7AWQ0L5OYm6nl7WHMdGGMVw4lVfHrzmlHhFMJun1vfZt16NmR",
+      "userEmail": "admin@jackpot.com",
+      "audience": "staff",
+      "type": "web",
+      "platform": "web",
+      "subscription": {
+        "endpoint": "https://fcm.googleapis.com/fcm/send/dYvLw8FFHIA:APA91bHguS6CmdTyqEYYPm_fG2cspdOLj4CJsRl_SPT7YlktS1W-0liA1JSErsJTEUWIagSSb7Meo-R6jI_Gc7d7Esd7AWQ0L5OYm6nl7WHMdGGMVw4lVfHrzmlHhFMJun1vfZt16NmR",
+        "expirationTime": null,
+        "keys": {
+          "p256dh": "BFp6jKwt2JVMQ4PGw4RQ3uzcrYewrcOMy_vx_ouCw8u7mKVfqp8u2CjTSHUec--9pgwH04OgdCU1PG2emEA-cn4",
+          "auth": "V7EPiF7i7GEUs8DVbn8k_Q"
+        }
+      },
+      "nativeToken": null,
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
+      "updatedAt": "2026-07-23T02:36:33.544Z",
+      "_id": "rbbicw67095"
+    }
+  ]
 }
