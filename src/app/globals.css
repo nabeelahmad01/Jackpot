@@ -2169,6 +2169,28 @@ select option {
   z-index: 999;
 }
 
+/* Deposit invoice: lift SUPPORT above Cancel / I HAVE PAID so both stay tappable. */
+.support-chat-widget.support-chat-widget--deposit {
+  bottom: calc(108px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (max-width: 768px) {
+  .support-chat-widget.support-chat-widget--deposit {
+    bottom: calc(118px + env(safe-area-inset-bottom, 0px));
+    right: calc(14px + env(safe-area-inset-right, 0px));
+  }
+
+  .support-chat-widget.support-chat-widget--deposit .chat-widget-tooltip {
+    display: none; /* tip was covering the green button on small screens */
+  }
+
+  .invoice-actions-row {
+    position: relative;
+    z-index: 2;
+    margin-bottom: 0.25rem;
+  }
+}
+
 .chat-widget-bubble {
   position: relative;
   cursor: pointer;

@@ -1916,7 +1916,7 @@ export default function UserLobby({
                     )}
                   </div>
 
-                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <div className="invoice-actions-row" style={{ display: 'flex', gap: '0.75rem' }}>
                     <button
                       type="button"
                       onClick={handleCancelInvoice}
@@ -2049,7 +2049,7 @@ export default function UserLobby({
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+                  <div className="invoice-actions-row" style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
                     <button onClick={handleCancelInvoice} className="submit-btn" style={{ background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)', flex: 1, marginTop: 0 }}>
                       <span style={{ fontSize: '0.8rem', fontWeight: '900' }}>CANCEL DEPOSIT</span>
                     </button>
@@ -3084,8 +3084,11 @@ export default function UserLobby({
         />
       )}
 
-      {/* Floating support */}
-      <div className="support-chat-widget" onClick={onOpenSupport}>
+      {/* Floating support — move aside during deposit invoice so I HAVE PAID stays tappable */}
+      <div
+        className={`support-chat-widget${activeInvoice ? ' support-chat-widget--deposit' : ''}`}
+        onClick={onOpenSupport}
+      >
         <div className="chat-widget-bubble">
           <div className="chat-widget-tooltip">
             <span>Need help with deposit?</span>
