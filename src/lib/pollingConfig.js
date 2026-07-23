@@ -1,10 +1,11 @@
-// Real-time polling — fast enough for cross-screen approve/notify flow
+// Real-time polling — keep ops queues snappy for coins / shift staff
 export const POLL = {
-  STATS: 3000,
-  QUEUES: 2000,
-  LISTS: 4000,
-  SUPPORT: 2500,
-  CHAT: 2000,
+  LIVE: 1000,   // Shift dashboard + coins allotment (near real-time)
+  STATS: 1500,  // Sidebar badges + sound / desktop alerts
+  QUEUES: 1500, // Requests, ledger, deposits
+  LISTS: 3000,
+  SUPPORT: 2000,
+  CHAT: 1500,
   PLAYER: 4000,
   STATIC: 0
 };
@@ -13,7 +14,7 @@ export function getPollingOptions(intervalMs, overrides = {}) {
   return {
     refreshInterval: intervalMs,
     revalidateOnFocus: true,
-    dedupingInterval: intervalMs > 0 ? Math.min(2000, Math.floor(intervalMs / 2)) : 5000,
+    dedupingInterval: intervalMs > 0 ? Math.min(800, Math.floor(intervalMs / 2)) : 5000,
     ...overrides
   };
 }

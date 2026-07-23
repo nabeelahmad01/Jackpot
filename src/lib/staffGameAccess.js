@@ -1,3 +1,5 @@
+import { cache } from './cache';
+
 export function parseRoles(role) {
   return (role || '').toLowerCase().split(',').map((r) => r.trim()).filter(Boolean);
 }
@@ -14,16 +16,37 @@ export function isFullAccessRole(role) {
 export async function getStaffAllowedGameTitles(db, adminEmail) {
   if (!adminEmail) return null;
 
-  const staff = await db.collection('users').findOne({ email: adminEmail.toLowerCase().trim() });
-  if (!staff) return null;
-  if (isFullAccessRole(staff.role)) return null;
-  if (!isCoinsAdminRole(staff.role)) return null;
+  const cacheKey = `staff_games_${String(adminEmail).toLowerCase().trim()}`;
+  const cached = cache.get(cacheKey);
+  if (cached !== null && cached !== undefined) return cached;
+
+  const staff = await db.collection('users').findOne(
+    { email: adminEmail.toLowerCase().trim() },
+    { projection: { role: 1, allowedGameIds: 1 } }
+  );
+  if (!staff) {
+    cache.set(cacheKey, null, 60);
+    return null;
+  }
+  if (isFullAccessRole(staff.role)) {
+    cache.set(cacheKey, null, 120);
+    return null;
+  }
+  if (!isCoinsAdminRole(staff.role)) {
+    cache.set(cacheKey, null, 120);
+    return null;
+  }
 
   const allowedIds = Array.isArray(staff.allowedGameIds) ? staff.allowedGameIds.map(String) : [];
-  if (allowedIds.length === 0) return null;
+  if (allowedIds.length === 0) {
+    cache.set(cacheKey, null, 60);
+    return null;
+  }
 
-  const games = await db.collection('games').find({}).toArray();
-  return games.filter((g) => allowedIds.includes(String(g.id))).map((g) => g.title).filter(Boolean);
+  const games = await db.collection('games').find({}).project({ id: 1, title: 1 }).toArray();
+  const titles = games.filter((g) => allowedIds.includes(String(g.id))).map((g) => g.title).filter(Boolean);
+  cache.set(cacheKey, titles, 60);
+  return titles;
 }
 
 export async function applyStaffGameFilter(db, query, adminEmail) {

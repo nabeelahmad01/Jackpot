@@ -27,10 +27,11 @@ export default function CoinsAllotmentTab({
     return () => clearTimeout(handler);
   }, [search]);
 
-  // SWR automatically polls every 4s for coin allotments
+  // Pending allotments only — completed rows were flooding limit=50 and hiding live work
   const { data, error, mutate } = usePollingSWR(
-    `/api/coins-notifications?page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
-    POLL.QUEUES
+    `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED&page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
+    POLL.LIVE,
+    { refreshWhenHidden: true }
   );
 
   const notifications = (data?.coinsNotifications || []).filter((n) => !completedActionIds[n.id]);

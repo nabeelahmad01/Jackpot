@@ -232,12 +232,14 @@ export default function DistributorPortal() {
   // Pending queue counts for sidebar badges (status-filtered, use total from API)
   const { data: pendingRequestsData, mutate: mutatePendingRequests } = usePollingSWR(
     distId && distSession?.type === 'B' ? `/api/account-requests?status=PENDING&page=1&limit=1&adminRole=distributor&adminDistributorId=${distId}&adminEmail=${encodeURIComponent(staffAdminEmail)}` : null,
-    POLL.QUEUES
+    POLL.LIVE,
+    { refreshWhenHidden: true }
   );
 
   const { data: pendingCoinsData, mutate: mutatePendingCoins } = usePollingSWR(
     distId && distSession?.type === 'B' ? `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED&page=1&limit=1&adminRole=distributor&adminDistributorId=${distId}&adminEmail=${encodeURIComponent(staffAdminEmail)}` : null,
-    POLL.QUEUES
+    POLL.LIVE,
+    { refreshWhenHidden: true }
   );
 
   const pendingAccountRequestsCount = pendingRequestsData?.totalRequests || 0;

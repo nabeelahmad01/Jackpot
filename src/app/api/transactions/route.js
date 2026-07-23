@@ -52,8 +52,7 @@ export async function GET(req) {
     if (adminDistributorId) {
       query.distributorId = adminDistributorId;
     } else if (!email) {
-      const exclusion = await typeBExclusionFilter(db);
-      query = Object.keys(query).length ? { $and: [query, exclusion] } : exclusion;
+      Object.assign(query, await typeBExclusionFilter(db));
     }
     if (status) {
       const statuses = status.split(',').map(s => s.toUpperCase().trim());

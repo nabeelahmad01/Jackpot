@@ -24,16 +24,15 @@ export async function isTypeBDistributor(db, distributorId) {
 
 /**
  * Mongo filter that hides Type B distributor traffic from global HQ admin views.
- * - distributorType !== 'B' (covers tagged docs even if distributorId was empty)
- * - distributorId not in Type B id list
+ * Flat fields (not nested $and) so status indexes can still be used.
  */
 export async function typeBExclusionFilter(db) {
   const typeBDistIds = await getTypeBDistributorIds(db);
-  const parts = [{ distributorType: { $ne: 'B' } }];
+  const filter = { distributorType: { $ne: 'B' } };
   if (typeBDistIds.length > 0) {
-    parts.push({ distributorId: { $nin: typeBDistIds } });
+    filter.distributorId = { $nin: typeBDistIds };
   }
-  return parts.length === 1 ? parts[0] : { $and: parts };
+  return filter;
 }
 
 export function invalidateTypeBDistributorCache() {

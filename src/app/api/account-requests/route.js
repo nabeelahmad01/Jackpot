@@ -43,9 +43,9 @@ export async function GET(req) {
       if (adminDistributorId) {
         query.distributorId = adminDistributorId;
       } else if (!email) {
-        typeBDistIds = await getTypeBDistributorIds(db);
         const exclusion = await typeBExclusionFilter(db);
-        query = Object.keys(query).length ? { $and: [query, exclusion] } : exclusion;
+        typeBDistIds = await getTypeBDistributorIds(db);
+        Object.assign(query, exclusion);
       }
 
       let requestQuery = { ...query };
@@ -59,7 +59,33 @@ export async function GET(req) {
         requestQuery = await applyStaffGameFilter(db, requestQuery, adminEmail);
       }
 
-      const realRequestsRaw = await requestsCollection.find(requestQuery).toArray();
+      // Fast path for Shift Dashboard: PENDING-only — limit in Mongo, skip heavy READY synthetics
+      const pendingOnlyFastPath = wantPending && !wantReady && statuses.length === 1 && statuses[0] === 'PENDING';
+
+      let realRequestsRaw;
+      if (pendingOnlyFastPath) {
+        const fetchLimit = Math.min(Math.max(limit * 3, 50), 150);
+        realRequestsRaw = await requestsCollection
+          .find(requestQuery)
+          .project({
+            id: 1,
+            gameTitle: 1,
+            userEmail: 1,
+            status: 1,
+            date: 1,
+            createdAt: 1,
+            distributorId: 1,
+            distributorType: 1,
+            distributorName: 1,
+            gameAccountUsername: 1,
+            userName: 1
+          })
+          .sort({ createdAt: -1, id: -1 })
+          .limit(fetchLimit)
+          .toArray();
+      } else {
+        realRequestsRaw = await requestsCollection.find(requestQuery).toArray();
+      }
 
       // Collapse multi-tap PENDING duplicates (same player + same game) — keep newest
       const pendingDupIds = [];
@@ -77,7 +103,7 @@ export async function GET(req) {
           return true;
         });
 
-      if (pendingDupIds.length > 0) {
+      if (pendingDupIds.length > 0 && !pendingOnlyFastPath) {
         await requestsCollection.updateMany(
           { id: { $in: pendingDupIds } },
           {
@@ -89,6 +115,20 @@ export async function GET(req) {
           }
         );
         cache.del('admin_stats');
+      } else if (pendingDupIds.length > 0) {
+        // Don't block Shift Dashboard polls — close duplicates in background
+        Promise.resolve().then(() =>
+          requestsCollection.updateMany(
+            { id: { $in: pendingDupIds } },
+            {
+              $set: {
+                status: 'REJECTED',
+                rejectionReason: 'Duplicate request (auto-closed)',
+                processedBy: 'system'
+              }
+            }
+          ).catch(() => {})
+        );
       }
 
       // Build synthetic READY rows from gameAccounts when READY is requested
@@ -180,37 +220,58 @@ export async function GET(req) {
       let enrichedRequests = [];
       if (requests.length > 0) {
         const uniqueEmails = Array.from(new Set(requests.map(r => r.userEmail.toLowerCase().trim())));
-        const [gameAccounts, userDocs] = await Promise.all([
-          db.collection('gameAccounts').find({ userEmail: { $in: uniqueEmails } }).toArray(),
-          db.collection('users').find({ email: { $in: uniqueEmails } }).project({ email: 1, name: 1 }).toArray()
-        ]);
 
-        const accountsByEmail = {};
-        gameAccounts.forEach(acc => {
-          const emailKey = acc.userEmail.toLowerCase().trim();
-          if (!accountsByEmail[emailKey]) {
-            accountsByEmail[emailKey] = [];
-          }
-          accountsByEmail[emailKey].push({
-            gameTitle: acc.gameTitle,
-            username: acc.username,
-            status: acc.status || 'READY'
+        if (pendingOnlyFastPath) {
+          // Shift dashboard only needs player names — skip loading all gameAccounts
+          const userDocs = await db.collection('users')
+            .find({ email: { $in: uniqueEmails } })
+            .project({ email: 1, name: 1 })
+            .toArray();
+          const nameByEmail = {};
+          userDocs.forEach((u) => {
+            if (u.email) nameByEmail[u.email.toLowerCase().trim()] = u.name || '';
           });
-        });
+          enrichedRequests = requests.map((r) => {
+            const emailKey = r.userEmail.toLowerCase().trim();
+            return {
+              ...r,
+              userName: nameByEmail[emailKey] || r.userName || '',
+              existingAccounts: []
+            };
+          });
+        } else {
+          const [gameAccounts, userDocs] = await Promise.all([
+            db.collection('gameAccounts').find({ userEmail: { $in: uniqueEmails } }).toArray(),
+            db.collection('users').find({ email: { $in: uniqueEmails } }).project({ email: 1, name: 1 }).toArray()
+          ]);
 
-        const nameByEmail = {};
-        userDocs.forEach((u) => {
-          if (u.email) nameByEmail[u.email.toLowerCase().trim()] = u.name || '';
-        });
+          const accountsByEmail = {};
+          gameAccounts.forEach(acc => {
+            const emailKey = acc.userEmail.toLowerCase().trim();
+            if (!accountsByEmail[emailKey]) {
+              accountsByEmail[emailKey] = [];
+            }
+            accountsByEmail[emailKey].push({
+              gameTitle: acc.gameTitle,
+              username: acc.username,
+              status: acc.status || 'READY'
+            });
+          });
 
-        enrichedRequests = requests.map(r => {
-          const emailKey = r.userEmail.toLowerCase().trim();
-          return {
-            ...r,
-            userName: nameByEmail[emailKey] || r.userName || '',
-            existingAccounts: accountsByEmail[emailKey] || []
-          };
-        });
+          const nameByEmail = {};
+          userDocs.forEach((u) => {
+            if (u.email) nameByEmail[u.email.toLowerCase().trim()] = u.name || '';
+          });
+
+          enrichedRequests = requests.map(r => {
+            const emailKey = r.userEmail.toLowerCase().trim();
+            return {
+              ...r,
+              userName: nameByEmail[emailKey] || r.userName || '',
+              existingAccounts: accountsByEmail[emailKey] || []
+            };
+          });
+        }
       }
 
       return NextResponse.json({
@@ -599,7 +660,8 @@ export async function POST(req) {
 // PUT (update status) request (Admin approval/rejection)
 export async function PUT(req) {
   try {
-    const { id, status, gameAccountUsername, gameAccountPassword, processedBy, rejectionReason, adminEmail } = await req.json();
+    const body = await req.json();
+    const { id, status, gameAccountUsername, gameAccountPassword, processedBy, rejectionReason, adminEmail } = body;
 
     if (!id || !status) {
       return NextResponse.json({ success: false, message: 'Request ID and status are required.' }, { status: 400 });
@@ -608,120 +670,151 @@ export async function PUT(req) {
     const db = await getDb();
     const requestsCollection = db.collection('accountRequests');
 
-    const requestDoc = await requestsCollection.findOne({ id });
+    const idStr = String(id);
+    const idCandidates = [idStr];
+    if (/^\d+$/.test(idStr)) idCandidates.push(Number(idStr));
+
+    const requestDoc = await requestsCollection.findOne(
+      idCandidates.length > 1 ? { id: { $in: idCandidates } } : { id: idStr }
+    );
     if (!requestDoc) {
       return NextResponse.json({ success: false, message: 'Account request not found.' }, { status: 404 });
     }
 
     const actorEmail = adminEmail || processedBy;
-    if (actorEmail && !(await staffCanAccessGame(db, actorEmail, requestDoc.gameTitle))) {
-      return NextResponse.json({ success: false, message: 'You do not have access to process requests for this game.' }, { status: 403 });
-    }
+    const hasCreds =
+      String(gameAccountUsername || '').trim() !== '' &&
+      String(gameAccountPassword || '').trim() !== '';
 
-    // Normalize COMPLETED -> READY when credentials are provided (distributor approve flow)
+    // Run access check in parallel with credential upsert prep
+    const accessPromise = actorEmail
+      ? staffCanAccessGame(db, actorEmail, requestDoc.gameTitle)
+      : Promise.resolve(true);
+
     let finalStatus = status;
-    if ((status === 'COMPLETED' || status === 'READY') && gameAccountUsername && gameAccountPassword) {
-      finalStatus = 'READY';
+    const cleanEmail = String(requestDoc.userEmail || '').toLowerCase().trim();
+    const cleanTitle = String(requestDoc.gameTitle || '').trim();
+    const credUser = String(gameAccountUsername || '').trim();
+    const credPass = String(gameAccountPassword || '').trim();
 
-      // Create or upsert the game account credentials (case-insensitive title)
-      const gameAccountsCollection = db.collection('gameAccounts');
-      const cleanEmail = requestDoc.userEmail.toLowerCase().trim();
-      const cleanTitle = String(requestDoc.gameTitle || '').trim();
-      const titleRegex = new RegExp(`^${cleanTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
-      const existingAcc = await gameAccountsCollection.findOne({
-        userEmail: cleanEmail,
-        gameTitle: titleRegex
-      });
-      if (existingAcc) {
-        await gameAccountsCollection.updateOne(
-          { _id: existingAcc._id },
+    const upsertPromise = (async () => {
+      if ((status === 'COMPLETED' || status === 'READY') && hasCreds) {
+        if (!cleanEmail || !cleanTitle) {
+          return { error: 'Account request is missing player email or game title.', status: 400 };
+        }
+        // Exact match first (indexed) — avoids slow case-insensitive regex on hot path
+        await db.collection('gameAccounts').updateOne(
+          { userEmail: cleanEmail, gameTitle: cleanTitle },
           {
             $set: {
               gameTitle: cleanTitle,
-              username: gameAccountUsername.trim(),
-              password: gameAccountPassword.trim(),
+              userEmail: cleanEmail,
+              username: credUser,
+              password: credPass,
               status: 'READY'
             }
-          }
+          },
+          { upsert: true }
         );
-        await gameAccountsCollection.deleteMany({
-          userEmail: cleanEmail,
-          gameTitle: titleRegex,
-          _id: { $ne: existingAcc._id }
-        });
-      } else {
-        await gameAccountsCollection.insertOne({
-          gameTitle: cleanTitle,
-          userEmail: cleanEmail,
-          username: gameAccountUsername.trim(),
-          password: gameAccountPassword.trim(),
-          status: 'READY'
-        });
+        return { finalStatus: 'READY' };
       }
+
+      if ((status === 'COMPLETED' || status === 'READY') && !hasCreds) {
+        const existingAcc = await db.collection('gameAccounts').findOne(
+          { userEmail: cleanEmail, gameTitle: cleanTitle },
+          { projection: { username: 1, password: 1 } }
+        );
+        if (!existingAcc?.username || !existingAcc?.password) {
+          return {
+            error: 'Username and password are required to approve this account request.',
+            status: 400
+          };
+        }
+        return { finalStatus: 'READY' };
+      }
+
+      return { finalStatus: status };
+    })();
+
+    const [canAccess, upsertResult] = await Promise.all([accessPromise, upsertPromise]);
+
+    if (!canAccess) {
+      return NextResponse.json({
+        success: false,
+        message: 'You do not have access to process requests for this game.'
+      }, { status: 403 });
     }
+    if (upsertResult.error) {
+      return NextResponse.json({ success: false, message: upsertResult.error }, { status: upsertResult.status || 400 });
+    }
+    finalStatus = upsertResult.finalStatus;
 
     const updateFields = { status: finalStatus };
     if (processedBy) updateFields.processedBy = processedBy;
     if (rejectionReason) updateFields.rejectionReason = rejectionReason;
-    if (gameAccountUsername) updateFields.gameAccountUsername = String(gameAccountUsername).trim();
-    if (gameAccountPassword) updateFields.gameAccountPassword = String(gameAccountPassword).trim();
-
-    await requestsCollection.updateOne({ id }, { $set: updateFields });
-
-    // Handle automated referral reward coin allotment if the account was approved (status READY)
-    if (status === 'READY' && requestDoc.referralRewardId) {
-      try {
-        const pendingReferralsCollection = db.collection('pendingReferrals');
-        const refDoc = await pendingReferralsCollection.findOne({ id: requestDoc.referralRewardId });
-        
-        if (refDoc && refDoc.status !== 'CLAIMED') {
-          // 1. Fetch the referrer's profile to extract distributorId
-          const referrerUser = await db.collection('users').findOne({ email: refDoc.referrerEmail.toLowerCase().trim() });
-          const distId = referrerUser ? (referrerUser.distributorId || '') : '';
-
-          // 2. Insert transaction record for referral bonus
-          const txId = (Date.now() + Math.floor(Math.random() * 100)).toString();
-          await db.collection('transactions').insertOne({
-            id: txId,
-            userEmail: refDoc.referrerEmail.toLowerCase().trim(),
-            date: new Date().toLocaleString(),
-            type: 'BONUS',
-            amount: Number(refDoc.rewardCoins),
-            gateway: 'REFERRAL BONUS',
-            code: 'REFERRAL',
-            status: 'SUCCESS',
-            gameTitle: requestDoc.gameTitle || 'Lobby',
-            note: `Referral reward for inviting ${refDoc.refereeEmail}`,
-            distributorId: distId
-          });
-
-          // 3. Add the allotment notification task directly for the coins manager to fulfill
-          await db.collection('coinsNotifications').insertOne({
-            id: Date.now().toString() + Math.floor(Math.random() * 100 + 1).toString(),
-            userEmail: refDoc.referrerEmail,
-            gameTitle: requestDoc.gameTitle,
-            depositAmount: 0,
-            bonusApplied: -2, // -2 indicates Referral Reward
-            totalCoins: Number(refDoc.rewardCoins),
-            status: 'PENDING',
-            read: false,
-            timestamp: new Date().toISOString(),
-            transactionId: txId,
-            distributorId: distId
-          });
-
-          // 4. Mark pendingReferrals doc as CLAIMED
-          await pendingReferralsCollection.updateOne(
-            { id: requestDoc.referralRewardId },
-            { $set: { status: 'CLAIMED', claimedAt: new Date().toISOString() } }
-          );
-        }
-      } catch (refErr) {
-        console.error('Failed to auto-allot referral bonus upon account request approval:', refErr);
-      }
+    if (hasCreds) {
+      updateFields.gameAccountUsername = credUser;
+      updateFields.gameAccountPassword = credPass;
     }
-    
-    // Invalidate stats cache
+
+    await requestsCollection.updateOne({ _id: requestDoc._id }, { $set: updateFields });
+
+    // Respond immediately — referral bonus + cache bust happen in background
+    const referralId = requestDoc.referralRewardId;
+    const gameTitleForRef = requestDoc.gameTitle;
+    if (finalStatus === 'READY' && referralId) {
+      Promise.resolve().then(async () => {
+        try {
+          const pendingReferralsCollection = db.collection('pendingReferrals');
+          const refDoc = await pendingReferralsCollection.findOne({ id: referralId });
+          if (!refDoc || refDoc.status === 'CLAIMED' || !refDoc.referrerEmail) return;
+
+          const refEmail = String(refDoc.referrerEmail).toLowerCase().trim();
+          const referrerUser = await db.collection('users').findOne(
+            { email: refEmail },
+            { projection: { distributorId: 1 } }
+          );
+          const distId = referrerUser ? (referrerUser.distributorId || '') : '';
+          const txId = (Date.now() + Math.floor(Math.random() * 100)).toString();
+
+          await Promise.all([
+            db.collection('transactions').insertOne({
+              id: txId,
+              userEmail: refEmail,
+              date: new Date().toLocaleString(),
+              type: 'BONUS',
+              amount: Number(refDoc.rewardCoins),
+              gateway: 'REFERRAL BONUS',
+              code: 'REFERRAL',
+              status: 'SUCCESS',
+              gameTitle: gameTitleForRef || 'Lobby',
+              note: `Referral reward for inviting ${refDoc.refereeEmail}`,
+              distributorId: distId
+            }),
+            db.collection('coinsNotifications').insertOne({
+              id: Date.now().toString() + Math.floor(Math.random() * 100 + 1).toString(),
+              userEmail: refEmail,
+              gameTitle: gameTitleForRef,
+              depositAmount: 0,
+              bonusApplied: -2,
+              totalCoins: Number(refDoc.rewardCoins),
+              status: 'PENDING',
+              read: false,
+              timestamp: new Date().toISOString(),
+              transactionId: txId,
+              distributorId: distId
+            }),
+            pendingReferralsCollection.updateOne(
+              { id: referralId },
+              { $set: { status: 'CLAIMED', claimedAt: new Date().toISOString() } }
+            )
+          ]);
+        } catch (refErr) {
+          console.error('Failed to auto-allot referral bonus upon account request approval:', refErr);
+        }
+      });
+    }
+
     cache.del('admin_stats');
 
     return NextResponse.json({ success: true, message: 'Account request status updated successfully!' });

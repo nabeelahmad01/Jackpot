@@ -7,12 +7,22 @@ import { POLL } from '../../lib/pollingConfig';
 export default function ShiftDashboardTab({ adminUser }) {
   const { data: reqData, mutate: mutateRequests } = usePollingSWR(
     `/api/account-requests?status=PENDING&limit=50&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
-    POLL.QUEUES
+    POLL.LIVE,
+    { refreshWhenHidden: true }
   );
 
   const { data: coinData, mutate: mutateCoins } = usePollingSWR(
-    `/api/coins-notifications?limit=50&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
-    POLL.QUEUES
+    `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED&limit=100&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
+    POLL.LIVE,
+    { refreshWhenHidden: true }
+  );
+
+  // Fallback: finance-approved deposits waiting on coins (COINS_LOADING) that may
+  // lack a coinsNotifications row still need to appear in Verified Deposits.
+  const { data: coinsLoadingData, mutate: mutateCoinsLoading } = usePollingSWR(
+    `/api/transactions?status=COINS_LOADING&limit=50&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
+    POLL.LIVE,
+    { refreshWhenHidden: true }
   );
 
 
@@ -20,6 +30,8 @@ export default function ShiftDashboardTab({ adminUser }) {
   // Local input states for Game Credentials
   const [credsInput, setCredsInput] = useState({}); // { requestId: { username, password } }
   const [savingCredsId, setSavingCredsId] = useState(null);
+  // Keep saved rows hidden even if a poll refreshes before the API finishes
+  const [hiddenRequestIds, setHiddenRequestIds] = useState(() => new Set());
 
   // Local input states for Coin Allotments invalidation reasons
   const [invalidReasons, setInvalidReasons] = useState({}); // { notificationId: reason }
@@ -29,62 +41,135 @@ export default function ShiftDashboardTab({ adminUser }) {
     const rows = reqData?.accountRequests || [];
     const seen = new Set();
     return rows.filter((r) => {
+      const idKey = String(r.id ?? '');
+      if (hiddenRequestIds.has(idKey)) return false;
       const key = `${String(r.userEmail || '').toLowerCase()}||${String(r.gameTitle || '').toLowerCase()}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     });
-  }, [reqData?.accountRequests]);
-  const pendingCoins = (coinData?.coinsNotifications || []).filter(n => n.status === 'PENDING' || n.status === 'CLAIM_REQUESTED');
+  }, [reqData?.accountRequests, hiddenRequestIds]);
+  const pendingCoins = useMemo(() => {
+    const fromNoti = (coinData?.coinsNotifications || []).filter(
+      (n) => n.status === 'PENDING' || n.status === 'CLAIM_REQUESTED'
+    );
+    const seenTx = new Set(
+      fromNoti.map((n) => String(n.transactionId || '')).filter(Boolean)
+    );
+    const seenIds = new Set(fromNoti.map((n) => String(n.id)));
 
-  // Handle saving credentials
+    const synthetic = (coinsLoadingData?.transactions || [])
+      .filter((tx) => {
+        if (String(tx.type || '').toUpperCase() !== 'DEPOSIT' && String(tx.type || '').toUpperCase() !== 'BONUS') {
+          return false;
+        }
+        const txId = String(tx.id || '');
+        return txId && !seenTx.has(txId);
+      })
+      .map((tx) => ({
+        id: `tx-coins-${tx.id}`,
+        userEmail: tx.userEmail,
+        gameTitle: tx.gameTitle || 'Lobby',
+        gameUsername: tx.gameUsername || '',
+        depositAmount: parseFloat(tx.amount || 0),
+        bonusApplied: 0,
+        totalCoins: parseFloat(tx.amount || 0),
+        status: 'PENDING',
+        transactionId: tx.id,
+        timestamp: tx.createdAt || tx.date || new Date().toISOString(),
+        fromCoinsLoadingTx: true
+      }))
+      .filter((n) => !seenIds.has(String(n.id)));
+
+    return [...fromNoti, ...synthetic];
+  }, [coinData?.coinsNotifications, coinsLoadingData?.transactions]);
+
+  // Handle saving credentials (optimistic UI + single PUT)
   const handleSaveCredentials = async (reqItem) => {
-    const fields = credsInput[reqItem.id] || {};
+    const reqKey = String(reqItem?.id ?? '');
+    const fields = credsInput[reqKey] || credsInput[reqItem.id] || {};
     const username = (fields.username || '').trim();
     const password = (fields.password || '').trim();
 
+    if (!reqKey || reqKey.startsWith('account-')) {
+      alert('This row is not a pending request. Ask the player to request an account again.');
+      return;
+    }
     if (!username || !password) {
       alert('Please fill in both Username and Password fields.');
       return;
     }
 
     setSavingCredsId(reqItem.id);
-    try {
-      // 1. Create/Save Game Account
-      const credResponse = await fetch('/api/game-accounts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          gameTitle: reqItem.gameTitle,
-          userEmail: reqItem.userEmail,
-          username,
-          password
-        })
-      });
-      const credResult = await credResponse.json();
+    setHiddenRequestIds((prev) => {
+      const next = new Set(prev);
+      next.add(reqKey);
+      return next;
+    });
+    setCredsInput((prev) => {
+      const next = { ...prev };
+      delete next[reqKey];
+      delete next[reqItem.id];
+      return next;
+    });
 
-      // 2. Mark Request READY
+    // Fire request without blocking the list on a slow re-fetch
+    try {
       const reqResponse = await fetch('/api/account-requests', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: reqItem.id,
+          id: reqKey,
           status: 'READY',
+          gameAccountUsername: username,
+          gameAccountPassword: password,
           processedBy: adminUser?.email || 'admin@jackpot.com',
           adminEmail: adminUser?.email || ''
         })
       });
-      const reqResult = await reqResponse.json();
 
-      if (credResult.success && reqResult.success) {
-        alert(`Account credentials saved for ${reqItem.userEmail}!`);
-        mutateRequests();
+      let reqResult = null;
+      const raw = await reqResponse.text();
+      try {
+        reqResult = raw ? JSON.parse(raw) : null;
+      } catch {
+        setHiddenRequestIds((prev) => {
+          const next = new Set(prev);
+          next.delete(reqKey);
+          return next;
+        });
+        alert(`Error saving credentials (HTTP ${reqResponse.status}). Please try again.`);
+        return;
+      }
+
+      if (reqResponse.ok && reqResult?.success) {
+        mutateRequests(
+          (current) => {
+            if (!current?.accountRequests) return current;
+            return {
+              ...current,
+              accountRequests: current.accountRequests.filter((r) => String(r.id) !== reqKey),
+              totalRequests: Math.max(0, (current.totalRequests || 1) - 1)
+            };
+          },
+          { revalidate: true }
+        );
       } else {
-        alert(credResult.message || reqResult.message || 'Failed to allot credentials.');
+        setHiddenRequestIds((prev) => {
+          const next = new Set(prev);
+          next.delete(reqKey);
+          return next;
+        });
+        alert(reqResult?.message || `Failed to save credentials (HTTP ${reqResponse.status}).`);
       }
     } catch (err) {
       console.error(err);
-      alert('Error saving credentials.');
+      setHiddenRequestIds((prev) => {
+        const next = new Set(prev);
+        next.delete(reqKey);
+        return next;
+      });
+      alert(err?.message ? `Error saving credentials: ${err.message}` : 'Error saving credentials.');
     } finally {
       setSavingCredsId(null);
     }
@@ -117,7 +202,7 @@ export default function ShiftDashboardTab({ adminUser }) {
         return;
       }
       if (data.success) {
-        await mutateCoins();
+        await Promise.all([mutateCoins(), mutateCoinsLoading()]);
       } else {
         alert(data.message || 'Failed to update status.');
       }
@@ -168,7 +253,7 @@ export default function ShiftDashboardTab({ adminUser }) {
           delete next[notiId];
           return next;
         });
-        await mutateCoins();
+        await Promise.all([mutateCoins(), mutateCoinsLoading()]);
       } else {
         alert(data.message || 'Failed to set hold note.');
       }
@@ -189,7 +274,7 @@ export default function ShiftDashboardTab({ adminUser }) {
         <div className="section-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
           <div>
             <h3 style={{ fontSize: '0.9rem', color: '#fff', fontWeight: 'bold' }}>Game Accounts Credentials</h3>
-            <span className="game-tap-tip">Only accounts missing username/password are shown. Live updates every 10 seconds.</span>
+            <span className="game-tap-tip">Only accounts missing username/password are shown. Live updates every 1 second.</span>
           </div>
           <span className="admin-badge-preview b-ready" style={{ background: 'rgba(168,85,247,0.15)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.25)' }}>SECURE</span>
         </div>
@@ -211,45 +296,53 @@ export default function ShiftDashboardTab({ adminUser }) {
                   <td colSpan="5" className="text-center text-muted" style={{ padding: '1.5rem' }}>No credentials requests pending.</td>
                 </tr>
               ) : (
-                pendingRequests.map((req) => (
-                  <tr key={req.id}>
+                pendingRequests.map((req) => {
+                  const reqKey = String(req.id ?? '');
+                  const draft = credsInput[reqKey] || credsInput[req.id] || {};
+                  return (
+                  <tr key={reqKey || `${req.userEmail}-${req.gameTitle}`}>
                     <td>
                       <strong>{req.userName || '—'}</strong>
+                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '0.15rem', wordBreak: 'break-all' }}>
+                        {req.userEmail}
+                      </div>
                     </td>
                     <td><span className="admin-badge-preview b-new" style={{ fontSize: '0.65rem' }}>{req.gameTitle}</span></td>
                     <td>
                       <input
                         type="text"
                         placeholder="Enter username"
-                        value={credsInput[req.id]?.username || ''}
+                        autoComplete="off"
+                        value={draft.username || ''}
                         onChange={(e) => setCredsInput(prev => ({
                           ...prev,
-                          [req.id]: { ...(prev[req.id] || {}), username: e.target.value }
+                          [reqKey]: { ...(prev[reqKey] || prev[req.id] || {}), username: e.target.value }
                         }))}
-                        style={{ background: '#070912', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.75rem', padding: '0.35rem 0.5rem', borderRadius: '6px', width: '150px' }}
+                        style={{ background: '#070912', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.75rem', padding: '0.35rem 0.5rem', borderRadius: '6px', width: '100%', minWidth: '120px' }}
                       />
                     </td>
                     <td>
                       <input
                         type="text"
                         placeholder="Enter password"
-                        value={credsInput[req.id]?.password || ''}
+                        autoComplete="off"
+                        value={draft.password || ''}
                         onChange={(e) => setCredsInput(prev => ({
                           ...prev,
-                          [req.id]: { ...(prev[req.id] || {}), password: e.target.value }
+                          [reqKey]: { ...(prev[reqKey] || prev[req.id] || {}), password: e.target.value }
                         }))}
-                        style={{ background: '#070912', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.75rem', padding: '0.35rem 0.5rem', borderRadius: '6px', width: '150px' }}
+                        style={{ background: '#070912', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.75rem', padding: '0.35rem 0.5rem', borderRadius: '6px', width: '100%', minWidth: '120px' }}
                       />
                     </td>
                     <td>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'center' }}>
                           <button
                             onClick={() => handleSaveCredentials(req)}
-                            disabled={savingCredsId === req.id}
+                            disabled={savingCredsId === req.id || savingCredsId === reqKey}
                             className="submit-btn"
                             style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold', margin: 0, padding: '0.35rem 1rem', width: 'auto', fontSize: '0.7rem' }}
                           >
-                            {savingCredsId === req.id ? 'Saving...' : 'Save'}
+                            {savingCredsId === req.id || savingCredsId === reqKey ? 'Saving...' : 'Save'}
                           </button>
                           {req.distributorType === 'B' && (
                             <span style={{ fontSize: '0.6rem', color: '#3b82f6', display: 'block', textAlign: 'center' }}>
@@ -259,7 +352,8 @@ export default function ShiftDashboardTab({ adminUser }) {
                         </div>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -271,7 +365,7 @@ export default function ShiftDashboardTab({ adminUser }) {
         <div className="section-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
           <div>
             <h3 style={{ fontSize: '0.9rem', color: '#fff', fontWeight: 'bold' }}>Verified Deposits</h3>
-            <span className="game-tap-tip">Mark verified deposits as processed (Loaded) or invalid.</span>
+            <span className="game-tap-tip">After finance verifies a deposit, it appears here for coin loading. Live updates every 1 second.</span>
           </div>
           <span className="admin-badge-preview b-ready" style={{ background: 'rgba(34,197,94,0.15)', color: '#2ecc71', border: '1px solid rgba(34,197,94,0.25)' }}>LIVE DEPOSITS</span>
         </div>

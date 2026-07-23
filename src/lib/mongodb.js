@@ -143,9 +143,12 @@ async function seedRealMongo(db) {
     await db.collection('accountRequests').createIndex({ id: 1 }, { unique: true });
     await db.collection('accountRequests').createIndex({ userEmail: 1 });
     await db.collection('accountRequests').createIndex({ status: 1 });
+    await db.collection('accountRequests').createIndex({ status: 1, createdAt: -1 });
+    await db.collection('accountRequests').createIndex({ status: 1, distributorType: 1, createdAt: -1 });
 
     await db.collection('gameAccounts').createIndex({ userEmail: 1 });
     await db.collection('gameAccounts').createIndex({ gameTitle: 1 });
+    await db.collection('gameAccounts').createIndex({ userEmail: 1, gameTitle: 1 });
 
     await db.collection('supportMessages').createIndex({ userEmail: 1 });
     await db.collection('supportMessages').createIndex({ timestamp: 1 });

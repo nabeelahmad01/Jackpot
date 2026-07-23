@@ -29,8 +29,7 @@ export async function GET(req) {
       query.distributorId = adminDistributorId;
     } else if (!email) {
       // Only exclude Type B distributor coin notifications from Super Admin/global views
-      const exclusion = await typeBExclusionFilter(db);
-      query = Object.keys(query).length ? { $and: [query, exclusion] } : exclusion;
+      Object.assign(query, await typeBExclusionFilter(db));
     }
 
     if (search) {
@@ -126,6 +125,76 @@ export async function PUT(req) {
     if (!originalNoti) {
       originalNoti = await notificationsCollection.findOne({ id });
     }
+
+    // Shift Dashboard synthetic rows: tx-coins-<transactionId> for COINS_LOADING
+    // deposits that never got a coinsNotifications document.
+    if (!originalNoti && idStr.startsWith('tx-coins-')) {
+      const txId = idStr.slice('tx-coins-'.length);
+      const tx =
+        (await db.collection('transactions').findOne({ id: txId })) ||
+        (await db.collection('transactions').findOne({ id: String(txId) }));
+      if (tx && (tx.type === 'DEPOSIT' || tx.type === 'BONUS')) {
+        const existingByTx = await notificationsCollection.findOne({ transactionId: tx.id })
+          || await notificationsCollection.findOne({ transactionId: String(tx.id) });
+        if (existingByTx) {
+          originalNoti = existingByTx;
+        } else {
+          const amount = parseFloat(tx.amount || 0);
+          const userEmail = String(tx.userEmail || '').toLowerCase().trim();
+          let bonusPercentage = 0;
+          let totalCoins = amount;
+          let isFreeplay = false;
+
+          if (tx.type === 'BONUS' && (tx.code === 'SIGNUP-FREE3' || tx.code === 'FREEPLAY')) {
+            isFreeplay = true;
+            bonusPercentage = -3;
+            totalCoins = amount;
+          } else if (tx.type === 'DEPOSIT') {
+            const successfulDepositsCount = await db.collection('transactions').countDocuments({
+              userEmail,
+              type: 'DEPOSIT',
+              status: 'SUCCESS',
+              id: { $ne: tx.id }
+            });
+            const isFirstDeposit = successfulDepositsCount === 0;
+            const [settings, frontendSettings, depositor] = await Promise.all([
+              db.collection('settings').findOne({ id: 'global_settings' }),
+              db.collection('settings').findOne({ id: 'frontend_settings' }),
+              db.collection('users').findOne({ email: userEmail }, { projection: { pendingDepositBonusPercent: 1 } })
+            ]);
+            const firstBonusPercent = frontendSettings?.firstDepositBonus !== undefined
+              ? Number(frontendSettings.firstDepositBonus)
+              : (settings ? Number(settings.firstDepositBonus) : 300);
+            const rawPromo = depositor?.pendingDepositBonusPercent;
+            const promoBonusPercent = rawPromo !== undefined && rawPromo !== null ? Number(rawPromo) : null;
+            const usePromoBonus = promoBonusPercent !== null && promoBonusPercent > 0;
+            bonusPercentage = usePromoBonus
+              ? promoBonusPercent
+              : (isFirstDeposit ? firstBonusPercent : (settings ? Number(settings.regularDepositBonus) : 20));
+            totalCoins = Math.round(amount * (1 + bonusPercentage / 100) * 100) / 100;
+          }
+
+          const newNoti = {
+            id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
+            userEmail: tx.userEmail,
+            gameTitle: tx.gameTitle || 'Lobby',
+            depositAmount: amount,
+            bonusApplied: bonusPercentage,
+            totalCoins,
+            ...(isFreeplay ? { isFreeplay: true } : {}),
+            status: 'PENDING',
+            read: false,
+            timestamp: new Date().toISOString(),
+            transactionId: tx.id,
+            distributorId: tx.distributorId || '',
+            distributorType: tx.distributorType || ''
+          };
+          await notificationsCollection.insertOne(newNoti);
+          originalNoti = newNoti;
+        }
+      }
+    }
+
     if (!originalNoti) {
       return NextResponse.json({ success: false, message: 'Notification not found.' }, { status: 404 });
     }

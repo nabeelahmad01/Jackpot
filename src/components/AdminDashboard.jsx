@@ -107,8 +107,8 @@ export default function AdminDashboard({
   const { data: statsData } = usePollingSWR(
     `/api/admin/stats?adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
     POLL.STATS,
-    // Keep polling even when the tab is hidden / Chrome is minimized so new
-    // requests still trigger the desktop notification + sound while away.
+    // Keep near-live polling when tab/APK is backgrounded so coins staff get
+    // sound + desktop/lock alerts without 6–10s lag.
     { refreshWhenHidden: true }
   );
 

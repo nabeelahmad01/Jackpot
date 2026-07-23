@@ -362,48 +362,34 @@ export default function AdminPage({ portalName, forcedRole }) {
 
   const handleSaveApprovedAccount = async (credData) => {
     try {
-      // 1. Create credentials record
-      const credResponse = await fetch('/api/game-accounts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          gameTitle: credData.gameTitle,
-          userEmail: credData.userEmail,
-          username: credData.username,
-          password: credData.password
-        })
-      });
-      const credResult = await credResponse.json();
-
-      // 2. Set Request Status as READY
+      // Single fast PUT — creates game account + marks READY (same path as Shift Dashboard)
       const reqResponse = await fetch('/api/account-requests', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: credData.requestId,
           status: 'READY',
+          gameAccountUsername: credData.username,
+          gameAccountPassword: credData.password,
           processedBy: adminUser?.email || 'admin@jackpot.com',
           adminEmail: adminUser?.email || ''
         })
       });
       const reqResult = await reqResponse.json();
 
-      if (credResult.success && reqResult.success) {
+      if (reqResponse.ok && reqResult.success) {
         showToast(`Account credentials sent to ${credData.userEmail}!`, 'success');
         setCompletedActionIds(prev => ({ ...prev, [credData.requestId]: true }));
-        
-        // Mutate stats and lists
+        setApproveModalOpen(false);
         mutate('/api/admin/stats');
         mutate((key) => typeof key === 'string' && key.startsWith('/api/account-requests'));
       } else {
-        showToast('Failed to finalize request approval.', 'error');
+        showToast(reqResult.message || 'Failed to finalize request approval.', 'error');
       }
     } catch (err) {
       console.error('Approve account request API error:', err);
       showToast('Connection error approving request.', 'error');
     }
-
-    setApproveModalOpen(false);
   };
 
   // Transaction Ledger Approvals
