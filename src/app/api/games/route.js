@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
 import { jsonOk } from '../../../lib/apiResponse';
+import { isGameImageProxyUrl, toPublicGames, toPublicGameImage } from '../../../lib/gameImages';
 
 // GET all games
 export async function GET(req) {
@@ -12,7 +13,11 @@ export async function GET(req) {
     if (!distributorId) {
       const cachedGames = cache.get('games_all');
       if (cachedGames) {
-        return jsonOk({ success: true, games: cachedGames }, { cacheSeconds: 60 });
+        // Memory keeps full docs (with data URLs); clients get slim proxy URLs.
+        return jsonOk(
+          { success: true, games: toPublicGames(cachedGames) },
+          { cacheSeconds: 120, scope: 'public' }
+        );
       }
     }
 
@@ -36,11 +41,18 @@ export async function GET(req) {
           openPanelLink: dg ? (dg.openPanelLink || game.openPanelLink || game.link) : (game.openPanelLink || game.link)
         };
       });
-      return NextResponse.json({ success: true, games: mappedGames });
+      return jsonOk(
+        { success: true, games: toPublicGames(mappedGames) },
+        { cacheSeconds: 60, scope: 'public' }
+      );
     }
 
-    cache.set('games_all', games, 120);
-    return jsonOk({ success: true, games }, { cacheSeconds: 60 });
+    // Cache FULL documents so /api/games/image can serve without another DB round-trip.
+    cache.set('games_all', games, 300);
+    return jsonOk(
+      { success: true, games: toPublicGames(games) },
+      { cacheSeconds: 120, scope: 'public' }
+    );
   } catch (err) {
     console.error('Fetch Games API Error:', err);
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
@@ -73,8 +85,9 @@ export async function POST(req) {
     
     // Invalidate caches
     cache.del('games_all');
+    cache.del(`game_image_${newGame.id}`);
     
-    return NextResponse.json({ success: true, game: newGame, message: 'Game added successfully!' });
+    return NextResponse.json({ success: true, game: { ...newGame, image: toPublicGameImage(newGame) }, message: 'Game added successfully!' });
   } catch (err) {
     console.error('Create Game API Error:', err);
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
@@ -123,6 +136,12 @@ export async function PUT(req) {
       updateFields.usedCoins = 0;
     }
 
+    // Admin edit form may send the public proxy URL if the cover was not re-uploaded.
+    // Never persist that URL over the real base64 / file path in Mongo.
+    if (isGameImageProxyUrl(updateFields.image)) {
+      delete updateFields.image;
+    }
+
     // Clean undefined fields
     Object.keys(updateFields).forEach(key => updateFields[key] === undefined && delete updateFields[key]);
 
@@ -130,6 +149,7 @@ export async function PUT(req) {
     
     // Invalidate caches
     cache.del('games_all');
+    cache.del(`game_image_${game.id}`);
 
     return NextResponse.json({ success: true, message: 'Game updated successfully!' });
   } catch (err) {
@@ -155,6 +175,7 @@ export async function DELETE(req) {
     
     // Invalidate caches
     cache.del('games_all');
+    cache.del(`game_image_${id}`);
 
     return NextResponse.json({ success: true, message: 'Game deleted successfully!' });
   } catch (err) {
