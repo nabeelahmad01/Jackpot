@@ -30,26 +30,72 @@ export default function SupportTab({ adminUser }) {
   const allMessages = convData?.messages || [];
   const activeChatMessages = activeChatData?.messages || [];
 
+  const resolveDisplayName = (email, preferredName) => {
+    const emailKey = String(email || '').toLowerCase().trim();
+    if (!emailKey) return 'Guest';
+    if (emailKey.includes('@jackpotguest.com') || emailKey.startsWith('guest_')) {
+      return 'Guest';
+    }
+    const raw = String(preferredName || '').trim();
+    if (raw && !/^support\s*agent$/i.test(raw) && !/^player$/i.test(raw)) {
+      if (/^guest(\s*#?\d+)?$/i.test(raw)) return 'Guest';
+      return raw;
+    }
+    return emailKey.split('@')[0] || 'Guest';
+  };
+
   const groups = {};
   allMessages.forEach((msg) => {
-    const email = msg.userEmail.toLowerCase();
+    const email = (msg.userEmail || '').toLowerCase();
+    if (!email) return;
+
     if (!groups[email]) {
       groups[email] = {
         email: msg.userEmail,
-        name: msg.userName,
-        lastMessage: msg.message,
+        name: null,
+        lastMessage: msg.message || (msg.attachment ? '[Image]' : ''),
         timestamp: msg.timestamp,
-        unread: msg.senderType === 'player' && msg.read === false
+        unread: false
       };
+    }
+
+    const g = groups[email];
+
+    // Prefer playerName from API, then player-sent userName (never agent label)
+    const candidate =
+      msg.playerName ||
+      (msg.senderType === 'player' ? msg.userName : '') ||
+      '';
+    if (candidate && !/^support\s*agent$/i.test(String(candidate))) {
+      g.name = candidate;
+    }
+
+    if (msg.senderType === 'player' && msg.read === false) {
+      g.unread = true;
     }
   });
 
-  const conversations = Object.values(groups).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  const conversations = Object.values(groups)
+    .map((c) => ({
+      ...c,
+      name: resolveDisplayName(c.email, c.name)
+    }))
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   const filteredConversations = conversations.filter(
     (c) =>
       c.email.toLowerCase().includes(chatSearch.toLowerCase()) ||
       (c.name && c.name.toLowerCase().includes(chatSearch.toLowerCase()))
   );
+
+  const activeChatDisplayName = activeChatEmail
+    ? resolveDisplayName(
+        activeChatEmail,
+        activeChatData?.playerName ||
+          conversations.find((c) => c.email.toLowerCase() === activeChatEmail.toLowerCase())?.name ||
+          activeChatMessages.find((m) => m.playerName)?.playerName ||
+          activeChatMessages.find((m) => m.senderType === 'player' && m.userName)?.userName
+      )
+    : '';
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -113,7 +159,7 @@ export default function SupportTab({ adminUser }) {
     const tempMessage = {
       id: 'temp-' + Date.now(),
       userEmail: activeChatEmail,
-      userName: 'Support Agent',
+      userName: activeChatDisplayName || 'Player',
       message: replyMsg,
       attachment: replyAttachment,
       senderType: 'admin',
@@ -132,7 +178,7 @@ export default function SupportTab({ adminUser }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userEmail: activeChatEmail,
-          userName: 'Support Agent',
+          userName: activeChatDisplayName || 'Player',
           message: replyMsg,
           attachment: replyAttachment,
           senderType: 'admin',
@@ -194,7 +240,7 @@ export default function SupportTab({ adminUser }) {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <strong style={{ fontSize: '0.775rem', color: '#fff', display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', flex: 1, marginRight: '0.5rem' }}>
-                      {chat.name || chat.email.split('@')[0]}
+                      {chat.name}
                     </strong>
                     {chat.unread && (
                       <span style={{
@@ -237,7 +283,12 @@ export default function SupportTab({ adminUser }) {
                   <i className="fa-solid fa-user" style={{ fontSize: '1.1rem' }}></i>
                 </div>
                 <div style={{ minWidth: 0 }}>
-                  <h4 style={{ fontSize: '0.85rem', color: '#fff', fontWeight: 'bold', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeChatEmail}</h4>
+                  <h4 style={{ fontSize: '0.85rem', color: '#fff', fontWeight: 'bold', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {activeChatDisplayName}
+                  </h4>
+                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {activeChatEmail}
+                  </span>
                   <span style={{ fontSize: '0.65rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                     <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }}></span> Active Live Chat Support
                   </span>
@@ -290,7 +341,7 @@ export default function SupportTab({ adminUser }) {
                       )}
                     </div>
                     <span style={{ fontSize: '0.55rem', opacity: 0.5, marginTop: '0.15rem' }}>
-                      {isMe ? 'You (Agent)' : (msg.userName || 'Player')} • {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {isMe ? 'You (Agent)' : (msg.userName && !/^support\s*agent$/i.test(msg.userName) ? msg.userName : activeChatDisplayName || 'Player')} • {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
                 );

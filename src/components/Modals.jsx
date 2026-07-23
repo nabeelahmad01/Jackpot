@@ -25,8 +25,12 @@ export function SupportModal({ isOpen, onClose, currentUser }) {
       if (!email) {
         const randId = Math.floor(100000 + Math.random() * 900000);
         email = `guest_${randId}@jackpotguest.com`;
-        name = `Guest #${randId}`;
+        name = 'Guest';
         localStorage.setItem('jackpot_guest_email', email);
+        localStorage.setItem('jackpot_guest_name', name);
+      } else {
+        // Normalize older "Guest #123456" labels
+        name = 'Guest';
         localStorage.setItem('jackpot_guest_name', name);
       }
       return { email, name, isGuest: true };
@@ -156,7 +160,7 @@ export function SupportModal({ isOpen, onClose, currentUser }) {
                       )}
                     </div>
                     <span style={{ fontSize: '0.55rem', opacity: 0.5, marginTop: '0.2rem' }}>
-                      {isMe ? 'You' : (msg.userName || 'Support Agent')} • {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {isMe ? 'You' : 'Support Agent'} • {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
                 );

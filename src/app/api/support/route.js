@@ -28,17 +28,42 @@ export async function GET(req) {
     if (email) {
       // Return full conversation history for a specific player (usually small, but paginated/limited to protect DB)
       const skip = (page - 1) * limit;
+      const emailKey = email.toLowerCase().trim();
       const messages = await supportCollection
-        .find({ ...baseQuery, userEmail: email.toLowerCase().trim() })
+        .find({ ...baseQuery, userEmail: emailKey })
         .sort({ timestamp: 1 })
         .skip(skip)
         .limit(limit)
         .toArray();
-      return NextResponse.json({ success: true, messages });
+
+      const isGuest =
+        emailKey.includes('@jackpotguest.com') || emailKey.startsWith('guest_');
+      let playerName = isGuest ? 'Guest' : '';
+      if (!isGuest) {
+        const userDoc = await db.collection('users').findOne(
+          { email: emailKey },
+          { projection: { name: 1 } }
+        );
+        playerName = (userDoc?.name || '').trim();
+        if (!playerName) {
+          const fromMsg = [...messages].reverse().find((m) => {
+            const raw = String(m.userName || '').trim();
+            return raw && !/^support\s*agent$/i.test(raw) && !/^player$/i.test(raw);
+          });
+          const raw = String(fromMsg?.userName || '').trim();
+          playerName = raw
+            ? (/^guest(\s*#?\d+)?$/i.test(raw) ? 'Guest' : raw)
+            : emailKey.split('@')[0] || 'Guest';
+        }
+      }
+      messages.forEach((m) => {
+        m.playerName = playerName;
+      });
+
+      return NextResponse.json({ success: true, messages, playerName });
     }
 
-    // Admin view: get all messages, grouped or sorted so admin can list conversations
-    // We fetch recent messages and let the backend/frontend group them by userEmail
+    // Admin view: recent messages for conversation list
     const skip = (page - 1) * limit;
     const messages = await supportCollection
       .find(baseQuery)
@@ -46,6 +71,43 @@ export async function GET(req) {
       .skip(skip)
       .limit(limit)
       .toArray();
+
+    // Enrich with real player names so list never sticks on "Support Agent"
+    const emails = Array.from(
+      new Set(messages.map((m) => (m.userEmail || '').toLowerCase().trim()).filter(Boolean))
+    );
+    if (emails.length > 0) {
+      const users = await db
+        .collection('users')
+        .find({ email: { $in: emails } })
+        .project({ email: 1, name: 1 })
+        .toArray();
+      const nameByEmail = {};
+      users.forEach((u) => {
+        if (u.email) nameByEmail[u.email.toLowerCase().trim()] = (u.name || '').trim();
+      });
+
+      for (const msg of messages) {
+        const emailKey = (msg.userEmail || '').toLowerCase().trim();
+        const isGuest =
+          emailKey.includes('@jackpotguest.com') || emailKey.startsWith('guest_');
+        if (isGuest) {
+          msg.playerName = 'Guest';
+          continue;
+        }
+        const fromDb = nameByEmail[emailKey];
+        if (fromDb) {
+          msg.playerName = fromDb;
+          continue;
+        }
+        const raw = String(msg.userName || '').trim();
+        if (raw && !/^support\s*agent$/i.test(raw) && !/^player$/i.test(raw)) {
+          msg.playerName = /^guest(\s*#?\d+)?$/i.test(raw) ? 'Guest' : raw;
+        } else {
+          msg.playerName = emailKey.split('@')[0] || 'Guest';
+        }
+      }
+    }
 
     return NextResponse.json({ success: true, messages });
   } catch (err) {
@@ -83,7 +145,22 @@ export async function POST(req) {
     const newMsg = {
       id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
       userEmail: userEmail.toLowerCase().trim(),
-      userName: userName || 'Player',
+      // Thread identity = player/guest name (never "Support Agent" on admin replies)
+      userName: (() => {
+        const emailLower = userEmail.toLowerCase().trim();
+        const isGuestEmail =
+          emailLower.includes('@jackpotguest.com') || emailLower.startsWith('guest_');
+        if (isGuestEmail) return 'Guest';
+        if (senderType === 'admin') {
+          return (userDoc?.name || userName || 'Player').trim() || 'Player';
+        }
+        const cleaned = String(userName || '').trim();
+        if (!cleaned || /^support\s*agent$/i.test(cleaned)) {
+          return userDoc?.name || 'Player';
+        }
+        if (/^guest(\s*#?\d+)?$/i.test(cleaned)) return 'Guest';
+        return cleaned;
+      })(),
       message: message ? message.trim() : '',
       attachment: attachment || '',
       senderType, // 'player' | 'admin'
