@@ -25,6 +25,8 @@ export default function FrontendSettingsTab({ adminUser }) {
   const [signupFreeplay, setSignupFreeplay] = useState(3);
   const [minimumDepositLimit, setMinimumDepositLimit] = useState(5);
   const [minimumWithdrawalLimit, setMinimumWithdrawalLimit] = useState(5);
+  const [withdrawRequireGameScreenshot, setWithdrawRequireGameScreenshot] = useState(false);
+  const [withdrawRequireTagQrScreenshot, setWithdrawRequireTagQrScreenshot] = useState(true);
 
   // Landing Page Texts
   const [landingWelcome, setLandingWelcome] = useState('');
@@ -116,6 +118,8 @@ export default function FrontendSettingsTab({ adminUser }) {
       setSignupFreeplay(s.signupFreeplay !== undefined ? s.signupFreeplay : 3);
       setMinimumDepositLimit(s.minimumDepositLimit !== undefined ? s.minimumDepositLimit : 5);
       setMinimumWithdrawalLimit(s.minimumWithdrawalLimit !== undefined ? s.minimumWithdrawalLimit : 5);
+      setWithdrawRequireGameScreenshot(s.withdrawRequireGameScreenshot === true);
+      setWithdrawRequireTagQrScreenshot(s.withdrawRequireTagQrScreenshot !== false);
 
       setLandingWelcome(s.landingWelcome || 'WELCOME TO JACKPOT ROYALS');
       setLandingGrab(s.landingGrab || 'Grab amazing bonuses and win big!');
@@ -262,6 +266,8 @@ export default function FrontendSettingsTab({ adminUser }) {
           signupFreeplay: Number(signupFreeplay),
           minimumDepositLimit: Number(minimumDepositLimit),
           minimumWithdrawalLimit: Number(minimumWithdrawalLimit),
+          withdrawRequireGameScreenshot,
+          withdrawRequireTagQrScreenshot,
 
           landingWelcome,
           landingGrab,
@@ -1130,6 +1136,31 @@ export default function FrontendSettingsTab({ adminUser }) {
                   />
                 </div>
               </div>
+            </div>
+
+            <div style={{ marginTop: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+              <h4 style={{ fontSize: '0.75rem', color: '#fff', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.65rem' }}>
+                Withdrawal Proof Requirements
+              </h4>
+              <p style={{ fontSize: '0.7rem', color: '#888', marginBottom: '0.75rem' }}>
+                Control which screenshot uploads players must attach when cashing out.
+              </p>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.78rem', color: '#ddd', cursor: 'pointer', marginBottom: '0.55rem' }}>
+                <input
+                  type="checkbox"
+                  checked={withdrawRequireGameScreenshot}
+                  onChange={(e) => setWithdrawRequireGameScreenshot(e.target.checked)}
+                />
+                Require game balance screenshot
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.78rem', color: '#ddd', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={withdrawRequireTagQrScreenshot}
+                  onChange={(e) => setWithdrawRequireTagQrScreenshot(e.target.checked)}
+                />
+                Require Tag QR screenshot
+              </label>
             </div>
 
             <div style={{ marginTop: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>

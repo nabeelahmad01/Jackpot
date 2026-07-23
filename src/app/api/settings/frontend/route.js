@@ -19,6 +19,9 @@ const DEFAULT_SETTINGS = {
   signupFreeplay: 3,
   minimumDepositLimit: 5,
   minimumWithdrawalLimit: 5,
+  // Withdrawal form proof requirements (Super Admin toggles)
+  withdrawRequireGameScreenshot: false,
+  withdrawRequireTagQrScreenshot: true,
   
   // Landing Page Texts
   landingWelcome: 'WELCOME TO JACKPOT ROYALS',

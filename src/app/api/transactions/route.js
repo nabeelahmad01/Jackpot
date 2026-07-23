@@ -451,10 +451,17 @@ export async function POST(req) {
     };
 
     if (txObject.type === 'WITHDRAW') {
-      if (!txObject.screenshot || String(txObject.screenshot).trim() === '') {
+      let frontendSettings = cache.get('frontend_settings_all');
+      if (!frontendSettings) {
+        frontendSettings = await db.collection('settings').findOne({ id: 'frontend_settings' }) || {};
+      }
+      const requireGameShot = frontendSettings.withdrawRequireGameScreenshot === true;
+      const requireTagQr = frontendSettings.withdrawRequireTagQrScreenshot !== false;
+
+      if (requireGameShot && (!txObject.screenshot || String(txObject.screenshot).trim() === '')) {
         return NextResponse.json({ success: false, message: 'Game screenshot is required for withdrawals.' }, { status: 400 });
       }
-      if (!txObject.tagQrScreenshot || String(txObject.tagQrScreenshot).trim() === '') {
+      if (requireTagQr && (!txObject.tagQrScreenshot || String(txObject.tagQrScreenshot).trim() === '')) {
         return NextResponse.json({ success: false, message: 'Tag QR screenshot is required for withdrawals.' }, { status: 400 });
       }
       // Server-side freeplay session: last action was freeplay, no deposit or freeplay cashout after it

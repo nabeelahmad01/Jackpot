@@ -794,11 +794,13 @@ export default function UserLobby({
       showToast('Please provide the email address.', 'error');
       return;
     }
-    if (!withdrawScreenshot) {
+    const requireGameShot = frontendSettings?.withdrawRequireGameScreenshot === true;
+    const requireTagQr = frontendSettings?.withdrawRequireTagQrScreenshot !== false;
+    if (requireGameShot && !withdrawScreenshot) {
       showToast('Please upload a screenshot of your game balance.', 'error');
       return;
     }
-    if (!tagQrScreenshot) {
+    if (requireTagQr && !tagQrScreenshot) {
       showToast('Please upload a screenshot of your Tag QR code.', 'error');
       return;
     }
@@ -821,8 +823,8 @@ export default function UserLobby({
       phoneOnTag: phoneOnTag.trim(),
       emailOnTag: shouldShowField('email') ? withdrawEmail.trim() : '',
       ...(isFreeplaySession ? { isFreeplayWithdraw: true } : {}),
-      screenshot: withdrawScreenshot,
-      tagQrScreenshot,
+      screenshot: withdrawScreenshot || '',
+      tagQrScreenshot: tagQrScreenshot || '',
       gameUsername: gameUsername || ''
     });
 
@@ -2688,6 +2690,7 @@ export default function UserLobby({
                 </div>
               )}
 
+              {frontendSettings?.withdrawRequireGameScreenshot === true && (
               <div className="input-group" style={{ marginTop: '0.5rem' }}>
                 <label htmlFor="withdraw-screenshot-receipt" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.35rem' }}>
                   Upload Game Screenshot (Required)
@@ -2710,7 +2713,9 @@ export default function UserLobby({
                   </span>
                 </div>
               </div>
+              )}
 
+              {frontendSettings?.withdrawRequireTagQrScreenshot !== false && (
               <div className="input-group" style={{ marginTop: '0.75rem' }}>
                 <label htmlFor="withdraw-tag-qr-screenshot" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.35rem' }}>
                   Upload Tag QR Screenshot (Required)
@@ -2733,6 +2738,7 @@ export default function UserLobby({
                   </span>
                 </div>
               </div>
+              )}
 
               <button
                 type="submit"
