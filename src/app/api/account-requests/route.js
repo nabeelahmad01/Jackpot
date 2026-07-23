@@ -60,7 +60,37 @@ export async function GET(req) {
         requestQuery = await applyStaffGameFilter(db, requestQuery, adminEmail);
       }
 
-      const realRequests = await requestsCollection.find(requestQuery).toArray();
+      const realRequestsRaw = await requestsCollection.find(requestQuery).toArray();
+
+      // Collapse multi-tap PENDING duplicates (same player + same game) — keep newest
+      const pendingDupIds = [];
+      const seenPendingKeys = new Set();
+      const realRequests = [...realRequestsRaw]
+        .sort((a, b) => String(b.id || '').localeCompare(String(a.id || '')))
+        .filter((r) => {
+          if (String(r.status || '').toUpperCase() !== 'PENDING') return true;
+          const key = `${String(r.userEmail || '').toLowerCase().trim()}||${String(r.gameTitle || '').toLowerCase().trim()}`;
+          if (seenPendingKeys.has(key)) {
+            if (r.id) pendingDupIds.push(r.id);
+            return false;
+          }
+          seenPendingKeys.add(key);
+          return true;
+        });
+
+      if (pendingDupIds.length > 0) {
+        await requestsCollection.updateMany(
+          { id: { $in: pendingDupIds } },
+          {
+            $set: {
+              status: 'REJECTED',
+              rejectionReason: 'Duplicate request (auto-closed)',
+              processedBy: 'system'
+            }
+          }
+        );
+        cache.del('admin_stats');
+      }
 
       // Build synthetic READY rows from gameAccounts when READY is requested
       let syntheticFromAccounts = [];
@@ -482,10 +512,66 @@ export async function POST(req) {
       );
     }
 
+    const cleanEmail = userEmail.toLowerCase().trim();
+    const cleanTitle = String(gameTitle).trim();
+    const titleRegex = new RegExp(`^${cleanTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+
+    // Block double-taps / spam: one PENDING request per player + game
+    const existingPending = await requestsCollection
+      .find({
+        userEmail: cleanEmail,
+        status: 'PENDING',
+        gameTitle: titleRegex
+      })
+      .sort({ id: -1 })
+      .toArray();
+
+    if (existingPending.length > 0) {
+      // Keep newest; cancel older duplicates from previous multi-taps
+      if (existingPending.length > 1) {
+        const keepId = existingPending[0].id;
+        await requestsCollection.updateMany(
+          {
+            userEmail: cleanEmail,
+            status: 'PENDING',
+            gameTitle: titleRegex,
+            id: { $ne: keepId }
+          },
+          {
+            $set: {
+              status: 'REJECTED',
+              rejectionReason: 'Duplicate request (auto-closed)',
+              processedBy: 'system'
+            }
+          }
+        );
+        cache.del('admin_stats');
+      }
+
+      return NextResponse.json({
+        success: true,
+        request: existingPending[0],
+        alreadyExists: true,
+        message: 'You already have a pending request for this game.'
+      });
+    }
+
+    // Already has credentials for this game — no new request needed
+    const existingAccount = await db.collection('gameAccounts').findOne({
+      userEmail: cleanEmail,
+      gameTitle: titleRegex
+    });
+    if (existingAccount) {
+      return NextResponse.json({
+        success: false,
+        message: 'You already have an account for this game.'
+      }, { status: 400 });
+    }
+
     const newRequest = {
       id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
-      gameTitle,
-      userEmail: userEmail.toLowerCase().trim(),
+      gameTitle: cleanTitle,
+      userEmail: cleanEmail,
       status: 'PENDING',
       date: new Date().toLocaleString(),
       createdAt: new Date().toISOString(),
@@ -500,7 +586,7 @@ export async function POST(req) {
 
     notifyStaffAsync(db, {
       title: 'New Account Request',
-      body: `${userEmail} · ${gameTitle}`,
+      body: `${cleanEmail} · ${cleanTitle}`,
       url: '/admin',
       tag: `acct-${newRequest.id}`
     });

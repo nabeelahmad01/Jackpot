@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import usePollingSWR from '../../hooks/usePollingSWR';
 import { POLL } from '../../lib/pollingConfig';
 
@@ -25,7 +25,16 @@ export default function ShiftDashboardTab({ adminUser }) {
   const [invalidReasons, setInvalidReasons] = useState({}); // { notificationId: reason }
   const [processingCoinId, setProcessingCoinId] = useState(null);
 
-  const pendingRequests = reqData?.accountRequests || [];
+  const pendingRequests = useMemo(() => {
+    const rows = reqData?.accountRequests || [];
+    const seen = new Set();
+    return rows.filter((r) => {
+      const key = `${String(r.userEmail || '').toLowerCase()}||${String(r.gameTitle || '').toLowerCase()}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [reqData?.accountRequests]);
   const pendingCoins = (coinData?.coinsNotifications || []).filter(n => n.status === 'PENDING' || n.status === 'CLAIM_REQUESTED');
 
   // Handle saving credentials

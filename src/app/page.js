@@ -235,9 +235,27 @@ export default function Home() {
   };
 
   // Player Account Creation Requests
+  const requestAccountInFlight = React.useRef(new Set());
   const handleRequestAccount = async (gameTitle) => {
+    if (!session?.email || !gameTitle) return;
+    const lockKey = `${session.email.toLowerCase().trim()}||${String(gameTitle).toLowerCase().trim()}`;
+    if (requestAccountInFlight.current.has(lockKey)) return;
+    requestAccountInFlight.current.add(lockKey);
+
     const cacheKey = emailQuery ? `/api/account-requests?email=${emailQuery}` : null;
     try {
+      // Client-side guard: already pending for this game
+      const existing = (accountRequests || []).find(
+        (r) =>
+          r.gameTitle &&
+          String(r.gameTitle).toLowerCase() === String(gameTitle).toLowerCase() &&
+          r.status === 'PENDING'
+      );
+      if (existing) {
+        showToast(`Request already pending for ${gameTitle}.`, 'info');
+        return;
+      }
+
       const response = await fetch('/api/account-requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -245,7 +263,12 @@ export default function Home() {
       });
       const data = await response.json();
       if (data.success) {
-        showToast(`Account creation request submitted for ${gameTitle}!`, 'success');
+        showToast(
+          data.alreadyExists
+            ? `Request already pending for ${gameTitle}.`
+            : `Account creation request submitted for ${gameTitle}!`,
+          data.alreadyExists ? 'info' : 'success'
+        );
 
         // Optimistic pending row so lobby shows APPROVAL PENDING immediately
         const optimistic = data.request || {
@@ -273,8 +296,10 @@ export default function Home() {
         showToast(data.message || 'Failed to submit account request.', 'error');
       }
     } catch (err) {
-      console.error('Request account error:', err);
-      showToast('Connection error submitting request.', 'error');
+      console.error(err);
+      showToast('Failed to submit account request.', 'error');
+    } finally {
+      requestAccountInFlight.current.delete(lockKey);
     }
   };
 
