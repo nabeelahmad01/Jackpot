@@ -54,7 +54,12 @@ export default function Home() {
     dedupingInterval: 60000,
     fallbackData: cachedGames ? { success: true, games: cachedGames } : undefined,
   });
-  const gatewaysQuery = session?.distributorId ? `/api/gateways?distributorId=${session.distributorId}` : '/api/gateways';
+  // Fetch gateways: Type B players must resolve via distributorId (or email fallback)
+  const gatewaysQuery = session?.distributorId
+    ? `/api/gateways?distributorId=${encodeURIComponent(session.distributorId)}`
+    : session?.email
+      ? `/api/gateways?email=${encodeURIComponent(session.email)}`
+      : '/api/gateways';
   const { data: gatewaysData } = useSWR(gatewaysQuery, fetcher, { revalidateOnFocus: false, dedupingInterval: 60000 });
   const { data: frontendSettingsData } = useSWR('/api/settings/frontend', fetcher, {
     revalidateOnFocus: false,

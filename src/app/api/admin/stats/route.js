@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/mongodb';
 import { cache } from '../../../../lib/cache';
 import { applyStaffGameFilter } from '../../../../lib/staffGameAccess';
-import { getTypeBDistributorIds } from '../../../../lib/typeBDistributors';
+import { typeBExclusionFilter } from '../../../../lib/typeBDistributors';
 import { jsonOk } from '../../../../lib/apiResponse';
 
 async function aggregateFinancialTotals(db, baseQuery) {
@@ -83,10 +83,7 @@ export async function GET(req) {
     if (adminDistributorId) {
       baseQuery.distributorId = adminDistributorId;
     } else {
-      const typeBDistIds = await getTypeBDistributorIds(db);
-      if (typeBDistIds.length > 0) {
-        baseQuery.distributorId = { $nin: typeBDistIds };
-      }
+      baseQuery = await typeBExclusionFilter(db);
     }
 
     let requestsQuery = { ...baseQuery, status: 'PENDING' };

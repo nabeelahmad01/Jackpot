@@ -3,6 +3,7 @@ import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
 import { applyStaffGameFilter, staffCanAccessGame } from '../../../lib/staffGameAccess';
 import { accountLookupKey, buildGameUsernameMap } from '../../../lib/resolveGameUsername';
+import { typeBExclusionFilter } from '../../../lib/typeBDistributors';
 
 // GET all coins notifications (supports filtering by email for users, or returning all for admins)
 export async function GET(req) {
@@ -28,12 +29,8 @@ export async function GET(req) {
       query.distributorId = adminDistributorId;
     } else if (!email) {
       // Only exclude Type B distributor coin notifications from Super Admin/global views
-      // When email is set, the player is viewing their OWN notifications — don't exclude!
-      const typeBDists = await db.collection('distributors').find({ type: 'B' }).project({ id: 1 }).toArray();
-      const typeBDistIds = typeBDists.map(d => d.id).filter(Boolean);
-      if (typeBDistIds.length > 0) {
-        query.distributorId = { $nin: typeBDistIds };
-      }
+      const exclusion = await typeBExclusionFilter(db);
+      query = Object.keys(query).length ? { $and: [query, exclusion] } : exclusion;
     }
 
     if (search) {
@@ -44,11 +41,8 @@ export async function GET(req) {
           { gameTitle: { $regex: cleanSearch, $options: 'i' } }
         ]
       };
-      if (email) {
-        query = { $and: [query, searchCriteria] };
-      } else {
-        query = searchCriteria;
-      }
+      // Always AND with existing filters (keeps Type B exclusion for HQ admin)
+      query = Object.keys(query).length > 0 ? { $and: [query, searchCriteria] } : searchCriteria;
     }
 
     const statusParam = searchParams.get('status');

@@ -2,11 +2,31 @@ import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
 
+const PLATFORM_GATEWAY_QUERY = {
+  $or: [
+    { distributorId: { $exists: false } },
+    { distributorId: null },
+    { distributorId: '' }
+  ]
+};
+
 // GET all gateways
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
-    const distributorId = searchParams.get('distributorId');
+    let distributorId = String(searchParams.get('distributorId') || '').trim();
+    const email = String(searchParams.get('email') || '').trim().toLowerCase();
+
+    const db = await getDb();
+
+    // Resolve distributor from player email when session id is missing/stale
+    if (!distributorId && email) {
+      const user = await db.collection('users').findOne(
+        { email },
+        { projection: { distributorId: 1 } }
+      );
+      distributorId = String(user?.distributorId || '').trim();
+    }
 
     const cacheKey = distributorId ? `gateways_dist_${distributorId}` : 'gateways_all';
     const cachedGateways = cache.get(cacheKey);
@@ -14,27 +34,27 @@ export async function GET(req) {
       return NextResponse.json({ success: true, gateways: cachedGateways });
     }
 
-    const db = await getDb();
     const gatewaysCollection = db.collection('gateways');
-    
-    let query = {};
+
+    let query = PLATFORM_GATEWAY_QUERY;
     if (distributorId) {
-      const distributorsCollection = db.collection('distributors');
-      const dist = await distributorsCollection.findOne({ id: distributorId });
-      if (dist && dist.type === 'B') {
-        // Type B distributor -> only return their own gateways
-        query.distributorId = distributorId;
-      } else {
-        // Type A distributor or main platform -> return main platform gateways
-        query = { $or: [{ distributorId: { $exists: false } }, { distributorId: '' }] };
+      const dist = await db.collection('distributors').findOne(
+        { id: distributorId },
+        { projection: { type: 1 } }
+      );
+      if (dist?.type === 'B') {
+        // Type B: players only see methods that distributor added
+        query = { distributorId };
+      } else if (!dist) {
+        // Unknown id — never leak platform payment methods
+        cache.set(cacheKey, [], 30);
+        return NextResponse.json({ success: true, gateways: [] });
       }
-    } else {
-      // Main platform gateways
-      query = { $or: [{ distributorId: { $exists: false } }, { distributorId: '' }] };
+      // Type A: intentional — players use main platform gateways
     }
 
     const gateways = await gatewaysCollection.find(query).toArray();
-    
+
     cache.set(cacheKey, gateways, 60);
     return NextResponse.json({ success: true, gateways });
   } catch (err) {

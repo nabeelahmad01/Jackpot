@@ -3,7 +3,7 @@ import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
 import { buildRemainderClaimAvailableAt } from '../../../lib/claimWait';
 import { calcCommissionFromProfit } from '../../../lib/commission';
-import { getTypeBDistributorIds } from '../../../lib/typeBDistributors';
+import { typeBExclusionFilter } from '../../../lib/typeBDistributors';
 import { notifyStaffAndDistributorAsync } from '../../../lib/pushNotifications';
 import { accountLookupKey, buildGameUsernameMap } from '../../../lib/resolveGameUsername';
 
@@ -52,10 +52,8 @@ export async function GET(req) {
     if (adminDistributorId) {
       query.distributorId = adminDistributorId;
     } else if (!email) {
-      const typeBDistIds = await getTypeBDistributorIds(db);
-      if (typeBDistIds.length > 0) {
-        query.distributorId = { $nin: typeBDistIds };
-      }
+      const exclusion = await typeBExclusionFilter(db);
+      query = Object.keys(query).length ? { $and: [query, exclusion] } : exclusion;
     }
     if (status) {
       const statuses = status.split(',').map(s => s.toUpperCase().trim());
@@ -235,6 +233,11 @@ export async function POST(req) {
     // Retrieve the player profile to extract distributorId
     const userDoc = await db.collection('users').findOne({ email: userEmail });
     const distId = userDoc ? (userDoc.distributorId || '') : '';
+    let distType = '';
+    if (distId) {
+      const distDoc = await db.collection('distributors').findOne({ id: distId }, { projection: { type: 1 } });
+      distType = distDoc?.type || '';
+    }
 
     if (newTx.isRemainderRequest) {
       const parentTx = await transactionsCollection.findOne({ id: newTx.parentTxId });
@@ -255,6 +258,7 @@ export async function POST(req) {
         note: `Remaining payout request for Tx #${newTx.parentTxId}`,
         parentTxId: newTx.parentTxId,
         distributorId: distId,
+        distributorType: distType,
         isFreeplayWithdraw: parentTx ? Boolean(parentTx.isFreeplayWithdraw) : false
       };
 
@@ -447,6 +451,7 @@ export async function POST(req) {
       status: newTx.type === 'WITHDRAW' ? 'PENDING_COINS' : isFreeplayBonus ? 'COINS_LOADING' : newTx.type === 'BONUS' ? 'SUCCESS' : 'PENDING',
       note: '',
       distributorId: distId,
+      distributorType: distType,
       ...newTx
     };
 
@@ -520,7 +525,8 @@ export async function POST(req) {
         timestamp: new Date().toISOString(),
         transactionId: txObject.id,
         isFreeplayWithdraw: Boolean(txObject.isFreeplayWithdraw),
-        distributorId: distId
+        distributorId: distId,
+        distributorType: distType
       });
     }
 
@@ -539,7 +545,8 @@ export async function POST(req) {
         read: false,
         timestamp: new Date().toISOString(),
         transactionId: txObject.id,
-        distributorId: distId
+        distributorId: distId,
+        distributorType: distType
       });
     }
 

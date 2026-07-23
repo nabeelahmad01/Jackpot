@@ -3,6 +3,7 @@ import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
 import { applyStaffGameFilter, getStaffAllowedGameTitles, staffCanAccessGame } from '../../../lib/staffGameAccess';
 import { notifyStaffAndDistributorAsync } from '../../../lib/pushNotifications';
+import { getTypeBDistributorIds, typeBExclusionFilter } from '../../../lib/typeBDistributors';
 
 // GET requests (supports filtering by email for users, or returning all for admins)
 export async function GET(req) {
@@ -42,11 +43,9 @@ export async function GET(req) {
       if (adminDistributorId) {
         query.distributorId = adminDistributorId;
       } else if (!email) {
-        const typeBDists = await db.collection('distributors').find({ type: 'B' }).project({ id: 1 }).toArray();
-        typeBDistIds = typeBDists.map(d => d.id).filter(Boolean);
-        if (typeBDistIds.length > 0) {
-          query.distributorId = { $nin: typeBDistIds };
-        }
+        typeBDistIds = await getTypeBDistributorIds(db);
+        const exclusion = await typeBExclusionFilter(db);
+        query = Object.keys(query).length ? { $and: [query, exclusion] } : exclusion;
       }
 
       let requestQuery = { ...query };
@@ -285,8 +284,7 @@ export async function GET(req) {
     });
 
     // Exclude Type B distributor players unless requested by that specific distributor
-    const typeBDists = await db.collection('distributors').find({ type: 'B' }).project({ id: 1 }).toArray();
-    const typeBDistIds = typeBDists.map(d => d.id).filter(Boolean);
+    const typeBDistIds = await getTypeBDistributorIds(db);
 
     const filteredEmails = [];
     emailsArray.forEach(emailKey => {

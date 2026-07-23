@@ -15,6 +15,27 @@ export async function getTypeBDistributorIds(db) {
   return ids;
 }
 
+export async function isTypeBDistributor(db, distributorId) {
+  const id = String(distributorId || '').trim();
+  if (!id) return false;
+  const ids = await getTypeBDistributorIds(db);
+  return ids.includes(id);
+}
+
+/**
+ * Mongo filter that hides Type B distributor traffic from global HQ admin views.
+ * - distributorType !== 'B' (covers tagged docs even if distributorId was empty)
+ * - distributorId not in Type B id list
+ */
+export async function typeBExclusionFilter(db) {
+  const typeBDistIds = await getTypeBDistributorIds(db);
+  const parts = [{ distributorType: { $ne: 'B' } }];
+  if (typeBDistIds.length > 0) {
+    parts.push({ distributorId: { $nin: typeBDistIds } });
+  }
+  return parts.length === 1 ? parts[0] : { $and: parts };
+}
+
 export function invalidateTypeBDistributorCache() {
   cache.del(CACHE_KEY);
 }

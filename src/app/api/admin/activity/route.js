@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/mongodb';
+import { typeBExclusionFilter } from '../../../../lib/typeBDistributors';
 
 // GET gets all staff members (non-user roles) and their last active status
 export async function GET(req) {
@@ -54,13 +55,10 @@ export async function GET(req) {
         coinsNotiQuery.distributorId = adminDistributorId;
       } else {
         // Exclude Type B distributor account requests & transactions & coins notifications
-        const typeBDists = await db.collection('distributors').find({ type: 'B' }).project({ id: 1 }).toArray();
-        const typeBDistIds = typeBDists.map(d => d.id).filter(Boolean);
-        if (typeBDistIds.length > 0) {
-          accountReqQuery.distributorId = { $nin: typeBDistIds };
-          txQuery.distributorId = { $nin: typeBDistIds };
-          coinsNotiQuery.distributorId = { $nin: typeBDistIds };
-        }
+        const exclusion = await typeBExclusionFilter(db);
+        accountReqQuery = { $and: [accountReqQuery, exclusion] };
+        txQuery = { $and: [txQuery, exclusion] };
+        coinsNotiQuery = { $and: [coinsNotiQuery, exclusion] };
       }
 
       // Check accountRequests

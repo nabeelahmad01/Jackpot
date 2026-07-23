@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
 import { notifyStaffAndDistributorAsync } from '../../../lib/pushNotifications';
+import { typeBExclusionFilter } from '../../../lib/typeBDistributors';
 
 // GET support chat messages
 export async function GET(req) {
@@ -22,7 +23,7 @@ export async function GET(req) {
     } else if (!email) {
       // Exclude chats belonging to Type B distributors ONLY for generic admin views
       // If email is present, player is querying their own chat, so don't exclude!
-      baseQuery.distributorType = { $ne: 'B' };
+      baseQuery = await typeBExclusionFilter(db);
     }
 
     if (email) {

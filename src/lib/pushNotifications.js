@@ -437,19 +437,31 @@ export function notifyDistributorAsync(db, alert) {
 }
 
 /**
- * Notify Jackpot Portal staff always; also notify the owning distributor APK
- * when distributorId is present (deposit / withdraw / account / support).
+ * Notify the owning distributor when distributorId is present.
+ * Jackpot Portal staff are notified only for main-platform / Type A traffic —
+ * Type B (independent) distributors handle their own ops; HQ must not get alerts.
  */
 export function notifyStaffAndDistributorAsync(db, alert, distributorId) {
-  notifyStaffAsync(db, {
-    ...alert,
-    url: alert?.url || '/admin'
-  });
-  if (distributorId) {
-    notifyDistributorAsync(db, {
-      ...alert,
-      distributorId,
-      url: '/distributor'
-    });
-  }
+  const distId = String(distributorId || '').trim();
+  Promise.resolve()
+    .then(async () => {
+      const { isTypeBDistributor } = await import('./typeBDistributors');
+      const typeB = distId ? await isTypeBDistributor(db, distId) : false;
+
+      if (distId) {
+        notifyDistributorAsync(db, {
+          ...alert,
+          distributorId: distId,
+          url: '/distributor'
+        });
+      }
+
+      if (!typeB) {
+        notifyStaffAsync(db, {
+          ...alert,
+          url: alert?.url || '/admin'
+        });
+      }
+    })
+    .catch((err) => console.error('notifyStaffAndDistributorAsync failed:', err));
 }
