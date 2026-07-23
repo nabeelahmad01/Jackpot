@@ -176,17 +176,30 @@ export default function TxSearchTab({ onInspectProof, adminUser }) {
                     </span>
                   </td>
                   <td>
-                    {tx.screenshot ? (
-                      <button
-                        onClick={() => onInspectProof(tx.screenshot, tx.id)}
-                        className="submit-btn"
-                        style={{ background: '#3498db', margin: 0, padding: '0.35rem 0.65rem', width: 'auto', display: 'inline-flex', gap: '0.3rem', alignItems: 'center' }}
-                      >
-                        <i className="fa-solid fa-receipt"></i> <span style={{ fontSize: '0.65rem' }}>View Proof</span>
-                      </button>
-                    ) : (
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>—</span>
-                    )}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}>
+                      {tx.screenshot ? (
+                        <button
+                          onClick={() => onInspectProof(tx.screenshot, tx.id, tx.type === 'WITHDRAW' ? 'screenshot' : null)}
+                          className="submit-btn"
+                          style={{ background: tx.type === 'WITHDRAW' ? '#eab308' : '#3498db', color: tx.type === 'WITHDRAW' ? '#000' : '#fff', margin: 0, padding: '0.35rem 0.65rem', width: 'auto', display: 'inline-flex', gap: '0.3rem', alignItems: 'center' }}
+                        >
+                          <i className={`fa-solid ${tx.type === 'WITHDRAW' ? 'fa-gamepad' : 'fa-receipt'}`}></i>{' '}
+                          <span style={{ fontSize: '0.65rem' }}>{tx.type === 'WITHDRAW' ? 'Game Balance' : 'View Proof'}</span>
+                        </button>
+                      ) : null}
+                      {tx.type === 'WITHDRAW' && tx.tagQrScreenshot ? (
+                        <button
+                          onClick={() => onInspectProof(tx.tagQrScreenshot, tx.id, 'tagQrScreenshot')}
+                          className="submit-btn"
+                          style={{ background: '#a855f7', color: '#fff', margin: 0, padding: '0.35rem 0.65rem', width: 'auto', display: 'inline-flex', gap: '0.3rem', alignItems: 'center' }}
+                        >
+                          <i className="fa-solid fa-qrcode"></i> <span style={{ fontSize: '0.65rem' }}>Tag QR</span>
+                        </button>
+                      ) : null}
+                      {!tx.screenshot && !(tx.type === 'WITHDRAW' && tx.tagQrScreenshot) && (
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>—</span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))

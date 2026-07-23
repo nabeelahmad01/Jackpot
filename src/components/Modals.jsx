@@ -4,11 +4,77 @@ import PanelModalBackdrop from './PanelModalBackdrop';
 import React, { useState, useEffect, useRef } from 'react';
 import { compressImageFile } from '../lib/imageCompress';
 
+/** Full-screen image viewer for chat attachments / proofs (works with base64; no new tab). */
+export function ImageLightbox({ src, onClose, alt = 'Screenshot' }) {
+  if (!src) return null;
+
+  return (
+    <div
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.94)',
+        zIndex: 100000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '1rem',
+        cursor: 'zoom-out'
+      }}
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close"
+        style={{
+          position: 'absolute',
+          top: '1rem',
+          right: '1rem',
+          background: 'rgba(255,255,255,0.1)',
+          border: '1px solid rgba(255,255,255,0.25)',
+          borderRadius: '50%',
+          color: '#fff',
+          width: '42px',
+          height: '42px',
+          fontSize: '1.5rem',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1
+        }}
+      >
+        &times;
+      </button>
+      <img
+        src={src}
+        alt={alt}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: '96%',
+          maxHeight: '92vh',
+          width: 'auto',
+          height: 'auto',
+          objectFit: 'contain',
+          borderRadius: '10px',
+          border: '2px solid var(--gold-primary)',
+          boxShadow: '0 0 40px rgba(255,215,0,0.18)',
+          cursor: 'default'
+        }}
+      />
+    </div>
+  );
+}
+
 // --- A) CUSTOMER SUPPORT MODAL ---
 export function SupportModal({ isOpen, onClose, currentUser }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [attachment, setAttachment] = useState('');
+  const [lightboxSrc, setLightboxSrc] = useState('');
   const fileInputRef = useRef(null);
   const chatEndRef = useRef(null);
 
@@ -102,6 +168,7 @@ export function SupportModal({ isOpen, onClose, currentUser }) {
   if (!isOpen) return null;
 
   return (
+    <>
     <PanelModalBackdrop onClick={onClose}>
       <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px', height: '550px', display: 'flex', flexDirection: 'column' }}>
         <div className="modal-header" style={{ padding: '1rem 1.25rem' }}>
@@ -155,7 +222,11 @@ export function SupportModal({ isOpen, onClose, currentUser }) {
                             border: '1px solid rgba(255,255,255,0.1)',
                             cursor: 'zoom-in'
                           }}
-                          onClick={() => window.open(msg.attachment, '_blank')}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLightboxSrc(msg.attachment);
+                          }}
+                          title="Tap to enlarge"
                         />
                       )}
                     </div>
@@ -244,6 +315,8 @@ export function SupportModal({ isOpen, onClose, currentUser }) {
         </div>
       </div>
     </PanelModalBackdrop>
+    <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc('')} alt="Chat screenshot" />
+    </>
   );
 }
 
@@ -992,11 +1065,18 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
 
 // --- G) VIEW RECEIPT PROOF MODAL ---
 export function ViewProofModal({ isOpen, onClose, proofUrl }) {
+  const [enlarged, setEnlarged] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) setEnlarged(false);
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
+    <>
     <PanelModalBackdrop onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px', border: '1px solid var(--gold-primary)' }}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 'min(720px, 96vw)', width: '100%', border: '1px solid var(--gold-primary)' }}>
         <div className="modal-header">
           <h3>
             <i className="fa-solid fa-receipt gold-text"></i> Payment Screenshot Receipt
@@ -1006,12 +1086,14 @@ export function ViewProofModal({ isOpen, onClose, proofUrl }) {
           </button>
         </div>
         <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', padding: '1.5rem' }}>
-          <div style={{ width: '100%', minHeight: '180px', maxHeight: '450px', overflowY: 'auto', borderRadius: '12px', background: '#090a10', border: '1px solid rgba(255,255,255,0.05)', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: '100%', minHeight: '180px', maxHeight: '70vh', overflowY: 'auto', borderRadius: '12px', background: '#090a10', border: '1px solid rgba(255,255,255,0.05)', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {proofUrl ? (
               <img
                 src={proofUrl}
                 alt="Payment Screenshot Receipt proof"
-                style={{ width: '100%', height: 'auto', display: 'block', borderRadius: '8px', objectFit: 'contain' }}
+                onClick={() => setEnlarged(true)}
+                title="Click to enlarge"
+                style={{ width: '100%', height: 'auto', maxHeight: '68vh', display: 'block', borderRadius: '8px', objectFit: 'contain', cursor: 'zoom-in' }}
               />
             ) : (
               <div style={{ textAlign: 'center', padding: '2rem', opacity: 0.6 }}>
@@ -1026,6 +1108,10 @@ export function ViewProofModal({ isOpen, onClose, proofUrl }) {
         </div>
       </div>
     </PanelModalBackdrop>
+    {enlarged && proofUrl ? (
+      <ImageLightbox src={proofUrl} onClose={() => setEnlarged(false)} alt="Payment screenshot" />
+    ) : null}
+    </>
   );
 }
 

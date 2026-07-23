@@ -27,7 +27,7 @@ export default function DistributorPortal() {
   const [supportOpen, setSupportOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const handleInspectProof = async (url, txId) => {
+  const handleInspectProof = async (url, txId, preferredField = null) => {
     const isValidUrl = typeof url === 'string' && (url.startsWith('data:') || url.startsWith('http') || url.startsWith('/'));
     if (isValidUrl) {
       setProofModalUrl(url);
@@ -37,9 +37,18 @@ export default function DistributorPortal() {
         const res = await fetch(`/api/transactions?id=${txId}&adminRole=distributor&email=${encodeURIComponent(distSession?.email || '')}`);
         const data = await res.json();
         if (data.success) {
-          // If transaction has payoutProof (admin payout receipt) load it, otherwise fallback to user upload proof
-          const targetImage = data.transaction?.payoutProof || data.transaction?.screenshot || '';
-          if (targetImage) {
+          let targetImage;
+          if (preferredField === 'tagQrScreenshot') {
+            targetImage = data.transaction?.tagQrScreenshot || '';
+          } else if (preferredField === 'screenshot') {
+            targetImage = data.transaction?.screenshot || '';
+          } else if (preferredField === 'payoutProof') {
+            targetImage = data.transaction?.payoutProof || '';
+          } else {
+            // If transaction has payoutProof (admin payout receipt) load it, otherwise fallback to user upload proof
+            targetImage = data.transaction?.payoutProof || data.transaction?.screenshot || data.transaction?.tagQrScreenshot || '';
+          }
+          if (targetImage && targetImage !== true) {
             setProofModalUrl(targetImage);
           } else {
             alert('No screenshot proof found for this transaction.');

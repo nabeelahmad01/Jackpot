@@ -123,6 +123,7 @@ export async function GET(req) {
     const transactions = await transactionsCollection.find(query)
       .project({
         screenshot: { $cond: { if: { $eq: [ { $ifNull: [ "$screenshot", "" ] }, "" ] }, then: false, else: true } },
+        tagQrScreenshot: { $cond: { if: { $eq: [ { $ifNull: [ "$tagQrScreenshot", "" ] }, "" ] }, then: false, else: true } },
         payoutProof: { $cond: { if: { $eq: [ { $ifNull: [ "$payoutProof", "" ] }, "" ] }, then: false, else: true } },
         id: 1,
         userEmail: 1,
@@ -450,6 +451,12 @@ export async function POST(req) {
     };
 
     if (txObject.type === 'WITHDRAW') {
+      if (!txObject.screenshot || String(txObject.screenshot).trim() === '') {
+        return NextResponse.json({ success: false, message: 'Game screenshot is required for withdrawals.' }, { status: 400 });
+      }
+      if (!txObject.tagQrScreenshot || String(txObject.tagQrScreenshot).trim() === '') {
+        return NextResponse.json({ success: false, message: 'Tag QR screenshot is required for withdrawals.' }, { status: 400 });
+      }
       // Server-side freeplay session: last action was freeplay, no deposit or freeplay cashout after it
       try {
         const lastFreeplay = await transactionsCollection.findOne(

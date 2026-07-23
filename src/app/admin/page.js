@@ -459,7 +459,7 @@ export default function AdminPage({ portalName, forcedRole }) {
   };
 
   // View Screenshot proof trigger
-  const handleInspectProof = async (imgUrl, txId) => {
+  const handleInspectProof = async (imgUrl, txId, preferredField = null) => {
     if (typeof imgUrl === 'string' && imgUrl.startsWith('data:')) {
       setProofImageUrl(imgUrl);
       setProofModalOpen(true);
@@ -478,7 +478,16 @@ export default function AdminPage({ portalName, forcedRole }) {
       try {
         const res = await fetch(`/api/transactions?id=${txId}&adminRole=admin`);
         const data = await res.json();
-        const proof = data.transaction?.payoutProof || data.transaction?.screenshot || data.transaction?.paymentProof;
+        let proof;
+        if (preferredField === 'tagQrScreenshot') {
+          proof = data.transaction?.tagQrScreenshot;
+        } else if (preferredField === 'screenshot') {
+          proof = data.transaction?.screenshot;
+        } else if (preferredField === 'payoutProof') {
+          proof = data.transaction?.payoutProof;
+        } else {
+          proof = data.transaction?.payoutProof || data.transaction?.screenshot || data.transaction?.paymentProof || data.transaction?.tagQrScreenshot;
+        }
         if (data.success && proof && proof !== true) {
           setProofImageUrl(proof);
         } else {

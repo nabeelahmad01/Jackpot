@@ -466,6 +466,7 @@ export default function UserLobby({
   // Screenshot Upload state
   const [screenshotBase64, setScreenshotBase64] = useState('');
   const [withdrawScreenshot, setWithdrawScreenshot] = useState('');
+  const [tagQrScreenshot, setTagQrScreenshot] = useState('');
 
   // Countdown timer ref for live invoice
   const timerRef = useRef(null);
@@ -560,6 +561,25 @@ export default function UserLobby({
     reader.onloadend = () => {
       setWithdrawScreenshot(reader.result);
       showToast('Game screenshot loaded successfully!', 'success');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleTagQrScreenshotChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('Tag QR screenshot must be less than 2MB.', 'error');
+      e.target.value = '';
+      setTagQrScreenshot('');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setTagQrScreenshot(reader.result);
+      showToast('Tag QR screenshot loaded successfully!', 'success');
     };
     reader.readAsDataURL(file);
   };
@@ -721,6 +741,10 @@ export default function UserLobby({
       showToast('Please upload a screenshot of your game balance.', 'error');
       return;
     }
+    if (!tagQrScreenshot) {
+      showToast('Please upload a screenshot of your Tag QR code.', 'error');
+      return;
+    }
 
     setActionLoading(true);
     setTimeout(() => setActionLoading(false), 2500);
@@ -741,6 +765,7 @@ export default function UserLobby({
       emailOnTag: shouldShowField('email') ? withdrawEmail.trim() : '',
       ...(isFreeplaySession ? { isFreeplayWithdraw: true } : {}),
       screenshot: withdrawScreenshot,
+      tagQrScreenshot,
       gameUsername: gameUsername || ''
     });
 
@@ -750,6 +775,7 @@ export default function UserLobby({
     setPhoneOnTag('');
     setWithdrawEmail('');
     setWithdrawScreenshot('');
+    setTagQrScreenshot('');
     setWithdrawModalOpen(false);
     showToast('Withdrawal request submitted successfully!', 'success');
   };
@@ -2490,6 +2516,29 @@ export default function UserLobby({
                   />
                   <span style={{ fontSize: '0.75rem', paddingLeft: '2.5rem', color: withdrawScreenshot ? '#4ade80' : 'rgba(255,255,255,0.4)', lineHeight: '40px', pointerEvents: 'none' }}>
                     {withdrawScreenshot ? 'Game screenshot selected ✓' : 'Choose screenshot image...'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="input-group" style={{ marginTop: '0.75rem' }}>
+                <label htmlFor="withdraw-tag-qr-screenshot" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.35rem' }}>
+                  Upload Tag QR Screenshot (Required)
+                </label>
+                <p style={{ fontSize: '0.6rem', color: 'var(--text-muted)', margin: '0.1rem 0 0.5rem' }}>
+                  Please upload a clear screenshot of your payment tag QR code.
+                </p>
+                <div className="input-wrapper" style={{ background: '#0b0c16', position: 'relative' }}>
+                  <i className="fa-solid fa-qrcode input-icon" style={{ color: 'var(--gold-primary)' }}></i>
+                  <input
+                    type="file"
+                    id="withdraw-tag-qr-screenshot"
+                    accept="image/*"
+                    onChange={handleTagQrScreenshotChange}
+                    style={{ opacity: 0, position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', cursor: 'pointer', zIndex: 5 }}
+                    required
+                  />
+                  <span style={{ fontSize: '0.75rem', paddingLeft: '2.5rem', color: tagQrScreenshot ? '#4ade80' : 'rgba(255,255,255,0.4)', lineHeight: '40px', pointerEvents: 'none' }}>
+                    {tagQrScreenshot ? 'Tag QR screenshot selected ✓' : 'Choose Tag QR screenshot...'}
                   </span>
                 </div>
               </div>

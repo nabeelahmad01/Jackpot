@@ -2,12 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import usePollingSWR from '../../hooks/usePollingSWR';
 import { POLL } from '../../lib/pollingConfig';
 import { registerNativeBackHandler } from '../../lib/nativeBack';
+import { ImageLightbox } from '../Modals';
 
 export default function SupportTab({ adminUser }) {
   const [chatSearch, setChatSearch] = useState('');
   const [activeChatEmail, setActiveChatEmail] = useState(null);
   const [adminReplyText, setAdminReplyText] = useState('');
   const [adminAttachment, setAdminAttachment] = useState('');
+  const [lightboxSrc, setLightboxSrc] = useState('');
   const [playerHits, setPlayerHits] = useState([]);
   const [playerSearchLoading, setPlayerSearchLoading] = useState(false);
   const [openedPlayers, setOpenedPlayers] = useState({}); // email -> { email, name }
@@ -15,14 +17,18 @@ export default function SupportTab({ adminUser }) {
 
   const distQueryParam = adminUser?.distributorId ? `&adminDistributorId=${adminUser.distributorId}` : '';
 
-  // Android back closes open support chat before leaving the tab
+  // Android back: close lightbox first, then open chat
   useEffect(() => {
     return registerNativeBackHandler(() => {
+      if (lightboxSrc) {
+        setLightboxSrc('');
+        return true;
+      }
       if (!activeChatEmail) return false;
       setActiveChatEmail(null);
       return true;
     });
-  }, [activeChatEmail]);
+  }, [activeChatEmail, lightboxSrc]);
 
   const { data: convData, mutate: mutateConversations, error: convError } = usePollingSWR(
     `/api/support?limit=200${distQueryParam}`,
@@ -510,7 +516,7 @@ export default function SupportTab({ adminUser }) {
                           <div style={{ marginTop: '0.5rem' }}>
                             <img
                               src={msg.attachment}
-                              alt="User Attachment"
+                              alt="Chat attachment"
                               style={{
                                 maxWidth: '100%',
                                 maxHeight: '180px',
@@ -519,8 +525,11 @@ export default function SupportTab({ adminUser }) {
                                 border: '1px solid rgba(255,255,255,0.1)',
                                 display: 'block'
                               }}
-                              onClick={() => window.open(msg.attachment, '_blank')}
-                              title="Click to view full-size image proof"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setLightboxSrc(msg.attachment);
+                              }}
+                              title="Click to enlarge screenshot"
                             />
                           </div>
                         )}
@@ -644,6 +653,7 @@ export default function SupportTab({ adminUser }) {
           </div>
         )}
       </div>
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc('')} alt="Chat screenshot" />
     </div>
   );
 }

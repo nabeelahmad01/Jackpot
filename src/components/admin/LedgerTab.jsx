@@ -297,7 +297,7 @@ export default function LedgerTab({
                       <td>
                         {tx.screenshot ? (
                           <button
-                            onClick={() => onInspectProof(tx.screenshot, tx.id)}
+                            onClick={() => onInspectProof(tx.screenshot, tx.id, 'screenshot')}
                             className="submit-btn"
                             style={{ background: '#3498db', margin: 0, padding: '0.35rem 0.65rem', width: 'auto', display: 'inline-flex', gap: '0.3rem', alignItems: 'center' }}
                           >
@@ -359,7 +359,7 @@ export default function LedgerTab({
                   <th>Gateway Details</th>
                   <th>Timestamp</th>
                   <th>Status</th>
-                  <th>Game Screenshot</th>
+                  <th>Proofs</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -429,17 +429,30 @@ export default function LedgerTab({
                         </span>
                       </td>
                       <td>
-                        {tx.screenshot ? (
-                          <button
-                            onClick={() => onInspectProof(tx.screenshot, tx.id)}
-                            className="submit-btn"
-                            style={{ background: '#eab308', color: '#000', margin: 0, padding: '0.35rem 0.65rem', width: 'auto', display: 'inline-flex', gap: '0.3rem', alignItems: 'center' }}
-                          >
-                            <i className="fa-solid fa-gamepad"></i> <span style={{ fontSize: '0.65rem', fontWeight: 'bold' }}>View Game Balance</span>
-                          </button>
-                        ) : (
-                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>No Screenshot</span>
-                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}>
+                          {tx.screenshot ? (
+                            <button
+                              onClick={() => onInspectProof(tx.screenshot, tx.id, 'screenshot')}
+                              className="submit-btn"
+                              style={{ background: '#eab308', color: '#000', margin: 0, padding: '0.35rem 0.65rem', width: 'auto', display: 'inline-flex', gap: '0.3rem', alignItems: 'center' }}
+                            >
+                              <i className="fa-solid fa-gamepad"></i> <span style={{ fontSize: '0.65rem', fontWeight: 'bold' }}>View Game Balance</span>
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>No Game Screenshot</span>
+                          )}
+                          {tx.tagQrScreenshot ? (
+                            <button
+                              onClick={() => onInspectProof(tx.tagQrScreenshot, tx.id, 'tagQrScreenshot')}
+                              className="submit-btn"
+                              style={{ background: '#a855f7', color: '#fff', margin: 0, padding: '0.35rem 0.65rem', width: 'auto', display: 'inline-flex', gap: '0.3rem', alignItems: 'center' }}
+                            >
+                              <i className="fa-solid fa-qrcode"></i> <span style={{ fontSize: '0.65rem', fontWeight: 'bold' }}>View Tag QR</span>
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>No Tag QR</span>
+                          )}
+                        </div>
                       </td>
                       <td>
                         {tx.status === 'PENDING' ? (
