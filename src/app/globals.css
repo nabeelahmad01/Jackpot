@@ -472,6 +472,11 @@ body {
   font-size: 1.1rem;
 }
 
+/* Portal headset FAB — hide on Live Support tab so it doesn't cover Reply */
+html.portal-on-support-tab .portal-support-fab {
+  display: none !important;
+}
+
 @media (max-width: 992px) {
   .auth-page-wrapper {
     flex-direction: column;
@@ -2451,6 +2456,26 @@ select option {
 
   .support-chat-window > form {
     flex-shrink: 0;
+  }
+
+  .support-chat-compose {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center;
+    gap: 0.45rem !important;
+    width: 100%;
+  }
+
+  .support-chat-compose .support-chat-reply-btn {
+    flex-shrink: 0;
+    padding: 0.65rem 0.9rem !important;
+    font-size: 0.75rem;
+    z-index: 2;
+  }
+
+  .support-chat-compose input[type='text'] {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
   }
 
   .admin-main-workspace--support .admin-workspace-scroll > * {

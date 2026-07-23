@@ -93,6 +93,12 @@ export default function DistributorPortal() {
     }
   }, [activeTab]);
 
+  // Hide floating headset FAB while already on Live Support (it covers Reply)
+  useEffect(() => {
+    document.documentElement.classList.toggle('portal-on-support-tab', activeTab === 'support');
+    return () => document.documentElement.classList.remove('portal-on-support-tab');
+  }, [activeTab]);
+
   // Unlock audio + prime desktop notifications on first user gesture
   useEffect(() => {
     initAudioUnlock();
@@ -2828,7 +2834,10 @@ export default function DistributorPortal() {
 
       {distSession && !supportOpen && (
         <button
+          type="button"
+          className="portal-support-fab"
           onClick={() => setSupportOpen(true)}
+          aria-label="Open support chat"
           style={{
             position: 'fixed',
             bottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))',

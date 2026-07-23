@@ -35,15 +35,45 @@ export async function POST(req) {
     const db = await getDb();
     const gameAccountsCollection = db.collection('gameAccounts');
 
-    const newAccount = {
-      gameTitle,
-      userEmail: userEmail.toLowerCase().trim(),
-      username,
-      password,
-      status: 'READY'
-    };
+    const cleanEmail = userEmail.toLowerCase().trim();
+    const cleanTitle = String(gameTitle).trim();
+    const titleRegex = new RegExp(`^${cleanTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
 
-    await gameAccountsCollection.insertOne(newAccount);
+    // Prefer updating an existing row (any casing) instead of inserting a duplicate
+    const existing = await gameAccountsCollection.findOne({
+      userEmail: cleanEmail,
+      gameTitle: titleRegex
+    });
+
+    let newAccount;
+    if (existing) {
+      await gameAccountsCollection.updateOne(
+        { _id: existing._id },
+        {
+          $set: {
+            gameTitle: cleanTitle,
+            username,
+            password,
+            status: 'READY'
+          }
+        }
+      );
+      await gameAccountsCollection.deleteMany({
+        userEmail: cleanEmail,
+        gameTitle: titleRegex,
+        _id: { $ne: existing._id }
+      });
+      newAccount = { ...existing, gameTitle: cleanTitle, username, password, status: 'READY' };
+    } else {
+      newAccount = {
+        gameTitle: cleanTitle,
+        userEmail: cleanEmail,
+        username,
+        password,
+        status: 'READY'
+      };
+      await gameAccountsCollection.insertOne(newAccount);
+    }
     return NextResponse.json({ success: true, gameAccount: newAccount, message: 'Credentials generated successfully!' });
   } catch (err) {
     console.error('Create Game Account API Error:', err);
@@ -64,19 +94,43 @@ export async function PUT(req) {
     const gameAccountsCollection = db.collection('gameAccounts');
 
     const cleanEmail = userEmail.toLowerCase().trim();
+    const cleanTitle = String(gameTitle).trim();
+    const titleRegex = new RegExp(`^${cleanTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
 
-    // Use updateOne with upsert to update if exists or insert if new
-    await gameAccountsCollection.updateOne(
-      { userEmail: cleanEmail, gameTitle },
-      {
-        $set: {
-          username: username.trim(),
-          password: password.trim(),
-          status: 'READY'
+    // Case-insensitive match so "VEGAS X" / "Vegas x" don't create duplicate accounts
+    const existing = await gameAccountsCollection.findOne({
+      userEmail: cleanEmail,
+      gameTitle: titleRegex
+    });
+
+    if (existing) {
+      await gameAccountsCollection.updateOne(
+        { _id: existing._id },
+        {
+          $set: {
+            gameTitle: cleanTitle,
+            username: username.trim(),
+            password: password.trim(),
+            status: 'READY'
+          }
         }
-      },
-      { upsert: true }
-    );
+      );
+
+      // Remove casing-duplicate leftovers for the same player + game
+      await gameAccountsCollection.deleteMany({
+        userEmail: cleanEmail,
+        gameTitle: titleRegex,
+        _id: { $ne: existing._id }
+      });
+    } else {
+      await gameAccountsCollection.insertOne({
+        gameTitle: cleanTitle,
+        userEmail: cleanEmail,
+        username: username.trim(),
+        password: password.trim(),
+        status: 'READY'
+      });
+    }
 
     return NextResponse.json({
       success: true,
@@ -110,9 +164,11 @@ export async function DELETE(req) {
     const db = await getDb();
     const gameAccountsCollection = db.collection('gameAccounts');
 
-    const result = await gameAccountsCollection.deleteOne({
+    const result = await gameAccountsCollection.deleteMany({
       userEmail: userEmail.toLowerCase().trim(),
-      gameTitle: gameTitle
+      gameTitle: {
+        $regex: new RegExp(`^${String(gameTitle).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
+      }
     });
 
     if (result.deletedCount === 0) {

@@ -678,7 +678,10 @@ export default function AdminPage({ portalName, forcedRole }) {
 
       {authenticated && !supportOpen && (
         <button
+          type="button"
+          className="portal-support-fab"
           onClick={() => setSupportOpen(true)}
+          aria-label="Open support chat"
           style={{
             position: 'fixed',
             bottom: '2rem',

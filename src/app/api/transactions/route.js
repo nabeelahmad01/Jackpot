@@ -5,6 +5,7 @@ import { buildRemainderClaimAvailableAt } from '../../../lib/claimWait';
 import { calcCommissionFromProfit } from '../../../lib/commission';
 import { getTypeBDistributorIds } from '../../../lib/typeBDistributors';
 import { notifyStaffAsync } from '../../../lib/pushNotifications';
+import { accountLookupKey, buildGameUsernameMap } from '../../../lib/resolveGameUsername';
 
 // GET transactions (supports filtering by email for users, or returning all for admins)
 export async function GET(req) {
@@ -156,24 +157,17 @@ export async function GET(req) {
       .limit(limit)
       .toArray();
 
-    // Fetch user game usernames for transactions in a batch (optimized from N+1 queries)
-    const txPairs = transactions.filter(t => t.gameTitle && t.userEmail);
-    const accountsMap = {};
-    
+    // Live username from Requests credentials / gameAccounts (fixes VEGAS X vs Vegas x duplicates)
+    const txPairs = transactions.filter((t) => t.gameTitle && t.userEmail);
+    let accountsMap = {};
     if (txPairs.length > 0) {
-      const uniqueEmails = Array.from(new Set(txPairs.map(t => t.userEmail.toLowerCase().trim())));
-      const gameAccountsCollection = db.collection('gameAccounts');
-      const accounts = await gameAccountsCollection.find({ userEmail: { $in: uniqueEmails } }).toArray();
-      accounts.forEach(a => {
-        const key = `${a.userEmail.toLowerCase().trim()}_${a.gameTitle}`;
-        accountsMap[key] = a.username;
-      });
+      const uniqueEmails = Array.from(new Set(txPairs.map((t) => t.userEmail.toLowerCase().trim())));
+      accountsMap = await buildGameUsernameMap(db, uniqueEmails, { dedupe: true });
     }
 
     for (const tx of transactions) {
       if (tx.gameTitle && tx.userEmail) {
-        const key = `${tx.userEmail.toLowerCase().trim()}_${tx.gameTitle}`;
-        tx.gameUsername = accountsMap[key] || '';
+        tx.gameUsername = accountsMap[accountLookupKey(tx.userEmail, tx.gameTitle)] || '';
       } else {
         tx.gameUsername = '';
       }

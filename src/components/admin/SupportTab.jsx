@@ -552,7 +552,7 @@ export default function SupportTab({ adminUser }) {
                 }
 
                 return (
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div className="support-chat-compose" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'nowrap' }}>
                     <label
                       style={{
                         display: 'flex',
@@ -585,7 +585,7 @@ export default function SupportTab({ adminUser }) {
                       value={adminReplyText}
                       onChange={(e) => setAdminReplyText(e.target.value)}
                       style={{
-                        flex: '1 1 140px',
+                        flex: '1 1 auto',
                         minWidth: 0,
                         background: '#0c0e17',
                         border: '1px solid rgba(255,255,255,0.1)',
@@ -597,7 +597,11 @@ export default function SupportTab({ adminUser }) {
                       }}
                       required={!adminAttachment}
                     />
-                    <button type="submit" className="submit-btn" style={{ margin: 0, padding: '0.65rem 1.25rem', width: 'auto', background: 'linear-gradient(135deg, #ffd700 0%, #cca000 100%)', color: '#000', fontWeight: 'bold', flexShrink: 0 }}>
+                    <button
+                      type="submit"
+                      className="submit-btn support-chat-reply-btn"
+                      style={{ margin: 0, padding: '0.65rem 1.25rem', width: 'auto', background: 'linear-gradient(135deg, #ffd700 0%, #cca000 100%)', color: '#000', fontWeight: 'bold', flexShrink: 0 }}
+                    >
                       {activeChatMessages.length === 0 ? 'Send' : 'Reply'}
                     </button>
                   </div>

@@ -86,6 +86,12 @@ export default function AdminDashboard({
     }
   }, [activeTab]);
 
+  // Hide floating headset FAB while already on Live Support (it covers Reply)
+  useEffect(() => {
+    document.documentElement.classList.toggle('portal-on-support-tab', activeTab === 'support');
+    return () => document.documentElement.classList.remove('portal-on-support-tab');
+  }, [activeTab]);
+
   // Android / Portal system back: close mobile sidebar first
   useEffect(() => {
     return registerNativeBackHandler(() => {

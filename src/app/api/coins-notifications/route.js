@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
 import { applyStaffGameFilter, staffCanAccessGame } from '../../../lib/staffGameAccess';
+import { accountLookupKey, buildGameUsernameMap } from '../../../lib/resolveGameUsername';
 
 // GET all coins notifications (supports filtering by email for users, or returning all for admins)
 export async function GET(req) {
@@ -77,24 +78,19 @@ export async function GET(req) {
       .limit(limit)
       .toArray();
 
-    // Fetch user game usernames for notifications in a batch (optimized from N+1 queries)
-    const notiPairs = notifications.filter(n => n.gameTitle && n.userEmail && n.gameTitle !== 'Referral Reward');
-    const accountsMap = {};
-
+    // Live username from Requests credentials / gameAccounts
+    const notiPairs = notifications.filter(
+      (n) => n.gameTitle && n.userEmail && n.gameTitle !== 'Referral Reward'
+    );
+    let accountsMap = {};
     if (notiPairs.length > 0) {
-      const uniqueEmails = Array.from(new Set(notiPairs.map(n => n.userEmail.toLowerCase().trim())));
-      const gameAccountsCollection = db.collection('gameAccounts');
-      const accounts = await gameAccountsCollection.find({ userEmail: { $in: uniqueEmails } }).toArray();
-      accounts.forEach(a => {
-        const key = `${a.userEmail.toLowerCase().trim()}_${a.gameTitle}`;
-        accountsMap[key] = a.username;
-      });
+      const uniqueEmails = Array.from(new Set(notiPairs.map((n) => n.userEmail.toLowerCase().trim())));
+      accountsMap = await buildGameUsernameMap(db, uniqueEmails, { dedupe: true });
     }
 
     for (const noti of notifications) {
       if (noti.gameTitle && noti.userEmail && noti.gameTitle !== 'Referral Reward') {
-        const key = `${noti.userEmail.toLowerCase().trim()}_${noti.gameTitle}`;
-        noti.gameUsername = accountsMap[key] || '';
+        noti.gameUsername = accountsMap[accountLookupKey(noti.userEmail, noti.gameTitle)] || '';
       } else {
         noti.gameUsername = '';
       }

@@ -539,24 +539,48 @@ export async function PUT(req) {
     if ((status === 'COMPLETED' || status === 'READY') && gameAccountUsername && gameAccountPassword) {
       finalStatus = 'READY';
 
-      // Create or upsert the game account credentials
+      // Create or upsert the game account credentials (case-insensitive title)
       const gameAccountsCollection = db.collection('gameAccounts');
-      await gameAccountsCollection.updateOne(
-        { userEmail: requestDoc.userEmail.toLowerCase().trim(), gameTitle: requestDoc.gameTitle },
-        {
-          $set: {
-            username: gameAccountUsername.trim(),
-            password: gameAccountPassword.trim(),
-            status: 'READY'
+      const cleanEmail = requestDoc.userEmail.toLowerCase().trim();
+      const cleanTitle = String(requestDoc.gameTitle || '').trim();
+      const titleRegex = new RegExp(`^${cleanTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+      const existingAcc = await gameAccountsCollection.findOne({
+        userEmail: cleanEmail,
+        gameTitle: titleRegex
+      });
+      if (existingAcc) {
+        await gameAccountsCollection.updateOne(
+          { _id: existingAcc._id },
+          {
+            $set: {
+              gameTitle: cleanTitle,
+              username: gameAccountUsername.trim(),
+              password: gameAccountPassword.trim(),
+              status: 'READY'
+            }
           }
-        },
-        { upsert: true }
-      );
+        );
+        await gameAccountsCollection.deleteMany({
+          userEmail: cleanEmail,
+          gameTitle: titleRegex,
+          _id: { $ne: existingAcc._id }
+        });
+      } else {
+        await gameAccountsCollection.insertOne({
+          gameTitle: cleanTitle,
+          userEmail: cleanEmail,
+          username: gameAccountUsername.trim(),
+          password: gameAccountPassword.trim(),
+          status: 'READY'
+        });
+      }
     }
 
     const updateFields = { status: finalStatus };
     if (processedBy) updateFields.processedBy = processedBy;
     if (rejectionReason) updateFields.rejectionReason = rejectionReason;
+    if (gameAccountUsername) updateFields.gameAccountUsername = String(gameAccountUsername).trim();
+    if (gameAccountPassword) updateFields.gameAccountPassword = String(gameAccountPassword).trim();
 
     await requestsCollection.updateOne({ id }, { $set: updateFields });
 

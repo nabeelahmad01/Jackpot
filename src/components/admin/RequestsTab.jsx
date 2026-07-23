@@ -297,7 +297,8 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
                       const requestedTitle = String(req.gameTitle || '').trim();
                       const match =
                         requestedTitle && requestedTitle !== '—'
-                          ? accounts.find(
+                          ? accounts.find((acc) => acc.gameTitle === requestedTitle) ||
+                            accounts.find(
                               (acc) =>
                                 String(acc.gameTitle || '').toLowerCase() === requestedTitle.toLowerCase()
                             )
