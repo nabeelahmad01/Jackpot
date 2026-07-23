@@ -391,19 +391,34 @@ export async function POST(req) {
 
         if (successFreeplays.length > 0) {
           const lastFp = successFreeplays[0];
+
+          // Cashout after freeplay resets $25 progress — only count deposits after last cashout (or freeplay)
+          const lastCashoutAfterFp = await transactionsCollection.findOne(
+            {
+              userEmail,
+              type: 'WITHDRAW',
+              status: { $ne: 'FAILED' },
+              id: { $gt: lastFp.id }
+            },
+            { sort: { id: -1 } }
+          );
+          const depositAfterId = lastCashoutAfterFp ? lastCashoutAfterFp.id : lastFp.id;
+
           const depositsAfter = await transactionsCollection
             .find({
               userEmail,
               type: 'DEPOSIT',
               status: 'SUCCESS',
-              id: { $gt: lastFp.id }
+              id: { $gt: depositAfterId }
             })
             .toArray();
           const depositTotal = depositsAfter.reduce((s, t) => s + parseFloat(t.amount || 0), 0);
           if (depositTotal < 25) {
             return NextResponse.json({
               success: false,
-              message: `Deposit at least $25.00 after your last freeplay to claim again. Current: $${depositTotal.toFixed(2)}.`
+              message: lastCashoutAfterFp
+                ? `Cashout reset freeplay progress. Deposit at least $25.00 since your last cashout. Current: $${depositTotal.toFixed(2)}.`
+                : `Deposit at least $25.00 after your last freeplay to claim again. Current: $${depositTotal.toFixed(2)}.`
             }, { status: 400 });
           }
           newTx.code = 'FREEPLAY';

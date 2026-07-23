@@ -199,12 +199,22 @@ export default function UserLobby({
     }
 
     const mostRecent = success[0];
-    const isAfterFreeplay = (t) => {
-      if (t.id && mostRecent.id) return parseFloat(t.id) > parseFloat(mostRecent.id);
-      return new Date(t.date || 0).getTime() > new Date(mostRecent.date || 0).getTime();
+    const isAfterTx = (t, anchor) => {
+      if (t.id && anchor.id) return parseFloat(t.id) > parseFloat(anchor.id);
+      return new Date(t.date || t.createdAt || 0).getTime() > new Date(anchor.date || anchor.createdAt || 0).getTime();
     };
+
+    // Any cashout after freeplay resets the $25 deposit counter to 0
+    const lastCashoutAfterFreeplay = sorted.find(
+      (t) =>
+        t.type === 'WITHDRAW' &&
+        t.status !== 'FAILED' &&
+        isAfterTx(t, mostRecent)
+    );
+    const depositAnchor = lastCashoutAfterFreeplay || mostRecent;
+
     const depositTotalAfter = sorted.reduce((sum, t) => {
-      if (t.type === 'DEPOSIT' && t.status === 'SUCCESS' && isAfterFreeplay(t)) {
+      if (t.type === 'DEPOSIT' && t.status === 'SUCCESS' && isAfterTx(t, depositAnchor)) {
         return sum + parseFloat(t.amount || 0);
       }
       return sum;
@@ -224,7 +234,9 @@ export default function UserLobby({
       canClaim: false,
       phase: 'need_deposit',
       isFirst: false,
-      message: `Deposit at least $${remaining.toFixed(2)} more ($${depositTotalAfter.toFixed(2)} / $25.00) to claim freeplay again.`
+      message: lastCashoutAfterFreeplay
+        ? `Cashout reset your freeplay progress. Deposit $${remaining.toFixed(2)} more ($${depositTotalAfter.toFixed(2)} / $25.00) since your last cashout.`
+        : `Deposit at least $${remaining.toFixed(2)} more ($${depositTotalAfter.toFixed(2)} / $25.00) to claim freeplay again.`
     };
   }, [transactions]);
 
