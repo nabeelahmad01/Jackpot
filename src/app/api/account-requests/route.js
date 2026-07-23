@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
 import { applyStaffGameFilter, getStaffAllowedGameTitles, staffCanAccessGame } from '../../../lib/staffGameAccess';
-import { notifyStaffAsync } from '../../../lib/pushNotifications';
+import { notifyStaffAndDistributorAsync } from '../../../lib/pushNotifications';
 
 // GET requests (supports filtering by email for users, or returning all for admins)
 export async function GET(req) {
@@ -584,12 +584,12 @@ export async function POST(req) {
     // Invalidate stats cache
     cache.del('admin_stats');
 
-    notifyStaffAsync(db, {
+    notifyStaffAndDistributorAsync(db, {
       title: 'New Account Request',
       body: `${cleanEmail} · ${cleanTitle}`,
       url: '/admin',
       tag: `acct-${newRequest.id}`
-    });
+    }, distId);
 
     return NextResponse.json({ success: true, request: newRequest, message: 'Game account request submitted successfully!' });
   } catch (err) {

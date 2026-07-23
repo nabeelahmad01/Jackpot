@@ -12,11 +12,18 @@ function isPortalNative() {
   return /JackpotPortalNative/i.test(navigator.userAgent || '');
 }
 
+function isDistributorNative() {
+  if (typeof window === 'undefined') return false;
+  return /JackpotDistributorNative/i.test(navigator.userAgent || '');
+}
+
 function isNativePlatform() {
   if (typeof window === 'undefined') return false;
   if (window.Capacitor?.isNativePlatform?.() === true) return true;
-  // Capacitor WebView UA markers (player APK + staff Portal APK).
-  return /JackpotRoyalsNative|JackpotPortalNative/i.test(navigator.userAgent || '');
+  // Capacitor WebView UA markers (player / staff Portal / distributor APKs).
+  return /JackpotRoyalsNative|JackpotPortalNative|JackpotDistributorNative/i.test(
+    navigator.userAgent || ''
+  );
 }
 
 export function isIosDevice() {
@@ -57,7 +64,7 @@ export async function getExistingPushSubscription() {
   return registration.pushManager.getSubscription();
 }
 
-async function subscribeToNativePush(userEmail, { audience = 'player' } = {}) {
+async function subscribeToNativePush(userEmail, { audience = 'player', distributorId = '' } = {}) {
   // Access the native plugin through the runtime bridge instead of a static
   // import so the web build never hard-depends on @capacitor/push-notifications.
   const Capacitor = typeof window !== 'undefined' ? window.Capacitor : null;
@@ -74,16 +81,35 @@ async function subscribeToNativePush(userEmail, { audience = 'player' } = {}) {
     throw new Error('Notification permission was not allowed.');
   }
 
-  const portal = audience === 'staff' || isPortalNative();
-  const channelId = portal ? 'jackpot_portal_alerts' : 'jackpot_promotions';
+  const resolvedAudience = audience === 'distributor' || isDistributorNative()
+    ? 'distributor'
+    : audience === 'staff' || isPortalNative()
+      ? 'staff'
+      : 'player';
+  const channelId =
+    resolvedAudience === 'distributor'
+      ? 'jackpot_distributor_alerts'
+      : resolvedAudience === 'staff'
+        ? 'jackpot_portal_alerts'
+        : 'jackpot_promotions';
+  const channelName =
+    resolvedAudience === 'distributor'
+      ? 'Distributor Alerts'
+      : resolvedAudience === 'staff'
+        ? 'Portal Alerts'
+        : 'Promotions';
+  const channelDescription =
+    resolvedAudience === 'distributor'
+      ? 'Jackpot Distributor request alerts'
+      : resolvedAudience === 'staff'
+        ? 'Jackpot Portal request alerts'
+        : 'Jackpot Royals offers and promotions';
 
   if (Capacitor?.getPlatform?.() === 'android') {
     await PushNotifications.createChannel({
       id: channelId,
-      name: portal ? 'Portal Alerts' : 'Promotions',
-      description: portal
-        ? 'Jackpot Portal request alerts'
-        : 'Jackpot Royals offers and promotions',
+      name: channelName,
+      description: channelDescription,
       importance: 4,
       visibility: 1,
       vibration: true
@@ -124,7 +150,8 @@ async function subscribeToNativePush(userEmail, { audience = 'player' } = {}) {
       email: String(userEmail || '').trim().toLowerCase(),
       nativeToken: token,
       platform: Capacitor?.getPlatform?.() || 'android',
-      audience: portal ? 'staff' : 'player',
+      audience: resolvedAudience,
+      distributorId: resolvedAudience === 'distributor' ? String(distributorId || '').trim() : '',
       userAgent: navigator.userAgent
     })
   });
@@ -136,7 +163,13 @@ async function subscribeToNativePush(userEmail, { audience = 'player' } = {}) {
   if (!nativeActionListenerReady) {
     nativeActionListenerReady = true;
     await PushNotifications.addListener('pushNotificationActionPerformed', ({ notification }) => {
-      const url = notification?.data?.url || (portal ? '/admin' : '/lobby');
+      const fallback =
+        resolvedAudience === 'distributor'
+          ? '/distributor'
+          : resolvedAudience === 'staff'
+            ? '/admin'
+            : '/lobby';
+      const url = notification?.data?.url || fallback;
       window.location.assign(url);
     });
   }
@@ -144,7 +177,7 @@ async function subscribeToNativePush(userEmail, { audience = 'player' } = {}) {
   return { nativeToken: token };
 }
 
-async function subscribeToWebPush(userEmail, { audience = 'player' } = {}) {
+async function subscribeToWebPush(userEmail, { audience = 'player', distributorId = '' } = {}) {
   if (isIosDevice() && !isStandaloneDisplay()) {
     throw new Error(
       'On iPhone, open Jackpot Royals from the Home Screen icon first, then enable notifications.'
@@ -179,13 +212,17 @@ async function subscribeToWebPush(userEmail, { audience = 'player' } = {}) {
     });
   }
 
+  const resolvedAudience =
+    audience === 'distributor' ? 'distributor' : audience === 'staff' ? 'staff' : 'player';
+
   const response = await fetch('/api/push-subscriptions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       email: String(userEmail || '').trim().toLowerCase(),
       subscription: subscription.toJSON(),
-      audience: audience === 'staff' ? 'staff' : 'player',
+      audience: resolvedAudience,
+      distributorId: resolvedAudience === 'distributor' ? String(distributorId || '').trim() : '',
       userAgent: navigator.userAgent
     })
   });
@@ -200,9 +237,12 @@ async function subscribeToWebPush(userEmail, { audience = 'player' } = {}) {
 export async function subscribeToPromoPush(userEmail) {
   if (isNativePlatform()) {
     try {
-      return await subscribeToNativePush(userEmail, {
-        audience: isPortalNative() ? 'staff' : 'player'
-      });
+      const audience = isDistributorNative()
+        ? 'distributor'
+        : isPortalNative()
+          ? 'staff'
+          : 'player';
+      return await subscribeToNativePush(userEmail, { audience });
     } catch (error) {
       const message = String(error?.message || '');
       // Permission denied should not silently fall back.
@@ -225,6 +265,25 @@ export async function subscribeToStaffPush(userEmail) {
     }
   }
   return subscribeToWebPush(userEmail, { audience: 'staff' });
+}
+
+/** Jackpot Distributor APK — lock-screen alerts for that distributor's requests. */
+export async function subscribeToDistributorPush(userEmail, distributorId) {
+  if (isNativePlatform()) {
+    try {
+      return await subscribeToNativePush(userEmail, {
+        audience: 'distributor',
+        distributorId
+      });
+    } catch (error) {
+      const message = String(error?.message || '');
+      if (/permission was not allowed/i.test(message)) throw error;
+    }
+  }
+  return subscribeToWebPush(userEmail, {
+    audience: 'distributor',
+    distributorId
+  });
 }
 
 export async function unsubscribeFromPromoPush(userEmail) {

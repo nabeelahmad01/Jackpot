@@ -137,7 +137,8 @@ export default function AdminDashboard({
         /JackpotRoyalsNative|JackpotPortalNative/i.test(navigator.userAgent || '') ||
         window.Capacitor?.isNativePlatform?.() === true ||
         // Portal APK always opens /admin — treat Capacitor WebView on admin as native shell
-        (window.Capacitor != null && window.location.pathname.startsWith('/admin'));
+        (window.Capacitor != null && window.location.pathname.startsWith('/admin')) ||
+        /JackpotDistributorNative/i.test(navigator.userAgent || '');
 
       if (isNative) {
         document.documentElement.classList.add('admin-native-shell');

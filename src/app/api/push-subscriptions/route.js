@@ -4,6 +4,13 @@ import { getVapidPublicKey, isStaffRole } from '../../../lib/pushNotifications';
 
 export const dynamic = 'force-dynamic';
 
+function resolveAudience(raw) {
+  const value = String(raw || 'player').trim().toLowerCase();
+  if (value === 'staff') return 'staff';
+  if (value === 'distributor') return 'distributor';
+  return 'player';
+}
+
 export async function GET() {
   const publicKey = getVapidPublicKey();
   return NextResponse.json({
@@ -20,9 +27,8 @@ export async function POST(req) {
     const subscription = body.subscription;
     const nativeToken = String(body.nativeToken || '').trim();
     const platform = String(body.platform || '').trim().toLowerCase() || 'web';
-    const audience = String(body.audience || 'player').trim().toLowerCase() === 'staff'
-      ? 'staff'
-      : 'player';
+    const audience = resolveAudience(body.audience);
+    const requestedDistributorId = String(body.distributorId || '').trim();
     const endpoint = subscription?.endpoint || (nativeToken ? `native:${nativeToken}` : '');
 
     const hasWebSubscription = Boolean(
@@ -60,10 +66,16 @@ export async function POST(req) {
       { email: userEmail },
       { projection: { _id: 1, role: 1, distributorId: 1 } }
     );
+    const distributorDoc = await db.collection('distributors').findOne(
+      { email: userEmail },
+      { projection: { id: 1, email: 1 } }
+    );
 
-    if (!isEnvAdmin && !user) {
+    if (!isEnvAdmin && !user && !distributorDoc) {
       return NextResponse.json({ success: false, message: 'User account was not found.' }, { status: 404 });
     }
+
+    let distributorId = '';
 
     if (audience === 'staff') {
       const roleOk = isEnvAdmin || isStaffRole(user?.role);
@@ -71,6 +83,26 @@ export async function POST(req) {
       if (!roleOk || isDistributorStaff) {
         return NextResponse.json(
           { success: false, message: 'Only Jackpot Portal admin/staff can register for staff alerts.' },
+          { status: 403 }
+        );
+      }
+    }
+
+    if (audience === 'distributor') {
+      if (distributorDoc?.id) {
+        distributorId = distributorDoc.id;
+      } else if (user?.distributorId && user.role && user.role !== 'user') {
+        distributorId = String(user.distributorId).trim();
+      }
+      if (requestedDistributorId && distributorId && requestedDistributorId !== distributorId) {
+        return NextResponse.json(
+          { success: false, message: 'Distributor id mismatch for this account.' },
+          { status: 403 }
+        );
+      }
+      if (!distributorId) {
+        return NextResponse.json(
+          { success: false, message: 'Only distributor accounts can register for distributor alerts.' },
           { status: 403 }
         );
       }
@@ -84,6 +116,7 @@ export async function POST(req) {
           endpoint,
           userEmail,
           audience,
+          distributorId: audience === 'distributor' ? distributorId : '',
           type: hasNativeSubscription ? 'native' : 'web',
           platform: hasNativeSubscription ? platform : 'web',
           subscription: hasWebSubscription ? subscription : null,
@@ -96,7 +129,7 @@ export async function POST(req) {
       { upsert: true }
     );
 
-    return NextResponse.json({ success: true, audience });
+    return NextResponse.json({ success: true, audience, distributorId: distributorId || undefined });
   } catch (error) {
     console.error('Push subscription save error:', error);
     return NextResponse.json(

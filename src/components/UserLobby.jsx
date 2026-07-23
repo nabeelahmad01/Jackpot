@@ -234,9 +234,11 @@ export default function UserLobby({
       canClaim: false,
       phase: 'need_deposit',
       isFirst: false,
+      depositTotal: depositTotalAfter,
+      remaining,
       message: lastCashoutAfterFreeplay
-        ? `Cashout reset your freeplay progress. Deposit $${remaining.toFixed(2)} more ($${depositTotalAfter.toFixed(2)} / $25.00) since your last cashout.`
-        : `Deposit at least $${remaining.toFixed(2)} more ($${depositTotalAfter.toFixed(2)} / $25.00) to claim freeplay again.`
+        ? `You will be eligible for freeplay after depositing $${remaining.toFixed(2)} more since your last cashout ($${depositTotalAfter.toFixed(2)} / $25.00).`
+        : `You will be eligible for freeplay after depositing $${remaining.toFixed(2)} more ($${depositTotalAfter.toFixed(2)} / $25.00).`
     };
   }, [transactions]);
 
@@ -802,7 +804,7 @@ export default function UserLobby({
 
   const handleFreeplayClaim = () => {
     if (!freeplayGate.canClaim) {
-      showToast(freeplayGate.message || 'You are not eligible for Freeplay right now.', 'error');
+      showToast(freeplayGate.message || 'You are not eligible for Freeplay right now.', 'info');
       return;
     }
 
@@ -1354,35 +1356,24 @@ export default function UserLobby({
                           <span>
                             {freeplayGate.isFirst && freeplayGate.phase !== 'pending'
                               ? (frontendSettings?.lobbyFreeplayCondition || 'ON SIGNUP!')
-                              : freeplayGate.phase === 'deposit'
-                                ? 'AFTER $25+ DEPOSIT'
+                              : freeplayGate.phase === 'deposit' && freeplayGate.canClaim
+                                ? 'READY TO CLAIM'
                                 : freeplayGate.phase === 'pending'
                                   ? 'REQUEST PENDING'
-                                  : 'DEPOSIT $25+ TO UNLOCK'}
+                                  : freeplayGate.phase === 'need_deposit'
+                                    ? `$${Number(freeplayGate.depositTotal || 0).toFixed(0)} / $25 TO ELIGIBLE`
+                                    : 'AFTER $25+ DEPOSIT'}
                           </span>
                         </div>
                       </div>
-                      {freeplayGate.canClaim ? (
-                        <button
-                          type="button"
-                          onClick={handleFreeplayClaim}
-                          className="freeplay-claim-btn"
-                        >
-                          <i className="fa-solid fa-gift"></i>
-                          {frontendSettings?.lobbyFreeplayClaimBtn || "CLAIM FREEPLAY NOW"}
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className="freeplay-claim-btn"
-                          disabled
-                          style={{ opacity: 0.55, cursor: 'not-allowed' }}
-                          title={freeplayGate.message}
-                        >
-                          <i className="fa-solid fa-lock"></i>
-                          {freeplayGate.phase === 'pending' ? 'REQUESTED' : 'LOCKED'}
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={handleFreeplayClaim}
+                        className="freeplay-claim-btn"
+                      >
+                        <i className="fa-solid fa-gift"></i>
+                        {frontendSettings?.lobbyFreeplayClaimBtn || "CLAIM FREEPLAY NOW"}
+                      </button>
                     </div>
                   </>
                 ) : (
@@ -1420,11 +1411,13 @@ export default function UserLobby({
                     <p className="freeplay-condition">
                       {freeplayGate.isFirst && freeplayGate.phase !== 'pending'
                         ? (frontendSettings?.lobbyFreeplayCondition || 'ON SIGNUP!')
-                        : freeplayGate.phase === 'deposit'
-                          ? 'AFTER $25+ DEPOSIT'
+                        : freeplayGate.phase === 'deposit' && freeplayGate.canClaim
+                          ? 'READY TO CLAIM'
                           : freeplayGate.phase === 'pending'
                             ? 'REQUEST PENDING'
-                            : 'DEPOSIT $25+ TO UNLOCK'}
+                            : freeplayGate.phase === 'need_deposit'
+                              ? `$${Number(freeplayGate.depositTotal || 0).toFixed(0)} / $25 TO ELIGIBLE`
+                              : 'AFTER $25+ DEPOSIT'}
                     </p>
 
                     <div className="freeplay-bullets">
@@ -1441,49 +1434,26 @@ export default function UserLobby({
                         <div className="bullet-desc"><strong>{frontendSettings?.lobbyBullet3Title || "CASH OUT"}</strong><span>{frontendSettings?.lobbyBullet3Desc || "Fast withdrawals"}</span></div>
                       </div>
                     </div>
-                    {freeplayGate.canClaim ? (
-                      <button
-                        onClick={handleFreeplayClaim}
-                        className="submit-btn"
-                        style={{
-                          marginTop: '1.25rem',
-                          background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)',
-                          color: '#fff',
-                          fontWeight: 'bold',
-                          padding: '0.65rem 1rem',
-                          fontSize: '0.75rem',
-                          borderRadius: '10px',
-                          width: '100%',
-                          border: 'none',
-                          boxShadow: '0 4px 15px rgba(168,85,247,0.3)',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <i className="fa-solid fa-gift" style={{ marginRight: '6px' }}></i> {frontendSettings?.lobbyFreeplayClaimBtn || "CLAIM FREEPLAY NOW"}
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="submit-btn"
-                        disabled
-                        title={freeplayGate.message}
-                        style={{
-                          marginTop: '1.25rem',
-                          background: 'rgba(255,255,255,0.08)',
-                          color: 'rgba(255,255,255,0.55)',
-                          fontWeight: 'bold',
-                          padding: '0.65rem 1rem',
-                          fontSize: '0.75rem',
-                          borderRadius: '10px',
-                          width: '100%',
-                          border: '1px solid rgba(255,255,255,0.1)',
-                          cursor: 'not-allowed'
-                        }}
-                      >
-                        <i className="fa-solid fa-lock" style={{ marginRight: '6px' }}></i>
-                        {freeplayGate.phase === 'pending' ? 'FREEPLAY REQUESTED' : 'DEPOSIT $25+ TO UNLOCK'}
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={handleFreeplayClaim}
+                      className="submit-btn"
+                      style={{
+                        marginTop: '1.25rem',
+                        background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)',
+                        color: '#fff',
+                        fontWeight: 'bold',
+                        padding: '0.65rem 1rem',
+                        fontSize: '0.75rem',
+                        borderRadius: '10px',
+                        width: '100%',
+                        border: 'none',
+                        boxShadow: '0 4px 15px rgba(168,85,247,0.3)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <i className="fa-solid fa-gift" style={{ marginRight: '6px' }}></i> {frontendSettings?.lobbyFreeplayClaimBtn || "CLAIM FREEPLAY NOW"}
+                    </button>
                   </>
                 )}
               </div>
@@ -1729,22 +1699,9 @@ export default function UserLobby({
             </div>
 
             <div className="game-header-buttons">
-              {freeplayGate.canClaim ? (
-                <button onClick={handleFreeplayClaim} className="lobby-nav-btn app-btn" style={{ background: '#a855f7', color: '#fff', padding: '0.5rem 0.85rem' }}>
-                  <i className="fa-solid fa-gift"></i> <span style={{ fontSize: '0.75rem' }}>FREEPLAY</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="lobby-nav-btn app-btn"
-                  disabled
-                  title={freeplayGate.message}
-                  onClick={() => showToast(freeplayGate.message, 'info')}
-                  style={{ background: 'rgba(168,85,247,0.25)', color: 'rgba(255,255,255,0.55)', padding: '0.5rem 0.85rem', cursor: 'not-allowed' }}
-                >
-                  <i className="fa-solid fa-lock"></i> <span style={{ fontSize: '0.75rem' }}>{freeplayGate.phase === 'pending' ? 'PENDING' : 'LOCKED'}</span>
-                </button>
-              )}
+              <button onClick={handleFreeplayClaim} className="lobby-nav-btn app-btn" style={{ background: '#a855f7', color: '#fff', padding: '0.5rem 0.85rem' }}>
+                <i className="fa-solid fa-gift"></i> <span style={{ fontSize: '0.75rem' }}>FREEPLAY</span>
+              </button>
               <button onClick={handleReferEarn} className="lobby-nav-btn app-btn" style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '0.5rem 0.85rem' }}>
                 <i className="fa-solid fa-link"></i> <span style={{ fontSize: '0.75rem' }}>INVITE</span>
               </button>

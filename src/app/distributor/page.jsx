@@ -18,6 +18,7 @@ import PanelModalBackdrop from '../../components/PanelModalBackdrop';
 import ParticlesBackground from '../../components/ParticlesBackground';
 import { initAudioUnlock, playNotificationSound } from '../../lib/notificationSound';
 import { initDesktopNotifications, notifyStaffActivity } from '../../lib/desktopNotify';
+import { subscribeToDistributorPush } from '../../lib/pushClient';
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
 export default function DistributorPortal() {
@@ -113,6 +114,56 @@ export default function DistributorPortal() {
     initAudioUnlock();
     initDesktopNotifications();
   }, []);
+
+  // Capacitor Distributor APK: safe-area shell (same as Portal /admin)
+  useEffect(() => {
+    const apply = () => {
+      const isNative =
+        /JackpotRoyalsNative|JackpotPortalNative|JackpotDistributorNative/i.test(
+          navigator.userAgent || ''
+        ) ||
+        window.Capacitor?.isNativePlatform?.() === true ||
+        (window.Capacitor != null && window.location.pathname.startsWith('/distributor'));
+
+      if (isNative) {
+        document.documentElement.classList.add('admin-native-shell');
+        return true;
+      }
+      return false;
+    };
+
+    apply();
+    const interval = window.setInterval(() => {
+      if (apply()) window.clearInterval(interval);
+    }, 300);
+    const stop = window.setTimeout(() => window.clearInterval(interval), 6000);
+
+    return () => {
+      window.clearInterval(interval);
+      window.clearTimeout(stop);
+      document.documentElement.classList.remove('admin-native-shell');
+    };
+  }, []);
+
+  // Register this device for Jackpot Distributor lock-screen request alerts
+  useEffect(() => {
+    const email = distSession?.email;
+    const distributorId = distSession?.id;
+    if (!email || !distributorId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        await subscribeToDistributorPush(email, distributorId);
+      } catch (err) {
+        if (!cancelled) {
+          console.warn('Distributor push registration:', err?.message || err);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [distSession?.email, distSession?.id]);
 
   // Referred Players tab is owner-only; redirect staff away if they land on it
   useEffect(() => {

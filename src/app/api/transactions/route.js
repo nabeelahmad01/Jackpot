@@ -4,7 +4,7 @@ import { cache } from '../../../lib/cache';
 import { buildRemainderClaimAvailableAt } from '../../../lib/claimWait';
 import { calcCommissionFromProfit } from '../../../lib/commission';
 import { getTypeBDistributorIds } from '../../../lib/typeBDistributors';
-import { notifyStaffAsync } from '../../../lib/pushNotifications';
+import { notifyStaffAndDistributorAsync } from '../../../lib/pushNotifications';
 import { accountLookupKey, buildGameUsernameMap } from '../../../lib/resolveGameUsername';
 
 // GET transactions (supports filtering by email for users, or returning all for admins)
@@ -269,12 +269,12 @@ export async function POST(req) {
       // Invalidate stats cache
       cache.del('admin_stats');
 
-      notifyStaffAsync(db, {
+      notifyStaffAndDistributorAsync(db, {
         title: 'Remainder Payout Request',
         body: `${txObject.userEmail} · $${parseFloat(txObject.amount || 0).toFixed(2)}`,
         url: '/admin',
         tag: `tx-${txObject.id}`
-      });
+      }, txObject.distributorId);
 
       return NextResponse.json({ success: true, transaction: txObject, message: 'Remaining payout request submitted successfully!' });
     }
@@ -490,14 +490,14 @@ export async function POST(req) {
 
     await transactionsCollection.insertOne(txObject);
 
-    // Alert Jackpot Portal (admin/staff) devices — never touches player promo push.
+    // Alert Jackpot Portal + owning Distributor APK — never touches player promo push.
     const alertType = String(txObject.type || 'REQUEST').replace(/_/g, ' ');
-    notifyStaffAsync(db, {
+    notifyStaffAndDistributorAsync(db, {
       title: `New ${alertType}`,
       body: `${txObject.userEmail || 'Player'} · $${parseFloat(txObject.amount || 0).toFixed(2)}${txObject.gameTitle ? ` · ${txObject.gameTitle}` : ''}`,
       url: '/admin',
       tag: `tx-${txObject.id}`
-    });
+    }, txObject.distributorId);
 
     if (txObject.type === 'WITHDRAW') {
       const notificationsCollection = db.collection('coinsNotifications');

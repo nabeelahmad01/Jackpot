@@ -64,3 +64,5 @@ Staff push hooks live in the Next.js API. Redeploy the site (Hostinger) so live 
 | Audience | player promos | staff request alerts |
 
 Both apps can be installed on the same phone side by side.
+
+See also: [DISTRIBUTOR_SETUP.md](./DISTRIBUTOR_SETUP.md) for the separate **Jackpot Distributor** APK (`/distributor` + lock-screen alerts per distributor).

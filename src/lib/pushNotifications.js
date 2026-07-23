@@ -317,3 +317,139 @@ export function notifyStaffAsync(db, alert) {
     .then(() => sendStaffPush(db, alert))
     .catch((err) => console.error('notifyStaffAsync failed:', err));
 }
+
+/**
+ * Lock-screen alerts for the Jackpot Distributor APK.
+ * Only devices registered with audience: 'distributor' and matching distributorId.
+ */
+export async function sendDistributorPush(
+  db,
+  { distributorId, title, body, url = '/distributor', tag = 'distributor-alert' } = {}
+) {
+  try {
+    const distId = String(distributorId || '').trim();
+    if (!distId) {
+      return { sent: 0, failed: 0, skipped: true };
+    }
+
+    const subscriptions = await db.collection('pushSubscriptions')
+      .find({ audience: 'distributor', distributorId: distId })
+      .toArray();
+
+    if (subscriptions.length === 0) {
+      return { sent: 0, failed: 0, skipped: true };
+    }
+
+    const webSubscriptions = subscriptions.filter(
+      (record) => record.type !== 'native' && record.subscription
+    );
+    const nativeSubscriptions = subscriptions.filter(
+      (record) => record.type === 'native' && record.nativeToken
+    );
+
+    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://jackpotroyals.com')
+      .replace(/\/$/, '');
+    const safeTitle = String(title || 'Jackpot Distributor').slice(0, 80);
+    const safeBody = String(body || 'New request waiting in your portal.').slice(0, 180);
+    const safeUrl = String(url || '/distributor');
+    const payload = JSON.stringify({
+      title: safeTitle,
+      body: safeBody,
+      icon: `${siteUrl}/icon-192.png`,
+      badge: `${siteUrl}/icon-192.png`,
+      tag,
+      url: safeUrl
+    });
+
+    let sent = 0;
+    let failed = 0;
+    const expiredEndpoints = [];
+
+    if (configureWebPush()) {
+      for (const record of webSubscriptions) {
+        try {
+          await webpush.sendNotification(record.subscription, payload);
+          sent += 1;
+        } catch (error) {
+          failed += 1;
+          const statusCode = error?.statusCode;
+          if (statusCode === 404 || statusCode === 410) {
+            expiredEndpoints.push(record.endpoint);
+          }
+        }
+      }
+    }
+
+    const messaging = getFirebaseMessaging();
+    if (messaging && nativeSubscriptions.length > 0) {
+      for (let index = 0; index < nativeSubscriptions.length; index += 500) {
+        const batch = nativeSubscriptions.slice(index, index + 500);
+        const response = await messaging.sendEachForMulticast({
+          tokens: batch.map((record) => record.nativeToken),
+          notification: {
+            title: safeTitle,
+            body: safeBody
+          },
+          data: {
+            url: safeUrl,
+            tag: String(tag)
+          },
+          android: {
+            priority: 'high',
+            notification: {
+              channelId: 'jackpot_distributor_alerts',
+              sound: 'default'
+            }
+          }
+        });
+
+        sent += response.successCount;
+        failed += response.failureCount;
+        response.responses.forEach((result, resultIndex) => {
+          const code = result.error?.code;
+          if (
+            code === 'messaging/registration-token-not-registered' ||
+            code === 'messaging/invalid-registration-token'
+          ) {
+            expiredEndpoints.push(batch[resultIndex].endpoint);
+          }
+        });
+      }
+    }
+
+    if (expiredEndpoints.length > 0) {
+      await db.collection('pushSubscriptions').deleteMany({
+        endpoint: { $in: expiredEndpoints }
+      });
+    }
+
+    return { sent, failed, skipped: false };
+  } catch (error) {
+    console.error('Distributor push error:', error);
+    return { sent: 0, failed: 0, skipped: true, error: error.message };
+  }
+}
+
+export function notifyDistributorAsync(db, alert) {
+  Promise.resolve()
+    .then(() => sendDistributorPush(db, alert))
+    .catch((err) => console.error('notifyDistributorAsync failed:', err));
+}
+
+/**
+ * Notify Jackpot Portal staff always; also notify the owning distributor APK
+ * when distributorId is present (deposit / withdraw / account / support).
+ */
+export function notifyStaffAndDistributorAsync(db, alert, distributorId) {
+  notifyStaffAsync(db, {
+    ...alert,
+    url: alert?.url || '/admin'
+  });
+  if (distributorId) {
+    notifyDistributorAsync(db, {
+      ...alert,
+      distributorId,
+      url: '/distributor'
+    });
+  }
+}
