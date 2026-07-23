@@ -24,6 +24,14 @@ function clearAllSessions() {
   }
 }
 
+function isClientProtectedSuperAdmin(email) {
+  const clean = String(email || '').toLowerCase().trim();
+  if (!clean) return true;
+  if (clean === 'admin@jackpot.com') return true;
+  const envEmail = String(process.env.NEXT_PUBLIC_ADMIN_EMAIL || '').toLowerCase().trim();
+  return Boolean(envEmail && clean === envEmail);
+}
+
 /**
  * While logged in, poll session-status. If the account was deleted (or revoked),
  * wipe local sessions and hard-redirect to login — even if they never clicked Logout.
@@ -33,7 +41,9 @@ export default function useSessionGuard(email, { redirectTo = '/login', interval
 
   useEffect(() => {
     const cleanEmail = String(email || '').toLowerCase().trim();
-    if (!cleanEmail || cleanEmail === 'admin@jackpot.com') return undefined;
+    // Super admin may only exist via env (not in DB). Never poll-kick them here;
+    // session-status also treats them as always valid.
+    if (!cleanEmail || isClientProtectedSuperAdmin(cleanEmail)) return undefined;
 
     let cancelled = false;
     let timer = null;

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/mongodb';
-import { isSessionRevoked } from '../../../../lib/sessionRevoke';
+import { isSessionRevoked, isProtectedSuperAdminEmail } from '../../../../lib/sessionRevoke';
 
 /**
  * Lightweight live-session check. Clients poll this while logged in;
@@ -12,6 +12,11 @@ export async function GET(req) {
     const email = String(searchParams.get('email') || '').toLowerCase().trim();
     if (!email) {
       return NextResponse.json({ success: false, valid: false, message: 'Email required.' }, { status: 400 });
+    }
+
+    // Env / legacy super admin is not a DB user — never treat as missing/deleted.
+    if (isProtectedSuperAdminEmail(email)) {
+      return NextResponse.json({ success: true, valid: true, role: 'admin' });
     }
 
     if (isSessionRevoked(email)) {
