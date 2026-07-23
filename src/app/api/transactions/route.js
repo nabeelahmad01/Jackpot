@@ -162,7 +162,7 @@ export async function GET(req) {
     let accountsMap = {};
     if (txPairs.length > 0) {
       const uniqueEmails = Array.from(new Set(txPairs.map((t) => t.userEmail.toLowerCase().trim())));
-      accountsMap = await buildGameUsernameMap(db, uniqueEmails, { dedupe: true });
+      accountsMap = await buildGameUsernameMap(db, uniqueEmails, { dedupe: false });
     }
 
     for (const tx of transactions) {

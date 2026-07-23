@@ -92,22 +92,38 @@ export default function ShiftDashboardTab({ adminUser }) {
 
   // Handle Allotment Loaded (Success)
   const handleCoinAllotmentSuccess = async (notiId) => {
+    if (!notiId) {
+      alert('Missing notification id.');
+      return;
+    }
     setProcessingCoinId(notiId);
     try {
       const res = await fetch('/api/coins-notifications', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: notiId, status: 'COMPLETED', read: true, processedBy: adminUser?.email || 'admin@jackpot.com', adminEmail: adminUser?.email || '' })
+        body: JSON.stringify({
+          id: notiId,
+          status: 'COMPLETED',
+          read: true,
+          processedBy: adminUser?.email || 'admin@jackpot.com',
+          adminEmail: adminUser?.email || ''
+        })
       });
-      const data = await res.json();
+      let data = null;
+      try {
+        data = await res.json();
+      } catch {
+        alert(`Error updating status (HTTP ${res.status}). Please try again.`);
+        return;
+      }
       if (data.success) {
-        mutateCoins();
+        await mutateCoins();
       } else {
         alert(data.message || 'Failed to update status.');
       }
     } catch (err) {
       console.error(err);
-      alert('Error updating status.');
+      alert(err?.message ? `Error updating status: ${err.message}` : 'Error updating status.');
     } finally {
       setProcessingCoinId(null);
     }
@@ -120,28 +136,45 @@ export default function ShiftDashboardTab({ adminUser }) {
       alert('Please enter a reason for invalidating this transaction.');
       return;
     }
+    if (!notiId) {
+      alert('Missing notification id.');
+      return;
+    }
 
     setProcessingCoinId(notiId);
     try {
       const res = await fetch('/api/coins-notifications', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: notiId, status: 'HOLD', read: true, holdNote: reason, processedBy: adminUser?.email || 'admin@jackpot.com', adminEmail: adminUser?.email || '' })
+        body: JSON.stringify({
+          id: notiId,
+          status: 'HOLD',
+          read: true,
+          holdNote: reason,
+          processedBy: adminUser?.email || 'admin@jackpot.com',
+          adminEmail: adminUser?.email || ''
+        })
       });
-      const data = await res.json();
+      let data = null;
+      try {
+        data = await res.json();
+      } catch {
+        alert(`Error setting hold note (HTTP ${res.status}). Please try again.`);
+        return;
+      }
       if (data.success) {
         setInvalidReasons(prev => {
           const next = { ...prev };
           delete next[notiId];
           return next;
         });
-        mutateCoins();
+        await mutateCoins();
       } else {
         alert(data.message || 'Failed to set hold note.');
       }
     } catch (err) {
       console.error(err);
-      alert('Error setting hold note.');
+      alert(err?.message ? `Error setting hold note: ${err.message}` : 'Error setting hold note.');
     } finally {
       setProcessingCoinId(null);
     }

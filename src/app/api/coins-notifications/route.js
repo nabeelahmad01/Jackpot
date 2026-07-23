@@ -85,7 +85,8 @@ export async function GET(req) {
     let accountsMap = {};
     if (notiPairs.length > 0) {
       const uniqueEmails = Array.from(new Set(notiPairs.map((n) => n.userEmail.toLowerCase().trim())));
-      accountsMap = await buildGameUsernameMap(db, uniqueEmails, { dedupe: true });
+      // Read-only resolve — never mutate gameAccounts on every poll
+      accountsMap = await buildGameUsernameMap(db, uniqueEmails, { dedupe: false });
     }
 
     for (const noti of notifications) {
@@ -112,16 +113,25 @@ export async function GET(req) {
 // PUT update status, read indicator, or hold note
 export async function PUT(req) {
   try {
-    const { id, status, read, holdNote, processedBy, adminEmail } = await req.json();
+    const body = await req.json();
+    const { id, status, read, holdNote, processedBy, adminEmail } = body || {};
 
-    if (!id) {
+    if (id === undefined || id === null || id === '') {
       return NextResponse.json({ success: false, message: 'Notification ID is required.' }, { status: 400 });
     }
 
     const db = await getDb();
     const notificationsCollection = db.collection('coinsNotifications');
 
-    const originalNoti = await notificationsCollection.findOne({ id });
+    // id may be stored as string or number depending on older inserts
+    const idStr = String(id);
+    let originalNoti = await notificationsCollection.findOne({ id: idStr });
+    if (!originalNoti && !Number.isNaN(Number(idStr))) {
+      originalNoti = await notificationsCollection.findOne({ id: Number(idStr) });
+    }
+    if (!originalNoti) {
+      originalNoti = await notificationsCollection.findOne({ id });
+    }
     if (!originalNoti) {
       return NextResponse.json({ success: false, message: 'Notification not found.' }, { status: 404 });
     }
@@ -152,7 +162,11 @@ export async function PUT(req) {
       updateFields.processedBy = processedBy;
     }
 
-    await notificationsCollection.updateOne({ id }, { $set: updateFields });
+    const notiQuery = originalNoti._id
+      ? { _id: originalNoti._id }
+      : { id: originalNoti.id };
+
+    await notificationsCollection.updateOne(notiQuery, { $set: updateFields });
 
     if (status === 'COMPLETED' && originalNoti.status !== 'COMPLETED') {
       // Deduct coins from dynamic game pools on allotment completion
@@ -162,7 +176,8 @@ export async function PUT(req) {
       if (gameTitle && gameTitle !== 'Referral Reward' && gameTitle !== 'Lobby') {
         try {
           const gamesCollection = db.collection('games');
-          const game = await gamesCollection.findOne({ title: { $regex: new RegExp(`^${gameTitle}$`, 'i') } });
+          const escaped = String(gameTitle).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const game = await gamesCollection.findOne({ title: { $regex: new RegExp(`^${escaped}$`, 'i') } });
           if (game) {
             if (originalNoti.distributorId) {
               const distGamesColl = db.collection('distributorGames');
@@ -192,7 +207,8 @@ export async function PUT(req) {
 
       if (originalNoti.transactionId) {
         const transactionsCollection = db.collection('transactions');
-        const parentTx = await transactionsCollection.findOne({ id: originalNoti.transactionId });
+        const parentTx = await transactionsCollection.findOne({ id: originalNoti.transactionId })
+          || await transactionsCollection.findOne({ id: String(originalNoti.transactionId) });
         if (parentTx) {
           const txUpdate = { allottedBy: processedBy || originalNoti.processedBy || 'system' };
           if (parentTx.type === 'WITHDRAW') {
@@ -207,7 +223,7 @@ export async function PUT(req) {
             txUpdate.status = 'SUCCESS';
           }
           await transactionsCollection.updateOne(
-            { id: originalNoti.transactionId },
+            parentTx._id ? { _id: parentTx._id } : { id: parentTx.id },
             { $set: txUpdate }
           );
         }
@@ -216,7 +232,8 @@ export async function PUT(req) {
       // If a withdrawal coin check is invalidated, directly fail the parent transaction
       if (originalNoti.transactionId) {
         const transactionsCollection = db.collection('transactions');
-        const parentTx = await transactionsCollection.findOne({ id: originalNoti.transactionId });
+        const parentTx = await transactionsCollection.findOne({ id: originalNoti.transactionId })
+          || await transactionsCollection.findOne({ id: String(originalNoti.transactionId) });
         if (parentTx) {
           const txUpdate = {
             status: 'FAILED',
@@ -224,7 +241,7 @@ export async function PUT(req) {
             allottedBy: processedBy || originalNoti.processedBy || 'system'
           };
           await transactionsCollection.updateOne(
-            { id: originalNoti.transactionId },
+            parentTx._id ? { _id: parentTx._id } : { id: parentTx.id },
             { $set: txUpdate }
           );
         }
