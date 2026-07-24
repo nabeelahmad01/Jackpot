@@ -26,6 +26,7 @@ export default function UserLobby({
   onLogout,
   showToast,
   onOpenSupport,
+  supportUnread = false,
   onRequestAccount,
   onSubmitTransaction,
   frontendSettings = {},
@@ -3091,17 +3092,18 @@ export default function UserLobby({
 
       {/* Floating support — move aside during deposit invoice so I HAVE PAID stays tappable */}
       <div
-        className={`support-chat-widget${activeInvoice ? ' support-chat-widget--deposit' : ''}`}
+        className={`support-chat-widget${activeInvoice ? ' support-chat-widget--deposit' : ''}${supportUnread ? ' support-chat-widget--unread' : ''}`}
         onClick={onOpenSupport}
       >
         <div className="chat-widget-bubble">
           <div className="chat-widget-tooltip">
-            <span>Need help with deposit?</span>
+            <span>{supportUnread ? 'New message from Support!' : 'Need help with deposit?'}</span>
             <div className="tooltip-arrow"></div>
           </div>
           <div className="chat-widget-inner">
             <i className="fa-solid fa-comment-dots"></i>
             <span>SUPPORT</span>
+            {supportUnread && <span className="support-unread-badge" aria-label="New support message">1</span>}
           </div>
         </div>
       </div>

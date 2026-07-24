@@ -49,6 +49,7 @@ export default function AuthPortal({
   triggerLoading,
   showToast,
   onOpenSupport,
+  supportUnread = false,
   frontendSettings = {}
 }) {
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || 'your_google_client_id_here';
@@ -1085,9 +1086,14 @@ export default function AuthPortal({
 
         {/* Floating Support Button FAB */}
         {onOpenSupport && (
-          <button type="button" className="support-fab" onClick={onOpenSupport}>
+          <button
+            type="button"
+            className={`support-fab${supportUnread ? ' support-fab--unread' : ''}`}
+            onClick={onOpenSupport}
+          >
             <i className="fa-solid fa-comment-dots"></i>
-            <span>Support</span>
+            <span>{supportUnread ? 'New msg' : 'Support'}</span>
+            {supportUnread && <span className="support-unread-badge" aria-label="New support message">1</span>}
           </button>
         )}
       </div>

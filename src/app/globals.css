@@ -472,6 +472,52 @@ body {
   font-size: 1.1rem;
 }
 
+.support-fab {
+  position: relative;
+}
+
+.support-fab--unread {
+  animation: support-unread-pulse 1.6s ease-in-out infinite;
+  box-shadow: 0 4px 18px rgba(239, 68, 68, 0.55), 0 0 22px rgba(239, 68, 68, 0.3);
+}
+
+.support-unread-badge {
+  position: absolute;
+  top: -6px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+  border: 2px solid #0b0d16;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.7);
+}
+
+.chat-widget-inner {
+  position: relative;
+}
+
+.support-chat-widget--unread .chat-widget-inner {
+  animation: support-unread-pulse 1.6s ease-in-out infinite;
+  box-shadow: 0 6px 22px rgba(239, 68, 68, 0.55);
+}
+
+.support-chat-widget--unread .chat-widget-tooltip {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+@keyframes support-unread-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+
 /* Portal headset FAB — hide on Live Support tab so it doesn't cover Reply */
 html.portal-on-support-tab .portal-support-fab {
   display: none !important;

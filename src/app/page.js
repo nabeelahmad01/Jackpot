@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import useSWR, { mutate } from 'swr';
 import usePollingSWR from '../hooks/usePollingSWR';
 import { POLL } from '../lib/pollingConfig';
@@ -13,6 +13,33 @@ import { SupportModal, GoogleWarningModal } from '../components/Modals';
 import useSessionGuard from '../hooks/useSessionGuard';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
+
+function resolveSupportEmail(session) {
+  if (session?.email) return String(session.email).toLowerCase().trim();
+  if (typeof window === 'undefined') return '';
+  try {
+    return String(localStorage.getItem('jackpot_guest_email') || '').toLowerCase().trim();
+  } catch {
+    return '';
+  }
+}
+
+function supportSeenKey(email) {
+  return `jackpot_support_seen_${String(email || '').toLowerCase().trim()}`;
+}
+
+function markSupportMessagesSeen(email, messages) {
+  const clean = String(email || '').toLowerCase().trim();
+  if (!clean || typeof window === 'undefined') return;
+  const adminMsgs = (messages || []).filter((m) => m?.senderType === 'admin');
+  const latest = adminMsgs.length ? adminMsgs[adminMsgs.length - 1] : null;
+  const stamp = latest?.timestamp || new Date().toISOString();
+  try {
+    localStorage.setItem(supportSeenKey(clean), stamp);
+  } catch {
+    /* ignore */
+  }
+}
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
@@ -33,6 +60,8 @@ export default function Home() {
   // Modals Open states
   const [supportOpen, setSupportOpen] = useState(false);
   const [googleWarnOpen, setGoogleWarnOpen] = useState(false);
+  const [supportUnread, setSupportUnread] = useState(false);
+  const supportAlertRef = useRef('');
 
   // Last-saved catalogs cached in localStorage so a refresh shows games
   // instantly instead of waiting on /api/games (often cold + was ~1MB+).
@@ -236,8 +265,61 @@ export default function Home() {
     }
   };
 
-  // Authentications callback handlers
-  const handleLoginSuccess = (user) => {
+  // Player support: badge + toast when admin replies (does not change chat/API logic).
+  useEffect(() => {
+    if (!mounted) return undefined;
+    if (supportOpen) {
+      setSupportUnread(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const check = async () => {
+      const email = resolveSupportEmail(session);
+      if (!email) {
+        if (!cancelled) setSupportUnread(false);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/support?email=${encodeURIComponent(email)}`, { cache: 'no-store' });
+        const data = await res.json().catch(() => null);
+        if (cancelled || !data?.success) return;
+        const adminMsgs = (data.messages || []).filter((m) => m?.senderType === 'admin');
+        if (adminMsgs.length === 0) {
+          setSupportUnread(false);
+          return;
+        }
+        const latest = adminMsgs[adminMsgs.length - 1];
+        const latestTs = String(latest?.timestamp || '');
+        let seen = '';
+        try {
+          seen = localStorage.getItem(supportSeenKey(email)) || '';
+        } catch {
+          seen = '';
+        }
+        const unread = !seen || (latestTs && new Date(latestTs).getTime() > new Date(seen).getTime());
+        setSupportUnread(Boolean(unread));
+        if (unread && latestTs && supportAlertRef.current !== latestTs) {
+          supportAlertRef.current = latestTs;
+          showToast('New message from Support — tap SUPPORT to read.', 'info');
+        }
+      } catch {
+        /* ignore network blips */
+      }
+    };
+
+    check();
+    const timer = window.setInterval(check, 4000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [mounted, session, supportOpen]);
+
+  const openSupport = () => {
+    setSupportUnread(false);
+    setSupportOpen(true);
+  };
     if (user.role === 'admin') {
       showToast('Admin credentials verified. Redirecting to Secure Workspace...', 'success');
       localStorage.setItem('jackpot_admin_session', 'active');
@@ -433,7 +515,8 @@ export default function Home() {
           onGoogleWarning={() => setGoogleWarnOpen(true)}
           triggerLoading={triggerLoading}
           showToast={showToast}
-          onOpenSupport={() => setSupportOpen(true)}
+          onOpenSupport={openSupport}
+          supportUnread={supportUnread}
           frontendSettings={frontendSettings}
         />
       ) : (
@@ -450,7 +533,8 @@ export default function Home() {
           currentUserEmail={session?.email}
           onLogout={handleLogout}
           showToast={showToast}
-          onOpenSupport={() => setSupportOpen(true)}
+          onOpenSupport={openSupport}
+          supportUnread={supportUnread}
           onRequestAccount={handleRequestAccount}
           onSubmitTransaction={handleSubmitTransaction}
           frontendSettings={frontendSettings}
@@ -466,6 +550,11 @@ export default function Home() {
         isOpen={supportOpen}
         onClose={() => setSupportOpen(false)}
         currentUser={session}
+        onMessagesSeen={(messages) => {
+          const email = resolveSupportEmail(session);
+          markSupportMessagesSeen(email, messages);
+          setSupportUnread(false);
+        }}
       />
 
       <GoogleWarningModal isOpen={googleWarnOpen} onClose={() => setGoogleWarnOpen(false)} />

@@ -70,13 +70,15 @@ export function ImageLightbox({ src, onClose, alt = 'Screenshot' }) {
 }
 
 // --- A) CUSTOMER SUPPORT MODAL ---
-export function SupportModal({ isOpen, onClose, currentUser }) {
+export function SupportModal({ isOpen, onClose, currentUser, onMessagesSeen }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [attachment, setAttachment] = useState('');
   const [lightboxSrc, setLightboxSrc] = useState('');
   const fileInputRef = useRef(null);
   const chatEndRef = useRef(null);
+  const onMessagesSeenRef = useRef(onMessagesSeen);
+  onMessagesSeenRef.current = onMessagesSeen;
 
   // Get active email & name for chat (either logged-in user or guest)
   const getChatIdentity = () => {
@@ -116,6 +118,9 @@ export function SupportModal({ isOpen, onClose, currentUser }) {
         const data = await res.json();
         if (data.success) {
           setMessages(data.messages);
+          if (typeof onMessagesSeenRef.current === 'function') {
+            onMessagesSeenRef.current(data.messages || []);
+          }
         }
       } catch (err) {
         console.error('Failed to load support chat:', err);
