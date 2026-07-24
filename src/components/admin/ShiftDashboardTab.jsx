@@ -242,6 +242,30 @@ export default function ShiftDashboardTab({ adminUser }) {
     const txId = row?.transactionId;
     setProcessingCoinId(notiId);
     hideCoinRow(notiId, txId);
+    // Optimistic SWR remove — never wait on poll round-trips for Loaded UX
+    mutateCoins(
+      (current) => {
+        if (!current?.coinsNotifications) return current;
+        return {
+          ...current,
+          coinsNotifications: current.coinsNotifications.filter((n) => String(n.id) !== String(notiId)),
+          totalNotifications: Math.max(0, (current.totalNotifications || 1) - 1)
+        };
+      },
+      { revalidate: true }
+    );
+    if (txId) {
+      mutateCoinsLoading(
+        (current) => {
+          if (!current?.transactions) return current;
+          return {
+            ...current,
+            transactions: current.transactions.filter((t) => String(t.id) !== String(txId))
+          };
+        },
+        { revalidate: true }
+      );
+    }
     try {
       const res = await fetch('/api/coins-notifications', {
         method: 'PUT',
@@ -259,18 +283,22 @@ export default function ShiftDashboardTab({ adminUser }) {
         data = await res.json();
       } catch {
         unhideCoinRow(notiId, txId);
+        mutateCoins();
+        mutateCoinsLoading();
         alert(`Error updating status (HTTP ${res.status}). Please try again.`);
         return;
       }
-      if (data.success) {
-        await Promise.all([mutateCoins(), mutateCoinsLoading()]);
-      } else {
+      if (!data.success) {
         unhideCoinRow(notiId, txId);
+        mutateCoins();
+        mutateCoinsLoading();
         alert(data.message || 'Failed to update status.');
       }
     } catch (err) {
       console.error(err);
       unhideCoinRow(notiId, txId);
+      mutateCoins();
+      mutateCoinsLoading();
       alert(err?.message ? `Error updating status: ${err.message}` : 'Error updating status.');
     } finally {
       setProcessingCoinId(null);
@@ -299,6 +327,29 @@ export default function ShiftDashboardTab({ adminUser }) {
       delete next[String(notiId)];
       return next;
     });
+    mutateCoins(
+      (current) => {
+        if (!current?.coinsNotifications) return current;
+        return {
+          ...current,
+          coinsNotifications: current.coinsNotifications.filter((n) => String(n.id) !== String(notiId)),
+          totalNotifications: Math.max(0, (current.totalNotifications || 1) - 1)
+        };
+      },
+      { revalidate: true }
+    );
+    if (txId) {
+      mutateCoinsLoading(
+        (current) => {
+          if (!current?.transactions) return current;
+          return {
+            ...current,
+            transactions: current.transactions.filter((t) => String(t.id) !== String(txId))
+          };
+        },
+        { revalidate: true }
+      );
+    }
     try {
       const res = await fetch('/api/coins-notifications', {
         method: 'PUT',
@@ -317,18 +368,22 @@ export default function ShiftDashboardTab({ adminUser }) {
         data = await res.json();
       } catch {
         unhideCoinRow(notiId, txId);
+        mutateCoins();
+        mutateCoinsLoading();
         alert(`Error setting hold note (HTTP ${res.status}). Please try again.`);
         return;
       }
-      if (data.success) {
-        await Promise.all([mutateCoins(), mutateCoinsLoading()]);
-      } else {
+      if (!data.success) {
         unhideCoinRow(notiId, txId);
+        mutateCoins();
+        mutateCoinsLoading();
         alert(data.message || 'Failed to set hold note.');
       }
     } catch (err) {
       console.error(err);
       unhideCoinRow(notiId, txId);
+      mutateCoins();
+      mutateCoinsLoading();
       alert(err?.message ? `Error setting hold note: ${err.message}` : 'Error setting hold note.');
     } finally {
       setProcessingCoinId(null);

@@ -128,59 +128,28 @@ export async function PUT(req) {
 
     // Shift Dashboard synthetic rows: tx-coins-<transactionId> for COINS_LOADING
     // deposits that never got a coinsNotifications document.
+    // Keep this path FAST — no first-deposit bonus recount (finance already approved).
     if (!originalNoti && idStr.startsWith('tx-coins-')) {
       const txId = idStr.slice('tx-coins-'.length);
       const tx =
         (await db.collection('transactions').findOne({ id: txId })) ||
         (await db.collection('transactions').findOne({ id: String(txId) }));
       if (tx && (tx.type === 'DEPOSIT' || tx.type === 'BONUS')) {
-        const existingByTx = await notificationsCollection.findOne({ transactionId: tx.id })
-          || await notificationsCollection.findOne({ transactionId: String(tx.id) });
+        const existingByTx = await notificationsCollection.findOne({
+          transactionId: { $in: [tx.id, String(tx.id)] }
+        });
         if (existingByTx) {
           originalNoti = existingByTx;
         } else {
           const amount = parseFloat(tx.amount || 0);
-          const userEmail = String(tx.userEmail || '').toLowerCase().trim();
-          let bonusPercentage = 0;
-          let totalCoins = amount;
-          let isFreeplay = false;
-
-          if (tx.type === 'BONUS' && (tx.code === 'SIGNUP-FREE3' || tx.code === 'FREEPLAY')) {
-            isFreeplay = true;
-            bonusPercentage = -3;
-            totalCoins = amount;
-          } else if (tx.type === 'DEPOSIT') {
-            const successfulDepositsCount = await db.collection('transactions').countDocuments({
-              userEmail,
-              type: 'DEPOSIT',
-              status: 'SUCCESS',
-              id: { $ne: tx.id }
-            });
-            const isFirstDeposit = successfulDepositsCount === 0;
-            const [settings, frontendSettings, depositor] = await Promise.all([
-              db.collection('settings').findOne({ id: 'global_settings' }),
-              db.collection('settings').findOne({ id: 'frontend_settings' }),
-              db.collection('users').findOne({ email: userEmail }, { projection: { pendingDepositBonusPercent: 1 } })
-            ]);
-            const firstBonusPercent = frontendSettings?.firstDepositBonus !== undefined
-              ? Number(frontendSettings.firstDepositBonus)
-              : (settings ? Number(settings.firstDepositBonus) : 300);
-            const rawPromo = depositor?.pendingDepositBonusPercent;
-            const promoBonusPercent = rawPromo !== undefined && rawPromo !== null ? Number(rawPromo) : null;
-            const usePromoBonus = promoBonusPercent !== null && promoBonusPercent > 0;
-            bonusPercentage = usePromoBonus
-              ? promoBonusPercent
-              : (isFirstDeposit ? firstBonusPercent : (settings ? Number(settings.regularDepositBonus) : 20));
-            totalCoins = Math.round(amount * (1 + bonusPercentage / 100) * 100) / 100;
-          }
-
+          const isFreeplay = tx.type === 'BONUS' && (tx.code === 'SIGNUP-FREE3' || tx.code === 'FREEPLAY');
           const newNoti = {
             id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
             userEmail: tx.userEmail,
             gameTitle: tx.gameTitle || 'Lobby',
             depositAmount: amount,
-            bonusApplied: bonusPercentage,
-            totalCoins,
+            bonusApplied: isFreeplay ? -3 : 0,
+            totalCoins: amount,
             ...(isFreeplay ? { isFreeplay: true } : {}),
             status: 'PENDING',
             read: false,
@@ -236,51 +205,57 @@ export async function PUT(req) {
       const gameTitle = originalNoti.gameTitle;
       const amountToDeduct = parseFloat(originalNoti.totalCoins || 0);
 
-      if (gameTitle && gameTitle !== 'Referral Reward' && gameTitle !== 'Lobby') {
+      const poolPromise = (async () => {
+        if (!gameTitle || gameTitle === 'Referral Reward' || gameTitle === 'Lobby') return;
         try {
           const gamesCollection = db.collection('games');
-          const escaped = String(gameTitle).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const game = await gamesCollection.findOne({ title: { $regex: new RegExp(`^${escaped}$`, 'i') } });
-          if (game) {
-            if (originalNoti.distributorId) {
-              const distGamesColl = db.collection('distributorGames');
-              const dg = await distGamesColl.findOne({ distributorId: originalNoti.distributorId, gameId: game.id });
-              const currentCoins = parseFloat(dg?.availableCoins || 0);
-              const newCoins = Math.max(0, currentCoins - amountToDeduct);
-              const currentUsed = parseFloat(dg?.usedCoins || 0);
-              const newUsed = originalNoti.isFreeplayWithdraw ? currentUsed : (currentUsed + amountToDeduct);
-              await distGamesColl.updateOne(
-                { distributorId: originalNoti.distributorId, gameId: game.id },
-                { $set: { availableCoins: newCoins, usedCoins: newUsed, title: gameTitle } },
-                { upsert: true }
-              );
-            } else {
-              const currentCoins = parseFloat(game.availableCoins || 0);
-              const newCoins = Math.max(0, currentCoins - amountToDeduct);
-              const currentUsed = parseFloat(game.usedCoins || 0);
-              const newUsed = originalNoti.isFreeplayWithdraw ? currentUsed : (currentUsed + amountToDeduct);
-              await gamesCollection.updateOne({ id: game.id }, { $set: { availableCoins: newCoins, usedCoins: newUsed } });
-              cache.del('games_all');
-            }
+          let game = await gamesCollection.findOne({ title: gameTitle });
+          if (!game) {
+            const escaped = String(gameTitle).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            game = await gamesCollection.findOne({ title: { $regex: new RegExp(`^${escaped}$`, 'i') } });
+          }
+          if (!game) return;
+          if (originalNoti.distributorId) {
+            const distGamesColl = db.collection('distributorGames');
+            const dg = await distGamesColl.findOne({ distributorId: originalNoti.distributorId, gameId: game.id });
+            const currentCoins = parseFloat(dg?.availableCoins || 0);
+            const newCoins = Math.max(0, currentCoins - amountToDeduct);
+            const currentUsed = parseFloat(dg?.usedCoins || 0);
+            const newUsed = originalNoti.isFreeplayWithdraw ? currentUsed : (currentUsed + amountToDeduct);
+            await distGamesColl.updateOne(
+              { distributorId: originalNoti.distributorId, gameId: game.id },
+              { $set: { availableCoins: newCoins, usedCoins: newUsed, title: gameTitle } },
+              { upsert: true }
+            );
+          } else {
+            const currentCoins = parseFloat(game.availableCoins || 0);
+            const newCoins = Math.max(0, currentCoins - amountToDeduct);
+            const currentUsed = parseFloat(game.usedCoins || 0);
+            const newUsed = originalNoti.isFreeplayWithdraw ? currentUsed : (currentUsed + amountToDeduct);
+            await gamesCollection.updateOne({ id: game.id }, { $set: { availableCoins: newCoins, usedCoins: newUsed } });
+            cache.del('games_all');
           }
         } catch (poolErr) {
           console.error('Failed to deduct game coin pool for completed allotment:', poolErr);
         }
-      }
+      })();
 
-      if (originalNoti.transactionId) {
-        const transactionsCollection = db.collection('transactions');
-        const parentTx = await transactionsCollection.findOne({ id: originalNoti.transactionId })
-          || await transactionsCollection.findOne({ id: String(originalNoti.transactionId) });
-        if (parentTx) {
+      const parentPromise = (async () => {
+        if (!originalNoti.transactionId) return;
+        try {
+          const transactionsCollection = db.collection('transactions');
+          const parentTx = await transactionsCollection.findOne({
+            id: { $in: [originalNoti.transactionId, String(originalNoti.transactionId)] }
+          });
+          if (!parentTx) return;
           const txUpdate = { allottedBy: processedBy || originalNoti.processedBy || 'system' };
           if (parentTx.type === 'WITHDRAW') {
             txUpdate.status = 'PENDING';
             if (originalNoti.isFreeplayWithdraw) {
               txUpdate.payoutAmount = 30;
-              txUpdate.amount = 30.0; // Cap the ledger/finance amount to $30 max cashout
+              txUpdate.amount = 30.0;
               txUpdate.isFreeplayWithdraw = true;
-              txUpdate.note = "Freeplay win capped at $30 max cashout.";
+              txUpdate.note = 'Freeplay win capped at $30 max cashout.';
             }
           } else if (parentTx.type === 'DEPOSIT' || parentTx.type === 'BONUS') {
             txUpdate.status = 'SUCCESS';
@@ -289,15 +264,20 @@ export async function PUT(req) {
             parentTx._id ? { _id: parentTx._id } : { id: parentTx.id },
             { $set: txUpdate }
           );
+        } catch (txErr) {
+          console.error('Failed to update parent transaction on allotment complete:', txErr);
         }
-      }
+      })();
+
+      await Promise.all([poolPromise, parentPromise]);
     } else if (status === 'HOLD') {
       // Withdrawals: Invalid → fail parent tx. Deposits: keep HOLD on noti (reclaimable)
       // but always stamp the reason on the parent so COINS_LOADING rows don't look "stuck".
       if (originalNoti.transactionId) {
         const transactionsCollection = db.collection('transactions');
-        const parentTx = await transactionsCollection.findOne({ id: originalNoti.transactionId })
-          || await transactionsCollection.findOne({ id: String(originalNoti.transactionId) });
+        const parentTx = await transactionsCollection.findOne({
+          id: { $in: [originalNoti.transactionId, String(originalNoti.transactionId)] }
+        });
         if (parentTx) {
           const txUpdate = {
             note: holdNote || 'Declined by Administrator.',

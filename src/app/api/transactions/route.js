@@ -7,6 +7,7 @@ import { typeBExclusionFilter } from '../../../lib/typeBDistributors';
 import { notifyStaffAndDistributorAsync } from '../../../lib/pushNotifications';
 import { accountLookupKey, buildGameUsernameMap } from '../../../lib/resolveGameUsername';
 import { compressDataUrlIfNeeded } from '../../../lib/serverImageCompress';
+import { applyStaffGameFilter } from '../../../lib/staffGameAccess';
 
 // GET transactions (supports filtering by email for users, or returning all for admins)
 export async function GET(req) {
@@ -112,6 +113,12 @@ export async function GET(req) {
       } else {
         query.type = { $nin: excludedTypes };
       }
+    }
+
+    // Coins staff: only their assigned games (Shift Dashboard COINS_LOADING fallback)
+    const adminEmail = searchParams.get('adminEmail');
+    if (adminEmail) {
+      query = await applyStaffGameFilter(db, query, adminEmail);
     }
 
     const totalTransactions = await transactionsCollection.countDocuments(query);
@@ -277,7 +284,9 @@ export async function POST(req) {
         title: 'Remainder Payout Request',
         body: `${txObject.userEmail} · $${parseFloat(txObject.amount || 0).toFixed(2)}`,
         url: '/admin',
-        tag: `tx-${txObject.id}`
+        tag: `tx-${txObject.id}`,
+        gameTitle: txObject.gameTitle || parentTx?.gameTitle || '',
+        alertKind: 'game'
       }, txObject.distributorId);
 
       return NextResponse.json({ success: true, transaction: txObject, message: 'Remaining payout request submitted successfully!' });
@@ -508,7 +517,9 @@ export async function POST(req) {
       title: `New ${alertType}`,
       body: `${txObject.userEmail || 'Player'} · $${parseFloat(txObject.amount || 0).toFixed(2)}${txObject.gameTitle ? ` · ${txObject.gameTitle}` : ''}`,
       url: '/admin',
-      tag: `tx-${txObject.id}`
+      tag: `tx-${txObject.id}`,
+      gameTitle: txObject.gameTitle || '',
+      alertKind: 'game'
     }, txObject.distributorId);
 
     if (txObject.type === 'WITHDRAW') {

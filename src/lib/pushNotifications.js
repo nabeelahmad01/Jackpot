@@ -197,16 +197,138 @@ const STAFF_PUSH_ROLES = [
   'operation_admin'
 ];
 
+const ALERT_KIND_ROLES = {
+  // Deposits / withdraws / remainder — finance + coins ops
+  game: ['admin', 'operation_admin', 'financial_admin', 'coins_admin'],
+  // Account / credentials requests — coins ops only
+  coins: ['admin', 'operation_admin', 'coins_admin'],
+  // Player support chat
+  support: ['admin', 'operation_admin', 'support_admin'],
+  // Affiliate campaign requests
+  campaign: ['admin', 'operation_admin'],
+  // Fallback
+  general: STAFF_PUSH_ROLES
+};
+
+function parseStaffRoles(role) {
+  return String(role || '')
+    .toLowerCase()
+    .split(',')
+    .map((r) => r.trim())
+    .filter(Boolean);
+}
+
+function isEnvSuperAdminEmail(email) {
+  const clean = String(email || '').toLowerCase().trim();
+  if (!clean) return false;
+  if (clean === 'admin@jackpot.com') return true;
+  const envEmail = String(process.env.ADMIN_EMAIL || process.env.NEXT_PUBLIC_ADMIN_EMAIL || '')
+    .toLowerCase()
+    .trim();
+  return Boolean(envEmail && clean === envEmail);
+}
+
+/**
+ * Keep only staff devices that should see this alert:
+ * - role match for alertKind
+ * - coins_admin additionally limited to allowedGameIds when gameTitle is set
+ */
+async function filterStaffSubscriptionsForAlert(db, subscriptions, { gameTitle, alertKind } = {}) {
+  if (!subscriptions.length) return subscriptions;
+
+  const kind = String(alertKind || (gameTitle ? 'game' : 'general')).toLowerCase();
+  const allowedRoles = ALERT_KIND_ROLES[kind] || ALERT_KIND_ROLES.general;
+  const skipGameTitles = new Set(['Lobby', 'Referral Reward', 'Distributor Payout', 'Platform Fees', '']);
+
+  const emails = Array.from(
+    new Set(
+      subscriptions
+        .map((s) => String(s.userEmail || '').toLowerCase().trim())
+        .filter(Boolean)
+    )
+  );
+
+  const users = emails.length
+    ? await db
+        .collection('users')
+        .find({ email: { $in: emails } }, { projection: { email: 1, role: 1, allowedGameIds: 1 } })
+        .toArray()
+    : [];
+  const userByEmail = new Map(
+    users.map((u) => [String(u.email || '').toLowerCase().trim(), u])
+  );
+
+  // Preload game titles once for coins_admin allow-lists
+  const coinsAdminsNeedingGames = users.filter((u) => {
+    const roles = parseStaffRoles(u.role);
+    return roles.includes('coins_admin') && !roles.includes('admin') && !roles.includes('operation_admin');
+  });
+  let gamesById = null;
+  if (gameTitle && !skipGameTitles.has(String(gameTitle)) && coinsAdminsNeedingGames.length > 0) {
+    const games = await db.collection('games').find({}, { projection: { id: 1, title: 1 } }).toArray();
+    gamesById = new Map(games.map((g) => [String(g.id), g.title]));
+  }
+
+  const gameTitleLower = String(gameTitle || '').toLowerCase().trim();
+
+  return subscriptions.filter((record) => {
+    const email = String(record.userEmail || '').toLowerCase().trim();
+    if (!email) return false;
+    if (isEnvSuperAdminEmail(email)) return true;
+
+    const user = userByEmail.get(email);
+    if (!user) return false;
+
+    const roles = parseStaffRoles(user.role);
+    if (!roles.some((r) => allowedRoles.includes(r))) return false;
+
+    // Full portal / ops always receive alerts they're role-eligible for
+    if (roles.includes('admin') || roles.includes('operation_admin')) {
+      return true;
+    }
+
+    // Finance gets money alerts, not account-request / support spam
+    if (roles.includes('financial_admin')) {
+      return kind === 'game' || kind === 'general';
+    }
+
+    // support / campaign already role-gated above
+    if (kind === 'support' || kind === 'campaign' || kind === 'general') {
+      return true;
+    }
+
+    // coins_admin: only their allowed games (when a gameTitle is present)
+    if (roles.includes('coins_admin') && (kind === 'game' || kind === 'coins')) {
+      if (!gameTitleLower || skipGameTitles.has(String(gameTitle || ''))) return true;
+      const allowedIds = Array.isArray(user.allowedGameIds) ? user.allowedGameIds.map(String) : [];
+      if (allowedIds.length === 0) return false; // restricted coins staff with no games → no game alerts
+      if (!gamesById) return false;
+      return allowedIds.some((id) => String(gamesById.get(id) || '').toLowerCase() === gameTitleLower);
+    }
+
+    return false;
+  });
+}
+
 /**
  * Lock-screen / native alerts for the Jackpot Portal (admin + staff) APK.
  * Only devices registered with audience: 'staff' receive these — the player APK
  * subscriptions are never touched.
+ * Recipients are filtered by staff role + optional game access.
  */
-export async function sendStaffPush(db, { title, body, url = '/admin', tag = 'staff-alert' } = {}) {
+export async function sendStaffPush(
+  db,
+  { title, body, url = '/admin', tag = 'staff-alert', gameTitle = '', alertKind = '' } = {}
+) {
   try {
-    const subscriptions = await db.collection('pushSubscriptions')
+    const allSubscriptions = await db.collection('pushSubscriptions')
       .find({ audience: 'staff' })
       .toArray();
+
+    const subscriptions = await filterStaffSubscriptionsForAlert(db, allSubscriptions, {
+      gameTitle,
+      alertKind
+    });
 
     if (subscriptions.length === 0) {
       return { sent: 0, failed: 0, skipped: true };

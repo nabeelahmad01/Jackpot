@@ -337,7 +337,8 @@ export async function POST(req) {
         title: 'New Support Message',
         body: `${userName || userEmail}: ${(message || 'Attachment').slice(0, 100)}`,
         url: '/admin',
-        tag: `support-${newMsg.id}`
+        tag: `support-${newMsg.id}`,
+        alertKind: 'support'
       }, distId);
     }
 

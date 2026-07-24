@@ -647,7 +647,9 @@ export async function POST(req) {
       title: 'New Account Request',
       body: `${cleanEmail} · ${cleanTitle}`,
       url: '/admin',
-      tag: `acct-${newRequest.id}`
+      tag: `acct-${newRequest.id}`,
+      gameTitle: cleanTitle,
+      alertKind: 'coins'
     }, distId);
 
     return NextResponse.json({ success: true, request: newRequest, message: 'Game account request submitted successfully!' });

@@ -104,7 +104,8 @@ export async function POST(req) {
       title: 'New Campaign Request',
       body: `${cleanEmail} · $${budgetVal.toFixed(2)} · ${campaignName.trim()}`,
       url: '/admin',
-      tag: `campaign-${newRequest.id}`
+      tag: `campaign-${newRequest.id}`,
+      alertKind: 'campaign'
     });
 
     return NextResponse.json({
