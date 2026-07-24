@@ -152,15 +152,25 @@ export async function DELETE(req) {
     const players = await usersCollection
       .find({ distributorId: id, role: 'user' }, { projection: { email: 1 } })
       .toArray();
-    const playerEmails = players.map((p) => p.email).filter(Boolean);
+    // gameAccounts / accountRequests always store lowercased emails
+    const playerEmails = [
+      ...new Set(
+        players
+          .map((p) => String(p.email || '').toLowerCase().trim())
+          .filter(Boolean)
+      )
+    ];
 
     // Remove their game accounts AND their old account requests so each player
     // starts fresh: the lobby will show the "Request / Create Account" option
     // again, and the new request will route to the super admin (their
     // distributorId is now cleared).
     if (playerEmails.length > 0) {
-      await db.collection('gameAccounts').deleteMany({ userEmail: { $in: playerEmails } });
-      await db.collection('accountRequests').deleteMany({ userEmail: { $in: playerEmails } });
+      const emailMatchers = playerEmails.map(
+        (email) => new RegExp(`^${email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
+      );
+      await db.collection('gameAccounts').deleteMany({ userEmail: { $in: emailMatchers } });
+      await db.collection('accountRequests').deleteMany({ userEmail: { $in: emailMatchers } });
     }
 
     // Hand players (and their financial records) over to the super admin.

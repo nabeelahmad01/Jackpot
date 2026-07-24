@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/mongodb';
+import { healOrphanedDistributorPlayer } from '../../../../lib/orphanDistributorPlayer';
 import crypto from 'crypto';
 
 function generateReferralCode() {
@@ -72,6 +73,11 @@ export async function POST(req) {
       const result = await usersCollection.insertOne(matchedUser);
       matchedUser._id = result.insertedId;
       isNewUser = true;
+    }
+
+    // Deleted distributor → player stays, but game accounts reset so they can re-request.
+    if (!isNewUser) {
+      matchedUser = await healOrphanedDistributorPlayer(db, matchedUser);
     }
 
     return NextResponse.json({

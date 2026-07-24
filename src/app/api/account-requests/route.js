@@ -4,6 +4,7 @@ import { cache } from '../../../lib/cache';
 import { applyStaffGameFilter, getStaffAllowedGameTitles, staffCanAccessGame } from '../../../lib/staffGameAccess';
 import { notifyStaffAndDistributorAsync } from '../../../lib/pushNotifications';
 import { getTypeBDistributorIds, typeBExclusionFilter } from '../../../lib/typeBDistributors';
+import { healOrphanedDistributorPlayer } from '../../../lib/orphanDistributorPlayer';
 
 // GET requests (supports filtering by email for users, or returning all for admins)
 export async function GET(req) {
@@ -540,7 +541,11 @@ export async function POST(req) {
     const requestsCollection = db.collection('accountRequests');
 
     // Retrieve player's profile to extract distributor information
-    const userDoc = await db.collection('users').findOne({ email: userEmail.toLowerCase().trim() });
+    let userDoc = await db.collection('users').findOne({ email: userEmail.toLowerCase().trim() });
+    // Deleted distributor → wipe old game accounts so this request can succeed
+    if (userDoc) {
+      userDoc = await healOrphanedDistributorPlayer(db, userDoc);
+    }
     let distId = userDoc ? (userDoc.distributorId || '') : '';
     let distType = '';
     let distName = '';
@@ -560,6 +565,9 @@ export async function POST(req) {
       if (distributor) {
         distType = distributor.type || 'A';
         distName = distributor.name || '';
+      } else {
+        // Stale id (e.g. inherited from referrer) — do not tag the request with a dead distributor
+        distId = '';
       }
     }
 

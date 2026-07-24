@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/mongodb';
+import { healOrphanedDistributorPlayer } from '../../../../lib/orphanDistributorPlayer';
 
 export async function POST(req) {
   try {
@@ -82,10 +83,13 @@ export async function POST(req) {
       );
     }
 
+    // Deleted distributor → player stays, but game accounts reset so they can re-request.
+    const user = await healOrphanedDistributorPlayer(db, matchedUser);
+
     return NextResponse.json({
       success: true,
       message: 'Login successful!',
-      user: { name: matchedUser.name, email: matchedUser.email, role: matchedUser.role, coins: matchedUser.coins || 0, referralCode: matchedUser.referralCode || '', isSubscribed: matchedUser.isSubscribed || false, distributorId: matchedUser.distributorId || '', allowedGameIds: matchedUser.allowedGameIds || [] }
+      user: { name: user.name, email: user.email, role: user.role, coins: user.coins || 0, referralCode: user.referralCode || '', isSubscribed: user.isSubscribed || false, distributorId: user.distributorId || '', allowedGameIds: user.allowedGameIds || [] }
     });
   } catch (err) {
     console.error('Login API Error:', err);
