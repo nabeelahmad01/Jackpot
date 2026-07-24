@@ -291,18 +291,23 @@ export async function PUT(req) {
           );
         }
       }
-    } else if (status === 'HOLD' && originalNoti.totalCoins < 0) {
-      // If a withdrawal coin check is invalidated, directly fail the parent transaction
+    } else if (status === 'HOLD') {
+      // Withdrawals: Invalid → fail parent tx. Deposits: keep HOLD on noti (reclaimable)
+      // but always stamp the reason on the parent so COINS_LOADING rows don't look "stuck".
       if (originalNoti.transactionId) {
         const transactionsCollection = db.collection('transactions');
         const parentTx = await transactionsCollection.findOne({ id: originalNoti.transactionId })
           || await transactionsCollection.findOne({ id: String(originalNoti.transactionId) });
         if (parentTx) {
           const txUpdate = {
-            status: 'FAILED',
             note: holdNote || 'Declined by Administrator.',
-            allottedBy: processedBy || originalNoti.processedBy || 'system'
+            allottedBy: processedBy || originalNoti.processedBy || 'system',
+            coinsHoldNote: holdNote || 'Declined by Administrator.',
+            coinsHoldAt: new Date().toISOString()
           };
+          if (originalNoti.totalCoins < 0) {
+            txUpdate.status = 'FAILED';
+          }
           await transactionsCollection.updateOne(
             parentTx._id ? { _id: parentTx._id } : { id: parentTx.id },
             { $set: txUpdate }

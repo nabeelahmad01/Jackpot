@@ -6,6 +6,7 @@ import { calcCommissionFromProfit } from '../../../lib/commission';
 import { typeBExclusionFilter } from '../../../lib/typeBDistributors';
 import { notifyStaffAndDistributorAsync } from '../../../lib/pushNotifications';
 import { accountLookupKey, buildGameUsernameMap } from '../../../lib/resolveGameUsername';
+import { compressDataUrlIfNeeded } from '../../../lib/serverImageCompress';
 
 // GET transactions (supports filtering by email for users, or returning all for admins)
 export async function GET(req) {
@@ -604,7 +605,9 @@ export async function PUT(req) {
       updateFields.approvedBy = processedBy;
     }
     if (payoutProof !== undefined) {
-      updateFields.payoutProof = payoutProof;
+      // Large phone screenshots as raw base64 make this PUT hang for many seconds.
+      // Compress oversized proofs only — small ones and non-images stay untouched.
+      updateFields.payoutProof = await compressDataUrlIfNeeded(payoutProof);
     }
 
     if (status === 'SUCCESS' && payoutHold !== undefined && Number(payoutHold) > 0) {
@@ -670,7 +673,12 @@ export async function PUT(req) {
     if (status === 'SUCCESS' && originalTx.type === 'WITHDRAW' && originalTx.status !== 'SUCCESS') {
       try {
         const gamesCollection = db.collection('games');
-        const game = await gamesCollection.findOne({ title: { $regex: new RegExp(`^${originalTx.gameTitle}$`, 'i') } });
+        const title = String(originalTx.gameTitle || '').trim();
+        let game = title ? await gamesCollection.findOne({ title }) : null;
+        if (!game && title) {
+          const escaped = title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          game = await gamesCollection.findOne({ title: { $regex: new RegExp(`^${escaped}$`, 'i') } });
+        }
         if (game) {
           if (originalTx.distributorId) {
             const distGamesColl = db.collection('distributorGames');

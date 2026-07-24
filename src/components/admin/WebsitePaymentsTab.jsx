@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import PanelModalBackdrop from '../PanelModalBackdrop';
 import usePollingSWR from '../../hooks/usePollingSWR';
 import { POLL } from '../../lib/pollingConfig';
+import { compressImageFile } from '../../lib/imageCompress';
 
 export default function WebsitePaymentsTab({
   onInspectProof,
@@ -123,56 +124,76 @@ export default function WebsitePaymentsTab({
   };
 
   // Handle uploader change
-  const handlePayoutProofChange = (e) => {
-    const file = e.target.files[0];
+  const handlePayoutProofChange = async (e) => {
+    const file = e.target.files?.[0];
     if (!file) return;
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPayoutProof(reader.result);
-      alert('Paid proof screenshot loaded successfully!');
-    };
-    reader.readAsDataURL(file);
+    try {
+      const compressed = await compressImageFile(file, { maxSize: 1280, quality: 0.72 });
+      setPayoutProof(compressed);
+    } catch (err) {
+      console.error(err);
+      alert('Could not load paid proof screenshot. Please try another image.');
+    }
   };
 
   // Submit Payout completion
   const handlePayoutSubmit = async (e) => {
     e.preventDefault();
     if (!selectedTx) return;
+    if (!payoutProof) {
+      alert('Please upload a paid proof screenshot before completing.');
+      return;
+    }
+
+    const txId = selectedTx.id;
+    const holdVal = Number(payoutHold);
+    const payload = {
+      id: txId,
+      status: 'SUCCESS',
+      note: payoutNote.trim() || 'Distributor payout processed',
+      payoutProof,
+      payoutSent: Number(payoutSent),
+      payoutHold: holdVal,
+      processedBy: adminUser?.email || 'admin@jackpot.com'
+    };
+    if (holdVal > 0) {
+      payload.remainderWaitHours = Math.max(0, Number(remainderWaitHours) || 0);
+      payload.remainderWaitMinutes = Math.max(0, Number(remainderWaitMinutes) || 0);
+    }
 
     setIsProcessing(true);
-    try {
-      const holdVal = Number(payoutHold);
-      const payload = {
-        id: selectedTx.id,
-        status: 'SUCCESS',
-        note: payoutNote.trim() || 'Distributor payout processed',
-        payoutProof: payoutProof,
-        payoutSent: Number(payoutSent),
-        payoutHold: holdVal,
-        processedBy: adminUser?.email || 'admin@jackpot.com'
-      };
-      if (holdVal > 0) {
-        payload.remainderWaitHours = Math.max(0, Number(remainderWaitHours) || 0);
-        payload.remainderWaitMinutes = Math.max(0, Number(remainderWaitMinutes) || 0);
-      }
+    setPayoutModalOpen(false);
+    setSelectedTx(null);
+    setPayoutProof('');
+    mutate(
+      (current) => {
+        if (!current?.transactions) return current;
+        return {
+          ...current,
+          transactions: current.transactions.filter((t) => t.id !== txId),
+          totalTransactions: Math.max(0, (current.totalTransactions || 1) - 1)
+        };
+      },
+      { revalidate: false }
+    );
 
+    try {
       const response = await fetch('/api/transactions', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      const resData = await response.json();
-      if (resData.success) {
-        alert('Distributor commission payout processed successfully!');
-        setPayoutModalOpen(false);
+      const resData = await response.json().catch(() => null);
+      if (resData?.success) {
         mutate();
       } else {
-        alert(resData.message || 'Failed to process payout.');
+        alert(resData?.message || 'Failed to process payout.');
+        mutate();
       }
     } catch (err) {
       console.error(err);
       alert('Error processing payout.');
+      mutate();
     } finally {
       setIsProcessing(false);
     }

@@ -11,8 +11,9 @@ export default function ShiftDashboardTab({ adminUser }) {
     { refreshWhenHidden: true }
   );
 
+  // Include HOLD so Invalid'd rows are known and not re-created from COINS_LOADING txs.
   const { data: coinData, mutate: mutateCoins } = usePollingSWR(
-    `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED&limit=100&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
+    `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED,HOLD&limit=100&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
     POLL.LIVE,
     { refreshWhenHidden: true }
   );
@@ -36,6 +37,9 @@ export default function ShiftDashboardTab({ adminUser }) {
   // Local input states for Coin Allotments invalidation reasons
   const [invalidReasons, setInvalidReasons] = useState({}); // { notificationId: reason }
   const [processingCoinId, setProcessingCoinId] = useState(null);
+  // Hide processed rows immediately (poll must not bring Invalid'd deposits back)
+  const [hiddenCoinIds, setHiddenCoinIds] = useState(() => new Set());
+  const [hiddenCoinTxIds, setHiddenCoinTxIds] = useState(() => new Set());
 
   const pendingRequests = useMemo(() => {
     const rows = reqData?.accountRequests || [];
@@ -50,13 +54,22 @@ export default function ShiftDashboardTab({ adminUser }) {
     });
   }, [reqData?.accountRequests, hiddenRequestIds]);
   const pendingCoins = useMemo(() => {
-    const fromNoti = (coinData?.coinsNotifications || []).filter(
-      (n) => n.status === 'PENDING' || n.status === 'CLAIM_REQUESTED'
-    );
+    const allNotis = coinData?.coinsNotifications || [];
+    // Any existing noti for a tx (incl. HOLD/COMPLETED) must block synthetic re-create
     const seenTx = new Set(
-      fromNoti.map((n) => String(n.transactionId || '')).filter(Boolean)
+      allNotis.map((n) => String(n.transactionId || '')).filter(Boolean)
+    );
+    for (const txId of hiddenCoinTxIds) {
+      if (txId) seenTx.add(String(txId));
+    }
+
+    const fromNoti = allNotis.filter(
+      (n) =>
+        (n.status === 'PENDING' || n.status === 'CLAIM_REQUESTED') &&
+        !hiddenCoinIds.has(String(n.id))
     );
     const seenIds = new Set(fromNoti.map((n) => String(n.id)));
+    for (const id of hiddenCoinIds) seenIds.add(String(id));
 
     const synthetic = (coinsLoadingData?.transactions || [])
       .filter((tx) => {
@@ -64,7 +77,10 @@ export default function ShiftDashboardTab({ adminUser }) {
           return false;
         }
         const txId = String(tx.id || '');
-        return txId && !seenTx.has(txId);
+        if (!txId || seenTx.has(txId) || hiddenCoinTxIds.has(txId)) return false;
+        // Already invalidated / put on hold — never re-surface in Verified Deposits
+        if (tx.coinsHoldNote || tx.coinsHoldAt) return false;
+        return true;
       })
       .map((tx) => ({
         id: `tx-coins-${tx.id}`,
@@ -79,10 +95,10 @@ export default function ShiftDashboardTab({ adminUser }) {
         timestamp: tx.createdAt || tx.date || new Date().toISOString(),
         fromCoinsLoadingTx: true
       }))
-      .filter((n) => !seenIds.has(String(n.id)));
+      .filter((n) => !seenIds.has(String(n.id)) && !hiddenCoinIds.has(String(n.id)));
 
     return [...fromNoti, ...synthetic];
-  }, [coinData?.coinsNotifications, coinsLoadingData?.transactions]);
+  }, [coinData?.coinsNotifications, coinsLoadingData?.transactions, hiddenCoinIds, hiddenCoinTxIds]);
 
   // Handle saving credentials (optimistic UI + single PUT)
   const handleSaveCredentials = async (reqItem) => {
@@ -175,13 +191,57 @@ export default function ShiftDashboardTab({ adminUser }) {
     }
   };
 
+  const findPendingCoin = (notiId) =>
+    pendingCoins.find((n) => String(n.id) === String(notiId));
+
+  const hideCoinRow = (notiId, transactionId) => {
+    const idKey = String(notiId || '');
+    const txKey = String(transactionId || '');
+    if (idKey) {
+      setHiddenCoinIds((prev) => {
+        const next = new Set(prev);
+        next.add(idKey);
+        return next;
+      });
+    }
+    if (txKey) {
+      setHiddenCoinTxIds((prev) => {
+        const next = new Set(prev);
+        next.add(txKey);
+        return next;
+      });
+    }
+  };
+
+  const unhideCoinRow = (notiId, transactionId) => {
+    const idKey = String(notiId || '');
+    const txKey = String(transactionId || '');
+    if (idKey) {
+      setHiddenCoinIds((prev) => {
+        const next = new Set(prev);
+        next.delete(idKey);
+        return next;
+      });
+    }
+    if (txKey) {
+      setHiddenCoinTxIds((prev) => {
+        const next = new Set(prev);
+        next.delete(txKey);
+        return next;
+      });
+    }
+  };
+
   // Handle Allotment Loaded (Success)
   const handleCoinAllotmentSuccess = async (notiId) => {
     if (!notiId) {
       alert('Missing notification id.');
       return;
     }
+    const row = findPendingCoin(notiId);
+    const txId = row?.transactionId;
     setProcessingCoinId(notiId);
+    hideCoinRow(notiId, txId);
     try {
       const res = await fetch('/api/coins-notifications', {
         method: 'PUT',
@@ -198,16 +258,19 @@ export default function ShiftDashboardTab({ adminUser }) {
       try {
         data = await res.json();
       } catch {
+        unhideCoinRow(notiId, txId);
         alert(`Error updating status (HTTP ${res.status}). Please try again.`);
         return;
       }
       if (data.success) {
         await Promise.all([mutateCoins(), mutateCoinsLoading()]);
       } else {
+        unhideCoinRow(notiId, txId);
         alert(data.message || 'Failed to update status.');
       }
     } catch (err) {
       console.error(err);
+      unhideCoinRow(notiId, txId);
       alert(err?.message ? `Error updating status: ${err.message}` : 'Error updating status.');
     } finally {
       setProcessingCoinId(null);
@@ -216,7 +279,7 @@ export default function ShiftDashboardTab({ adminUser }) {
 
   // Handle Allotment Invalid (Hold / Notes)
   const handleCoinAllotmentInvalid = async (notiId) => {
-    const reason = (invalidReasons[notiId] || '').trim();
+    const reason = String(invalidReasons[notiId] || invalidReasons[String(notiId)] || '').trim();
     if (!reason) {
       alert('Please enter a reason for invalidating this transaction.');
       return;
@@ -226,7 +289,16 @@ export default function ShiftDashboardTab({ adminUser }) {
       return;
     }
 
+    const row = findPendingCoin(notiId);
+    const txId = row?.transactionId;
     setProcessingCoinId(notiId);
+    hideCoinRow(notiId, txId);
+    setInvalidReasons((prev) => {
+      const next = { ...prev };
+      delete next[notiId];
+      delete next[String(notiId)];
+      return next;
+    });
     try {
       const res = await fetch('/api/coins-notifications', {
         method: 'PUT',
@@ -244,21 +316,19 @@ export default function ShiftDashboardTab({ adminUser }) {
       try {
         data = await res.json();
       } catch {
+        unhideCoinRow(notiId, txId);
         alert(`Error setting hold note (HTTP ${res.status}). Please try again.`);
         return;
       }
       if (data.success) {
-        setInvalidReasons(prev => {
-          const next = { ...prev };
-          delete next[notiId];
-          return next;
-        });
         await Promise.all([mutateCoins(), mutateCoinsLoading()]);
       } else {
+        unhideCoinRow(notiId, txId);
         alert(data.message || 'Failed to set hold note.');
       }
     } catch (err) {
       console.error(err);
+      unhideCoinRow(notiId, txId);
       alert(err?.message ? `Error setting hold note: ${err.message}` : 'Error setting hold note.');
     } finally {
       setProcessingCoinId(null);
@@ -417,8 +487,12 @@ export default function ShiftDashboardTab({ adminUser }) {
                             <input
                               type="text"
                               placeholder="Reason (required)"
-                              value={invalidReasons[noti.id] || ''}
-                              onChange={(e) => setInvalidReasons(prev => ({ ...prev, [noti.id]: e.target.value }))}
+                              value={invalidReasons[noti.id] || invalidReasons[String(noti.id)] || ''}
+                              onChange={(e) => setInvalidReasons(prev => ({
+                                ...prev,
+                                [noti.id]: e.target.value,
+                                [String(noti.id)]: e.target.value
+                              }))}
                               style={{ background: '#070912', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.725rem', padding: '0.35rem 0.5rem', borderRadius: '6px', width: '140px' }}
                             />
                             <button
@@ -511,8 +585,12 @@ export default function ShiftDashboardTab({ adminUser }) {
                             <input
                               type="text"
                               placeholder="Reason (required)"
-                              value={invalidReasons[noti.id] || ''}
-                              onChange={(e) => setInvalidReasons(prev => ({ ...prev, [noti.id]: e.target.value }))}
+                              value={invalidReasons[noti.id] || invalidReasons[String(noti.id)] || ''}
+                              onChange={(e) => setInvalidReasons(prev => ({
+                                ...prev,
+                                [noti.id]: e.target.value,
+                                [String(noti.id)]: e.target.value
+                              }))}
                               style={{ background: '#070912', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.725rem', padding: '0.35rem 0.5rem', borderRadius: '6px', width: '140px' }}
                             />
                             <button

@@ -4,6 +4,7 @@ import usePollingSWR from '../../hooks/usePollingSWR';
 import { POLL } from '../../lib/pollingConfig';
 import { parseRoles } from '../../lib/staffGameAccess';
 import GatewayRevenueBreakdown from './GatewayRevenueBreakdown';
+import { compressImageFile } from '../../lib/imageCompress';
 
 export default function LedgerTab({
   onInspectProof,
@@ -128,54 +129,77 @@ export default function LedgerTab({
   const handleProcessPayoutSubmit = async (e) => {
     e.preventDefault();
     if (!selectedPayoutTx) return;
+    if (!payoutProof) {
+      alert('Please upload a payout receipt screenshot before confirming.');
+      return;
+    }
+
+    const txId = selectedPayoutTx.id;
+    const holdVal = parseFloat(payoutHoldAmount || 0);
+    const payload = {
+      id: txId,
+      status: 'SUCCESS',
+      note: payoutCustomNote.trim() || `Payout processed to ${payoutGateway}`,
+      payoutSent: parseFloat(payoutSentAmount || 0),
+      payoutHold: holdVal,
+      processedBy: adminUser?.email || 'admin@jackpot.com',
+      payoutProof
+    };
+    if (holdVal > 0) {
+      payload.remainderWaitHours = Math.max(0, Number(remainderWaitHours) || 0);
+      payload.remainderWaitMinutes = Math.max(0, Number(remainderWaitMinutes) || 0);
+    }
 
     setIsProcessingPayout(true);
-    try {
-      const holdVal = parseFloat(payoutHoldAmount || 0);
-      const payload = {
-        id: selectedPayoutTx.id,
-        status: 'SUCCESS',
-        note: payoutCustomNote.trim() || `Payout processed to ${payoutGateway}`,
-        payoutSent: parseFloat(payoutSentAmount || 0),
-        payoutHold: holdVal,
-        processedBy: adminUser?.email || 'admin@jackpot.com',
-        payoutProof: payoutProof
-      };
-      if (holdVal > 0) {
-        payload.remainderWaitHours = Math.max(0, Number(remainderWaitHours) || 0);
-        payload.remainderWaitMinutes = Math.max(0, Number(remainderWaitMinutes) || 0);
-      }
+    // Optimistic: close modal + hide row immediately so UI never sits on "PROCESSING..."
+    setPayoutModalOpen(false);
+    setSelectedPayoutTx(null);
+    setPayoutProof('');
+    mutate(
+      (current) => {
+        if (!current?.transactions) return current;
+        return {
+          ...current,
+          transactions: current.transactions.filter((t) => t.id !== txId),
+          totalTransactions: Math.max(0, (current.totalTransactions || 1) - 1)
+        };
+      },
+      { revalidate: false }
+    );
 
+    try {
       const response = await fetch('/api/transactions', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      const data = await response.json();
-      if (data.success) {
-        setPayoutModalOpen(false);
+      const data = await response.json().catch(() => null);
+      if (data?.success) {
         mutate();
       } else {
-        alert(data.message || 'Failed to process payout.');
+        alert(data?.message || 'Failed to process payout.');
+        mutate(); // restore list from server
       }
     } catch (err) {
       console.error(err);
       alert('Error processing payout.');
+      mutate();
     } finally {
       setIsProcessingPayout(false);
     }
   };
 
-  const handlePayoutProofChange = (e) => {
-    const file = e.target.files[0];
+  const handlePayoutProofChange = async (e) => {
+    const file = e.target.files?.[0];
     if (!file) return;
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPayoutProof(reader.result);
-      alert('Payout proof receipt screenshot loaded successfully!');
-    };
-    reader.readAsDataURL(file);
+    try {
+      // Receipts need readable text — 1280px is enough and keeps upload small/fast.
+      const compressed = await compressImageFile(file, { maxSize: 1280, quality: 0.72 });
+      setPayoutProof(compressed);
+    } catch (err) {
+      console.error(err);
+      alert('Could not load payout screenshot. Please try another image.');
+    }
   };
 
   const handleFail = async (txId) => {
