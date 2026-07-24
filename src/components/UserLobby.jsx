@@ -10,6 +10,7 @@ import { shouldShowInfoOnLobby } from '../lib/infoPage';
 import ReferralCenter from './ReferralCenter';
 import RemainderClaimAction from './RemainderClaimAction';
 import { canShowClaimRemainderButton } from '../lib/remainderClaim';
+import { compressImageFile } from '../lib/imageCompress';
 
 export default function UserLobby({
   games,
@@ -548,8 +549,8 @@ export default function UserLobby({
     reader.readAsDataURL(file);
   };
 
-  const handleWithdrawScreenshotChange = (e) => {
-    const file = e.target.files[0];
+  const handleWithdrawScreenshotChange = async (e) => {
+    const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.size > 2 * 1024 * 1024) {
@@ -559,16 +560,18 @@ export default function UserLobby({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setWithdrawScreenshot(reader.result);
+    try {
+      const compressed = await compressImageFile(file, { maxSize: 1280, quality: 0.72 });
+      setWithdrawScreenshot(compressed);
       showToast('Game screenshot loaded successfully!', 'success');
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error(err);
+      showToast('Could not load game screenshot. Try another image.', 'error');
+    }
   };
 
-  const handleTagQrScreenshotChange = (e) => {
-    const file = e.target.files[0];
+  const handleTagQrScreenshotChange = async (e) => {
+    const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.size > 2 * 1024 * 1024) {
@@ -578,12 +581,14 @@ export default function UserLobby({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setTagQrScreenshot(reader.result);
+    try {
+      const compressed = await compressImageFile(file, { maxSize: 1280, quality: 0.72 });
+      setTagQrScreenshot(compressed);
       showToast('Tag QR screenshot loaded successfully!', 'success');
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error(err);
+      showToast('Could not load Tag QR screenshot. Try another image.', 'error');
+    }
   };
 
   const handleDepositClick = (e) => {
@@ -806,7 +811,7 @@ export default function UserLobby({
     }
 
     setActionLoading(true);
-    setTimeout(() => setActionLoading(false), 2500);
+    setTimeout(() => setActionLoading(false), 800);
 
     const allottedAcc = (gameAccounts || []).find(
       (acc) => acc.gameTitle === activeGame.title

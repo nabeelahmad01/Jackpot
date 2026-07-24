@@ -68,12 +68,26 @@ export default function ShiftDashboardTab({ adminUser }) {
         (n.status === 'PENDING' || n.status === 'CLAIM_REQUESTED') &&
         !hiddenCoinIds.has(String(n.id))
     );
-    const seenIds = new Set(fromNoti.map((n) => String(n.id)));
+    // One row per transactionId (prevents freeplay / allotment showing twice)
+    const dedupedFromNoti = [];
+    const seenNotiTx = new Set();
+    for (const n of fromNoti) {
+      const tid = String(n.transactionId || '');
+      if (tid) {
+        if (seenNotiTx.has(tid)) continue;
+        seenNotiTx.add(tid);
+      }
+      dedupedFromNoti.push(n);
+    }
+
+    const seenIds = new Set(dedupedFromNoti.map((n) => String(n.id)));
     for (const id of hiddenCoinIds) seenIds.add(String(id));
 
     const synthetic = (coinsLoadingData?.transactions || [])
       .filter((tx) => {
-        if (String(tx.type || '').toUpperCase() !== 'DEPOSIT' && String(tx.type || '').toUpperCase() !== 'BONUS') {
+        // Only finance-approved DEPOSITS. Freeplay BONUS already has its own
+        // coinsNotification — including BONUS here was duplicating freeplay rows.
+        if (String(tx.type || '').toUpperCase() !== 'DEPOSIT') {
           return false;
         }
         const txId = String(tx.id || '');
@@ -97,7 +111,7 @@ export default function ShiftDashboardTab({ adminUser }) {
       }))
       .filter((n) => !seenIds.has(String(n.id)) && !hiddenCoinIds.has(String(n.id)));
 
-    return [...fromNoti, ...synthetic];
+    return [...dedupedFromNoti, ...synthetic];
   }, [coinData?.coinsNotifications, coinsLoadingData?.transactions, hiddenCoinIds, hiddenCoinTxIds]);
 
   // Handle saving credentials (optimistic UI + single PUT)

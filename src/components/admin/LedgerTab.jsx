@@ -28,7 +28,9 @@ export default function LedgerTab({
     return () => clearTimeout(handler);
   }, [search]);
 
-  const swrKey = `/api/transactions?status=PENDING,PENDING_COINS&page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}`;
+  // Finance ledger: only PENDING. Withdrawals stay PENDING_COINS for coins staff
+  // first; after coins approve they become PENDING and then appear here.
+  const swrKey = `/api/transactions?status=PENDING&page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}`;
 
   // SWR automatically polls every 4s for ledger transactions
   const { data, error, mutate } = usePollingSWR(swrKey, POLL.QUEUES);

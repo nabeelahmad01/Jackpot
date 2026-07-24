@@ -205,34 +205,45 @@ export async function POST(req) {
 
     const userEmail = newTx.userEmail.toLowerCase().trim();
 
-    // Migrate any legacy PENDING freeplay bonuses directly to coins queue
-    const orphanedFreeplay = await transactionsCollection.find({
-      userEmail,
-      type: 'BONUS',
-      code: { $in: ['SIGNUP-FREE3', 'FREEPLAY'] },
-      status: 'PENDING'
-    }).toArray();
+    // Compress large withdraw/deposit proofs before Mongo write (keeps submit fast).
+    if (typeof newTx.screenshot === 'string' && newTx.screenshot.startsWith('data:image')) {
+      newTx.screenshot = await compressDataUrlIfNeeded(newTx.screenshot);
+    }
+    if (typeof newTx.tagQrScreenshot === 'string' && newTx.tagQrScreenshot.startsWith('data:image')) {
+      newTx.tagQrScreenshot = await compressDataUrlIfNeeded(newTx.tagQrScreenshot);
+    }
 
-    if (orphanedFreeplay.length > 0) {
-      const notificationsCollection = db.collection('coinsNotifications');
-      for (const fp of orphanedFreeplay) {
-        await transactionsCollection.updateOne({ id: fp.id }, { $set: { status: 'COINS_LOADING' } });
-        const existingNoti = await notificationsCollection.findOne({ transactionId: fp.id });
-        if (!existingNoti) {
-          await notificationsCollection.insertOne({
-            id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
-            userEmail: fp.userEmail,
-            gameTitle: fp.gameTitle || 'Lobby',
-            depositAmount: 0,
-            bonusApplied: -3,
-            isFreeplay: true,
-            totalCoins: parseFloat(fp.amount),
-            status: 'PENDING',
-            read: false,
-            timestamp: new Date().toISOString(),
-            transactionId: fp.id,
-            distributorId: fp.distributorId || ''
-          });
+    // Migrate any legacy PENDING freeplay bonuses directly to coins queue
+    // (skip on WITHDRAW submits — not needed and was slowing cashout requests)
+    if (newTx.type !== 'WITHDRAW') {
+      const orphanedFreeplay = await transactionsCollection.find({
+        userEmail,
+        type: 'BONUS',
+        code: { $in: ['SIGNUP-FREE3', 'FREEPLAY'] },
+        status: 'PENDING'
+      }).toArray();
+
+      if (orphanedFreeplay.length > 0) {
+        const notificationsCollection = db.collection('coinsNotifications');
+        for (const fp of orphanedFreeplay) {
+          await transactionsCollection.updateOne({ id: fp.id }, { $set: { status: 'COINS_LOADING' } });
+          const existingNoti = await notificationsCollection.findOne({ transactionId: fp.id });
+          if (!existingNoti) {
+            await notificationsCollection.insertOne({
+              id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
+              userEmail: fp.userEmail,
+              gameTitle: fp.gameTitle || 'Lobby',
+              depositAmount: 0,
+              bonusApplied: -3,
+              isFreeplay: true,
+              totalCoins: parseFloat(fp.amount),
+              status: 'PENDING',
+              read: false,
+              timestamp: new Date().toISOString(),
+              transactionId: fp.id,
+              distributorId: fp.distributorId || ''
+            });
+          }
         }
       }
     }
