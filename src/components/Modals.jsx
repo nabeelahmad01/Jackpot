@@ -72,6 +72,7 @@ export function ImageLightbox({ src, onClose, alt = 'Screenshot' }) {
 // --- A) CUSTOMER SUPPORT MODAL ---
 export function SupportModal({ isOpen, onClose, currentUser, onMessagesSeen }) {
   const [messages, setMessages] = useState([]);
+  const [loadingChat, setLoadingChat] = useState(false);
   const [input, setInput] = useState('');
   const [attachment, setAttachment] = useState('');
   const [lightboxSrc, setLightboxSrc] = useState('');
@@ -108,9 +109,15 @@ export function SupportModal({ isOpen, onClose, currentUser, onMessagesSeen }) {
   };
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      setLoadingChat(false);
+      return;
+    }
 
     const identity = getChatIdentity();
+    let firstLoad = true;
+    setLoadingChat(true);
+    setMessages([]);
 
     const fetchMessages = async () => {
       try {
@@ -124,6 +131,11 @@ export function SupportModal({ isOpen, onClose, currentUser, onMessagesSeen }) {
         }
       } catch (err) {
         console.error('Failed to load support chat:', err);
+      } finally {
+        if (firstLoad) {
+          firstLoad = false;
+          setLoadingChat(false);
+        }
       }
     };
 
@@ -191,7 +203,12 @@ export function SupportModal({ isOpen, onClose, currentUser, onMessagesSeen }) {
           </p>
 
           <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingRight: '0.25rem', marginBottom: '1rem' }}>
-            {messages.length === 0 ? (
+            {loadingChat ? (
+              <div style={{ margin: 'auto', textAlign: 'center', opacity: 0.7, fontSize: '0.8rem' }}>
+                <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '1.5rem', display: 'block', marginBottom: '0.5rem', color: 'var(--gold-primary)' }}></i>
+                Loading chat…
+              </div>
+            ) : messages.length === 0 ? (
               <div style={{ margin: 'auto', textAlign: 'center', opacity: 0.5, fontSize: '0.8rem' }}>
                 <i className="fa-solid fa-comments" style={{ fontSize: '2rem', display: 'block', marginBottom: '0.5rem', color: 'var(--gold-primary)' }}></i>
                 No messages yet. Send a message to start!
@@ -259,18 +276,21 @@ export function SupportModal({ isOpen, onClose, currentUser, onMessagesSeen }) {
               ref={fileInputRef}
               style={{ display: 'none' }}
               accept="image/*"
-              onChange={(e) => {
-                const file = e.target.files[0];
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
                 if (!file) return;
                 if (file.size > 2 * 1024 * 1024) {
                   alert('Screenshot attachment must be less than 2MB.');
+                  e.target.value = '';
                   return;
                 }
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                  setAttachment(reader.result);
-                };
-                reader.readAsDataURL(file);
+                try {
+                  const compressed = await compressImageFile(file, { maxSize: 1280, quality: 0.72 });
+                  setAttachment(compressed);
+                } catch (err) {
+                  console.error(err);
+                  alert('Could not load image. Try another file.');
+                }
                 e.target.value = '';
               }}
             />

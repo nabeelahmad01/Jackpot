@@ -424,6 +424,13 @@ export default function Home() {
 
   // Player Transactions Requests
   const handleSubmitTransaction = async (newTx) => {
+    // Instant feedback — toast no longer waits on the full upload round-trip.
+    if (newTx.type === 'DEPOSIT') {
+      showToast(`Deposit request of $${parseFloat(newTx.amount).toFixed(2)} submitted with payment proof.`, 'success');
+    } else if (newTx.type === 'WITHDRAW') {
+      showToast(`Withdrawal request of $${parseFloat(newTx.amount).toFixed(2)} submitted.`, 'success');
+    }
+
     try {
       const response = await fetch('/api/transactions', {
         method: 'POST',
@@ -432,12 +439,9 @@ export default function Home() {
       });
       const data = await response.json();
       if (data.success) {
-        if (newTx.type === 'DEPOSIT') {
-          showToast(`Deposit request of $${parseFloat(newTx.amount).toFixed(2)} submitted with payment proof.`, 'success');
-        } else {
-          showToast(`Withdrawal request of $${parseFloat(newTx.amount).toFixed(2)} submitted.`, 'success');
+        if (newTx.type !== 'DEPOSIT' && newTx.type !== 'WITHDRAW') {
+          showToast(data.message || 'Request submitted.', 'success');
         }
-        
         // Mutate transactions and notifications cache keys
         const url = emailQuery ? `/api/transactions?email=${emailQuery}&limit=100` : null;
         mutate(url);

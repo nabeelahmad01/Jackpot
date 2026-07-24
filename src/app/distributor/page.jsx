@@ -1123,6 +1123,7 @@ export default function DistributorPortal() {
         alert('Transaction approved successfully.');
         mutateStats();
         mutate((key) => typeof key === 'string' && key.startsWith('/api/transactions'));
+        mutate((key) => typeof key === 'string' && key.includes('/api/coins-notifications'));
       } else {
         alert(data.message || 'Failed to approve transaction.');
       }
@@ -1146,6 +1147,7 @@ export default function DistributorPortal() {
         alert('Transaction set to FAILED status.');
         mutateStats();
         mutate((key) => typeof key === 'string' && key.startsWith('/api/transactions'));
+        mutate((key) => typeof key === 'string' && key.includes('/api/coins-notifications'));
       } else {
         alert(data.message || 'Failed to decline transaction.');
       }

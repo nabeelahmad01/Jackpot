@@ -419,9 +419,10 @@ export default function AdminPage({ portalName, forcedRole }) {
         showToast(`Transaction approved successfully.`, 'success');
         setCompletedActionIds(prev => ({ ...prev, [txId]: true }));
         
-        // Mutate stats and transaction lists
+        // Mutate stats, ledger, and coins queue so allotment appears immediately
         mutate('/api/admin/stats');
         mutate((key) => typeof key === 'string' && key.startsWith('/api/transactions'));
+        mutate((key) => typeof key === 'string' && key.startsWith('/api/coins-notifications'));
       } else {
         showToast(data.message || 'Failed to approve transaction.', 'error');
       }
@@ -449,6 +450,7 @@ export default function AdminPage({ portalName, forcedRole }) {
         // Mutate stats and transaction lists
         mutate('/api/admin/stats');
         mutate((key) => typeof key === 'string' && key.startsWith('/api/transactions'));
+        mutate((key) => typeof key === 'string' && key.startsWith('/api/coins-notifications'));
       } else {
         showToast(data.message || 'Failed to decline transaction.', 'error');
       }

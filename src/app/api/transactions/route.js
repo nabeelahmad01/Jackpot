@@ -206,6 +206,7 @@ export async function POST(req) {
     const userEmail = newTx.userEmail.toLowerCase().trim();
 
     // Compress large withdraw/deposit proofs before Mongo write (keeps submit fast).
+    // Client already compresses most uploads; this catches anything still oversized.
     if (typeof newTx.screenshot === 'string' && newTx.screenshot.startsWith('data:image')) {
       newTx.screenshot = await compressDataUrlIfNeeded(newTx.screenshot);
     }
@@ -213,9 +214,9 @@ export async function POST(req) {
       newTx.tagQrScreenshot = await compressDataUrlIfNeeded(newTx.tagQrScreenshot);
     }
 
-    // Migrate any legacy PENDING freeplay bonuses directly to coins queue
-    // (skip on WITHDRAW submits — not needed and was slowing cashout requests)
-    if (newTx.type !== 'WITHDRAW') {
+    // Legacy PENDING freeplay → coins queue. Skip on DEPOSIT/WITHDRAW hot paths
+    // (same end state; freeplay now creates its own coins noti on submit).
+    if (newTx.type === 'BONUS') {
       const orphanedFreeplay = await transactionsCollection.find({
         userEmail,
         type: 'BONUS',
@@ -248,7 +249,7 @@ export async function POST(req) {
       }
     }
 
-    // Retrieve the player profile to extract distributorId
+    // Retrieve the player profile to extract distributorId (parallel when needed)
     const userDoc = await db.collection('users').findOne({ email: userEmail });
     const distId = userDoc ? (userDoc.distributorId || '') : '';
     let distType = '';
@@ -575,7 +576,22 @@ export async function POST(req) {
     // Invalidate stats cache
     cache.del('admin_stats');
 
-    return NextResponse.json({ success: true, transaction: txObject, message: 'Transaction request submitted successfully!' });
+    // Don't echo multi-MB base64 proofs back to the client — DB still has them.
+    const {
+      screenshot: _shot,
+      tagQrScreenshot: _tagQr,
+      payoutProof: _payout,
+      ...txWithoutProofs
+    } = txObject;
+    return NextResponse.json({
+      success: true,
+      transaction: {
+        ...txWithoutProofs,
+        hasScreenshot: Boolean(_shot),
+        hasTagQrScreenshot: Boolean(_tagQr)
+      },
+      message: 'Transaction request submitted successfully!'
+    });
   } catch (err) {
     console.error('Create Transaction API Error:', err);
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
@@ -732,22 +748,25 @@ export async function PUT(req) {
     if (status === 'SUCCESS' && (originalTx.type === 'DEPOSIT' || originalTx.type === 'BONUS') && originalTx.status !== 'SUCCESS') {
       try {
         const userEmail = originalTx.userEmail.toLowerCase();
-        
-        // 1. Count other existing successful deposits (uses compound index)
-        const successfulDepositsCount = await transactionsCollection.countDocuments({
-          userEmail,
-          type: 'DEPOSIT',
-          status: 'SUCCESS',
-          id: { $ne: id }
-        });
+        const settingsCollection = db.collection('settings');
+        const notificationsCollection = db.collection('coinsNotifications');
+
+        // Parallel lookups — same data as before, just not sequential.
+        const [successfulDepositsCount, settings, frontendSettings, depositor, existingNoti] = await Promise.all([
+          transactionsCollection.countDocuments({
+            userEmail,
+            type: 'DEPOSIT',
+            status: 'SUCCESS',
+            id: { $ne: id }
+          }),
+          settingsCollection.findOne({ id: 'global_settings' }),
+          settingsCollection.findOne({ id: 'frontend_settings' }),
+          db.collection('users').findOne({ email: userEmail }),
+          notificationsCollection.findOne({ transactionId: originalTx.id })
+        ]);
 
         const isFirstDeposit = successfulDepositsCount === 0;
 
-        // 2. Fetch system settings
-        const settingsCollection = db.collection('settings');
-        let settings = await settingsCollection.findOne({ id: 'global_settings' });
-        let frontendSettings = await settingsCollection.findOne({ id: 'frontend_settings' });
-        
         const firstBonusPercent = (frontendSettings && frontendSettings.firstDepositBonus !== undefined)
           ? Number(frontendSettings.firstDepositBonus)
           : (settings ? Number(settings.firstDepositBonus) : 300);
@@ -755,8 +774,7 @@ export async function PUT(req) {
         // Promo deposit bonus: if the player claimed a "deposit bonus" promotion,
         // their next approved deposit uses that promo % instead of the default
         // first/regular bonus, and any bundled freeplay is auto-granted below.
-        const depositorForBonus = await db.collection('users').findOne({ email: userEmail });
-        const rawPromoBonus = depositorForBonus ? depositorForBonus.pendingDepositBonusPercent : undefined;
+        const rawPromoBonus = depositor ? depositor.pendingDepositBonusPercent : undefined;
         const promoBonusPercent = (rawPromoBonus !== undefined && rawPromoBonus !== null) ? Number(rawPromoBonus) : null;
         const usePromoBonus = originalTx.type === 'DEPOSIT' && promoBonusPercent !== null && promoBonusPercent > 0;
 
@@ -769,9 +787,7 @@ export async function PUT(req) {
         const amount = parseFloat(originalTx.amount);
         const totalCoins = isBonus ? amount : (amount * (1 + bonusPercentage / 100));
 
-        // 3. Insert notification for the Coins Manager (with duplicate prevention)
-        const notificationsCollection = db.collection('coinsNotifications');
-        const existingNoti = await notificationsCollection.findOne({ transactionId: originalTx.id });
+        // Insert notification for the Coins Manager (with duplicate prevention)
         if (!existingNoti) {
           if (originalTx.type === 'BONUS' && (originalTx.code === 'SIGNUP-FREE3' || originalTx.code === 'FREEPLAY')) {
             // Freeplay bonus — special coins notification with isFreeplay flag
@@ -807,7 +823,7 @@ export async function PUT(req) {
           }
         }
 
-        // 3b. Consume the claimed promo deposit bonus so it only applies to this
+        // Consume the claimed promo deposit bonus so it only applies to this
         // one deposit (the bonus % was already used above). No freeplay is granted.
         if (usePromoBonus) {
           await db.collection('users').updateOne(
@@ -816,9 +832,7 @@ export async function PUT(req) {
           );
         }
 
-        // 4. Referral System Bonus: Check if this depositor was referred by someone
-        const usersCollection = db.collection('users');
-        const depositor = await usersCollection.findOne({ email: userEmail });
+        // Referral System Bonus: Check if this depositor was referred by someone
         if (depositor && depositor.referredBy && originalTx.type === 'DEPOSIT' && isFirstDeposit) {
           const referrerEmail = depositor.referredBy.toLowerCase().trim();
           

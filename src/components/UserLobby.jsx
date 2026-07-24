@@ -530,9 +530,9 @@ export default function UserLobby({
     showToast('Copied to clipboard!', 'success');
   };
 
-  // Convert uploaded image to Base64 data string
-  const handleScreenshotChange = (e) => {
-    const file = e.target.files[0];
+  // Compress payment proof (same as withdraw) so "I Paid" uploads fast.
+  const handleScreenshotChange = async (e) => {
+    const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.size > 2 * 1024 * 1024) {
@@ -542,12 +542,16 @@ export default function UserLobby({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setScreenshotBase64(reader.result);
+    try {
+      const compressed = await compressImageFile(file, { maxSize: 1280, quality: 0.72 });
+      setScreenshotBase64(compressed);
       showToast('Payment screenshot receipt loaded. Ready to confirm!', 'success');
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error(err);
+      showToast('Could not load payment screenshot. Try another image.', 'error');
+      e.target.value = '';
+      setScreenshotBase64('');
+    }
   };
 
   const handleWithdrawScreenshotChange = async (e) => {
