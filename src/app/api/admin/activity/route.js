@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/mongodb';
 import { typeBExclusionFilter } from '../../../../lib/typeBDistributors';
+import { cache } from '../../../../lib/cache';
+import { notifyStaffAsync } from '../../../../lib/pushNotifications';
+
+// Pending items older than this (with staff online) count as unresponded.
+const UNRESPONDED_AFTER_MS = 5 * 60 * 1000;
 
 // GET gets all staff members (non-user roles) and their last active status
 export async function GET(req) {
@@ -42,7 +47,7 @@ export async function GET(req) {
     };
 
     if (activeStaff.length > 0) {
-      const twoMinutesAgo = Date.now() - 2 * 60 * 1000;
+      const staleBefore = Date.now() - UNRESPONDED_AFTER_MS;
 
       // 1. Build queries based on distributor role
       let accountReqQuery = { status: 'PENDING' };
@@ -66,7 +71,7 @@ export async function GET(req) {
       const unrespondedAccounts = pendingAccounts.filter(r => {
         const time = r.createdAt || r.timestamp || r.date;
         const parsedTime = parseDateSafe(time);
-        return parsedTime > 0 && parsedTime < twoMinutesAgo;
+        return parsedTime > 0 && parsedTime < staleBefore;
       });
 
       // Check transactions
@@ -74,7 +79,7 @@ export async function GET(req) {
       const unrespondedTx = pendingTx.filter(t => {
         const time = t.createdAt || t.timestamp || t.date;
         const parsedTime = parseDateSafe(time);
-        return parsedTime > 0 && parsedTime < twoMinutesAgo;
+        return parsedTime > 0 && parsedTime < staleBefore;
       });
 
       // Check coinsNotifications
@@ -82,7 +87,7 @@ export async function GET(req) {
       const unrespondedCoins = pendingCoins.filter(n => {
         const time = n.createdAt || n.timestamp || n.date;
         const parsedTime = parseDateSafe(time);
-        return parsedTime > 0 && parsedTime < twoMinutesAgo;
+        return parsedTime > 0 && parsedTime < staleBefore;
       });
 
       // Populate unresponded list
@@ -117,6 +122,22 @@ export async function GET(req) {
       pendingCount = unrespondedRequests.length;
       if (pendingCount > 0) {
         hasUnrespondedRequest = true;
+      }
+    }
+
+    // Portal lock-screen: remind staff once per window when work sits > 5 min
+    // (HQ view only — distributor panels use their own distributor push path).
+    if (hasUnrespondedRequest && !adminDistributorId) {
+      const throttleKey = 'staff_unresponded_push_v1';
+      if (!cache.get(throttleKey)) {
+        cache.set(throttleKey, Date.now(), 5 * 60);
+        notifyStaffAsync(db, {
+          title: 'Requests waiting 5+ minutes',
+          body: `${pendingCount} pending task(s) need a response. Open Jackpot Portal.`,
+          url: '/admin',
+          tag: 'staff-unresponded-5m',
+          alertKind: 'general'
+        });
       }
     }
 

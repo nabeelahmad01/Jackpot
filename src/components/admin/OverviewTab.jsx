@@ -5,6 +5,7 @@ import usePollingSWR from '../../hooks/usePollingSWR';
 import { POLL } from '../../lib/pollingConfig';
 import { filterGamesForStaff, parseRoles } from '../../lib/staffGameAccess';
 import GatewayRevenueBreakdown from './GatewayRevenueBreakdown';
+import { notifyStaffActivity } from '../../lib/desktopNotify';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -12,6 +13,7 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
   const [shiftName, setShiftName] = React.useState('Morning Shift (5 AM - 1 PM)');
   const [notes, setNotes] = React.useState('');
   const [isSubmittingReport, setIsSubmittingReport] = React.useState(false);
+  const unrespondedAlertRef = React.useRef(false);
 
   const handleShiftReportSubmit = async (e) => {
     e.preventDefault();
@@ -53,6 +55,26 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
     `/api/admin/activity?adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}`,
     POLL.LISTS
   );
+
+  // When pending work sits 5+ minutes, also ping lock-screen/desktop if staff tab is away.
+  React.useEffect(() => {
+    const alertOn =
+      Boolean(activityData?.hasUnrespondedRequest) &&
+      Number(activityData?.activeStaffCount || 0) > 0;
+    if (alertOn && !unrespondedAlertRef.current) {
+      unrespondedAlertRef.current = true;
+      try {
+        notifyStaffActivity({
+          title: 'Requests waiting 5+ minutes',
+          body: `${activityData?.pendingCount || 0} pending task(s) need a response.`,
+          url: '/admin'
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+    if (!alertOn) unrespondedAlertRef.current = false;
+  }, [activityData?.hasUnrespondedRequest, activityData?.activeStaffCount, activityData?.pendingCount]);
 
   const stats = statsData?.stats || {
     todayDeposits: 0,
@@ -173,12 +195,12 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
             Unresponded Request Alert (Staff Logged In)
           </h4>
           <p style={{ fontSize: '0.75rem', color: '#cbd5e1', margin: '0.5rem 0' }}>
-            There are currently <strong style={{ color: '#ef4444' }}>{activityData?.activeStaffCount} active staff member(s)</strong> logged in, but one or more requests have been pending for **over 2 minutes** without a response!
+            There are currently <strong style={{ color: '#ef4444' }}>{activityData?.activeStaffCount} active staff member(s)</strong> logged in, but one or more requests have been pending for **over 5 minutes** without a response!
           </p>
 
           <div style={{ margin: '0.75rem 0', padding: '0.75rem', background: 'rgba(0,0,0,0.2)', borderRadius: '10px', border: '1px solid rgba(239,68,68,0.2)' }}>
             <h5 style={{ color: '#ef4444', margin: '0 0 0.5rem 0', fontSize: '0.725rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Pending Tasks (&gt; 2 min):
+              Pending Tasks (&gt; 5 min):
             </h5>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '150px', overflowY: 'auto' }}>
               {activityData?.unrespondedRequests?.map((req, idx) => (
