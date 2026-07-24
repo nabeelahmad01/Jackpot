@@ -320,6 +320,8 @@ export default function Home() {
     setSupportUnread(false);
     setSupportOpen(true);
   };
+
+  const handleLoginSuccess = (user) => {
     if (user.role === 'admin') {
       showToast('Admin credentials verified. Redirecting to Secure Workspace...', 'success');
       localStorage.setItem('jackpot_admin_session', 'active');

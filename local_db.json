@@ -44,6 +44,20 @@
       "role": "user",
       "coins": 100,
       "_id": "97u8skb3480"
+    },
+    {
+      "name": "nabeel ahmad",
+      "email": "ahmadnabeel634@gmail.com",
+      "password": "OAuth-Google-Login",
+      "role": "user",
+      "coins": 100,
+      "referralCode": "89D694AD",
+      "referredBy": "",
+      "distributorId": "",
+      "agentCode": "",
+      "campaign": "organic",
+      "createdAt": "2026-07-24T15:19:52.943Z",
+      "_id": "vqrntt92943"
     }
   ],
   "games": [
@@ -303,7 +317,9 @@
       "infoEmailEnabled": true,
       "infoEmailLabel": "Email Support",
       "infoEmailHandle": "support@jackpotroyals.com",
-      "infoEmailUrl": "mailto:support@jackpotroyals.com"
+      "infoEmailUrl": "mailto:support@jackpotroyals.com",
+      "withdrawRequireGameScreenshot": false,
+      "withdrawRequireTagQrScreenshot": true
     }
   ],
   "coinsNotifications": [],
@@ -312,8 +328,8 @@
   "pushSubscriptions": [
     {
       "endpoint": "https://fcm.googleapis.com/fcm/send/dYvLw8FFHIA:APA91bHguS6CmdTyqEYYPm_fG2cspdOLj4CJsRl_SPT7YlktS1W-0liA1JSErsJTEUWIagSSb7Meo-R6jI_Gc7d7Esd7AWQ0L5OYm6nl7WHMdGGMVw4lVfHrzmlHhFMJun1vfZt16NmR",
-      "userEmail": "admin@jackpot.com",
-      "audience": "staff",
+      "userEmail": "ahmadnabeel634@gmail.com",
+      "audience": "player",
       "type": "web",
       "platform": "web",
       "subscription": {
@@ -326,8 +342,9 @@
       },
       "nativeToken": null,
       "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
-      "updatedAt": "2026-07-23T02:36:33.544Z",
-      "_id": "rbbicw67095"
+      "updatedAt": "2026-07-24T15:20:06.201Z",
+      "_id": "rbbicw67095",
+      "distributorId": ""
     }
   ]
 }
