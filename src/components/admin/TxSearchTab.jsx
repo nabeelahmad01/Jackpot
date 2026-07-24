@@ -196,7 +196,16 @@ export default function TxSearchTab({ onInspectProof, adminUser }) {
                           <i className="fa-solid fa-qrcode"></i> <span style={{ fontSize: '0.65rem' }}>Tag QR</span>
                         </button>
                       ) : null}
-                      {!tx.screenshot && !(tx.type === 'WITHDRAW' && tx.tagQrScreenshot) && (
+                      {tx.type === 'WITHDRAW' && tx.payoutProof ? (
+                        <button
+                          onClick={() => onInspectProof(tx.payoutProof, tx.id, 'payoutProof')}
+                          className="submit-btn"
+                          style={{ background: '#10b981', color: '#fff', margin: 0, padding: '0.35rem 0.65rem', width: 'auto', display: 'inline-flex', gap: '0.3rem', alignItems: 'center' }}
+                        >
+                          <i className="fa-solid fa-money-check-dollar"></i> <span style={{ fontSize: '0.65rem' }}>Paid Receipt</span>
+                        </button>
+                      ) : null}
+                      {!tx.screenshot && !(tx.type === 'WITHDRAW' && tx.tagQrScreenshot) && !(tx.type === 'WITHDRAW' && tx.payoutProof) && (
                         <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>—</span>
                       )}
                     </div>
