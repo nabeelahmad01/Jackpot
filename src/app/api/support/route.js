@@ -9,11 +9,34 @@ export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const email = searchParams.get('email');
+    const attachmentId = searchParams.get('attachmentId');
     const page = parseInt(searchParams.get('page') || '1', 10);
     const limit = parseInt(searchParams.get('limit') || '50', 10);
 
     const db = await getDb();
     const supportCollection = db.collection('supportMessages');
+
+    // Lazy image load — keeps chat thread JSON tiny (base64 proofs stay in DB).
+    if (attachmentId) {
+      const msg = await supportCollection.findOne(
+        { id: String(attachmentId) },
+        { projection: { attachment: 1 } }
+      );
+      const dataUrl = typeof msg?.attachment === 'string' ? msg.attachment : '';
+      if (!dataUrl) {
+        return new NextResponse('Not found', { status: 404 });
+      }
+      const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+      if (match) {
+        return new NextResponse(Buffer.from(match[2], 'base64'), {
+          headers: {
+            'Content-Type': match[1] || 'image/jpeg',
+            'Cache-Control': 'private, max-age=3600'
+          }
+        });
+      }
+      return new NextResponse('Unsupported attachment', { status: 415 });
+    }
 
     const adminDistributorId = searchParams.get('adminDistributorId');
 
@@ -27,7 +50,7 @@ export async function GET(req) {
     }
 
     if (email) {
-      // Return full conversation history for a specific player
+      // Return conversation history for a specific player (text first — no inline base64)
       const skip = (page - 1) * limit;
       const emailKey = email.toLowerCase().trim();
 
@@ -47,9 +70,23 @@ export async function GET(req) {
         }
       }
 
-      // Full thread by email (do not require distributorId on each message)
+      // Exclude huge attachment payloads so chat opens instantly (images load via attachmentId).
       const messages = await supportCollection
         .find({ userEmail: emailKey })
+        .project({
+          _id: 0,
+          id: 1,
+          userEmail: 1,
+          userName: 1,
+          message: 1,
+          senderType: 1,
+          senderEmail: 1,
+          read: 1,
+          timestamp: 1,
+          distributorId: 1,
+          distributorType: 1,
+          hasAttachment: 1
+        })
         .sort({ timestamp: 1 })
         .skip(skip)
         .limit(limit)
@@ -75,11 +112,21 @@ export async function GET(req) {
             : emailKey.split('@')[0] || 'Guest';
         }
       }
-      messages.forEach((m) => {
-        m.playerName = playerName;
+
+      const leanMessages = messages.map((m) => {
+        // New rows set hasAttachment; older rows may omit it — still offer lazy URL
+        // (404s are hidden in the UI) so proofs keep working without bloating this JSON.
+        const showAttachment = m.hasAttachment !== false && Boolean(m.id);
+        return {
+          ...m,
+          playerName,
+          attachment: showAttachment
+            ? `/api/support?attachmentId=${encodeURIComponent(m.id)}`
+            : ''
+        };
       });
 
-      return NextResponse.json({ success: true, messages, playerName });
+      return NextResponse.json({ success: true, messages: leanMessages, playerName });
     }
 
     // Admin / distributor conversation list — group by player so unread chats
@@ -318,6 +365,7 @@ export async function POST(req) {
       })(),
       message: message ? message.trim() : '',
       attachment: attachment || '',
+      hasAttachment: Boolean(attachment && String(attachment).trim()),
       senderType, // 'player' | 'admin'
       senderEmail: senderEmail ? senderEmail.toLowerCase().trim() : '',
       read: senderType === 'admin', // default to read if admin, unread if player

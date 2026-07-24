@@ -35,9 +35,16 @@ export default function SupportTab({ adminUser }) {
     POLL.SUPPORT
   );
 
-  const { data: activeChatData, mutate: mutateActiveChat } = usePollingSWR(
+  // keepPreviousData:false — switching chats must NOT keep showing the previous customer's messages
+  const {
+    data: activeChatData,
+    mutate: mutateActiveChat,
+    isLoading: chatLoading,
+    isValidating: chatValidating
+  } = usePollingSWR(
     activeChatEmail ? `/api/support?email=${encodeURIComponent(activeChatEmail)}${distQueryParam}` : null,
-    POLL.CHAT
+    POLL.CHAT,
+    { keepPreviousData: false }
   );
 
   // Search registered players by Gmail/name so staff can message before player texts first
@@ -93,7 +100,17 @@ export default function SupportTab({ adminUser }) {
   }, [chatSearch, adminUser?.distributorId]);
 
   const allMessages = convData?.messages || [];
-  const activeChatMessages = activeChatData?.messages || [];
+  // Only show messages for the currently selected email (guards against any stale cache)
+  const activeChatMessages = (() => {
+    const msgs = activeChatData?.messages || [];
+    if (!activeChatEmail || !msgs.length) return msgs;
+    const emailKey = activeChatEmail.toLowerCase();
+    const mismatched = msgs.some(
+      (m) => m.userEmail && String(m.userEmail).toLowerCase() !== emailKey
+    );
+    return mismatched ? [] : msgs;
+  })();
+  const showChatLoading = Boolean(activeChatEmail) && (chatLoading || (chatValidating && !activeChatData));
 
   const resolveDisplayName = (email, preferredName) => {
     const emailKey = String(email || '').toLowerCase().trim();
@@ -403,7 +420,11 @@ export default function SupportTab({ adminUser }) {
             filteredConversations.map((chat) => (
               <div
                 key={chat.email}
-                onClick={() => setActiveChatEmail(chat.email)}
+                onClick={() => {
+                  setActiveChatEmail(chat.email);
+                  setAdminReplyText('');
+                  setAdminAttachment('');
+                }}
                 style={{
                   padding: '0.75rem',
                   background: activeChatEmail === chat.email ? 'rgba(255,215,0,0.1)' : 'rgba(255,255,255,0.01)',
@@ -487,7 +508,12 @@ export default function SupportTab({ adminUser }) {
             </div>
 
             <div className="support-chat-messages">
-              {activeChatMessages.length === 0 ? (
+              {showChatLoading ? (
+                <div style={{ margin: 'auto', textAlign: 'center', opacity: 0.7, padding: '1.25rem' }}>
+                  <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '1.6rem', color: 'var(--gold-primary)', display: 'block', marginBottom: '0.55rem' }}></i>
+                  <p style={{ fontSize: '0.8rem', margin: 0 }}>Loading chat…</p>
+                </div>
+              ) : activeChatMessages.length === 0 ? (
                 <div style={{ margin: 'auto', textAlign: 'center', opacity: 0.55, padding: '1.25rem', maxWidth: '280px' }}>
                   <i className="fa-solid fa-paper-plane" style={{ fontSize: '1.6rem', color: 'var(--gold-primary)', display: 'block', marginBottom: '0.55rem' }}></i>
                   <p style={{ fontSize: '0.8rem', margin: 0, lineHeight: 1.4 }}>
@@ -517,6 +543,7 @@ export default function SupportTab({ adminUser }) {
                             <img
                               src={msg.attachment}
                               alt="Chat attachment"
+                              loading="lazy"
                               style={{
                                 maxWidth: '100%',
                                 maxHeight: '180px',
@@ -524,6 +551,9 @@ export default function SupportTab({ adminUser }) {
                                 cursor: 'zoom-in',
                                 border: '1px solid rgba(255,255,255,0.1)',
                                 display: 'block'
+                              }}
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
                               }}
                               onClick={(e) => {
                                 e.stopPropagation();

@@ -235,6 +235,7 @@ export function SupportModal({ isOpen, onClose, currentUser, onMessagesSeen }) {
                         <img
                           src={msg.attachment}
                           alt="Support Attachment"
+                          loading="lazy"
                           style={{
                             maxWidth: '100%',
                             maxHeight: '180px',
@@ -243,6 +244,9 @@ export function SupportModal({ isOpen, onClose, currentUser, onMessagesSeen }) {
                             marginTop: '0.4rem',
                             border: '1px solid rgba(255,255,255,0.1)',
                             cursor: 'zoom-in'
+                          }}
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
                           }}
                           onClick={(e) => {
                             e.stopPropagation();
