@@ -153,9 +153,24 @@ export default function CampaignRequestsTab({ adminUser, onInspectProof }) {
                       End: {new Date(c.endDate).toLocaleDateString()}
                     </td>
                     <td>
-                      {c.paymentProof ? (
+                      {c.paymentProof || c.hasPaymentProof ? (
                         <button
-                          onClick={() => onInspectProof(c.paymentProof)}
+                          onClick={async () => {
+                            try {
+                              // List payload is lean — fetch full proof only when inspecting
+                              const res = await fetch(`/api/campaign-requests?id=${encodeURIComponent(c.id)}`);
+                              const data = await res.json();
+                              const proof = data?.campaign?.paymentProof;
+                              if (proof && typeof onInspectProof === 'function') {
+                                onInspectProof(proof);
+                              } else {
+                                alert('No payment proof found for this campaign.');
+                              }
+                            } catch (err) {
+                              console.error(err);
+                              alert('Could not load payment proof.');
+                            }
+                          }}
                           style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '0.25rem 0.5rem', color: 'var(--gold-primary)', fontSize: '0.675rem', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
                         >
                           <i className="fa-solid fa-image"></i> Inspect

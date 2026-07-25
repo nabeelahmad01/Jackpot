@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/mongodb';
+import { cache } from '../../../../lib/cache';
 
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const adminDistributorId = searchParams.get('adminDistributorId');
+    const cacheKey = `gateway_stats_${adminDistributorId || 'platform'}`;
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return NextResponse.json({ success: true, stats: cached });
+    }
 
     const db = await getDb();
     const transactionsCollection = db.collection('transactions');
@@ -24,33 +30,47 @@ export async function GET(req) {
       ];
     }
 
-    const txs = await transactionsCollection.find(matchCriteria)
-      .project({ gateway: 1, amount: 1, type: 1 })
+    const rows = await transactionsCollection
+      .aggregate([
+        { $match: matchCriteria },
+        {
+          $group: {
+            _id: { $ifNull: ['$gateway', 'Unknown'] },
+            received: {
+              $sum: {
+                $cond: [
+                  { $eq: ['$type', 'DEPOSIT'] },
+                  { $toDouble: { $ifNull: ['$amount', 0] } },
+                  0
+                ]
+              }
+            },
+            withdrawn: {
+              $sum: {
+                $cond: [
+                  { $eq: ['$type', 'WITHDRAW'] },
+                  { $toDouble: { $ifNull: ['$amount', 0] } },
+                  0
+                ]
+              }
+            }
+          }
+        }
+      ])
       .toArray();
 
-    const gatewayMap = {};
-    txs.forEach(tx => {
-      const gw = (tx.gateway || 'Unknown').trim();
-      if (!gatewayMap[gw]) {
-        gatewayMap[gw] = { gateway: gw, received: 0, withdrawn: 0 };
-      }
-      const val = parseFloat(tx.amount || 0);
-      if (!isNaN(val)) {
-        if (tx.type === 'DEPOSIT') {
-          gatewayMap[gw].received += val;
-        } else if (tx.type === 'WITHDRAW') {
-          gatewayMap[gw].withdrawn += val;
-        }
-      }
+    const stats = rows.map((item) => {
+      const received = Math.round((item.received || 0) * 100) / 100;
+      const withdrawn = Math.round((item.withdrawn || 0) * 100) / 100;
+      return {
+        gateway: String(item._id || 'Unknown').trim() || 'Unknown',
+        received,
+        withdrawn,
+        net: Math.round((received - withdrawn) * 100) / 100
+      };
     });
 
-    const stats = Object.values(gatewayMap).map(item => ({
-      gateway: item.gateway,
-      received: Math.round(item.received * 100) / 100,
-      withdrawn: Math.round(item.withdrawn * 100) / 100,
-      net: Math.round((item.received - item.withdrawn) * 100) / 100
-    }));
-
+    cache.set(cacheKey, stats, 45);
     return NextResponse.json({ success: true, stats });
   } catch (err) {
     console.error('Failed to fetch gateway stats:', err);

@@ -63,30 +63,47 @@ export async function GET(req) {
       // Fast path for Shift Dashboard: PENDING-only — limit in Mongo, skip heavy READY synthetics
       const pendingOnlyFastPath = wantPending && !wantReady && statuses.length === 1 && statuses[0] === 'PENDING';
 
-      let realRequestsRaw;
-      if (pendingOnlyFastPath) {
-        const fetchLimit = Math.min(Math.max(limit * 3, 50), 150);
-        realRequestsRaw = await requestsCollection
-          .find(requestQuery)
-          .project({
-            id: 1,
-            gameTitle: 1,
-            userEmail: 1,
-            status: 1,
-            date: 1,
-            createdAt: 1,
-            distributorId: 1,
-            distributorType: 1,
-            distributorName: 1,
-            gameAccountUsername: 1,
-            userName: 1
-          })
-          .sort({ createdAt: -1, id: -1 })
-          .limit(fetchLimit)
-          .toArray();
-      } else {
-        realRequestsRaw = await requestsCollection.find(requestQuery).toArray();
+      const requestListProjection = {
+        id: 1,
+        gameTitle: 1,
+        userEmail: 1,
+        status: 1,
+        date: 1,
+        createdAt: 1,
+        distributorId: 1,
+        distributorType: 1,
+        distributorName: 1,
+        gameAccountUsername: 1,
+        userName: 1
+      };
+
+      let accountQuery = {};
+      if (email) {
+        accountQuery.userEmail = email.toLowerCase().trim();
       }
+
+      // Parallel: requests + gameAccounts (READY synthetics) — same data, less wait
+      const fetchLimit = Math.min(Math.max(limit * 3, 50), 150);
+      const [realRequestsRaw, accountsRaw] = await Promise.all([
+        pendingOnlyFastPath
+          ? requestsCollection
+              .find(requestQuery)
+              .project(requestListProjection)
+              .sort({ createdAt: -1, id: -1 })
+              .limit(fetchLimit)
+              .toArray()
+          : requestsCollection.find(requestQuery).project(requestListProjection).toArray(),
+        wantReady
+          ? db.collection('gameAccounts').find(accountQuery).project({
+              _id: 1,
+              id: 1,
+              userEmail: 1,
+              gameTitle: 1,
+              username: 1,
+              createdAt: 1
+            }).toArray()
+          : Promise.resolve([])
+      ]);
 
       // Collapse multi-tap PENDING duplicates (same player + same game) — keep newest
       const pendingDupIds = [];
@@ -135,12 +152,7 @@ export async function GET(req) {
       // Build synthetic READY rows from gameAccounts when READY is requested
       let syntheticFromAccounts = [];
       if (wantReady) {
-        let accountQuery = {};
-        if (email) {
-          accountQuery.userEmail = email.toLowerCase().trim();
-        }
-
-        let accounts = await db.collection('gameAccounts').find(accountQuery).toArray();
+        let accounts = accountsRaw;
 
         // Restrict by distributor / Type B same as requests
         if (accounts.length > 0) {

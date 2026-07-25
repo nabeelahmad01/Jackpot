@@ -55,8 +55,17 @@ export async function GET(req) {
 
     const gateways = await gatewaysCollection.find(query).toArray();
 
-    cache.set(cacheKey, gateways, 60);
-    return NextResponse.json({ success: true, gateways });
+    // Swap inline base64 QRs for a cached image proxy — same UI, much smaller JSON
+    const lean = gateways.map((g) => {
+      const qr = g.qrImage || '';
+      if (typeof qr === 'string' && qr.startsWith('data:image') && g.id) {
+        return { ...g, qrImage: `/api/gateways/image?id=${encodeURIComponent(g.id)}` };
+      }
+      return g;
+    });
+
+    cache.set(cacheKey, lean, 60);
+    return NextResponse.json({ success: true, gateways: lean });
   } catch (err) {
     console.error('Fetch Gateways API Error:', err);
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
@@ -106,6 +115,7 @@ export async function POST(req) {
     
     // Invalidate caches
     cache.del('gateways_all');
+    if (newGateway.id) cache.del(`gateway_image_${newGateway.id}`);
 
     return NextResponse.json({ success: true, gateway: newGateway, message: 'Payment gateway added successfully!' });
   } catch (err) {
@@ -147,6 +157,7 @@ export async function PUT(req) {
     
     // Invalidate caches
     cache.del('gateways_all');
+    cache.del(`gateway_image_${gateway.id}`);
 
     return NextResponse.json({ success: true, message: 'Payment gateway updated successfully!' });
   } catch (err) {
@@ -172,6 +183,7 @@ export async function DELETE(req) {
     
     // Invalidate caches
     cache.del('gateways_all');
+    cache.del(`gateway_image_${id}`);
 
     return NextResponse.json({ success: true, message: 'Payment gateway deleted successfully!' });
   } catch (err) {

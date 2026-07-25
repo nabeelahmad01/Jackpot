@@ -167,7 +167,9 @@ export async function GET(req) {
               userEmail: { $first: '$userEmail' },
               userName: { $first: '$userName' },
               lastMessage: { $first: '$message' },
-              lastAttachment: { $first: '$attachment' },
+              // Prefer stored hasAttachment flag (set on write). Avoid $first:'$attachment'
+              // which forces Mongo to load multi-MB base64 into the pipeline.
+              lastAttachment: { $first: { $ifNull: ['$hasAttachment', false] } },
               timestamp: { $first: '$timestamp' },
               senderType: { $first: '$senderType' },
               unread: {
@@ -231,7 +233,7 @@ export async function GET(req) {
                 userEmail: { $first: '$userEmail' },
                 userName: { $first: '$userName' },
                 lastMessage: { $first: '$message' },
-                lastAttachment: { $first: '$attachment' },
+                lastAttachment: { $first: { $ifNull: ['$hasAttachment', false] } },
                 timestamp: { $first: '$timestamp' },
                 senderType: { $first: '$senderType' },
                 unread: { $literal: true },

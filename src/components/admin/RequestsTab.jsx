@@ -158,7 +158,8 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
   // SWR: pending requests first, then created (READY) accounts — not PENDING-only
   const { data, error, mutate } = usePollingSWR(
     `/api/account-requests?status=PENDING,READY&page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
-    POLL.QUEUES
+    POLL.QUEUES,
+    { keepPreviousData: false }
   );
 
   const requests = (data?.accountRequests || []).filter((r) => !completedActionIds[r.id]);

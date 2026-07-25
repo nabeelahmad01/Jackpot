@@ -156,7 +156,8 @@ export async function GET(req) {
         approvedBy: 1,
         allottedBy: 1,
         isFreeplayWithdraw: 1,
-        gameAmount: 1
+        gameAmount: 1,
+        proofPending: 1
       })
       .sort({ id: -1 })
       .skip(skip)
@@ -205,30 +206,38 @@ export async function POST(req) {
 
     const userEmail = newTx.userEmail.toLowerCase().trim();
 
-    // Compress large withdraw/deposit proofs before Mongo write (keeps submit fast).
-    // Client already compresses most uploads; this catches anything still oversized.
-    if (typeof newTx.screenshot === 'string' && newTx.screenshot.startsWith('data:image')) {
+    // Deposit proofs attach via /api/transactions/proof after a tiny create POST.
+    // Only compress images that are actually present on this request (withdrawals).
+    const proofPending = Boolean(newTx.proofPending) && newTx.type === 'DEPOSIT';
+    if (!proofPending && typeof newTx.screenshot === 'string' && newTx.screenshot.startsWith('data:image')) {
       newTx.screenshot = await compressDataUrlIfNeeded(newTx.screenshot);
     }
     if (typeof newTx.tagQrScreenshot === 'string' && newTx.tagQrScreenshot.startsWith('data:image')) {
       newTx.tagQrScreenshot = await compressDataUrlIfNeeded(newTx.tagQrScreenshot);
     }
+    // Never store a multi-MB proof on the fast deposit create path
+    if (proofPending) {
+      delete newTx.screenshot;
+    }
+    delete newTx.proofPending;
 
-    // Legacy PENDING freeplay → coins queue. Skip on DEPOSIT/WITHDRAW hot paths
-    // (same end state; freeplay now creates its own coins noti on submit).
+    // Legacy PENDING freeplay heal — never block a new claim (background)
     if (newTx.type === 'BONUS') {
-      const orphanedFreeplay = await transactionsCollection.find({
-        userEmail,
-        type: 'BONUS',
-        code: { $in: ['SIGNUP-FREE3', 'FREEPLAY'] },
-        status: 'PENDING'
-      }).toArray();
-
-      if (orphanedFreeplay.length > 0) {
+      Promise.resolve().then(async () => {
+        const orphanedFreeplay = await transactionsCollection.find({
+          userEmail,
+          type: 'BONUS',
+          code: { $in: ['SIGNUP-FREE3', 'FREEPLAY'] },
+          status: 'PENDING'
+        }).project({ id: 1, userEmail: 1, gameTitle: 1, amount: 1, distributorId: 1 }).toArray();
+        if (orphanedFreeplay.length === 0) return;
         const notificationsCollection = db.collection('coinsNotifications');
         for (const fp of orphanedFreeplay) {
           await transactionsCollection.updateOne({ id: fp.id }, { $set: { status: 'COINS_LOADING' } });
-          const existingNoti = await notificationsCollection.findOne({ transactionId: fp.id });
+          const existingNoti = await notificationsCollection.findOne(
+            { transactionId: fp.id },
+            { projection: { _id: 1 } }
+          );
           if (!existingNoti) {
             await notificationsCollection.insertOne({
               id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
@@ -246,16 +255,25 @@ export async function POST(req) {
             });
           }
         }
-      }
+      }).catch((err) => console.error('Orphan freeplay heal failed:', err));
     }
 
-    // Retrieve the player profile to extract distributorId (parallel when needed)
-    const userDoc = await db.collection('users').findOne({ email: userEmail });
+    // Retrieve the player profile to extract distributorId
+    const userDoc = await db.collection('users').findOne(
+      { email: userEmail },
+      { projection: { email: 1, distributorId: 1 } }
+    );
     const distId = userDoc ? (userDoc.distributorId || '') : '';
     let distType = '';
     if (distId) {
-      const distDoc = await db.collection('distributors').findOne({ id: distId }, { projection: { type: 1 } });
-      distType = distDoc?.type || '';
+      const distCacheKey = `dist_type_${distId}`;
+      let cachedType = cache.get(distCacheKey);
+      if (cachedType == null) {
+        const distDoc = await db.collection('distributors').findOne({ id: distId }, { projection: { type: 1 } });
+        cachedType = distDoc?.type || '';
+        cache.set(distCacheKey, cachedType, 120);
+      }
+      distType = cachedType;
     }
 
     if (newTx.isRemainderRequest) {
@@ -389,12 +407,39 @@ export async function POST(req) {
     const isFreeplayBonus = newTx.type === 'BONUS' && (newTx.code === 'SIGNUP-FREE3' || newTx.code === 'FREEPLAY');
 
     if (isFreeplayBonus) {
-      const pendingFreeplay = await transactionsCollection.findOne({
-        userEmail,
-        type: 'BONUS',
-        code: { $in: ['SIGNUP-FREE3', 'FREEPLAY'] },
-        status: { $in: ['COINS_LOADING', 'PENDING', 'PENDING_COINS'] }
-      });
+      if (!newTx.gameTitle || String(newTx.gameTitle).trim() === '') {
+        return NextResponse.json({
+          success: false,
+          message: 'Select a game to claim freeplay.'
+        }, { status: 400 });
+      }
+
+      const isPromoFreeplay = /promo freeplay/i.test(String(newTx.note || ''));
+
+      // Parallel: pending guard + latest success freeplay (no full history scan)
+      const [pendingFreeplay, lastFp] = await Promise.all([
+        transactionsCollection.findOne(
+          {
+            userEmail,
+            type: 'BONUS',
+            code: { $in: ['SIGNUP-FREE3', 'FREEPLAY'] },
+            status: { $in: ['COINS_LOADING', 'PENDING', 'PENDING_COINS'] }
+          },
+          { projection: { _id: 1 } }
+        ),
+        isPromoFreeplay
+          ? Promise.resolve(null)
+          : transactionsCollection.findOne(
+              {
+                userEmail,
+                type: 'BONUS',
+                code: { $in: ['SIGNUP-FREE3', 'FREEPLAY'] },
+                status: 'SUCCESS'
+              },
+              { sort: { id: -1 }, projection: { id: 1 } }
+            )
+      ]);
+
       if (pendingFreeplay) {
         return NextResponse.json({
           success: false,
@@ -402,22 +447,8 @@ export async function POST(req) {
         }, { status: 400 });
       }
 
-      const isPromoFreeplay = /promo freeplay/i.test(String(newTx.note || ''));
-
       if (!isPromoFreeplay) {
-        const successFreeplays = await transactionsCollection
-          .find({
-            userEmail,
-            type: 'BONUS',
-            code: { $in: ['SIGNUP-FREE3', 'FREEPLAY'] },
-            status: 'SUCCESS'
-          })
-          .sort({ id: -1 })
-          .toArray();
-
-        if (successFreeplays.length > 0) {
-          const lastFp = successFreeplays[0];
-
+        if (lastFp) {
           // Cashout after freeplay resets $25 progress — only count deposits after last cashout (or freeplay)
           const lastCashoutAfterFp = await transactionsCollection.findOne(
             {
@@ -426,19 +457,27 @@ export async function POST(req) {
               status: { $ne: 'FAILED' },
               id: { $gt: lastFp.id }
             },
-            { sort: { id: -1 } }
+            { sort: { id: -1 }, projection: { id: 1 } }
           );
           const depositAfterId = lastCashoutAfterFp ? lastCashoutAfterFp.id : lastFp.id;
 
-          const depositsAfter = await transactionsCollection
-            .find({
-              userEmail,
-              type: 'DEPOSIT',
-              status: 'SUCCESS',
-              id: { $gt: depositAfterId }
-            })
-            .toArray();
-          const depositTotal = depositsAfter.reduce((s, t) => s + parseFloat(t.amount || 0), 0);
+          const depositAgg = await transactionsCollection.aggregate([
+            {
+              $match: {
+                userEmail,
+                type: 'DEPOSIT',
+                status: 'SUCCESS',
+                id: { $gt: depositAfterId }
+              }
+            },
+            {
+              $group: {
+                _id: null,
+                total: { $sum: { $toDouble: { $ifNull: ['$amount', 0] } } }
+              }
+            }
+          ]).toArray();
+          const depositTotal = depositAgg[0]?.total || 0;
           if (depositTotal < 25) {
             return NextResponse.json({
               success: false,
@@ -454,13 +493,6 @@ export async function POST(req) {
           newTx.gateway = newTx.gateway || 'Signup Bonus';
         }
       }
-
-      if (!newTx.gameTitle || String(newTx.gameTitle).trim() === '') {
-        return NextResponse.json({
-          success: false,
-          message: 'Select a game to claim freeplay.'
-        }, { status: 400 });
-      }
     }
 
     const txObject = {
@@ -473,7 +505,9 @@ export async function POST(req) {
       note: '',
       distributorId: distId,
       distributorType: distType,
-      ...newTx
+      ...newTx,
+      proofPending: Boolean(proofPending),
+      hasScreenshot: Boolean(newTx.screenshot && String(newTx.screenshot).trim())
     };
 
     if (txObject.type === 'WITHDRAW') {
@@ -521,22 +555,12 @@ export async function POST(req) {
       // The amount will be capped to $30 when the coins admin approves (in coins-notifications PUT)
     }
 
-    await transactionsCollection.insertOne(txObject);
-
-    // Alert Jackpot Portal + owning Distributor APK — never touches player promo push.
-    const alertType = String(txObject.type || 'REQUEST').replace(/_/g, ' ');
-    notifyStaffAndDistributorAsync(db, {
-      title: `New ${alertType}`,
-      body: `${txObject.userEmail || 'Player'} · $${parseFloat(txObject.amount || 0).toFixed(2)}${txObject.gameTitle ? ` · ${txObject.gameTitle}` : ''}`,
-      url: '/admin',
-      tag: `tx-${txObject.id}`,
-      gameTitle: txObject.gameTitle || '',
-      alertKind: 'game'
-    }, txObject.distributorId);
+    // Freeplay / withdraw: write tx + coins task together so admin queue is ready when response returns
+    const notificationsCollection = db.collection('coinsNotifications');
+    const writeOps = [transactionsCollection.insertOne(txObject)];
 
     if (txObject.type === 'WITHDRAW') {
-      const notificationsCollection = db.collection('coinsNotifications');
-      await notificationsCollection.insertOne({
+      writeOps.push(notificationsCollection.insertOne({
         id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
         userEmail: txObject.userEmail,
         gameTitle: txObject.gameTitle || 'Lobby',
@@ -550,13 +574,11 @@ export async function POST(req) {
         isFreeplayWithdraw: Boolean(txObject.isFreeplayWithdraw),
         distributorId: distId,
         distributorType: distType
-      });
+      }));
     }
 
-    // Freeplay bonus goes DIRECTLY to coins admin — create coins notification immediately
     if (isFreeplayBonus) {
-      const notificationsCollection = db.collection('coinsNotifications');
-      await notificationsCollection.insertOne({
+      writeOps.push(notificationsCollection.insertOne({
         id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
         userEmail: txObject.userEmail,
         gameTitle: txObject.gameTitle || 'Lobby',
@@ -570,8 +592,21 @@ export async function POST(req) {
         transactionId: txObject.id,
         distributorId: distId,
         distributorType: distType
-      });
+      }));
     }
+
+    await Promise.all(writeOps);
+
+    // Alert Jackpot Portal + owning Distributor APK — never touches player promo push.
+    const alertType = String(txObject.type || 'REQUEST').replace(/_/g, ' ');
+    notifyStaffAndDistributorAsync(db, {
+      title: `New ${alertType}`,
+      body: `${txObject.userEmail || 'Player'} · $${parseFloat(txObject.amount || 0).toFixed(2)}${txObject.gameTitle ? ` · ${txObject.gameTitle}` : ''}`,
+      url: '/admin',
+      tag: `tx-${txObject.id}`,
+      gameTitle: txObject.gameTitle || '',
+      alertKind: 'game'
+    }, txObject.distributorId);
 
     // Invalidate stats cache
     cache.del('admin_stats');
@@ -610,7 +645,18 @@ export async function PUT(req) {
     const db = await getDb();
     const transactionsCollection = db.collection('transactions');
 
-    const originalTx = await transactionsCollection.findOne({ id });
+    // Slim read for approve/reject — never load multi-MB screenshots into memory
+    const originalTx = await transactionsCollection.findOne(
+      { id },
+      {
+        projection: {
+          screenshot: 0,
+          tagQrScreenshot: 0,
+          payoutProof: 0,
+          paymentProof: 0
+        }
+      }
+    );
     if (!originalTx) {
       return NextResponse.json({ success: false, message: 'Transaction not found.' }, { status: 404 });
     }
@@ -760,24 +806,43 @@ export async function PUT(req) {
     // allotment task (or a second referral reward).
     if (isCoinsApproval) {
       try {
+        // Proof still uploading from player two-phase deposit — don't approve yet
+        if (originalTx.type === 'DEPOSIT' && originalTx.proofPending === true) {
+          return NextResponse.json({
+            success: false,
+            message: 'Payment proof is still uploading. Wait a moment and try again.'
+          }, { status: 409 });
+        }
+
         const userEmail = originalTx.userEmail.toLowerCase();
         const settingsCollection = db.collection('settings');
         const notificationsCollection = db.collection('coinsNotifications');
 
-        // Parallel lookups — same data as before, just not sequential.
-        const [successfulDepositsCount, settings, frontendSettings, depositor] = await Promise.all([
-          transactionsCollection.countDocuments({
-            userEmail,
-            type: 'DEPOSIT',
-            status: 'SUCCESS',
-            id: { $ne: id }
-          }),
-          settingsCollection.findOne({ id: 'global_settings' }),
-          settingsCollection.findOne({ id: 'frontend_settings' }),
-          db.collection('users').findOne({ email: userEmail })
+        // Cached settings + findOne (not count) for first-deposit check — fewer Atlas round-trips
+        let settings = cache.get('global_settings');
+        let frontendSettings = cache.get('frontend_settings_all');
+        const [priorSuccessDeposit, settingsFresh, frontendFresh, depositor] = await Promise.all([
+          transactionsCollection.findOne(
+            { userEmail, type: 'DEPOSIT', status: 'SUCCESS', id: { $ne: id } },
+            { projection: { _id: 1 } }
+          ),
+          settings ? Promise.resolve(null) : settingsCollection.findOne({ id: 'global_settings' }),
+          frontendSettings ? Promise.resolve(null) : settingsCollection.findOne({ id: 'frontend_settings' }),
+          db.collection('users').findOne(
+            { email: userEmail },
+            { projection: { email: 1, referredBy: 1, pendingDepositBonusPercent: 1, pendingBonusFreeplay: 1, pendingBonusPromoId: 1, pendingBonusPromoTitle: 1 } }
+          )
         ]);
+        if (settingsFresh) {
+          settings = settingsFresh;
+          cache.set('global_settings', settingsFresh, 60);
+        }
+        if (frontendFresh) {
+          frontendSettings = frontendFresh;
+          cache.set('frontend_settings_all', frontendFresh, 60);
+        }
 
-        const isFirstDeposit = successfulDepositsCount === 0;
+        const isFirstDeposit = !priorSuccessDeposit;
 
         const firstBonusPercent = (frontendSettings && frontendSettings.firstDepositBonus !== undefined)
           ? Number(frontendSettings.firstDepositBonus)
@@ -850,16 +915,17 @@ export async function PUT(req) {
           { $set: updateFields }
         );
 
-        // Consume the claimed promo deposit bonus so it only applies to this
-        // one deposit (the bonus % was already used above). No freeplay is granted.
+        // Consume promo flag off the hot path (bonus % already applied above)
         if (createdCoinTask && usePromoBonus) {
-          await db.collection('users').updateOne(
-            { email: userEmail },
-            { $unset: { pendingDepositBonusPercent: '', pendingBonusFreeplay: '', pendingBonusPromoId: '', pendingBonusPromoTitle: '' } }
-          );
+          Promise.resolve(
+            db.collection('users').updateOne(
+              { email: userEmail },
+              { $unset: { pendingDepositBonusPercent: '', pendingBonusFreeplay: '', pendingBonusPromoId: '', pendingBonusPromoTitle: '' } }
+            )
+          ).catch((err) => console.error('Promo bonus consume failed:', err));
         }
 
-        // Referral System Bonus: Check if this depositor was referred by someone
+        // Referral reward — non-blocking so finance approve returns immediately
         if (
           createdCoinTask &&
           depositor &&
@@ -868,22 +934,19 @@ export async function PUT(req) {
           isFirstDeposit
         ) {
           const referrerEmail = depositor.referredBy.toLowerCase().trim();
-          
-          // Get referral reward percentage (default: 10%)
           const refBonusPercent = (settings && settings.referralBonus !== undefined) ? Number(settings.referralBonus) : 10;
-          
           if (refBonusPercent > 0) {
             const rewardCoins = amount * (refBonusPercent / 100);
-            
-            // Insert referral reward under pendingReferrals for user claim choice
-            await db.collection('pendingReferrals').insertOne({
-              id: Date.now().toString() + Math.floor(Math.random() * 100 + 1).toString(),
-              referrerEmail,
-              refereeEmail: userEmail,
-              rewardCoins: Math.round(rewardCoins * 100) / 100,
-              status: 'PENDING',
-              timestamp: new Date().toISOString()
-            });
+            Promise.resolve(
+              db.collection('pendingReferrals').insertOne({
+                id: Date.now().toString() + Math.floor(Math.random() * 100 + 1).toString(),
+                referrerEmail,
+                refereeEmail: userEmail,
+                rewardCoins: Math.round(rewardCoins * 100) / 100,
+                status: 'PENDING',
+                timestamp: new Date().toISOString()
+              })
+            ).catch((err) => console.error('Referral reward insert failed:', err));
           }
         }
       } catch (notiErr) {

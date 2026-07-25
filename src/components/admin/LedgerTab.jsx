@@ -33,7 +33,7 @@ export default function LedgerTab({
   const swrKey = `/api/transactions?status=PENDING&page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}`;
 
   // SWR automatically polls every 4s for ledger transactions
-  const { data, error, mutate } = usePollingSWR(swrKey, POLL.QUEUES);
+  const { data, error, mutate } = usePollingSWR(swrKey, POLL.QUEUES, { keepPreviousData: false });
 
   const roles = parseRoles(adminUser?.role);
   const showGatewayBreakdown = roles.includes('admin') || roles.includes('operation_admin');
@@ -321,7 +321,9 @@ export default function LedgerTab({
                         </span>
                       </td>
                       <td>
-                        {tx.screenshot ? (
+                        {tx.proofPending && !tx.screenshot ? (
+                          <span style={{ fontSize: '0.7rem', color: 'var(--gold-main)' }}>Proof uploading…</span>
+                        ) : tx.screenshot ? (
                           <button
                             onClick={() => onInspectProof(tx.screenshot, tx.id, 'screenshot')}
                             className="submit-btn"

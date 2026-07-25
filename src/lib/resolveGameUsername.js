@@ -27,7 +27,10 @@ export async function buildGameUsernameMap(db, emails, options = {}) {
   if (cleanEmails.length === 0) return {};
 
   const [accounts, requests] = await Promise.all([
-    db.collection('gameAccounts').find({ userEmail: { $in: cleanEmails } }).toArray(),
+    db.collection('gameAccounts')
+      .find({ userEmail: { $in: cleanEmails } })
+      .project({ userEmail: 1, gameTitle: 1, username: 1, _id: 1 })
+      .toArray(),
     db
       .collection('accountRequests')
       .find({

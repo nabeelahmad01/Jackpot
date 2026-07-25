@@ -543,7 +543,8 @@ export default function UserLobby({
     }
 
     try {
-      const compressed = await compressImageFile(file, { maxSize: 1280, quality: 0.72 });
+      // Smaller proof = instant "I Paid" + faster admin ledger (proof attaches in background)
+      const compressed = await compressImageFile(file, { maxSize: 1000, quality: 0.62 });
       setScreenshotBase64(compressed);
       showToast('Payment screenshot receipt loaded. Ready to confirm!', 'success');
     } catch (err) {
@@ -708,7 +709,7 @@ export default function UserLobby({
     }
 
     setActionLoading(true);
-    setTimeout(() => setActionLoading(false), 2500);
+    setTimeout(() => setActionLoading(false), 400);
 
     const allottedAcc = (gameAccounts || []).find(
       (acc) => acc.gameTitle === activeGame.title
@@ -905,7 +906,7 @@ export default function UserLobby({
 
     if (actionLoading) return;
     setActionLoading(true);
-    setTimeout(() => setActionLoading(false), 2500);
+    setTimeout(() => setActionLoading(false), 400);
 
     // 4. Submit the Freeplay request (signup once / deposit re-earn)
     const isFirstFreeplay = freeplayGate.isFirst;
@@ -921,7 +922,7 @@ export default function UserLobby({
       gameUsername: currentAccount.username,
       screenshot: ''
     });
-    showToast(`Freeplay request of $3.00 submitted for ${activeGame.title}! Awaiting approval.`, "success");
+    // Toast is shown instantly inside onSubmitTransaction (do not double-toast)
   };
 
   // Close a promo popup. `permanent` (default) also remembers it so it never
@@ -989,7 +990,7 @@ export default function UserLobby({
     // Step 3 — everything is ready: submit the freeplay request.
     if (actionLoading) return;
     setActionLoading(true);
-    setTimeout(() => setActionLoading(false), 2500);
+    setTimeout(() => setActionLoading(false), 400);
 
     onSubmitTransaction({
       gameTitle: activeGame.title,
@@ -1004,7 +1005,7 @@ export default function UserLobby({
       gameUsername: currentAccount.username,
       screenshot: ''
     });
-    showToast(`Freeplay request of $${amount.toFixed(2)} submitted for ${activeGame.title}! Awaiting approval.`, 'success');
+    // Toast is shown instantly inside onSubmitTransaction (do not double-toast)
     setPendingPromoFreeplay(null);
     dismissPromo(promo, true);
   };
@@ -1035,7 +1036,7 @@ export default function UserLobby({
   const handleRequestAccountWithBonus = () => {
     if (actionLoading) return;
     setActionLoading(true);
-    setTimeout(() => setActionLoading(false), 2500);
+    setTimeout(() => setActionLoading(false), 400);
 
     onRequestAccount(activeGame.title);
   };

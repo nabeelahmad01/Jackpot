@@ -61,15 +61,17 @@ export async function GET(req) {
       query = await applyStaffGameFilter(db, query, adminEmail);
     }
 
-    const totalNotifications = await notificationsCollection.countDocuments(query);
     const skip = (page - 1) * limit;
 
-    // Fetch and sort at the DB level (highly optimized using timestamp index)
-    const notifications = await notificationsCollection.find(query)
-      .sort({ timestamp: -1 })
-      .skip(skip)
-      .limit(limit)
-      .toArray();
+    // Parallel count + page fetch (same results, one less serial round-trip)
+    const [totalNotifications, notifications] = await Promise.all([
+      notificationsCollection.countDocuments(query),
+      notificationsCollection.find(query)
+        .sort({ timestamp: -1 })
+        .skip(skip)
+        .limit(limit)
+        .toArray()
+    ]);
 
     // Live username from Requests credentials / gameAccounts
     const notiPairs = notifications.filter(

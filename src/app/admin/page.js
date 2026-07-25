@@ -96,10 +96,18 @@ export default function AdminPage({ portalName, forcedRole }) {
     };
   }, []);
 
-  // Shared toast trigger
+  // Shared toast trigger — clear prior timer so late responses don't wipe early toasts
+  const toastTimerRef = React.useRef(null);
   const showToast = (message, type = 'info') => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
     setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
+      toastTimerRef.current = null;
+    }, 4000);
   };
 
   const triggerLoading = (duration = 1000, callback) => {
@@ -255,6 +263,10 @@ export default function AdminPage({ portalName, forcedRole }) {
   };
 
   const handleUpdateCoinsNotification = async (id, status, read, holdNote) => {
+    // Instant queue clear — rollback if API fails
+    if (status === 'COMPLETED' || status === 'HOLD') {
+      setCompletedActionIds(prev => ({ ...prev, [id]: true }));
+    }
     try {
       const response = await fetch('/api/coins-notifications', {
         method: 'PUT',
@@ -265,7 +277,6 @@ export default function AdminPage({ portalName, forcedRole }) {
       if (data.success) {
         if (status === 'COMPLETED') {
           showToast('Coin allotment request marked as DONE!', 'success');
-          setCompletedActionIds(prev => ({ ...prev, [id]: true }));
         } else if (status === 'HOLD') {
           showToast('Allotment task placed ON HOLD.', 'info');
         } else {
@@ -275,10 +286,25 @@ export default function AdminPage({ portalName, forcedRole }) {
         // Revalidate stats & allotment queues caches
         mutate('/api/admin/stats');
         mutate((key) => typeof key === 'string' && key.startsWith('/api/coins-notifications'));
+        mutate((key) => typeof key === 'string' && key.startsWith('/api/transactions'));
       } else {
+        if (status === 'COMPLETED' || status === 'HOLD') {
+          setCompletedActionIds(prev => {
+            const next = { ...prev };
+            delete next[id];
+            return next;
+          });
+        }
         showToast(data.message || 'Failed to update notification.', 'error');
       }
     } catch (err) {
+      if (status === 'COMPLETED' || status === 'HOLD') {
+        setCompletedActionIds(prev => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      }
       console.error('Update notification API error:', err);
       showToast('Connection error updating notification.', 'error');
     }
@@ -408,6 +434,14 @@ export default function AdminPage({ portalName, forcedRole }) {
 
   // Transaction Ledger Approvals
   const handleApproveTransaction = async (txId) => {
+    // Instant hide + toast — do not wait for Mongo / coins task round-trip
+    setCompletedActionIds(prev => ({ ...prev, [txId]: true }));
+    showToast('Transaction approved successfully.', 'success');
+    // Kick list refreshes in parallel with the approve call (coins row appears ASAP)
+    mutate('/api/admin/stats');
+    mutate((key) => typeof key === 'string' && key.startsWith('/api/transactions'));
+    mutate((key) => typeof key === 'string' && key.startsWith('/api/coins-notifications'));
+
     try {
       const response = await fetch('/api/transactions', {
         method: 'PUT',
@@ -416,19 +450,30 @@ export default function AdminPage({ portalName, forcedRole }) {
       });
       const data = await response.json();
       if (data.success) {
-        showToast(`Transaction approved successfully.`, 'success');
-        setCompletedActionIds(prev => ({ ...prev, [txId]: true }));
-        
-        // Mutate stats, ledger, and coins queue so allotment appears immediately
+        // Revalidate again once coins notification is definitely written
         mutate('/api/admin/stats');
         mutate((key) => typeof key === 'string' && key.startsWith('/api/transactions'));
         mutate((key) => typeof key === 'string' && key.startsWith('/api/coins-notifications'));
       } else {
+        setCompletedActionIds(prev => {
+          const next = { ...prev };
+          delete next[txId];
+          return next;
+        });
         showToast(data.message || 'Failed to approve transaction.', 'error');
+        mutate((key) => typeof key === 'string' && key.startsWith('/api/transactions'));
+        mutate((key) => typeof key === 'string' && key.startsWith('/api/coins-notifications'));
       }
     } catch (err) {
+      setCompletedActionIds(prev => {
+        const next = { ...prev };
+        delete next[txId];
+        return next;
+      });
       console.error('Approve transaction API error:', err);
       showToast('Connection error approving transaction.', 'error');
+      mutate((key) => typeof key === 'string' && key.startsWith('/api/transactions'));
+      mutate((key) => typeof key === 'string' && key.startsWith('/api/coins-notifications'));
     }
   };
 
@@ -436,6 +481,7 @@ export default function AdminPage({ portalName, forcedRole }) {
     const feedbackMsg = window.prompt('Enter reason for rejection/failure:', 'Payment not received');
     if (feedbackMsg === null) return;
 
+    setCompletedActionIds(prev => ({ ...prev, [txId]: true }));
     try {
       const response = await fetch('/api/transactions', {
         method: 'PUT',
@@ -445,16 +491,25 @@ export default function AdminPage({ portalName, forcedRole }) {
       const data = await response.json();
       if (data.success) {
         showToast('Transaction set to FAILED status.', 'error');
-        setCompletedActionIds(prev => ({ ...prev, [txId]: true }));
         
         // Mutate stats and transaction lists
         mutate('/api/admin/stats');
         mutate((key) => typeof key === 'string' && key.startsWith('/api/transactions'));
         mutate((key) => typeof key === 'string' && key.startsWith('/api/coins-notifications'));
       } else {
+        setCompletedActionIds(prev => {
+          const next = { ...prev };
+          delete next[txId];
+          return next;
+        });
         showToast(data.message || 'Failed to decline transaction.', 'error');
       }
     } catch (err) {
+      setCompletedActionIds(prev => {
+        const next = { ...prev };
+        delete next[txId];
+        return next;
+      });
       console.error('Decline transaction API error:', err);
       showToast('Connection error declining transaction.', 'error');
     }

@@ -66,24 +66,42 @@ export async function GET(req) {
         coinsNotiQuery = { $and: [coinsNotiQuery, exclusion] };
       }
 
-      // Check accountRequests
-      const pendingAccounts = await db.collection('accountRequests').find(accountReqQuery).toArray();
+      // Slim projections — never pull screenshots/proofs into the activity scanner
+      const pendingAccounts = await db.collection('accountRequests')
+        .find(accountReqQuery)
+        .project({
+          id: 1, gameTitle: 1, userEmail: 1, createdAt: 1, timestamp: 1, date: 1
+        })
+        .limit(200)
+        .toArray();
       const unrespondedAccounts = pendingAccounts.filter(r => {
         const time = r.createdAt || r.timestamp || r.date;
         const parsedTime = parseDateSafe(time);
         return parsedTime > 0 && parsedTime < staleBefore;
       });
 
-      // Check transactions
-      const pendingTx = await db.collection('transactions').find(txQuery).toArray();
+      const pendingTx = await db.collection('transactions')
+        .find(txQuery)
+        .project({
+          id: 1, type: 1, amount: 1, userEmail: 1, gameTitle: 1,
+          createdAt: 1, timestamp: 1, date: 1
+        })
+        .limit(200)
+        .toArray();
       const unrespondedTx = pendingTx.filter(t => {
         const time = t.createdAt || t.timestamp || t.date;
         const parsedTime = parseDateSafe(time);
         return parsedTime > 0 && parsedTime < staleBefore;
       });
 
-      // Check coinsNotifications
-      const pendingCoins = await db.collection('coinsNotifications').find(coinsNotiQuery).toArray();
+      const pendingCoins = await db.collection('coinsNotifications')
+        .find(coinsNotiQuery)
+        .project({
+          id: 1, totalCoins: 1, userEmail: 1, gameTitle: 1,
+          createdAt: 1, timestamp: 1, date: 1
+        })
+        .limit(200)
+        .toArray();
       const unrespondedCoins = pendingCoins.filter(n => {
         const time = n.createdAt || n.timestamp || n.date;
         const parsedTime = parseDateSafe(time);

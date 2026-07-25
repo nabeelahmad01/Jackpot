@@ -142,7 +142,7 @@ export default function Home() {
   );
 
   const { data: transactionsData } = usePollingSWR(
-    emailQuery ? `/api/transactions?email=${emailQuery}&limit=100` : null,
+    emailQuery ? `/api/transactions?email=${emailQuery}&limit=40` : null,
     POLL.PLAYER
   );
 
@@ -255,12 +255,18 @@ export default function Home() {
     }, durationMs);
   };
 
-  // Toast notifier
+  // Toast notifier — clear prior timer so a late API toast cannot wipe an early one
+  const toastTimerRef = useRef(null);
   const showToast = (message, type = 'info', duration = 5000) => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
     setToast({ message, type });
     if (duration > 0) {
-      setTimeout(() => {
+      toastTimerRef.current = setTimeout(() => {
         setToast(null);
+        toastTimerRef.current = null;
       }, duration);
     }
   };
@@ -424,28 +430,60 @@ export default function Home() {
 
   // Player Transactions Requests
   const handleSubmitTransaction = async (newTx) => {
-    // Instant feedback — toast no longer waits on the full upload round-trip.
-    if (newTx.type === 'DEPOSIT') {
+    const isDeposit = newTx.type === 'DEPOSIT';
+    const isWithdraw = newTx.type === 'WITHDRAW';
+    const isFreeplay =
+      newTx.type === 'BONUS' &&
+      (newTx.code === 'SIGNUP-FREE3' || newTx.code === 'FREEPLAY' || /promo freeplay/i.test(String(newTx.note || '')));
+
+    // Paint toast before API — freeplay/deposit/withdraw must not wait on Mongo
+    if (isDeposit) {
       showToast(`Deposit request of $${parseFloat(newTx.amount).toFixed(2)} submitted with payment proof.`, 'success');
-    } else if (newTx.type === 'WITHDRAW') {
+    } else if (isWithdraw) {
       showToast(`Withdrawal request of $${parseFloat(newTx.amount).toFixed(2)} submitted.`, 'success');
+    } else if (isFreeplay || newTx.type === 'BONUS') {
+      const gameBit = newTx.gameTitle ? ` for ${newTx.gameTitle}` : '';
+      showToast(
+        `Freeplay request of $${parseFloat(newTx.amount).toFixed(2)} submitted${gameBit}! Awaiting approval.`,
+        'success'
+      );
     }
+    await new Promise((r) => setTimeout(r, 0));
 
     try {
+      const screenshot = isDeposit ? newTx.screenshot : undefined;
+      // Deposit: create the ledger row WITHOUT base64 first (instant), then attach proof.
+      const createBody = isDeposit
+        ? { ...newTx, screenshot: undefined, proofPending: Boolean(screenshot), userEmail: session.email }
+        : { ...newTx, userEmail: session.email };
+
       const response = await fetch('/api/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...newTx, userEmail: session.email })
+        body: JSON.stringify(createBody)
       });
       const data = await response.json();
       if (data.success) {
-        if (newTx.type !== 'DEPOSIT' && newTx.type !== 'WITHDRAW') {
+        // Already toasted optimistically for deposit / withdraw / freeplay
+        if (!isDeposit && !isWithdraw && !isFreeplay && newTx.type !== 'BONUS') {
           showToast(data.message || 'Request submitted.', 'success');
         }
-        // Mutate transactions and notifications cache keys
-        const url = emailQuery ? `/api/transactions?email=${emailQuery}&limit=100` : null;
+        const url = emailQuery ? `/api/transactions?email=${emailQuery}&limit=40` : null;
         mutate(url);
         mutate(emailQuery ? `/api/coins-notifications?email=${emailQuery}` : null);
+
+        // Background proof upload — admin already sees the PENDING row from create.
+        if (isDeposit && screenshot && data.transaction?.id) {
+          void fetch('/api/transactions/proof', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: data.transaction.id,
+              screenshot,
+              userEmail: session.email
+            })
+          }).catch((err) => console.error('Deposit proof upload failed:', err));
+        }
       } else {
         showToast(data.message || 'Transaction submission failed.', 'error');
       }

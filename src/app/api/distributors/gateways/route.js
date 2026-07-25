@@ -14,9 +14,24 @@ export async function GET(req) {
 
     const db = await getDb();
     const gatewaysCollection = db.collection('gateways');
-    const gateways = await gatewaysCollection.find({ distributorId }).toArray();
+    const cacheKey = `gateways_dist_${distributorId}`;
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return NextResponse.json({ success: true, gateways: cached });
+    }
 
-    return NextResponse.json({ success: true, gateways });
+    const gateways = await gatewaysCollection.find({ distributorId }).toArray();
+    // Same lean QR proxy as /api/gateways — list JSON stays small
+    const lean = gateways.map((g) => {
+      const qr = g.qrImage || '';
+      if (typeof qr === 'string' && qr.startsWith('data:image') && g.id) {
+        return { ...g, qrImage: `/api/gateways/image?id=${encodeURIComponent(g.id)}` };
+      }
+      return g;
+    });
+    cache.set(cacheKey, lean, 60);
+
+    return NextResponse.json({ success: true, gateways: lean });
   } catch (err) {
     console.error('Fetch Distributor Gateways API Error:', err);
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
@@ -121,6 +136,7 @@ export async function PUT(req) {
 
     cache.del('gateways_all');
     cache.del(`gateways_dist_${distributorId}`);
+    cache.del(`gateway_image_${id}`);
     return NextResponse.json({ success: true, message: 'Gateway updated successfully!' });
   } catch (err) {
     console.error('Update Distributor Gateway API Error:', err);
@@ -150,6 +166,7 @@ export async function DELETE(req) {
 
     cache.del('gateways_all');
     cache.del(`gateways_dist_${distributorId}`);
+    cache.del(`gateway_image_${id}`);
     return NextResponse.json({ success: true, message: 'Gateway deleted successfully!' });
   } catch (err) {
     console.error('Delete Distributor Gateway API Error:', err);

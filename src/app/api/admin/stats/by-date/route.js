@@ -17,12 +17,28 @@ export async function GET(req) {
 
     const targetDateStr = targetDate.toDateString();
 
+    // Narrow Mongo scan (±1 day on createdAt) then apply the same toDateString filter as before
+    const looseStart = new Date(targetDate);
+    looseStart.setDate(looseStart.getDate() - 1);
+    looseStart.setHours(0, 0, 0, 0);
+    const looseEnd = new Date(targetDate);
+    looseEnd.setDate(looseEnd.getDate() + 1);
+    looseEnd.setHours(23, 59, 59, 999);
+
     const db = await getDb();
-    
-    // Fetch all successful transactions with projection
+
     const transactions = await db.collection('transactions')
       .find(
-        { status: 'SUCCESS' },
+        {
+          status: 'SUCCESS',
+          $or: [
+            { createdAt: { $gte: looseStart.toISOString(), $lte: looseEnd.toISOString() } },
+            { createdAt: { $gte: looseStart, $lte: looseEnd } },
+            { createdAt: { $exists: false } },
+            { createdAt: null },
+            { createdAt: '' }
+          ]
+        },
         { projection: { amount: 1, type: 1, date: 1 } }
       )
       .toArray();

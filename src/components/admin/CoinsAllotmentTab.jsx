@@ -31,7 +31,7 @@ export default function CoinsAllotmentTab({
   const { data, error, mutate } = usePollingSWR(
     `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED&page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
     POLL.LIVE,
-    { refreshWhenHidden: true }
+    { refreshWhenHidden: true, keepPreviousData: false }
   );
 
   const notifications = (data?.coinsNotifications || []).filter((n) => !completedActionIds[n.id]);

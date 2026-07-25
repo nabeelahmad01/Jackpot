@@ -18,12 +18,18 @@ export async function GET(req) {
     }
     const targetDateStr = targetDate.toDateString();
 
+    const looseStart = new Date(targetDate);
+    looseStart.setDate(looseStart.getDate() - 1);
+    looseStart.setHours(0, 0, 0, 0);
+    const looseEnd = new Date(targetDate);
+    looseEnd.setDate(looseEnd.getDate() + 1);
+    looseEnd.setHours(23, 59, 59, 999);
+
     const db = await getDb();
     const distributorsCollection = db.collection('distributors');
     const usersCollection = db.collection('users');
     const transactionsCollection = db.collection('transactions');
 
-    // Find distributor to get rates
     const dist = await distributorsCollection.findOne({ id: distributorId });
     if (!dist) {
       return NextResponse.json({ success: false, message: 'Distributor not found.' }, { status: 404 });
@@ -32,7 +38,6 @@ export async function GET(req) {
     const commissionRate = parseFloat(dist.commissionRate || 0);
     const websiteCommissionRate = parseFloat(dist.websiteCommissionRate || 0);
 
-    // Find referred players
     const players = await usersCollection.find(
       { distributorId, role: 'user' },
       { projection: { email: 1 } }
@@ -44,11 +49,20 @@ export async function GET(req) {
     let totalWithdrawals = 0;
 
     if (playerEmails.length > 0) {
-      // Find success transactions on that date
-      const txs = await transactionsCollection.find({
-        userEmail: { $in: playerEmails },
-        status: 'SUCCESS'
-      }).toArray();
+      const txs = await transactionsCollection.find(
+        {
+          userEmail: { $in: playerEmails },
+          status: 'SUCCESS',
+          $or: [
+            { createdAt: { $gte: looseStart.toISOString(), $lte: looseEnd.toISOString() } },
+            { createdAt: { $gte: looseStart, $lte: looseEnd } },
+            { createdAt: { $exists: false } },
+            { createdAt: null },
+            { createdAt: '' }
+          ]
+        },
+        { projection: { amount: 1, type: 1, date: 1 } }
+      ).toArray();
 
       txs.forEach(tx => {
         if (!tx.date) return;

@@ -22,23 +22,43 @@ export async function GET(req) {
       query.agentEmail = agentEmail.toLowerCase().trim();
     }
 
+    // Single campaign with full proof (inspect modal)
+    const campaignId = searchParams.get('id');
+    if (campaignId) {
+      const one = await campaignsCollection.findOne({ id: String(campaignId) });
+      if (!one) {
+        return NextResponse.json({ success: false, message: 'Campaign not found.' }, { status: 404 });
+      }
+      return NextResponse.json({ success: true, campaign: one });
+    }
+
+    // List: never ship base64 paymentProof (inspect loads via ?id=)
     const campaigns = await campaignsCollection
       .find(query)
+      .project({ paymentProof: 0 })
       .sort({ createdAt: -1 })
       .toArray();
+
+    const lean = campaigns.map((c) => ({
+      ...c,
+      // Keep truthy paymentProof so existing UI "Inspect" buttons still render;
+      // actual image is fetched on click via ?id=
+      paymentProof: c.hasPaymentProof === false ? '' : '1',
+      hasPaymentProof: c.hasPaymentProof !== false
+    }));
 
     // If querying for a specific agent, calculate their remaining budget limit
     const budgetCap = await getAdBudgetLimit(db);
     let remainingLimit = budgetCap;
     if (agentEmail) {
-      const activeCampaigns = campaigns.filter(c => c.status !== 'REJECTED');
+      const activeCampaigns = lean.filter(c => c.status !== 'REJECTED');
       const totalSpent = activeCampaigns.reduce((sum, c) => sum + parseFloat(c.budget || 0), 0);
       remainingLimit = Math.max(0, budgetCap - totalSpent);
     }
 
     return NextResponse.json({
       success: true,
-      campaigns,
+      campaigns: lean,
       remainingLimit
     });
   } catch (err) {
@@ -92,6 +112,7 @@ export async function POST(req) {
       endDate: endDate.trim(),
       notes: (notes || '').trim(),
       paymentProof: paymentProof || '', // Base64 screenshot proof
+      hasPaymentProof: Boolean(paymentProof && String(paymentProof).trim()),
       status: 'PENDING',
       trackingLink: '',
       createdAt: new Date().toISOString()

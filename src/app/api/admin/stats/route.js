@@ -142,7 +142,7 @@ export async function GET(req) {
       pendingCampaignRequestsCount
     };
 
-    cache.set(cacheKey, stats, 5);
+    cache.set(cacheKey, stats, 12);
 
     return jsonOk({ success: true, stats }, { cacheSeconds: 0 });
   } catch (err) {
