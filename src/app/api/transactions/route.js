@@ -4,7 +4,7 @@ import { cache } from '../../../lib/cache';
 import { buildRemainderClaimAvailableAt } from '../../../lib/claimWait';
 import { calcCommissionFromProfit } from '../../../lib/commission';
 import { typeBExclusionFilter } from '../../../lib/typeBDistributors';
-import { notifyStaffAndDistributorAsync } from '../../../lib/pushNotifications';
+import { notifyStaffAndDistributorAsync, notifyStaffAsync } from '../../../lib/pushNotifications';
 import { accountLookupKey, buildGameUsernameMap } from '../../../lib/resolveGameUsername';
 import { compressDataUrlIfNeeded } from '../../../lib/serverImageCompress';
 import { applyStaffGameFilter } from '../../../lib/staffGameAccess';
@@ -906,7 +906,6 @@ export async function PUT(req) {
         const createdCoinTask = coinTaskResult.upsertedCount === 1;
 
         // Publish COINS_LOADING only after the real notification (with bonus) exists.
-        // Coins Allotment and Shift Dashboard now see the correct total immediately.
         await transactionsCollection.updateOne(
           {
             id,
@@ -915,7 +914,22 @@ export async function PUT(req) {
           { $set: updateFields }
         );
 
-        // Consume promo flag off the hot path (bonus % already applied above)
+        // Ping coins staff / Shift APK immediately — don't wait for their next poll
+        if (createdCoinTask || coinTaskResult.matchedCount > 0) {
+          const coinsLabel = isFreeplayNoti
+            ? `Freeplay $${parseFloat(originalTx.amount || 0).toFixed(2)}`
+            : `Deposit $${amount.toFixed(2)} → ${Math.round(totalCoins * 100) / 100} coins`;
+          notifyStaffAsync(db, {
+            title: 'Coins allotment ready',
+            body: `${userEmail} · ${coinsLabel}${originalTx.gameTitle ? ` · ${originalTx.gameTitle}` : ''}`,
+            url: '/admin',
+            tag: `coins-${originalTx.id}`,
+            gameTitle: originalTx.gameTitle || '',
+            alertKind: 'coins'
+          });
+        }
+
+        // Consume promo / referral off the hot path
         if (createdCoinTask && usePromoBonus) {
           Promise.resolve(
             db.collection('users').updateOne(
@@ -925,7 +939,6 @@ export async function PUT(req) {
           ).catch((err) => console.error('Promo bonus consume failed:', err));
         }
 
-        // Referral reward — non-blocking so finance approve returns immediately
         if (
           createdCoinTask &&
           depositor &&

@@ -1,6 +1,6 @@
 // Real-time polling — near-live without hammering Atlas on every tab.
 export const POLL = {
-  LIVE: 2500,   // Shift dashboard + coins allotment
+  LIVE: 1200,   // Shift dashboard + coins allotment (finance → coins must feel instant)
   STATS: 4000,  // Sidebar badges + sound / desktop alerts
   QUEUES: 2500, // Requests, ledger, deposits
   LISTS: 5000,

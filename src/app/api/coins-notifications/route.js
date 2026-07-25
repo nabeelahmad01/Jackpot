@@ -62,6 +62,8 @@ export async function GET(req) {
     }
 
     const skip = (page - 1) * limit;
+    // slim=1: skip username join — Shift/Coins polls stay fast (list doesn't need it every 1s)
+    const slim = searchParams.get('slim') === '1';
 
     // Parallel count + page fetch (same results, one less serial round-trip)
     const [totalNotifications, notifications] = await Promise.all([
@@ -73,21 +75,26 @@ export async function GET(req) {
         .toArray()
     ]);
 
-    // Live username from Requests credentials / gameAccounts
-    const notiPairs = notifications.filter(
-      (n) => n.gameTitle && n.userEmail && n.gameTitle !== 'Referral Reward'
-    );
-    let accountsMap = {};
-    if (notiPairs.length > 0) {
-      const uniqueEmails = Array.from(new Set(notiPairs.map((n) => n.userEmail.toLowerCase().trim())));
-      // Read-only resolve — never mutate gameAccounts on every poll
-      accountsMap = await buildGameUsernameMap(db, uniqueEmails, { dedupe: false });
-    }
+    if (!slim) {
+      // Live username from Requests credentials / gameAccounts
+      const notiPairs = notifications.filter(
+        (n) => n.gameTitle && n.userEmail && n.gameTitle !== 'Referral Reward'
+      );
+      let accountsMap = {};
+      if (notiPairs.length > 0) {
+        const uniqueEmails = Array.from(new Set(notiPairs.map((n) => n.userEmail.toLowerCase().trim())));
+        accountsMap = await buildGameUsernameMap(db, uniqueEmails, { dedupe: false });
+      }
 
-    for (const noti of notifications) {
-      if (noti.gameTitle && noti.userEmail && noti.gameTitle !== 'Referral Reward') {
-        noti.gameUsername = accountsMap[accountLookupKey(noti.userEmail, noti.gameTitle)] || '';
-      } else {
+      for (const noti of notifications) {
+        if (noti.gameTitle && noti.userEmail && noti.gameTitle !== 'Referral Reward') {
+          noti.gameUsername = accountsMap[accountLookupKey(noti.userEmail, noti.gameTitle)] || '';
+        } else {
+          noti.gameUsername = '';
+        }
+      }
+    } else {
+      for (const noti of notifications) {
         noti.gameUsername = '';
       }
     }

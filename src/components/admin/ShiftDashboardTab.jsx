@@ -13,9 +13,9 @@ export default function ShiftDashboardTab({ adminUser }) {
 
   // Include HOLD so Invalid'd rows are known and not re-created from COINS_LOADING txs.
   const { data: coinData, mutate: mutateCoins } = usePollingSWR(
-    `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED,HOLD&limit=100&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
+    `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED,HOLD&limit=100&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}&slim=1`,
     POLL.LIVE,
-    { refreshWhenHidden: true }
+    { refreshWhenHidden: true, dedupingInterval: 400 }
   );
 
   // Fallback: finance-approved deposits waiting on coins (COINS_LOADING) that may
@@ -23,7 +23,7 @@ export default function ShiftDashboardTab({ adminUser }) {
   const { data: coinsLoadingData, mutate: mutateCoinsLoading } = usePollingSWR(
     `/api/transactions?status=COINS_LOADING&limit=50&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
     POLL.LIVE,
-    { refreshWhenHidden: true }
+    { refreshWhenHidden: true, dedupingInterval: 400 }
   );
 
 

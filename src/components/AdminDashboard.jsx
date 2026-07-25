@@ -4,6 +4,8 @@ import React, { useState, useEffect, Suspense } from 'react';
 import useSWR, { mutate } from 'swr';
 import { motion, AnimatePresence } from 'framer-motion';
 import usePollingSWR from '../hooks/usePollingSWR';
+import useAdminEvents from '../hooks/useAdminEvents';
+import PullToRefresh from './PullToRefresh';
 import { POLL } from '../lib/pollingConfig';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import TabErrorBoundary from './TabErrorBoundary';
@@ -102,6 +104,12 @@ export default function AdminDashboard({
   }, [sidebarOpen]);
 
   const [processingIds, setProcessingIds] = useState({});
+
+  // Instant list refresh when finance approves / players submit (SSE)
+  useAdminEvents({
+    enabled: Boolean(adminUser?.email),
+    distributorId: adminUser?.distributorId || ''
+  });
 
   // Use SWR to poll counts/stats for the sidebar badges
   const { data: statsData } = usePollingSWR(
@@ -995,7 +1003,30 @@ export default function AdminDashboard({
 
       {/* Main Content Workspace Wrapper */}
       <main className={`admin-main-workspace${activeTab === 'support' ? ' admin-main-workspace--support' : ''}`}>
-        <div className="admin-workspace-scroll">
+        <PullToRefresh
+          className="admin-workspace-scroll"
+          enabled={activeTab !== 'support'}
+          onRefresh={async () => {
+            // Revalidate all live admin queues + stats (same as a full soft refresh)
+            await Promise.all([
+              mutate((key) => typeof key === 'string' && key.includes('/api/admin/stats')),
+              mutate((key) => typeof key === 'string' && key.includes('/api/account-requests')),
+              mutate(
+                (key) =>
+                  typeof key === 'string' &&
+                  key.includes('/api/transactions') &&
+                  !key.includes('AFFILIATE_COMMISSION')
+              ),
+              mutate((key) => typeof key === 'string' && key.includes('/api/coins-notifications')),
+              mutate((key) => typeof key === 'string' && key.includes('/api/support')),
+              mutate((key) => typeof key === 'string' && key.includes('/api/campaign-requests')),
+              mutate((key) => typeof key === 'string' && key.includes('/api/games')),
+              mutate((key) => typeof key === 'string' && key.includes('/api/users')),
+              mutate((key) => typeof key === 'string' && key.includes('/api/gateways')),
+              mutate((key) => typeof key === 'string' && key.includes('/api/distributors'))
+            ]);
+          }}
+        >
         <TabErrorBoundary onBack={() => setActiveTab('dashboard')}>
         <Suspense fallback={
           <div style={{ padding: '2rem', textAlign: 'center', opacity: 0.5 }}>
@@ -1104,7 +1135,7 @@ export default function AdminDashboard({
           </AnimatePresence>
         </Suspense>
         </TabErrorBoundary>
-        </div>
+        </PullToRefresh>
       </main>
     </div>
   );
