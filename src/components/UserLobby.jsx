@@ -1146,7 +1146,7 @@ export default function UserLobby({
                 <span className="get-app-tip-arrow" />
               </span>
               <i className="fa-solid fa-mobile-screen-button" aria-hidden="true"></i>
-              <span className="get-app-label">Get App</span>
+              <span className="get-app-label"><span className="get-app-label-long">Get </span>App</span>
             </button>
           )}
           {lobbySubView !== 'referrals' && (
