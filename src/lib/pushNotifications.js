@@ -198,16 +198,16 @@ const STAFF_PUSH_ROLES = [
 ];
 
 const ALERT_KIND_ROLES = {
-  // Deposits / withdraws / remainder — finance + coins ops
-  game: ['admin', 'operation_admin', 'financial_admin', 'coins_admin'],
-  // Account / credentials requests — coins ops only
+  // Finance queue: new deposits / withdraws awaiting money review
+  game: ['admin', 'operation_admin', 'financial_admin'],
+  // Coins allotment ready + account/credential requests (coins / ops staff)
   coins: ['admin', 'operation_admin', 'coins_admin'],
   // Player support chat
   support: ['admin', 'operation_admin', 'support_admin'],
   // Affiliate campaign requests
   campaign: ['admin', 'operation_admin'],
-  // Fallback
-  general: STAFF_PUSH_ROLES
+  // Fallback — super/ops only (no spam to specialized staff)
+  general: ['admin', 'operation_admin']
 };
 
 function parseStaffRoles(role) {
@@ -441,12 +441,127 @@ export function notifyStaffAsync(db, alert) {
 }
 
 /**
+ * Distributor APK: only staff whose role/games match the alert.
+ * Owner account (role distributor / no restricted staff role) gets everything.
+ */
+async function filterDistributorSubscriptionsForAlert(
+  db,
+  subscriptions,
+  { distributorId, gameTitle, alertKind } = {}
+) {
+  if (!subscriptions.length) return subscriptions;
+
+  const distId = String(distributorId || '').trim();
+  const kind = String(alertKind || (gameTitle ? 'game' : 'general')).toLowerCase();
+  const allowedRoles = ALERT_KIND_ROLES[kind] || ALERT_KIND_ROLES.general;
+  const skipGameTitles = new Set(['Lobby', 'Referral Reward', 'Distributor Payout', 'Platform Fees', '']);
+
+  const emails = Array.from(
+    new Set(
+      subscriptions
+        .map((s) => String(s.userEmail || '').toLowerCase().trim())
+        .filter(Boolean)
+    )
+  );
+
+  const users = emails.length
+    ? await db
+        .collection('users')
+        .find(
+          { email: { $in: emails }, distributorId: distId },
+          { projection: { email: 1, role: 1, allowedGameIds: 1 } }
+        )
+        .toArray()
+    : [];
+  const userByEmail = new Map(
+    users.map((u) => [String(u.email || '').toLowerCase().trim(), u])
+  );
+
+  // Distributor master accounts live in `distributors`, not always as staff users
+  const distributorDocs = emails.length
+    ? await db
+        .collection('distributors')
+        .find({ id: distId, email: { $in: emails } }, { projection: { email: 1 } })
+        .toArray()
+    : [];
+  const ownerEmails = new Set(
+    distributorDocs.map((d) => String(d.email || '').toLowerCase().trim()).filter(Boolean)
+  );
+
+  let gamesById = null;
+  const needsGameMap =
+    gameTitle &&
+    !skipGameTitles.has(String(gameTitle)) &&
+    users.some((u) => {
+      const roles = parseStaffRoles(u.role);
+      return roles.includes('coins_admin') && !roles.includes('admin') && !roles.includes('operation_admin');
+    });
+  if (needsGameMap) {
+    const games = await db.collection('games').find({}, { projection: { id: 1, title: 1 } }).toArray();
+    gamesById = new Map(games.map((g) => [String(g.id), g.title]));
+  }
+
+  const gameTitleLower = String(gameTitle || '').toLowerCase().trim();
+
+  return subscriptions.filter((record) => {
+    const email = String(record.userEmail || '').toLowerCase().trim();
+    if (!email) return false;
+
+    // Distributor owner / login email → all alerts for this office
+    if (ownerEmails.has(email)) return true;
+
+    const user = userByEmail.get(email);
+    if (!user) {
+      // Token registered but no staff user row — treat as owner-side device only if email matches none
+      return false;
+    }
+
+    const roles = parseStaffRoles(user.role);
+    // Legacy full-access staff tags on distributor
+    if (roles.includes('admin') || roles.includes('operation_admin') || roles.includes('distributor')) {
+      return true;
+    }
+
+    if (!roles.some((r) => allowedRoles.includes(r))) return false;
+
+    if (roles.includes('financial_admin')) {
+      return kind === 'game' || kind === 'general';
+    }
+
+    if (kind === 'support' || kind === 'campaign' || kind === 'general') {
+      return true;
+    }
+
+    if (roles.includes('coins_admin') && (kind === 'game' || kind === 'coins')) {
+      // coins staff on distributor only get coins/account alerts (kind coins), not finance game
+      if (kind === 'game') return false;
+      if (!gameTitleLower || skipGameTitles.has(String(gameTitle || ''))) return true;
+      const allowedIds = Array.isArray(user.allowedGameIds) ? user.allowedGameIds.map(String) : [];
+      if (allowedIds.length === 0) return false;
+      if (!gamesById) return false;
+      return allowedIds.some((id) => String(gamesById.get(id) || '').toLowerCase() === gameTitleLower);
+    }
+
+    return false;
+  });
+}
+
+/**
  * Lock-screen alerts for the Jackpot Distributor APK.
- * Only devices registered with audience: 'distributor' and matching distributorId.
+ * Only devices registered with audience: 'distributor' and matching distributorId,
+ * further filtered by that staff member's role + game access.
  */
 export async function sendDistributorPush(
   db,
-  { distributorId, title, body, url = '/distributor', tag = 'distributor-alert' } = {}
+  {
+    distributorId,
+    title,
+    body,
+    url = '/distributor',
+    tag = 'distributor-alert',
+    gameTitle = '',
+    alertKind = ''
+  } = {}
 ) {
   try {
     const distId = String(distributorId || '').trim();
@@ -454,9 +569,15 @@ export async function sendDistributorPush(
       return { sent: 0, failed: 0, skipped: true };
     }
 
-    const subscriptions = await db.collection('pushSubscriptions')
+    const allSubscriptions = await db.collection('pushSubscriptions')
       .find({ audience: 'distributor', distributorId: distId })
       .toArray();
+
+    const subscriptions = await filterDistributorSubscriptionsForAlert(db, allSubscriptions, {
+      distributorId: distId,
+      gameTitle,
+      alertKind
+    });
 
     if (subscriptions.length === 0) {
       return { sent: 0, failed: 0, skipped: true };
@@ -574,7 +695,9 @@ export function notifyStaffAndDistributorAsync(db, alert, distributorId) {
         notifyDistributorAsync(db, {
           ...alert,
           distributorId: distId,
-          url: '/distributor'
+          url: '/distributor',
+          gameTitle: alert?.gameTitle || '',
+          alertKind: alert?.alertKind || ''
         });
       }
 

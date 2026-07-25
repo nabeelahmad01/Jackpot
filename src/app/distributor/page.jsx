@@ -1587,10 +1587,34 @@ export default function DistributorPortal() {
         </div>
 
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', padding: '1rem 1rem 1.25rem', marginTop: 'auto' }}>
-          <div style={{ marginBottom: '1rem' }}>
+          <div style={{ marginBottom: '0.75rem' }}>
             <div style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>{distSession?.name || 'Distributor'}</div>
             <div style={{ fontSize: '0.65rem', color: '#888' }}>{distSession?.email || ''}</div>
           </div>
+          <a
+            href="/downloads/jackpot-distributor.apk"
+            download
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.4rem',
+              marginBottom: '0.65rem',
+              padding: '0.5rem',
+              borderRadius: '6px',
+              textDecoration: 'none',
+              fontSize: '0.7rem',
+              fontWeight: 800,
+              background: 'linear-gradient(135deg, rgba(255,215,0,0.2) 0%, rgba(234,179,8,0.12) 100%)',
+              border: '1px solid rgba(255,215,0,0.4)',
+              color: '#ffe566',
+              boxSizing: 'border-box'
+            }}
+          >
+            <i className="fa-solid fa-mobile-screen-button" aria-hidden="true" />
+            Download Distributor App
+          </a>
           <button onClick={handleLogout} style={{ width: '100%', background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', padding: '0.5rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>
             Log Out Panel
           </button>

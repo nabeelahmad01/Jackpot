@@ -987,7 +987,7 @@ export default function AdminDashboard({
           )}
         </nav>
 
-        {/* Profile Card & Logout */}
+        {/* Profile Card, Portal APK & Logout */}
         <div style={{ padding: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#fff' }}>{adminUser?.name || 'System Admin'}</span>
@@ -995,6 +995,28 @@ export default function AdminDashboard({
               <i className="fa-solid fa-shield-halved"></i> {adminUser?.role?.replace('_', ' ') || 'Super Admin'}
             </span>
           </div>
+          <a
+            href="/downloads/jackpot-portal.apk"
+            download
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.45rem',
+              padding: '0.55rem 0.6rem',
+              borderRadius: '8px',
+              textDecoration: 'none',
+              fontSize: '0.7rem',
+              fontWeight: 800,
+              background: 'linear-gradient(135deg, rgba(255,215,0,0.2) 0%, rgba(234,179,8,0.12) 100%)',
+              border: '1px solid rgba(255,215,0,0.4)',
+              color: '#ffe566'
+            }}
+          >
+            <i className="fa-solid fa-mobile-screen-button" aria-hidden="true" />
+            <span>Download Portal App</span>
+          </a>
           <button className="lobby-nav-btn logout-btn" onClick={onLogout} style={{ width: '100%', padding: '0.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', margin: 0 }}>
             <i className="fa-solid fa-right-from-bracket"></i> <span>Logout</span>
           </button>
