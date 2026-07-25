@@ -14,7 +14,7 @@ export default function CoinsAllotmentTab({
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
-  const limit = 15;
+  const limit = 25;
 
   const [activeHoldId, setActiveHoldId] = useState(null);
   const [holdNoteText, setHoldNoteText] = useState('');
@@ -27,14 +27,17 @@ export default function CoinsAllotmentTab({
     return () => clearTimeout(handler);
   }, [search]);
 
-  // Pending allotments only — completed rows were flooding limit=50 and hiding live work
+  // All statuses — newest first (API sorts timestamp desc). Pending + history together.
   const { data, error, mutate } = usePollingSWR(
-    `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED&page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
+    `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED,HOLD,COMPLETED&page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
     POLL.LIVE,
     { refreshWhenHidden: true, keepPreviousData: false, dedupingInterval: 400 }
   );
 
-  const notifications = (data?.coinsNotifications || []).filter((n) => !completedActionIds[n.id]);
+  // Hide only optimistic in-progress rows; keep COMPLETED history visible
+  const notifications = (data?.coinsNotifications || []).filter(
+    (n) => n.status === 'COMPLETED' || !completedActionIds[n.id]
+  );
   const totalNotifications = data?.totalNotifications || 0;
   const totalPages = data?.totalPages || 1;
 
@@ -98,7 +101,7 @@ export default function CoinsAllotmentTab({
             ) : notifications.length === 0 ? (
               <tr>
                 <td colSpan="10" className="text-center text-muted" style={{ padding: '2rem' }}>
-                  No pending coin allotment tasks found.
+                  No coin allotment tasks found.
                 </td>
               </tr>
             ) : (
