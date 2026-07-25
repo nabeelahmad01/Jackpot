@@ -12,8 +12,9 @@ export default function ShiftDashboardTab({ adminUser }) {
   );
 
   // Include HOLD so Invalid'd rows are known and not re-created from COINS_LOADING txs.
+  // Do NOT use slim=1 here — Verified Deposits needs live gameUsername from credentials.
   const { data: coinData, mutate: mutateCoins } = usePollingSWR(
-    `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED,HOLD&limit=100&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}&slim=1`,
+    `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED,HOLD&limit=100&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
     POLL.LIVE,
     { refreshWhenHidden: true, dedupingInterval: 400 }
   );

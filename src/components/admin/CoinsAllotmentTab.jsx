@@ -29,7 +29,7 @@ export default function CoinsAllotmentTab({
 
   // Pending allotments only — completed rows were flooding limit=50 and hiding live work
   const { data, error, mutate } = usePollingSWR(
-    `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED&page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}&slim=1`,
+    `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED&page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
     POLL.LIVE,
     { refreshWhenHidden: true, keepPreviousData: false, dedupingInterval: 400 }
   );
