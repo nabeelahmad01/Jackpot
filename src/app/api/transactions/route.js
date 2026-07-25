@@ -620,8 +620,14 @@ export async function PUT(req) {
       return NextResponse.json({ success: false, message: 'Freeplay requests are handled by the Coins team only.' }, { status: 400 });
     }
 
+    const isCoinsApproval =
+      status === 'SUCCESS' &&
+      (originalTx.type === 'DEPOSIT' || originalTx.type === 'BONUS') &&
+      originalTx.status !== 'SUCCESS' &&
+      originalTx.status !== 'COINS_LOADING';
+
     let finalStatus = status;
-    if (status === 'SUCCESS' && (originalTx.type === 'DEPOSIT' || originalTx.type === 'BONUS') && originalTx.status !== 'SUCCESS' && originalTx.status !== 'COINS_LOADING') {
+    if (isCoinsApproval) {
       finalStatus = 'COINS_LOADING';
     }
     const updateFields = { status: finalStatus };
@@ -658,7 +664,12 @@ export async function PUT(req) {
       updateFields.remainderStatus = '';
     }
 
-    await transactionsCollection.updateOne({ id }, { $set: updateFields });
+    // For deposit/bonus approval, create the fully calculated coins task FIRST.
+    // If COINS_LOADING is exposed before that task exists, Shift Dashboard creates
+    // a temporary synthetic row with 0% bonus (10), then replaces it with 12.
+    if (!isCoinsApproval) {
+      await transactionsCollection.updateOne({ id }, { $set: updateFields });
+    }
 
     if (status === 'SUCCESS' && originalTx.parentTxId) {
       try {
@@ -747,12 +758,7 @@ export async function PUT(req) {
     // Trigger Coins notification if this transaction is approved as SUCCESS and it is a DEPOSIT or a BONUS.
     // COINS_LOADING means it was already approved once — re-approving must never create a second
     // allotment task (or a second referral reward).
-    if (
-      status === 'SUCCESS' &&
-      (originalTx.type === 'DEPOSIT' || originalTx.type === 'BONUS') &&
-      originalTx.status !== 'SUCCESS' &&
-      originalTx.status !== 'COINS_LOADING'
-    ) {
+    if (isCoinsApproval) {
       try {
         const userEmail = originalTx.userEmail.toLowerCase();
         const settingsCollection = db.collection('settings');
@@ -827,15 +833,26 @@ export async function PUT(req) {
               distributorId: originalTx.distributorId || ''
             };
 
-        await notificationsCollection.updateOne(
+        const coinTaskResult = await notificationsCollection.updateOne(
           { transactionId: originalTx.id },
           { $setOnInsert: notiDoc },
           { upsert: true }
         );
+        const createdCoinTask = coinTaskResult.upsertedCount === 1;
+
+        // Publish COINS_LOADING only after the real notification (with bonus) exists.
+        // Coins Allotment and Shift Dashboard now see the correct total immediately.
+        await transactionsCollection.updateOne(
+          {
+            id,
+            status: { $ne: 'COINS_LOADING' }
+          },
+          { $set: updateFields }
+        );
 
         // Consume the claimed promo deposit bonus so it only applies to this
         // one deposit (the bonus % was already used above). No freeplay is granted.
-        if (usePromoBonus) {
+        if (createdCoinTask && usePromoBonus) {
           await db.collection('users').updateOne(
             { email: userEmail },
             { $unset: { pendingDepositBonusPercent: '', pendingBonusFreeplay: '', pendingBonusPromoId: '', pendingBonusPromoTitle: '' } }
@@ -843,7 +860,13 @@ export async function PUT(req) {
         }
 
         // Referral System Bonus: Check if this depositor was referred by someone
-        if (depositor && depositor.referredBy && originalTx.type === 'DEPOSIT' && isFirstDeposit) {
+        if (
+          createdCoinTask &&
+          depositor &&
+          depositor.referredBy &&
+          originalTx.type === 'DEPOSIT' &&
+          isFirstDeposit
+        ) {
           const referrerEmail = depositor.referredBy.toLowerCase().trim();
           
           // Get referral reward percentage (default: 10%)
@@ -865,6 +888,8 @@ export async function PUT(req) {
         }
       } catch (notiErr) {
         console.error('Failed to generate coin allotment notification:', notiErr);
+        // Do not report finance approval as successful without its coins task.
+        throw notiErr;
       }
     }
 

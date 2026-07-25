@@ -142,6 +142,13 @@ async function seedRealMongo(db) {
     await db.collection('supportMessages').createIndex({ distributorId: 1, read: 1, senderType: 1 });
 
     await db.collection('coinsNotifications').createIndex({ id: 1 }, { unique: true });
+    await db.collection('coinsNotifications').createIndex(
+      { transactionId: 1 },
+      {
+        unique: true,
+        partialFilterExpression: { transactionId: { $type: 'string' } }
+      }
+    );
     await db.collection('coinsNotifications').createIndex({ userEmail: 1 });
     await db.collection('coinsNotifications').createIndex({ status: 1 });
     await db.collection('coinsNotifications').createIndex({ timestamp: -1 });
