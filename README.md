@@ -29,6 +29,10 @@ To send real OTP emails and enable Google Sign-In, define the following variable
 NEXT_PUBLIC_ADMIN_EMAIL=admin@jackpot.com
 NEXT_PUBLIC_ADMIN_PASSWORD=admin123
 
+# Realtime: leave OFF on Hostinger Business (uses polling + push).
+# On VPS only, set true for SSE instant admin updates:
+# NEXT_PUBLIC_ENABLE_SSE=true
+
 # SMTP Server Configurations (GMAIL / SMTP Relay)
 SMTP_USER=sender@gmail.com
 SMTP_PASS=gmail_app_password

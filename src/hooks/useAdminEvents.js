@@ -2,9 +2,12 @@
 
 import { useEffect, useRef } from 'react';
 import { mutate } from 'swr';
+import { isSseEnabled } from '../lib/realtimeConfig';
 
 /**
- * Instant admin UI updates via SSE. Polling remains as a safety net.
+ * Optional SSE for instant admin UI updates.
+ * Disabled by default (Hostinger Business). Enable on VPS with NEXT_PUBLIC_ENABLE_SSE=true.
+ * Polling + push remain the primary realtime path.
  *
  * @param {{ enabled?: boolean, distributorId?: string }} [options]
  */
@@ -14,7 +17,8 @@ export default function useAdminEvents(options = {}) {
   distRef.current = String(distributorId || '').trim();
 
   useEffect(() => {
-    if (!enabled || typeof window === 'undefined') return undefined;
+    // Shared hosting: never open EventSource (avoids hanging / reconnect spam)
+    if (!isSseEnabled() || !enabled || typeof window === 'undefined') return undefined;
 
     let es = null;
     let stopped = false;

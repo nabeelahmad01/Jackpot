@@ -1,8 +1,9 @@
 import { EventEmitter } from 'events';
+import { isSseEnabled } from './realtimeConfig';
 
 /**
  * In-process pub/sub for admin SSE (Jackpot Portal + Distributor panel).
- * Works with `next start` / single Node process (VPS).
+ * Only used when NEXT_PUBLIC_ENABLE_SSE=true (VPS). On Business plan this is a no-op.
  */
 function getBus() {
   if (!globalThis.__jackpotAdminEvents) {
@@ -18,6 +19,8 @@ function getBus() {
  * @param {object} [payload]
  */
 export function publishAdminEvent(type, payload = {}) {
+  // Hostinger Business: skip — no SSE listeners
+  if (!isSseEnabled()) return;
   try {
     const event = {
       type: String(type || 'stats'),
