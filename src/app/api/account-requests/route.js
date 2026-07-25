@@ -647,6 +647,23 @@ export async function POST(req) {
       }, { status: 400 });
     }
 
+    // Stale READY/COMPLETED requests with no live credentials (e.g. after
+    // distributor-delete → Undo) must not block a fresh Request / Create.
+    await requestsCollection.updateMany(
+      {
+        userEmail: cleanEmail,
+        gameTitle: titleRegex,
+        status: { $in: ['READY', 'COMPLETED'] }
+      },
+      {
+        $set: {
+          status: 'REJECTED',
+          rejectionReason: 'Superseded — player re-requested account',
+          processedBy: 'system'
+        }
+      }
+    );
+
     const newRequest = {
       id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
       gameTitle: cleanTitle,

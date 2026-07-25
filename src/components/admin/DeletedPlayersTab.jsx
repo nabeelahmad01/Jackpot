@@ -37,8 +37,13 @@ export default function DeletedPlayersTab() {
 
   const deletedPlayers = data?.deletedPlayers || [];
 
-  const handleRestore = async (email) => {
-    if (!window.confirm(`Are you sure you want to restore the player account "${email}"? All their details will be restored.`)) {
+  const handleRestore = async (email, record) => {
+    const distDeleted = record?.deletedBy === 'distributor' || record?.wipeGameAccess === true;
+    const gameCount = Array.isArray(record?.restoreGameTitles) ? record.restoreGameTitles.length : 0;
+    const confirmMsg = distDeleted
+      ? `Restore "${email}"?\n\nDistributor-deleted player will be unlinked from that distributor. ${gameCount > 0 ? `${gameCount} game request(s) will go to YOUR Requests tab.` : 'They can Request / Create under HQ.'}`
+      : `Restore "${email}"?\n\nIf this was an HQ delete, their previous game accounts will come back.`;
+    if (!window.confirm(confirmMsg)) {
       return;
     }
 
@@ -51,7 +56,7 @@ export default function DeletedPlayersTab() {
       });
       const resData = await response.json();
       if (resData.success) {
-        alert('Player account restored successfully!');
+        alert(resData.message || 'Player account restored successfully!');
         mutate();
       } else {
         alert(resData.message || 'Failed to restore player account.');
@@ -103,6 +108,7 @@ export default function DeletedPlayersTab() {
               <th style={{ padding: '0.75rem 0.5rem' }}>TYPE</th>
               <th style={{ padding: '0.75rem 0.5rem' }}>EMAIL</th>
               <th style={{ padding: '0.75rem 0.5rem' }}>COINS</th>
+              <th style={{ padding: '0.75rem 0.5rem' }}>DELETED BY</th>
               <th style={{ padding: '0.75rem 0.5rem' }}>DELETED DATE</th>
               <th style={{ padding: '0.75rem 0.5rem' }}>ACTIONS</th>
             </tr>
@@ -110,7 +116,7 @@ export default function DeletedPlayersTab() {
           <tbody>
             {deletedPlayers.length === 0 ? (
               <tr>
-                <td colSpan="6" style={{ textAlign: 'center', padding: '3rem', color: '#666' }}>
+                <td colSpan="7" style={{ textAlign: 'center', padding: '3rem', color: '#666' }}>
                   No deleted accounts recorded in the archive.
                 </td>
               </tr>
@@ -132,12 +138,19 @@ export default function DeletedPlayersTab() {
                   <td style={{ padding: '0.75rem 0.5rem', color: 'var(--gold-primary)', fontWeight: 'bold' }}>
                     ${(player.coins || 0).toFixed(2)}
                   </td>
+                  <td style={{ padding: '0.75rem 0.5rem' }}>
+                    {player.deletedBy === 'distributor' || player.wipeGameAccess ? (
+                      <span style={{ fontSize: '0.6rem', color: '#c084fc', fontWeight: 'bold' }}>Distributor → new request</span>
+                    ) : (
+                      <span style={{ fontSize: '0.6rem', color: '#4ade80', fontWeight: 'bold' }}>HQ → keep games</span>
+                    )}
+                  </td>
                   <td style={{ padding: '0.75rem 0.5rem', color: '#888' }}>
                     {player.deletedAt ? new Date(player.deletedAt).toLocaleString() : 'N/A'}
                   </td>
                   <td style={{ padding: '0.75rem 0.5rem' }}>
                     <button
-                      onClick={() => handleRestore(player.email)}
+                      onClick={() => handleRestore(player.email, player)}
                       disabled={restoringEmail === player.email}
                       className="submit-btn"
                       style={{

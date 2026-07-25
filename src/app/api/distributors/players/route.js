@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/mongodb';
 import { cache } from '../../../../lib/cache';
-import { purgeAccountAccess } from '../../../../lib/sessionRevoke';
+import { collectPlayerGameTitles, purgeAccountAccess } from '../../../../lib/sessionRevoke';
 
 // GET players for a distributor (Fallback or direct list)
 export async function GET(req) {
@@ -122,9 +122,16 @@ export async function DELETE(req) {
       return NextResponse.json({ success: false, message: 'Player not found or does not belong to your distributor panel.' }, { status: 404 });
     }
 
-    // Archive + revoke live session so the player is kicked out immediately
+    // Snapshot games BEFORE wipe — Super Admin Undo re-queues HQ PENDING requests.
+    const restoreGameTitles = await collectPlayerGameTitles(db, cleanEmail);
+
+    // Archive + revoke. Wipe credentials so Undo does not restore distributor accounts.
     await db.collection('users').deleteOne({ email: cleanEmail });
-    await purgeAccountAccess(db, cleanEmail, player);
+    await purgeAccountAccess(db, cleanEmail, player, {
+      deletedBy: 'distributor',
+      wipeGameAccess: true,
+      restoreGameTitles
+    });
     cache.del('admin_stats');
 
     return NextResponse.json({ success: true, message: 'Player account deleted successfully.' });

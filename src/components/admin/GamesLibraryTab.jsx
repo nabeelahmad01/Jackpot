@@ -66,13 +66,25 @@ export default function GamesLibraryTab({ onAddGameClick, onEditGameClick, onDel
                 <tr key={game.id}>
                   <td>
                     <div className="admin-game-th-img">
-                      {game.image.startsWith('data:') || game.image.startsWith('game_') || game.image.startsWith('http') ? (
-                        <img src={game.image} alt="cover" style={{ borderRadius: '6px' }} />
-                      ) : (
-                        <div className={`game-placeholder-card ${game.image === 'placeholder_2' ? 'pc-red' : game.image === 'placeholder_3' ? 'pc-blue' : 'pc-gold'}`} style={{ fontSize: '1rem', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {game.title.slice(0, 2).toUpperCase()}
-                        </div>
-                      )}
+                      {(() => {
+                        const img = String(game.image || '');
+                        // API returns lean proxy URLs (/api/games/image?id=...) — same as lobby
+                        const isRealCover =
+                          img.startsWith('data:') ||
+                          img.startsWith('game_') ||
+                          img.startsWith('http://') ||
+                          img.startsWith('https://') ||
+                          img.startsWith('/');
+                        if (isRealCover) {
+                          const src = img.startsWith('game_') ? `/${img}` : img;
+                          return <img src={src} alt={game.title || 'cover'} style={{ borderRadius: '6px', width: '40px', height: '40px', objectFit: 'cover' }} />;
+                        }
+                        return (
+                          <div className={`game-placeholder-card ${img === 'placeholder_2' ? 'pc-red' : img === 'placeholder_3' ? 'pc-blue' : 'pc-gold'}`} style={{ fontSize: '1rem', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {(game.title || '??').slice(0, 2).toUpperCase()}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </td>
                   <td><strong>{game.title}</strong></td>

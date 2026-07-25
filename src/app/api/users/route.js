@@ -210,8 +210,12 @@ export async function DELETE(req) {
       await usersCollection.deleteOne({ email: cleanEmail });
     }
 
-    // Revoke even if already missing from users (idempotent force-logout)
-    await purgeAccountAccess(db, cleanEmail, userDoc);
+    // HQ/admin delete: keep gameAccounts so Undo restores the player's previous games.
+    // (Distributor-panel deletes wipe games separately — see distributors/players DELETE.)
+    await purgeAccountAccess(db, cleanEmail, userDoc, {
+      deletedBy: 'admin',
+      wipeGameAccess: false
+    });
 
     cache.del('admin_stats');
 

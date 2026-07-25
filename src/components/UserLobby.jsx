@@ -1061,6 +1061,14 @@ export default function UserLobby({
       )
     : null;
 
+  // Only READY credentials unlock the panel. Stale READY requests without an
+  // account (e.g. after distributor-delete → Undo) must show Request / Create.
+  const hasReadyAccount =
+    currentAccount && String(currentAccount.status || '').toUpperCase() === 'READY';
+  const hasPendingRequest =
+    currentRequest && String(currentRequest.status || '').toUpperCase() === 'PENDING';
+  const showRequestAccount = Boolean(activeGame) && !hasReadyAccount && !hasPendingRequest;
+
   useEffect(() => {
     setTxPage(1);
   }, [activeGame]);
@@ -2101,7 +2109,7 @@ export default function UserLobby({
             /* NORMAL ACCOUNT VIEWS */
             <>
               {/* STATE A: REQUEST LOGIN */}
-              {!currentRequest && !currentAccount && (
+              {showRequestAccount && (
                 <div className="game-access-panel active">
                   <div className="auth-card" style={{ maxWidth: '650px', margin: '0 auto', padding: '2rem 1.5rem', textAlign: 'center' }}>
                     <div className="glow-border-layer"></div>
@@ -2155,7 +2163,7 @@ export default function UserLobby({
               )}
 
               {/* STATE B: REQUEST IS PENDING */}
-              {currentRequest && currentRequest.status === 'PENDING' && (
+              {hasPendingRequest && (
                 <div className="game-access-panel active">
                   <div className="auth-card" style={{ maxWidth: '650px', margin: '0 auto', padding: '2.5rem 1.5rem', textAlign: 'center' }}>
                     <div className="glow-border-layer"></div>
@@ -2169,7 +2177,7 @@ export default function UserLobby({
               )}
 
               {/* STATE C: ACCOUNT READY */}
-              {currentAccount && currentAccount.status === 'READY' && (
+              {hasReadyAccount && (
                 <div className="game-access-panel active" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
                   {/* Account detail */}
