@@ -17,13 +17,13 @@ export default function useAdminEvents(options = {}) {
   distRef.current = String(distributorId || '').trim();
 
   useEffect(() => {
-    // Shared hosting: never open EventSource (avoids hanging / reconnect spam)
-    if (!isSseEnabled() || !enabled || typeof window === 'undefined') return undefined;
+    if (!enabled || typeof window === 'undefined') return undefined;
 
     let es = null;
     let stopped = false;
     let retryTimer = null;
     let retryMs = 1000;
+    let bc = null;
 
     const refreshFromEvent = (event) => {
       const type = String(event?.type || '');
@@ -65,8 +65,18 @@ export default function useAdminEvents(options = {}) {
       }
     };
 
+    // Same-browser tabs (finance + coins on one PC) — works even if SSE worker mismatches
+    try {
+      bc = new BroadcastChannel('jackpot-admin-events');
+      bc.onmessage = (ev) => {
+        if (ev?.data) refreshFromEvent(ev.data);
+      };
+    } catch {
+      bc = null;
+    }
+
     const connect = () => {
-      if (stopped) return;
+      if (stopped || !isSseEnabled()) return;
       try {
         es?.close?.();
       } catch {
@@ -108,6 +118,11 @@ export default function useAdminEvents(options = {}) {
       if (retryTimer) clearTimeout(retryTimer);
       try {
         es?.close?.();
+      } catch {
+        /* ignore */
+      }
+      try {
+        bc?.close?.();
       } catch {
         /* ignore */
       }

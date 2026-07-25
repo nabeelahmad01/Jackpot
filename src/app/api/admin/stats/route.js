@@ -142,7 +142,8 @@ export async function GET(req) {
       pendingCampaignRequestsCount
     };
 
-    cache.set(cacheKey, stats, 12);
+    // Short TTL — coins badge must move within ~1s of finance approve on VPS
+    cache.set(cacheKey, stats, 2);
 
     return jsonOk({ success: true, stats }, { cacheSeconds: 0 });
   } catch (err) {

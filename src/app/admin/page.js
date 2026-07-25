@@ -454,6 +454,19 @@ export default function AdminPage({ portalName, forcedRole }) {
         mutate('/api/admin/stats');
         mutate((key) => typeof key === 'string' && key.startsWith('/api/transactions'));
         mutate((key) => typeof key === 'string' && key.startsWith('/api/coins-notifications'));
+        // Wake other admin tabs on this browser instantly (coins staff)
+        try {
+          const bc = new BroadcastChannel('jackpot-admin-events');
+          bc.postMessage({
+            type: 'coins',
+            distributorId: data.coinsNotification?.distributorId || '',
+            transactionId: txId
+          });
+          bc.postMessage({ type: 'transactions', status: data.status || 'COINS_LOADING' });
+          bc.close();
+        } catch {
+          /* ignore */
+        }
       } else {
         setCompletedActionIds(prev => {
           const next = { ...prev };

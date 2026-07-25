@@ -76,28 +76,49 @@ export async function GET(req) {
         .toArray()
     ]);
 
-    if (!slim) {
-      // Live username from Requests credentials / gameAccounts
-      const notiPairs = notifications.filter(
-        (n) => n.gameTitle && n.userEmail && n.gameTitle !== 'Referral Reward'
-      );
-      let accountsMap = {};
-      if (notiPairs.length > 0) {
-        const uniqueEmails = Array.from(new Set(notiPairs.map((n) => n.userEmail.toLowerCase().trim())));
-        accountsMap = await buildGameUsernameMap(db, uniqueEmails, { dedupe: false });
-      }
+    // Prefer username stored on the notification (set at approve time).
+    // Fill gaps only for active queue rows (or full join when slim is off).
+    const missingUname = notifications.filter((n) => {
+      if (!n.gameTitle || !n.userEmail || n.gameTitle === 'Referral Reward') return false;
+      if (String(n.gameUsername || '').trim()) return false;
+      if (!slim) return true;
+      const st = String(n.status || '').toUpperCase();
+      return st === 'PENDING' || st === 'CLAIM_REQUESTED' || st === 'HOLD';
+    });
+    let accountsMap = {};
+    if (missingUname.length > 0) {
+      const uniqueEmails = Array.from(new Set(missingUname.map((n) => n.userEmail.toLowerCase().trim())));
+      accountsMap = await buildGameUsernameMap(db, uniqueEmails, { dedupe: false });
+    }
 
-      for (const noti of notifications) {
-        if (noti.gameTitle && noti.userEmail && noti.gameTitle !== 'Referral Reward') {
-          noti.gameUsername = accountsMap[accountLookupKey(noti.userEmail, noti.gameTitle)] || '';
-        } else {
-          noti.gameUsername = '';
-        }
+    const backfillOps = [];
+    for (const noti of notifications) {
+      const stored = String(noti.gameUsername || '').trim();
+      if (stored) {
+        noti.gameUsername = stored;
+        continue;
       }
-    } else {
-      for (const noti of notifications) {
+      if (noti.gameTitle && noti.userEmail && noti.gameTitle !== 'Referral Reward') {
+        const resolved = accountsMap[accountLookupKey(noti.userEmail, noti.gameTitle)] || '';
+        noti.gameUsername = resolved;
+        // Persist so later slim polls / Shift rows stay filled without re-joining
+        if (resolved && noti.id != null) {
+          backfillOps.push(
+            notificationsCollection.updateOne(
+              { id: noti.id },
+              { $set: { gameUsername: resolved } }
+            )
+          );
+        }
+      } else {
         noti.gameUsername = '';
       }
+    }
+
+    if (backfillOps.length > 0) {
+      Promise.all(backfillOps).catch((err) => {
+        console.warn('coins username backfill:', err?.message || err);
+      });
     }
     
     return NextResponse.json({
@@ -153,10 +174,20 @@ export async function PUT(req) {
         } else {
           const amount = parseFloat(tx.amount || 0);
           const isFreeplay = tx.type === 'BONUS' && (tx.code === 'SIGNUP-FREE3' || tx.code === 'FREEPLAY');
+          const emailKey = String(tx.userEmail || '').toLowerCase().trim();
+          const titleKey = tx.gameTitle || 'Lobby';
+          let gameUsername = '';
+          try {
+            const umap = await buildGameUsernameMap(db, [emailKey], { dedupe: false });
+            gameUsername = umap[accountLookupKey(emailKey, titleKey)] || '';
+          } catch {
+            /* ignore */
+          }
           const newNoti = {
             id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
             userEmail: tx.userEmail,
-            gameTitle: tx.gameTitle || 'Lobby',
+            gameTitle: titleKey,
+            gameUsername,
             depositAmount: amount,
             bonusApplied: isFreeplay ? -3 : 0,
             totalCoins: amount,

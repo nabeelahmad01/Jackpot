@@ -27,11 +27,11 @@ export default function CoinsAllotmentTab({
     return () => clearTimeout(handler);
   }, [search]);
 
-  // All statuses — newest first (API sorts timestamp desc). Pending + history together.
+  // slim=1: username is stored on each row at approve time — skip heavy join every poll
   const { data, error, mutate } = usePollingSWR(
-    `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED,HOLD,COMPLETED&page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
+    `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED,HOLD,COMPLETED&page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}&slim=1`,
     POLL.LIVE,
-    { refreshWhenHidden: true, keepPreviousData: false, dedupingInterval: 400 }
+    { refreshWhenHidden: true, keepPreviousData: false, dedupingInterval: 200 }
   );
 
   // Hide only optimistic in-progress rows; keep COMPLETED history visible

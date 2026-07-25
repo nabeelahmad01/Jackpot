@@ -142,6 +142,7 @@ async function ensureIndexes(db) {
   await db.collection('coinsNotifications').createIndex({ userEmail: 1 });
   await db.collection('coinsNotifications').createIndex({ status: 1 });
   await db.collection('coinsNotifications').createIndex({ timestamp: -1 });
+  await db.collection('coinsNotifications').createIndex({ status: 1, timestamp: -1 });
 
   await db.collection('campaignRequests').createIndex({ status: 1, createdAt: -1 });
 

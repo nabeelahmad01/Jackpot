@@ -1120,6 +1120,9 @@ export default function DistributorPortal() {
   };
 
   const handleApproveTransactionDirect = async (txId) => {
+    mutateStats();
+    mutate((key) => typeof key === 'string' && key.startsWith('/api/transactions'));
+    mutate((key) => typeof key === 'string' && key.includes('/api/coins-notifications'));
     try {
       const response = await fetch('/api/transactions', {
         method: 'PUT',
@@ -1132,6 +1135,14 @@ export default function DistributorPortal() {
         mutateStats();
         mutate((key) => typeof key === 'string' && key.startsWith('/api/transactions'));
         mutate((key) => typeof key === 'string' && key.includes('/api/coins-notifications'));
+        try {
+          const bc = new BroadcastChannel('jackpot-admin-events');
+          bc.postMessage({ type: 'coins', distributorId: distId || '', transactionId: txId });
+          bc.postMessage({ type: 'transactions', distributorId: distId || '' });
+          bc.close();
+        } catch {
+          /* ignore */
+        }
       } else {
         alert(data.message || 'Failed to approve transaction.');
       }

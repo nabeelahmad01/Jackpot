@@ -561,11 +561,22 @@ export async function POST(req) {
     const notificationsCollection = db.collection('coinsNotifications');
     const writeOps = [transactionsCollection.insertOne(txObject)];
 
+    let coinGameUsername = '';
+    if (txObject.type === 'WITHDRAW' || isFreeplayBonus) {
+      try {
+        const umap = await buildGameUsernameMap(db, [String(txObject.userEmail || '').toLowerCase().trim()], { dedupe: false });
+        coinGameUsername = umap[accountLookupKey(txObject.userEmail, txObject.gameTitle || 'Lobby')] || '';
+      } catch {
+        /* ignore */
+      }
+    }
+
     if (txObject.type === 'WITHDRAW') {
       writeOps.push(notificationsCollection.insertOne({
         id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
         userEmail: txObject.userEmail,
         gameTitle: txObject.gameTitle || 'Lobby',
+        gameUsername: coinGameUsername,
         depositAmount: parseFloat(txObject.amount),
         bonusApplied: -1, // Indicates deduction/withdrawal action
         totalCoins: -parseFloat(txObject.amount), // Negative value indicates deduction
@@ -584,6 +595,7 @@ export async function POST(req) {
         id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
         userEmail: txObject.userEmail,
         gameTitle: txObject.gameTitle || 'Lobby',
+        gameUsername: coinGameUsername,
         depositAmount: 0,
         bonusApplied: -3, // indicates freeplay
         isFreeplay: true,
@@ -879,11 +891,22 @@ export async function PUT(req) {
         const isFreeplayNoti =
           originalTx.type === 'BONUS' && (originalTx.code === 'SIGNUP-FREE3' || originalTx.code === 'FREEPLAY');
 
+        // Resolve username once at insert so slim list polls stay fast (no join every 0.5s)
+        const gameTitleForNoti = originalTx.gameTitle || 'Lobby';
+        let gameUsername = '';
+        try {
+          const umap = await buildGameUsernameMap(db, [userEmail], { dedupe: false });
+          gameUsername = umap[accountLookupKey(userEmail, gameTitleForNoti)] || '';
+        } catch (unameErr) {
+          console.warn('gameUsername resolve on approve:', unameErr?.message || unameErr);
+        }
+
         const notiDoc = isFreeplayNoti
           ? {
               id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
               userEmail,
-              gameTitle: originalTx.gameTitle || 'Lobby',
+              gameTitle: gameTitleForNoti,
+              gameUsername,
               depositAmount: 0,
               bonusApplied: -3, // indicates signup freeplay
               isFreeplay: true,
@@ -897,7 +920,8 @@ export async function PUT(req) {
           : {
               id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
               userEmail,
-              gameTitle: originalTx.gameTitle || 'Lobby',
+              gameTitle: gameTitleForNoti,
+              gameUsername,
               depositAmount: amount,
               bonusApplied: bonusPercentage,
               totalCoins: Math.round(totalCoins * 100) / 100,
@@ -996,7 +1020,25 @@ export async function PUT(req) {
       });
     }
 
-    return NextResponse.json({ success: true, message: `Transaction status updated to ${status}!` });
+    // Include created coins task so approving client can refresh siblings instantly
+    let coinsNotification = null;
+    if (isCoinsApproval) {
+      try {
+        coinsNotification = await db.collection('coinsNotifications').findOne(
+          { transactionId: id },
+          { projection: { _id: 0 } }
+        );
+      } catch {
+        /* ignore */
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Transaction status updated to ${status}!`,
+      status: finalStatus,
+      coinsNotification
+    });
   } catch (err) {
     console.error('Update Transaction API Error:', err);
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
