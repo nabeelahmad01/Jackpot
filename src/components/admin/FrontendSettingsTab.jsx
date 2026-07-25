@@ -250,10 +250,7 @@ export default function FrontendSettingsTab({ adminUser }) {
     setSaveSuccess(false);
 
     try {
-      const response = await fetch('/api/settings/frontend', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const payload = {
           logoUrl,
           loginBgUrl,
           notificationSoundUrl,
@@ -328,20 +325,40 @@ export default function FrontendSettingsTab({ adminUser }) {
           cashoutRules,
           proofScreenshots,
           lobbyCashoutTrustItems
-        })
+      };
+
+      const approxKb = Math.round(JSON.stringify(payload).length / 1024);
+      if (approxKb > 12000) {
+        alert(`Settings payload is too large (~${approxKb}KB). Use a smaller login/logo image, or click Use Default for the auth background.`);
+        return;
+      }
+
+      const response = await fetch('/api/settings/frontend', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       });
 
-      const resData = await response.json();
-      if (resData.success) {
+      const raw = await response.text();
+      let resData = null;
+      try {
+        resData = raw ? JSON.parse(raw) : null;
+      } catch {
+        resData = null;
+      }
+
+      if (response.ok && resData?.success) {
         setSaveSuccess(true);
         mutate();
         setTimeout(() => setSaveSuccess(false), 3000);
+      } else if (response.status === 413) {
+        alert('Image too large for the server (413). Upload a smaller image or raise nginx client_max_body_size.');
       } else {
-        alert(resData.message || 'Failed to update frontend settings.');
+        alert(resData?.message || `Failed to update frontend settings (${response.status}).`);
       }
     } catch (err) {
       console.error(err);
-      alert('Error updating frontend settings.');
+      alert(err?.message || 'Error updating frontend settings. Image may be too large — try a smaller file.');
     } finally {
       setIsSaving(false);
     }
@@ -1239,7 +1256,7 @@ export default function FrontendSettingsTab({ adminUser }) {
                         }
                         try {
                           // Compress so mobile can load as full-bleed background
-                          const compressed = await compressImageFile(file, { maxSize: 1600, quality: 0.78 });
+                          const compressed = await compressImageFile(file, { maxSize: 1280, quality: 0.72 });
                           setLoginBgUrl(compressed);
                         } catch {
                           const reader = new FileReader();
@@ -1288,16 +1305,21 @@ export default function FrontendSettingsTab({ adminUser }) {
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
                       if (file.size > 8 * 1024 * 1024) {
                         alert('Image file size must be less than 8MB.');
                         return;
                       }
-                      const reader = new FileReader();
-                      reader.onloadend = () => setLogoUrl(reader.result);
-                      reader.readAsDataURL(file);
+                      try {
+                        const compressed = await compressImageFile(file, { maxSize: 512, quality: 0.8 });
+                        setLogoUrl(compressed);
+                      } catch {
+                        const reader = new FileReader();
+                        reader.onloadend = () => setLogoUrl(reader.result);
+                        reader.readAsDataURL(file);
+                      }
                     }}
                     style={{ fontSize: '0.75rem', color: '#fff' }}
                   />

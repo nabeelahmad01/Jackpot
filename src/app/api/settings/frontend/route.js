@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/mongodb';
 import { cache } from '../../../../lib/cache';
+import { compressDataUrlIfNeeded } from '../../../../lib/serverImageCompress';
 
 const DEFAULT_SETTINGS = {
   id: 'frontend_settings',
@@ -165,6 +166,22 @@ export async function PUT(req) {
           updateFields[key] = body[key];
         }
       }
+    }
+
+    // Keep auth/logo data-URLs under Mongo / nginx limits
+    if (typeof updateFields.loginBgUrl === 'string' && updateFields.loginBgUrl.startsWith('data:')) {
+      updateFields.loginBgUrl = await compressDataUrlIfNeeded(updateFields.loginBgUrl, {
+        maxChars: 350_000,
+        maxSize: 1280,
+        quality: 70
+      });
+    }
+    if (typeof updateFields.logoUrl === 'string' && updateFields.logoUrl.startsWith('data:')) {
+      updateFields.logoUrl = await compressDataUrlIfNeeded(updateFields.logoUrl, {
+        maxChars: 180_000,
+        maxSize: 512,
+        quality: 75
+      });
     }
 
     await settingsCollection.updateOne(
