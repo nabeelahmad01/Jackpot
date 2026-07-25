@@ -1506,6 +1506,11 @@ export default function DistributorPortal() {
                 >
                   <i className="fa-solid fa-business-time" style={{ width: '16px' }}></i>
                   Shift Dashboard
+                  {(pendingAccountRequestsCount + pendingCoinsCount) > 0 && (
+                    <span style={{ marginLeft: 'auto', background: '#ef4444', color: '#fff', fontSize: '0.625rem', padding: '0.15rem 0.35rem', borderRadius: '10px' }}>
+                      {pendingAccountRequestsCount + pendingCoinsCount}
+                    </span>
+                  )}
                 </button>
               )}
 
