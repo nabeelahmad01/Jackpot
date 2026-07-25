@@ -3460,7 +3460,17 @@ select option {
     flex: 1;
     min-width: 100px;
     justify-content: center;
-    padding: 0.6rem 0.75rem;
+    padding: 0.55rem 0.5rem;
+    gap: 0.35rem;
+  }
+
+  /* Keep FREEPLAY / INVITE / DOWNLOAD labels visible on mobile (not icons-only) */
+  .game-header-buttons .lobby-nav-btn span {
+    display: inline !important;
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
   }
 }
 
@@ -4334,10 +4344,6 @@ dialog::backdrop {
 
   .wallet-actions-split {
     grid-template-columns: 1fr !important;
-  }
-
-  .game-header-buttons span {
-    display: none !important;
   }
 }
 
