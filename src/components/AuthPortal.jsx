@@ -6,6 +6,15 @@ import { useGoogleLogin } from '@react-oauth/google';
 import { motion, AnimatePresence } from 'framer-motion';
 import { shouldShowInfoOnAuth } from '../lib/infoPage';
 
+const DEFAULT_LOGIN_BG = '/jackpot_royals_bg.png';
+
+/** Safe CSS url() — data: base64 must be quoted or mobile background silently fails. */
+function cssBgUrl(raw) {
+  const src = String(raw || DEFAULT_LOGIN_BG).trim() || DEFAULT_LOGIN_BG;
+  const escaped = src.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  return `url("${escaped}")`;
+}
+
 function isNativeApp() {
   if (typeof window === 'undefined') return false;
   return (
@@ -53,7 +62,8 @@ export default function AuthPortal({
   frontendSettings = {}
 }) {
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || 'your_google_client_id_here';
-  const loginBgUrl = frontendSettings.loginBgUrl || '/jackpot_royals_bg.png';
+  const loginBgUrl = frontendSettings.loginBgUrl || DEFAULT_LOGIN_BG;
+  const loginBgCss = cssBgUrl(loginBgUrl);
   const showInfoLinks = shouldShowInfoOnAuth(frontendSettings);
 
   // Detect Facebook/Messenger In-App WebView
@@ -656,10 +666,13 @@ export default function AuthPortal({
   return (
     <div
       className="auth-page-wrapper"
-      style={{ '--auth-login-bg': `url(${loginBgUrl})` }}
+      style={{ '--auth-login-bg': loginBgCss }}
     >
+      {/* Mobile full-bleed background (data URLs work more reliably on a real element) */}
+      <div className="auth-mobile-bg" aria-hidden="true" style={{ backgroundImage: loginBgCss }} />
+
       {/* Left Graphic Panel (Desktop only) */}
-      <div className="auth-graphic-panel" style={{ backgroundImage: `url(${loginBgUrl})` }}></div>
+      <div className="auth-graphic-panel" style={{ backgroundImage: loginBgCss, backgroundSize: 'cover', backgroundPosition: 'center center', backgroundRepeat: 'no-repeat' }}></div>
 
       {/* Right Form Panel */}
       <div className="auth-form-panel">

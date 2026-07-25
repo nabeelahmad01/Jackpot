@@ -192,6 +192,10 @@ body {
   position: relative;
 }
 
+.auth-mobile-bg {
+  display: none;
+}
+
 .auth-graphic-panel::after {
   content: '';
   position: absolute;
@@ -527,20 +531,30 @@ html.portal-on-support-tab .portal-support-fab {
   .auth-page-wrapper {
     flex-direction: column;
     background-color: #080a11;
-    background-image: var(--auth-login-bg);
+    /* Prefer .auth-mobile-bg for custom/data URLs — keep var as soft fallback */
+    background-image: none;
+    isolation: isolate;
+  }
+
+  .auth-mobile-bg {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
     background-repeat: no-repeat;
     background-position: center center;
     background-size: cover;
-    isolation: isolate;
+    background-color: #080a11;
   }
 
   .auth-page-wrapper::before {
     content: '';
     position: absolute;
     inset: 0;
-    z-index: 0;
+    z-index: 1;
     pointer-events: none;
-    background: linear-gradient(180deg, rgba(8, 10, 17, 0.5) 0%, rgba(8, 10, 17, 0.84) 100%);
+    background: linear-gradient(180deg, rgba(8, 10, 17, 0.45) 0%, rgba(8, 10, 17, 0.82) 100%);
   }
 
   .auth-graphic-panel {
@@ -552,7 +566,7 @@ html.portal-on-support-tab .portal-support-fab {
     background: transparent;
     box-shadow: none;
     padding: 2.5rem 1.25rem;
-    z-index: 1;
+    z-index: 2;
   }
 
   .brand-title {

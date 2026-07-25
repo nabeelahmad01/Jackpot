@@ -2,8 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
+import { compressImageFile } from '../../lib/imageCompress';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
+const DEFAULT_LOGIN_BG = '/jackpot_royals_bg.png';
+const DEFAULT_LOGO = '/jackpot_lion_mascot.png?v=2';
 
 export default function FrontendSettingsTab({ adminUser }) {
   const { data, error, mutate } = useSWR('/api/settings/frontend', fetcher);
@@ -103,8 +106,8 @@ export default function FrontendSettingsTab({ adminUser }) {
   useEffect(() => {
     if (data?.settings) {
       const s = data.settings;
-      setLogoUrl(s.logoUrl || '/jackpot_lion_mascot.png?v=2');
-      setLoginBgUrl(s.loginBgUrl || '/jackpot_royals_bg.png');
+      setLogoUrl(s.logoUrl || DEFAULT_LOGO);
+      setLoginBgUrl(s.loginBgUrl || DEFAULT_LOGIN_BG);
       setNotificationSoundUrl(s.notificationSoundUrl || 'https://raw.githubusercontent.com/AUTOMATIC1111/stable-diffusion-webui/master/notification.mp3');
       setWithdrawNotice(s.withdrawNotice || 'Fastest Withdrawals inside 5 Minutes!');
       setCashoutNotice(s.cashoutNotice || 'Standard cashout processing hours: 9 AM - 11 PM EST');
@@ -1223,24 +1226,48 @@ export default function FrontendSettingsTab({ adminUser }) {
                   <label style={{ fontSize: '0.725rem', color: 'var(--gold-primary)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>
                     Auth Side Image (Login / Register)
                   </label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      if (file.size > 8 * 1024 * 1024) {
-                        alert('Image file size must be less than 8MB.');
-                        return;
-                      }
-                      const reader = new FileReader();
-                      reader.onloadend = () => setLoginBgUrl(reader.result);
-                      reader.readAsDataURL(file);
-                    }}
-                    style={{ fontSize: '0.75rem', color: '#fff' }}
-                  />
-                  <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                    Single side image for auth page. Recommended: 1920x1080 landscape.
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (file.size > 8 * 1024 * 1024) {
+                          alert('Image file size must be less than 8MB.');
+                          return;
+                        }
+                        try {
+                          // Compress so mobile can load as full-bleed background
+                          const compressed = await compressImageFile(file, { maxSize: 1600, quality: 0.78 });
+                          setLoginBgUrl(compressed);
+                        } catch {
+                          const reader = new FileReader();
+                          reader.onloadend = () => setLoginBgUrl(reader.result);
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      style={{ fontSize: '0.75rem', color: '#fff' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setLoginBgUrl(DEFAULT_LOGIN_BG)}
+                      className="action-row-btn"
+                      style={{
+                        width: 'auto',
+                        padding: '0.35rem 0.75rem',
+                        fontSize: '0.65rem',
+                        fontWeight: 'bold',
+                        background: loginBgUrl === DEFAULT_LOGIN_BG ? 'rgba(255,215,0,0.15)' : 'rgba(255,255,255,0.05)',
+                        border: '1px solid rgba(255,215,0,0.35)',
+                        color: '#ffd700'
+                      }}
+                    >
+                      Use Default
+                    </button>
+                  </div>
+                  <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
+                    Full-screen login background (mobile + desktop). Recommended: landscape ~1600×900. Click <strong>Use Default</strong> then Save to restore the original Royals image.
                   </div>
                 </div>
               </div>
