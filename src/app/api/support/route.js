@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
 import { notifyStaffAndDistributorAsync } from '../../../lib/pushNotifications';
+import { publishAdminEvent } from '../../../lib/adminEvents';
 import { typeBExclusionFilter } from '../../../lib/typeBDistributors';
 
 // GET support chat messages
@@ -384,8 +385,9 @@ export async function POST(req) {
 
     await supportCollection.insertOne(newMsg);
 
-    // Invalidate stats cache
+    // Invalidate stats cache + SSE so Support tab opens the new thread instantly
     cache.del('admin_stats');
+    publishAdminEvent('support', { distributorId: distId || '', senderType });
 
     if (senderType === 'player') {
       notifyStaffAndDistributorAsync(db, {

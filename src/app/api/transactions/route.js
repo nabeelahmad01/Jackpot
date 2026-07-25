@@ -5,6 +5,7 @@ import { buildRemainderClaimAvailableAt } from '../../../lib/claimWait';
 import { calcCommissionFromProfit } from '../../../lib/commission';
 import { typeBExclusionFilter } from '../../../lib/typeBDistributors';
 import { notifyStaffAndDistributorAsync, notifyStaffAsync } from '../../../lib/pushNotifications';
+import { publishAdminEvent } from '../../../lib/adminEvents';
 import { accountLookupKey, buildGameUsernameMap } from '../../../lib/resolveGameUsername';
 import { compressDataUrlIfNeeded } from '../../../lib/serverImageCompress';
 import { applyStaffGameFilter } from '../../../lib/staffGameAccess';
@@ -309,6 +310,7 @@ export async function POST(req) {
 
       // Invalidate stats cache
       cache.del('admin_stats');
+      publishAdminEvent('transactions', { distributorId: txObject.distributorId || '' });
 
       notifyStaffAndDistributorAsync(db, {
         title: 'Remainder Payout Request',
@@ -608,8 +610,13 @@ export async function POST(req) {
       alertKind: 'game'
     }, txObject.distributorId);
 
-    // Invalidate stats cache
+    // Invalidate stats cache + instant admin SSE
     cache.del('admin_stats');
+    const distKey = txObject.distributorId || '';
+    publishAdminEvent('transactions', { distributorId: distKey, txType: txObject.type });
+    if (txObject.type === 'WITHDRAW' || isFreeplayBonus) {
+      publishAdminEvent('coins', { distributorId: distKey, transactionId: txObject.id });
+    }
 
     // Don't echo multi-MB base64 proofs back to the client — DB still has them.
     const {
@@ -914,7 +921,7 @@ export async function PUT(req) {
           { $set: updateFields }
         );
 
-        // Ping coins staff / Shift APK immediately — don't wait for their next poll
+        // Ping coins staff / Shift APK + SSE so open tabs refresh instantly
         if (createdCoinTask || coinTaskResult.matchedCount > 0) {
           const coinsLabel = isFreeplayNoti
             ? `Freeplay $${parseFloat(originalTx.amount || 0).toFixed(2)}`
@@ -926,6 +933,14 @@ export async function PUT(req) {
             tag: `coins-${originalTx.id}`,
             gameTitle: originalTx.gameTitle || '',
             alertKind: 'coins'
+          });
+          publishAdminEvent('coins', {
+            distributorId: originalTx.distributorId || '',
+            transactionId: originalTx.id
+          });
+          publishAdminEvent('transactions', {
+            distributorId: originalTx.distributorId || '',
+            status: 'COINS_LOADING'
           });
         }
 
@@ -969,8 +984,14 @@ export async function PUT(req) {
       }
     }
 
-    // Invalidate stats cache
+    // Invalidate stats cache + SSE (withdraw approve / fail / non-coins paths)
     cache.del('admin_stats');
+    if (!isCoinsApproval) {
+      publishAdminEvent('transactions', {
+        distributorId: originalTx.distributorId || '',
+        status: finalStatus
+      });
+    }
 
     return NextResponse.json({ success: true, message: `Transaction status updated to ${status}!` });
   } catch (err) {

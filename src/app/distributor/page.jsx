@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import useSWR, { mutate } from 'swr';
 import usePollingSWR from '../../hooks/usePollingSWR';
+import useAdminEvents from '../../hooks/useAdminEvents';
 import { POLL } from '../../lib/pollingConfig';
 import TxSearchTab from '../../components/admin/TxSearchTab';
 import SupportTab from '../../components/admin/SupportTab';
@@ -181,6 +182,13 @@ export default function DistributorPortal() {
 
   // Stats SWR
   const distId = distSession?.id;
+
+  // Instant Requests / Coins / Ledger refresh (SSE) — poll stays as backup
+  useAdminEvents({
+    enabled: Boolean(distSession?.email && distId),
+    distributorId: distId || ''
+  });
+
   const staffAdminEmail = distSession?.isStaff ? distSession.email : '';
 
   // Heartbeat ping tracker for current active distributor staff/admin

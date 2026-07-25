@@ -3,6 +3,7 @@ import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
 import { applyStaffGameFilter, getStaffAllowedGameTitles, staffCanAccessGame } from '../../../lib/staffGameAccess';
 import { notifyStaffAndDistributorAsync } from '../../../lib/pushNotifications';
+import { publishAdminEvent } from '../../../lib/adminEvents';
 import { getTypeBDistributorIds, typeBExclusionFilter } from '../../../lib/typeBDistributors';
 import { healOrphanedDistributorPlayer } from '../../../lib/orphanDistributorPlayer';
 
@@ -677,8 +678,9 @@ export async function POST(req) {
     };
     await requestsCollection.insertOne(newRequest);
     
-    // Invalidate stats cache
+    // Invalidate stats cache + instant SSE to Shift / Requests tabs
     cache.del('admin_stats');
+    publishAdminEvent('requests', { distributorId: distId || '', gameTitle: cleanTitle });
 
     notifyStaffAndDistributorAsync(db, {
       title: 'New Account Request',
@@ -855,6 +857,7 @@ export async function PUT(req) {
     }
 
     cache.del('admin_stats');
+    publishAdminEvent('requests', { status: String(status || '') });
 
     return NextResponse.json({ success: true, message: 'Account request status updated successfully!' });
   } catch (err) {

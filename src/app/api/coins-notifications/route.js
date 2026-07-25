@@ -4,6 +4,7 @@ import { cache } from '../../../lib/cache';
 import { applyStaffGameFilter, staffCanAccessGame } from '../../../lib/staffGameAccess';
 import { accountLookupKey, buildGameUsernameMap } from '../../../lib/resolveGameUsername';
 import { typeBExclusionFilter } from '../../../lib/typeBDistributors';
+import { publishAdminEvent } from '../../../lib/adminEvents';
 
 // GET all coins notifications (supports filtering by email for users, or returning all for admins)
 export async function GET(req) {
@@ -305,8 +306,13 @@ export async function PUT(req) {
       }
     }
 
-    // Invalidate stats cache
+    // Invalidate stats cache + SSE
     cache.del('admin_stats');
+    publishAdminEvent('coins', {
+      distributorId: originalNoti.distributorId || '',
+      status: status != null ? String(status) : undefined
+    });
+    publishAdminEvent('transactions', { distributorId: originalNoti.distributorId || '' });
 
     return NextResponse.json({ success: true, message: 'Notification updated successfully!' });
   } catch (err) {
