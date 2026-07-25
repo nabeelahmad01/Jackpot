@@ -36,13 +36,16 @@ export default function SupportTab({ adminUser }) {
   );
 
   // keepPreviousData:false — switching chats must NOT keep showing the previous customer's messages
+  // limit=100 newest messages so long threads still show the latest replies
   const {
     data: activeChatData,
     mutate: mutateActiveChat,
     isLoading: chatLoading,
     isValidating: chatValidating
   } = usePollingSWR(
-    activeChatEmail ? `/api/support?email=${encodeURIComponent(activeChatEmail)}${distQueryParam}` : null,
+    activeChatEmail
+      ? `/api/support?email=${encodeURIComponent(activeChatEmail)}&limit=100${distQueryParam}`
+      : null,
     POLL.CHAT,
     { keepPreviousData: false }
   );
@@ -286,8 +289,9 @@ export default function SupportTab({ adminUser }) {
     const replyAttachment = adminAttachment;
     setAdminAttachment('');
 
+    const tempId = 'temp-' + Date.now();
     const tempMessage = {
-      id: 'temp-' + Date.now(),
+      id: tempId,
       userEmail: activeChatEmail,
       userName: activeChatDisplayName || 'Player',
       message: replyMsg,
@@ -317,11 +321,54 @@ export default function SupportTab({ adminUser }) {
       });
       const data = await response.json();
       if (data.success) {
-        mutateActiveChat();
+        const saved = data.message || {};
+        const confirmed = {
+          ...saved,
+          playerName: activeChatDisplayName,
+          // Keep inline preview if we just uploaded; otherwise use lazy URL
+          attachment: replyAttachment
+            || (saved.hasAttachment && saved.id
+              ? `/api/support?attachmentId=${encodeURIComponent(saved.id)}`
+              : '')
+        };
+        // Replace temp bubble with saved message — don't wait on a full refetch that
+        // can briefly wipe the thread (and used to drop newest msgs past the old limit).
+        mutateActiveChat(
+          (current) => {
+            const prev = current?.messages || activeChatMessages;
+            const withoutTemp = prev.filter((m) => m.id !== tempId);
+            const already = withoutTemp.some((m) => m.id === confirmed.id);
+            return {
+              success: true,
+              playerName: activeChatDisplayName,
+              messages: already ? withoutTemp : [...withoutTemp, confirmed]
+            };
+          },
+          { revalidate: true }
+        );
         mutateConversations();
+      } else {
+        // Roll back optimistic bubble on failure
+        mutateActiveChat(
+          (current) => ({
+            success: true,
+            playerName: activeChatDisplayName,
+            messages: (current?.messages || []).filter((m) => m.id !== tempId)
+          }),
+          false
+        );
+        alert(data.message || 'Failed to send reply.');
       }
     } catch (err) {
       console.error('Send admin reply error:', err);
+      mutateActiveChat(
+        (current) => ({
+          success: true,
+          playerName: activeChatDisplayName,
+          messages: (current?.messages || []).filter((m) => m.id !== tempId)
+        }),
+        false
+      );
     }
   };
 

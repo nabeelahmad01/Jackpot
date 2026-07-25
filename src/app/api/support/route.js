@@ -51,8 +51,11 @@ export async function GET(req) {
 
     if (email) {
       // Return conversation history for a specific player (text first — no inline base64)
-      const skip = (page - 1) * limit;
       const emailKey = email.toLowerCase().trim();
+      // Default window is the MOST RECENT messages. Older chats with 50+ messages
+      // used to load only the oldest page — so new admin replies appeared then
+      // vanished on refresh because they were outside that window.
+      const threadLimit = Math.min(Math.max(limit, 1), 200);
 
       // Distributor may open a chat even if the player never messaged yet
       if (adminDistributorId) {
@@ -71,7 +74,8 @@ export async function GET(req) {
       }
 
       // Exclude huge attachment payloads so chat opens instantly (images load via attachmentId).
-      const messages = await supportCollection
+      // Newest-first fetch, then reverse so UI still renders oldest → newest.
+      const newestFirst = await supportCollection
         .find({ userEmail: emailKey })
         .project({
           _id: 0,
@@ -87,10 +91,11 @@ export async function GET(req) {
           distributorType: 1,
           hasAttachment: 1
         })
-        .sort({ timestamp: 1 })
-        .skip(skip)
-        .limit(limit)
+        .sort({ timestamp: -1 })
+        .skip(Math.max(0, (page - 1) * threadLimit))
+        .limit(threadLimit)
         .toArray();
+      const messages = newestFirst.reverse();
 
       const isGuest =
         emailKey.includes('@jackpotguest.com') || emailKey.startsWith('guest_');

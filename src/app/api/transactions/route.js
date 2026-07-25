@@ -744,15 +744,22 @@ export async function PUT(req) {
       }
     }
 
-    // Trigger Coins notification if this transaction is approved as SUCCESS and it is a DEPOSIT or a BONUS
-    if (status === 'SUCCESS' && (originalTx.type === 'DEPOSIT' || originalTx.type === 'BONUS') && originalTx.status !== 'SUCCESS') {
+    // Trigger Coins notification if this transaction is approved as SUCCESS and it is a DEPOSIT or a BONUS.
+    // COINS_LOADING means it was already approved once — re-approving must never create a second
+    // allotment task (or a second referral reward).
+    if (
+      status === 'SUCCESS' &&
+      (originalTx.type === 'DEPOSIT' || originalTx.type === 'BONUS') &&
+      originalTx.status !== 'SUCCESS' &&
+      originalTx.status !== 'COINS_LOADING'
+    ) {
       try {
         const userEmail = originalTx.userEmail.toLowerCase();
         const settingsCollection = db.collection('settings');
         const notificationsCollection = db.collection('coinsNotifications');
 
         // Parallel lookups — same data as before, just not sequential.
-        const [successfulDepositsCount, settings, frontendSettings, depositor, existingNoti] = await Promise.all([
+        const [successfulDepositsCount, settings, frontendSettings, depositor] = await Promise.all([
           transactionsCollection.countDocuments({
             userEmail,
             type: 'DEPOSIT',
@@ -761,8 +768,7 @@ export async function PUT(req) {
           }),
           settingsCollection.findOne({ id: 'global_settings' }),
           settingsCollection.findOne({ id: 'frontend_settings' }),
-          db.collection('users').findOne({ email: userEmail }),
-          notificationsCollection.findOne({ transactionId: originalTx.id })
+          db.collection('users').findOne({ email: userEmail })
         ]);
 
         const isFirstDeposit = successfulDepositsCount === 0;
@@ -787,11 +793,13 @@ export async function PUT(req) {
         const amount = parseFloat(originalTx.amount);
         const totalCoins = isBonus ? amount : (amount * (1 + bonusPercentage / 100));
 
-        // Insert notification for the Coins Manager (with duplicate prevention)
-        if (!existingNoti) {
-          if (originalTx.type === 'BONUS' && (originalTx.code === 'SIGNUP-FREE3' || originalTx.code === 'FREEPLAY')) {
-            // Freeplay bonus — special coins notification with isFreeplay flag
-            await notificationsCollection.insertOne({
+        // Coins Manager task — upsert keyed on transactionId so two overlapping
+        // approve requests can only ever produce ONE allotment row.
+        const isFreeplayNoti =
+          originalTx.type === 'BONUS' && (originalTx.code === 'SIGNUP-FREE3' || originalTx.code === 'FREEPLAY');
+
+        const notiDoc = isFreeplayNoti
+          ? {
               id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
               userEmail,
               gameTitle: originalTx.gameTitle || 'Lobby',
@@ -804,10 +812,8 @@ export async function PUT(req) {
               timestamp: new Date().toISOString(),
               transactionId: originalTx.id,
               distributorId: originalTx.distributorId || ''
-            });
-          } else {
-            // Regular deposit/bonus coins notification
-            await notificationsCollection.insertOne({
+            }
+          : {
               id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
               userEmail,
               gameTitle: originalTx.gameTitle || 'Lobby',
@@ -819,9 +825,13 @@ export async function PUT(req) {
               timestamp: new Date().toISOString(),
               transactionId: originalTx.id, // Linked parent transaction!
               distributorId: originalTx.distributorId || ''
-            });
-          }
-        }
+            };
+
+        await notificationsCollection.updateOne(
+          { transactionId: originalTx.id },
+          { $setOnInsert: notiDoc },
+          { upsert: true }
+        );
 
         // Consume the claimed promo deposit bonus so it only applies to this
         // one deposit (the bonus % was already used above). No freeplay is granted.
