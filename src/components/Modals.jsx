@@ -775,8 +775,8 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
   const [qrImage, setQrImage] = useState('');
   const [redirectUrl, setRedirectUrl] = useState('');
 
-  // Withdrawal configurations
-  const [isWithdrawActive, setIsWithdrawActive] = useState(false);
+  // Withdrawal configurations — default ON so new gateways appear for cashout too
+  const [isWithdrawActive, setIsWithdrawActive] = useState(true);
   const [requireNameOnTag, setRequireNameOnTag] = useState(true);
   const [requireTag, setRequireTag] = useState(true);
   const [requirePhoneOnTag, setRequirePhoneOnTag] = useState(true);
@@ -1052,12 +1052,17 @@ export function AdminGatewayModal({ isOpen, onClose, onSave, editGateway }) {
             {/* Withdrawal CMS Configuration Settings */}
             <div style={{ background: 'rgba(255,255,255,0.02)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.75rem', color: '#fff', fontWeight: 'bold' }}>Enable for Payout Withdrawals</span>
+                <div>
+                  <span style={{ fontSize: '0.75rem', color: '#fff', fontWeight: 'bold', display: 'block' }}>Show for player cashout</span>
+                  <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>
+                    ON = this gateway appears in Withdraw. If none are ON, all deposit gateways show for cashout.
+                  </span>
+                </div>
                 <input
                   type="checkbox"
                   checked={isWithdrawActive}
                   onChange={(e) => setIsWithdrawActive(e.target.checked)}
-                  style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--gold-primary)' }}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--gold-primary)', flexShrink: 0 }}
                 />
               </div>
 

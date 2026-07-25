@@ -555,6 +555,12 @@ export async function POST(req) {
       }
       // Keep full amount on the transaction — coins admin needs the real amount to deduct
       // The amount will be capped to $30 when the coins admin approves (in coins-notifications PUT)
+      if (txObject.isFreeplayWithdraw && parseFloat(txObject.amount) >= 100) {
+        return NextResponse.json(
+          { success: false, message: 'Freeplay withdraw request must be under $100.' },
+          { status: 400 }
+        );
+      }
     }
 
     // Freeplay / withdraw: write tx + coins task together so admin queue is ready when response returns

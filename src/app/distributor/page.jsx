@@ -319,7 +319,7 @@ export default function DistributorPortal() {
   const [gwTheme, setGwTheme] = useState('cashapp');
   const [gwQr, setGwQr] = useState('');
   const [gwRedirectUrl, setGwRedirectUrl] = useState('');
-  const [gwWithdraw, setGwWithdraw] = useState(false);
+  const [gwWithdraw, setGwWithdraw] = useState(true);
   const [isSubmittingGateway, setIsSubmittingGateway] = useState(false);
 
   const isGwLinkPay = gwTheme === 'cashapp' || gwTheme === 'stripe';
@@ -2548,9 +2548,14 @@ export default function DistributorPortal() {
                     </>
                   )}
 
-                  <div style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <input type="checkbox" checked={gwWithdraw} onChange={(e) => setGwWithdraw(e.target.checked)} style={{ cursor: 'pointer' }} />
-                    <label style={{ fontSize: '0.7rem', cursor: 'pointer' }}>Active for Withdrawals</label>
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input type="checkbox" checked={gwWithdraw} onChange={(e) => setGwWithdraw(e.target.checked)} style={{ cursor: 'pointer' }} />
+                      <label style={{ fontSize: '0.7rem', cursor: 'pointer' }}>Show for player cashout</label>
+                    </div>
+                    <span style={{ display: 'block', marginTop: '0.25rem', fontSize: '0.6rem', color: '#666' }}>
+                      ON = this gateway in Withdraw. If none ON, all deposit gateways show for cashout.
+                    </span>
                   </div>
 
                   <button type="submit" style={{ width: '100%', background: 'var(--gold-primary)', color: '#000', border: 'none', padding: '0.5rem', borderRadius: '6px', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer' }} disabled={isSubmittingGateway}>

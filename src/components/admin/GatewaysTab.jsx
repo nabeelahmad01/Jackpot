@@ -57,6 +57,7 @@ export default function GatewaysTab({ onAddGatewayClick, onEditGatewayClick, onD
               <th>Payment Handle Tag</th>
               <th>Phone / Contact Info</th>
               <th>Visual Theme</th>
+              <th>Cashout</th>
               <th>Pay Redirect URL</th>
               <th>QR Image Link</th>
               <th>Actions</th>
@@ -65,7 +66,7 @@ export default function GatewaysTab({ onAddGatewayClick, onEditGatewayClick, onD
           <tbody>
             {filteredGateways.length === 0 ? (
               <tr>
-                <td colSpan="8" className="text-center text-muted" style={{ padding: '2rem' }}>
+                <td colSpan="9" className="text-center text-muted" style={{ padding: '2rem' }}>
                   No gateways configured. Click Add to create one.
                 </td>
               </tr>
@@ -79,6 +80,15 @@ export default function GatewaysTab({ onAddGatewayClick, onEditGatewayClick, onD
                   <td>
                     <span className={`admin-badge-preview b-${gt.theme === 'chime' ? 'ready' : gt.theme === 'cashapp' ? 'none' : gt.theme === 'stripe' ? 'vip' : gt.theme === 'crypto' ? 'hot' : 'new'}`} style={{ textTransform: 'uppercase' }}>
                       {gt.theme}
+                    </span>
+                  </td>
+                  <td>
+                    <span
+                      className={`admin-badge-preview ${gt.isWithdrawActive ? 'b-ready' : 'b-none'}`}
+                      style={{ fontSize: '0.6rem', textTransform: 'uppercase' }}
+                      title={gt.isWithdrawActive ? 'Shown on player Withdraw' : 'Deposit only (unless no cashout gateways are enabled)'}
+                    >
+                      {gt.isWithdrawActive ? 'CASHOUT ON' : 'DEPOSIT'}
                     </span>
                   </td>
                   <td>

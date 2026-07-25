@@ -12,6 +12,18 @@ import RemainderClaimAction from './RemainderClaimAction';
 import { canShowClaimRemainderButton } from '../lib/remainderClaim';
 import { compressImageFile } from '../lib/imageCompress';
 
+/**
+ * Cashout methods:
+ * - If admin enabled any gateway for payout → show only those
+ * - Else → same list as deposit (all gateways except Stripe checkout)
+ */
+function getWithdrawGateways(list) {
+  const all = Array.isArray(list) ? list : [];
+  const cashoutOnly = all.filter((g) => g.isWithdrawActive);
+  if (cashoutOnly.length > 0) return cashoutOnly;
+  return all.filter((g) => String(g.theme || '').toLowerCase() !== 'stripe');
+}
+
 export default function UserLobby({
   games,
   accountRequests = [],
@@ -323,13 +335,13 @@ export default function UserLobby({
 
   useEffect(() => {
     if (withdrawModalOpen) {
-      const activeGts = (gateways || []).filter(g => g.isWithdrawActive);
+      const activeGts = getWithdrawGateways(gateways);
       if (activeGts.length > 0) {
         setSelectedWithdrawGateway(activeGts[0]);
         setWithdrawMethod(activeGts[0].name);
       } else {
         setSelectedWithdrawGateway(null);
-        setWithdrawMethod('Chime');
+        setWithdrawMethod('');
       }
     }
   }, [withdrawModalOpen, gateways]);
@@ -770,6 +782,11 @@ export default function UserLobby({
     }
     if (amountVal < 25) {
       showToast('Minimum withdrawal limit is $25.00.', 'error');
+      return;
+    }
+    // Freeplay: player may request under $100; coins see full amount, finance still caps at $30
+    if (isFreeplaySession && amountVal >= 100) {
+      showToast('Freeplay withdraw request must be under $100.', 'error');
       return;
     }
     setWithdrawModalOpen(true);
@@ -2271,7 +2288,9 @@ export default function UserLobby({
                               )}
                             </h4>
                             <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                              {isFreeplaySession ? 'Your freeplay cashout limit is $30.' : 'Request payout to your preferred tag.'}
+                              {isFreeplaySession
+                                ? 'Request under $100. Payout to finance is capped at $30.'
+                                : 'Request payout to your preferred tag.'}
                             </p>
                           </div>
                           <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(239,68,68,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f87171' }}>
@@ -2297,6 +2316,9 @@ export default function UserLobby({
                                 placeholder="10"
                                 value={withdrawAmount}
                                 onChange={(e) => setWithdrawAmount(e.target.value)}
+                                min={25}
+                                max={isFreeplaySession ? 99.99 : undefined}
+                                step="0.01"
                                 style={{ padding: '0.75rem 1rem', paddingLeft: isFreeplaySession ? '5.5rem' : '1rem' }}
                                 required
                               />
@@ -2527,7 +2549,7 @@ export default function UserLobby({
                 <label style={{ marginBottom: '0.5rem', display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Choose Payment Method</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                   {(() => {
-                    const activeGts = (gateways || []).filter(g => g.isWithdrawActive);
+                    const activeGts = getWithdrawGateways(gateways);
                     if (activeGts.length > 0) {
                       return activeGts.map((gt) => (
                         <label
@@ -2566,74 +2588,10 @@ export default function UserLobby({
                       ));
                     }
 
-                    // Fallback to static if no withdrawal gateways configured in CMS
                     return (
-                      <>
-                        <label
-                          onClick={() => {
-                            setSelectedWithdrawGateway(null);
-                            setWithdrawMethod('Chime');
-                          }}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '0.85rem 1rem',
-                            background: withdrawMethod === 'Chime' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.01)',
-                            border: withdrawMethod === 'Chime' ? '1.5px solid var(--gold-primary)' : '1.5px solid rgba(255,255,255,0.05)',
-                            borderRadius: '12px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease'
-                          }}
-                        >
-                          <div>
-                            <strong style={{ display: 'block', fontSize: '0.85rem', color: '#fff' }}>Chime</strong>
-                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Withdraw to your Chime tag</span>
-                          </div>
-                          <input
-                            type="radio"
-                            name="withdrawMethod"
-                            checked={withdrawMethod === 'Chime'}
-                            onChange={() => {
-                              setSelectedWithdrawGateway(null);
-                              setWithdrawMethod('Chime');
-                            }}
-                            style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--gold-primary)' }}
-                          />
-                        </label>
-                        <label
-                          onClick={() => {
-                            setSelectedWithdrawGateway(null);
-                            setWithdrawMethod('Cash App');
-                          }}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '0.85rem 1rem',
-                            background: withdrawMethod === 'Cash App' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.01)',
-                            border: withdrawMethod === 'Cash App' ? '1.5px solid var(--gold-primary)' : '1.5px solid rgba(255,255,255,0.05)',
-                            borderRadius: '12px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease'
-                          }}
-                        >
-                          <div>
-                            <strong style={{ display: 'block', fontSize: '0.85rem', color: '#fff' }}>Cash App</strong>
-                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Withdraw to your Cash App tag</span>
-                          </div>
-                          <input
-                            type="radio"
-                            name="withdrawMethod"
-                            checked={withdrawMethod === 'Cash App'}
-                            onChange={() => {
-                              setSelectedWithdrawGateway(null);
-                              setWithdrawMethod('Cash App');
-                            }}
-                            style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--gold-primary)' }}
-                          />
-                        </label>
-                      </>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '0.75rem', textAlign: 'center' }}>
+                        No payout gateways available. Ask admin to enable a deposit gateway for cashout.
+                      </div>
                     );
                   })()}
                 </div>
