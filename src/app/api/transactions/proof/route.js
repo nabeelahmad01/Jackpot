@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/mongodb';
 import { compressDataUrlIfNeeded } from '../../../../lib/serverImageCompress';
+import { publishAdminEvent } from '../../../../lib/adminEvents';
 
 /**
  * Attach payment proof after a fast deposit create (body without base64).
@@ -21,7 +22,7 @@ export async function PUT(req) {
     const email = String(userEmail).toLowerCase().trim();
     const tx = await db.collection('transactions').findOne(
       { id: String(id), userEmail: email },
-      { projection: { _id: 1, type: 1 } }
+      { projection: { _id: 1, type: 1, distributorId: 1 } }
     );
 
     if (!tx) {
@@ -30,23 +31,32 @@ export async function PUT(req) {
 
     const update = { proofPending: false };
     if (typeof screenshot === 'string' && screenshot.startsWith('data:image')) {
+      // Aggressive cap — proof is for admin glance/approve, not archival quality
       update.screenshot = await compressDataUrlIfNeeded(screenshot, {
-        maxChars: 160_000,
-        maxSize: 1100,
-        quality: 68
+        maxChars: 120_000,
+        maxSize: 960,
+        quality: 62
       });
       update.hasScreenshot = true;
     }
     if (typeof tagQrScreenshot === 'string' && tagQrScreenshot.startsWith('data:image')) {
       update.tagQrScreenshot = await compressDataUrlIfNeeded(tagQrScreenshot, {
-        maxChars: 160_000,
-        maxSize: 1100,
-        quality: 68
+        maxChars: 120_000,
+        maxSize: 960,
+        quality: 62
       });
       update.hasTagQrScreenshot = true;
     }
 
     await db.collection('transactions').updateOne({ id: String(id), userEmail: email }, { $set: update });
+
+    // Instant ledger refresh (View Proof) without waiting for the next poll
+    publishAdminEvent('transactions', {
+      distributorId: tx.distributorId || '',
+      txType: tx.type || 'DEPOSIT',
+      proofAttached: true,
+      transactionId: String(id)
+    });
 
     return NextResponse.json({ success: true, message: 'Payment proof attached.' });
   } catch (err) {

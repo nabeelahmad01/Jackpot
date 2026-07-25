@@ -334,9 +334,7 @@ export default function LedgerTab({
                         </span>
                       </td>
                       <td>
-                        {tx.proofPending && !tx.screenshot ? (
-                          <span style={{ fontSize: '0.7rem', color: 'var(--gold-main)' }}>Proof uploading…</span>
-                        ) : tx.screenshot ? (
+                        {tx.screenshot ? (
                           <button
                             onClick={() => onInspectProof(tx.screenshot, tx.id, 'screenshot')}
                             className="submit-btn"
@@ -344,6 +342,19 @@ export default function LedgerTab({
                           >
                             <i className="fa-solid fa-receipt"></i> <span style={{ fontSize: '0.65rem' }}>View Proof</span>
                           </button>
+                        ) : tx.proofPending ? (
+                          (() => {
+                            const createdMs = tx.createdAt
+                              ? Date.parse(tx.createdAt)
+                              : (Number(String(tx.id).replace(/\D/g, '').slice(0, 13)) || 0);
+                            const ageSec = createdMs ? (Date.now() - createdMs) / 1000 : 0;
+                            const stale = ageSec > 45;
+                            return (
+                              <span style={{ fontSize: '0.7rem', color: stale ? '#f87171' : 'var(--gold-main)' }}>
+                                {stale ? 'Proof delayed — refresh or reject' : 'Proof uploading…'}
+                              </span>
+                            );
+                          })()
                         ) : (
                           <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>No Screenshot</span>
                         )}

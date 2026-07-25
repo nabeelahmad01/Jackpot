@@ -153,9 +153,9 @@ export default function CoinsAllotmentTab({
                   </td>
                   <td>
                     {noti.totalCoins < 0 ? (
-                      <strong style={{ color: '#ff4d6d', fontSize: '0.9rem' }}><i className="fa-solid fa-coins" style={{ marginRight: '4px' }}></i> {noti.totalCoins} (Deduct)</strong>
+                      <strong style={{ color: '#ff4d6d', fontSize: '0.9rem' }}><i className="fa-solid fa-coins" style={{ marginRight: '4px' }}></i> -{Math.floor(Math.abs(Number(noti.totalCoins) || 0))} (Deduct)</strong>
                     ) : (
-                      <strong style={{ color: '#00ff66', fontSize: '0.9rem' }}><i className="fa-solid fa-coins" style={{ color: '#00ff66', marginRight: '4px' }}></i> {noti.totalCoins}</strong>
+                      <strong style={{ color: '#00ff66', fontSize: '0.9rem' }}><i className="fa-solid fa-coins" style={{ color: '#00ff66', marginRight: '4px' }}></i> {Math.floor(Number(noti.totalCoins) || 0)}</strong>
                     )}
                   </td>
                   <td style={{ fontSize: '0.7rem' }}>{new Date(noti.timestamp).toLocaleString()}</td>

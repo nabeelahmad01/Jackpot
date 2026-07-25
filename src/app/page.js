@@ -11,8 +11,59 @@ import UserLobby from '../components/UserLobby';
 import LoadingOverlay from '../components/LoadingOverlay';
 import { SupportModal, GoogleWarningModal } from '../components/Modals';
 import useSessionGuard from '../hooks/useSessionGuard';
+import { compressDataUrl } from '../lib/imageCompress';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
+
+/** Deposit proof attach — small payload + retries so ledger never sticks on "Proof uploading…" */
+async function uploadDepositProof(txId, screenshot, userEmail) {
+  let shot = screenshot;
+  try {
+    if (typeof shot === 'string' && shot.length > 140_000) {
+      shot = await compressDataUrl(shot, { maxSize: 900, quality: 0.52, maxChars: 140_000 });
+    }
+  } catch {
+    /* keep original; retries below may shrink further */
+  }
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch('/api/transactions/proof', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: txId, screenshot: shot, userEmail })
+      });
+      if (res.ok) return true;
+
+      // Body rejected / server choke — shrink harder and retry
+      if (res.status === 413 || res.status >= 500 || res.status === 400) {
+        try {
+          shot = await compressDataUrl(shot, {
+            maxSize: Math.max(480, 820 - attempt * 120),
+            quality: Math.max(0.38, 0.5 - attempt * 0.06),
+            maxChars: 100_000
+          });
+        } catch {
+          /* continue with current shot */
+        }
+        continue;
+      }
+      return false;
+    } catch (err) {
+      console.error('Deposit proof upload attempt failed:', err);
+      try {
+        shot = await compressDataUrl(shot, {
+          maxSize: 640,
+          quality: 0.42,
+          maxChars: 90_000
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  return false;
+}
 
 function resolveSupportEmail(session) {
   if (session?.email) return String(session.email).toLowerCase().trim();
@@ -474,15 +525,12 @@ export default function Home() {
 
         // Background proof upload — admin already sees the PENDING row from create.
         if (isDeposit && screenshot && data.transaction?.id) {
-          void fetch('/api/transactions/proof', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              id: data.transaction.id,
-              screenshot,
-              userEmail: session.email
-            })
-          }).catch((err) => console.error('Deposit proof upload failed:', err));
+          void uploadDepositProof(data.transaction.id, screenshot, session.email).then((ok) => {
+            if (!ok) {
+              showToast('Payment submitted, but proof upload failed. Please contact support with your amount/time.', 'error');
+            }
+            mutate(url);
+          });
         }
       } else {
         showToast(data.message || 'Transaction submission failed.', 'error');

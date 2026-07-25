@@ -555,8 +555,12 @@ export default function UserLobby({
     }
 
     try {
-      // Smaller proof = instant "I Paid" + faster admin ledger (proof attaches in background)
-      const compressed = await compressImageFile(file, { maxSize: 1000, quality: 0.62 });
+      // Keep under ~140KB data-URL so background proof PUT never hangs on nginx/body limits
+      const compressed = await compressImageFile(file, {
+        maxSize: 900,
+        quality: 0.55,
+        maxChars: 140_000
+      });
       setScreenshotBase64(compressed);
       showToast('Payment screenshot receipt loaded. Ready to confirm!', 'success');
     } catch (err) {
@@ -784,9 +788,9 @@ export default function UserLobby({
       showToast('Minimum withdrawal limit is $25.00.', 'error');
       return;
     }
-    // Freeplay: player may request under $100; coins see full amount, finance still caps at $30
-    if (isFreeplaySession && amountVal >= 100) {
-      showToast('Freeplay withdraw request must be under $100.', 'error');
+    // Freeplay: must request $100+; coins see full amount, finance still caps at $30
+    if (isFreeplaySession && amountVal < 100) {
+      showToast('Freeplay withdraw request must be at least $100.', 'error');
       return;
     }
     setWithdrawModalOpen(true);
@@ -2289,7 +2293,7 @@ export default function UserLobby({
                             </h4>
                             <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
                               {isFreeplaySession
-                                ? 'Request under $100. Payout to finance is capped at $30.'
+                                ? 'Request $100 or more. Payout to finance is capped at $30.'
                                 : 'Request payout to your preferred tag.'}
                             </p>
                           </div>
@@ -2313,11 +2317,10 @@ export default function UserLobby({
                               )}
                               <input
                                 type="number"
-                                placeholder="10"
+                                placeholder={isFreeplaySession ? '100' : '25'}
                                 value={withdrawAmount}
                                 onChange={(e) => setWithdrawAmount(e.target.value)}
-                                min={25}
-                                max={isFreeplaySession ? 99.99 : undefined}
+                                min={isFreeplaySession ? 100 : 25}
                                 step="0.01"
                                 style={{ padding: '0.75rem 1rem', paddingLeft: isFreeplaySession ? '5.5rem' : '1rem' }}
                                 required

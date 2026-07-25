@@ -540,7 +540,7 @@ export default function ShiftDashboardTab({ adminUser }) {
                     </td>
                     <td>
                       <strong style={{ color: 'var(--gold-primary)', fontSize: '0.85rem' }}>
-                        {Math.abs(noti.totalCoins).toFixed(2)}
+                        {Math.floor(Math.abs(Number(noti.totalCoins) || 0))}
                       </strong>
                     </td>
                     <td>
@@ -638,7 +638,7 @@ export default function ShiftDashboardTab({ adminUser }) {
                     </td>
                     <td>
                       <strong style={{ color: '#ff4d6d', fontSize: '0.85rem' }}>
-                        {Math.abs(noti.totalCoins).toFixed(2)}
+                        {Math.floor(Math.abs(Number(noti.totalCoins) || 0))}
                       </strong>
                     </td>
                     <td>

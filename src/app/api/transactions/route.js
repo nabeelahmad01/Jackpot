@@ -181,6 +181,20 @@ export async function GET(req) {
       }
     }
 
+    // Heal: proof already in DB but flag stuck on "uploading" (failed client ack / race)
+    const healedIds = transactions
+      .filter((t) => t.proofPending && t.screenshot)
+      .map((t) => t.id);
+    if (healedIds.length > 0) {
+      for (const t of transactions) {
+        if (healedIds.includes(t.id)) t.proofPending = false;
+      }
+      void transactionsCollection.updateMany(
+        { id: { $in: healedIds }, screenshot: { $type: 'string', $ne: '' } },
+        { $set: { proofPending: false, hasScreenshot: true } }
+      ).catch(() => {});
+    }
+
     return NextResponse.json({
       success: true,
       transactions,
@@ -247,7 +261,7 @@ export async function POST(req) {
               depositAmount: 0,
               bonusApplied: -3,
               isFreeplay: true,
-              totalCoins: parseFloat(fp.amount),
+              totalCoins: Math.floor(parseFloat(fp.amount) || 0),
               status: 'PENDING',
               read: false,
               timestamp: new Date().toISOString(),
@@ -555,9 +569,9 @@ export async function POST(req) {
       }
       // Keep full amount on the transaction — coins admin needs the real amount to deduct
       // The amount will be capped to $30 when the coins admin approves (in coins-notifications PUT)
-      if (txObject.isFreeplayWithdraw && parseFloat(txObject.amount) >= 100) {
+      if (txObject.isFreeplayWithdraw && parseFloat(txObject.amount) < 100) {
         return NextResponse.json(
-          { success: false, message: 'Freeplay withdraw request must be under $100.' },
+          { success: false, message: 'Freeplay withdraw request must be at least $100.' },
           { status: 400 }
         );
       }
@@ -585,7 +599,7 @@ export async function POST(req) {
         gameUsername: coinGameUsername,
         depositAmount: parseFloat(txObject.amount),
         bonusApplied: -1, // Indicates deduction/withdrawal action
-        totalCoins: -parseFloat(txObject.amount), // Negative value indicates deduction
+        totalCoins: -Math.floor(parseFloat(txObject.amount) || 0), // whole coins only
         status: 'PENDING',
         read: false,
         timestamp: new Date().toISOString(),
@@ -605,7 +619,7 @@ export async function POST(req) {
         depositAmount: 0,
         bonusApplied: -3, // indicates freeplay
         isFreeplay: true,
-        totalCoins: parseFloat(txObject.amount),
+        totalCoins: Math.floor(parseFloat(txObject.amount) || 0),
         status: 'PENDING',
         read: false,
         timestamp: new Date().toISOString(),
@@ -835,11 +849,20 @@ export async function PUT(req) {
     if (isCoinsApproval) {
       try {
         // Proof still uploading from player two-phase deposit — don't approve yet
+        // (If screenshot already landed, clear the stuck flag and continue.)
         if (originalTx.type === 'DEPOSIT' && originalTx.proofPending === true) {
-          return NextResponse.json({
-            success: false,
-            message: 'Payment proof is still uploading. Wait a moment and try again.'
-          }, { status: 409 });
+          const hasProof = typeof originalTx.screenshot === 'string' && originalTx.screenshot.startsWith('data:image');
+          if (hasProof) {
+            await transactionsCollection.updateOne(
+              { id },
+              { $set: { proofPending: false, hasScreenshot: true } }
+            );
+          } else {
+            return NextResponse.json({
+              success: false,
+              message: 'Payment proof is still uploading. Wait a moment and try again.'
+            }, { status: 409 });
+          }
         }
 
         const userEmail = originalTx.userEmail.toLowerCase();
@@ -888,9 +911,10 @@ export async function PUT(req) {
           ? 0
           : (usePromoBonus ? promoBonusPercent : (isFirstDeposit ? firstBonusPercent : (settings ? Number(settings.regularDepositBonus) : 20)));
         
-        // Calculate total coins to allot
+        // Calculate total coins to allot (whole coins only — drop cents after bonus)
         const amount = parseFloat(originalTx.amount);
-        const totalCoins = isBonus ? amount : (amount * (1 + bonusPercentage / 100));
+        const rawCoins = isBonus ? amount : (amount * (1 + bonusPercentage / 100));
+        const totalCoins = Math.floor(Number(rawCoins) || 0);
 
         // Coins Manager task — upsert keyed on transactionId so two overlapping
         // approve requests can only ever produce ONE allotment row.
@@ -916,7 +940,7 @@ export async function PUT(req) {
               depositAmount: 0,
               bonusApplied: -3, // indicates signup freeplay
               isFreeplay: true,
-              totalCoins: parseFloat(originalTx.amount),
+              totalCoins: Math.floor(parseFloat(originalTx.amount) || 0),
               status: 'PENDING',
               read: false,
               timestamp: new Date().toISOString(),
@@ -930,7 +954,7 @@ export async function PUT(req) {
               gameUsername,
               depositAmount: amount,
               bonusApplied: bonusPercentage,
-              totalCoins: Math.round(totalCoins * 100) / 100,
+              totalCoins,
               status: 'PENDING',
               read: false,
               timestamp: new Date().toISOString(),
@@ -958,7 +982,7 @@ export async function PUT(req) {
         if (createdCoinTask || coinTaskResult.matchedCount > 0) {
           const coinsLabel = isFreeplayNoti
             ? `Freeplay $${parseFloat(originalTx.amount || 0).toFixed(2)}`
-            : `Deposit $${amount.toFixed(2)} → ${Math.round(totalCoins * 100) / 100} coins`;
+            : `Deposit $${amount.toFixed(2)} → ${totalCoins} coins`;
           notifyStaffAsync(db, {
             title: 'Coins allotment ready',
             body: `${userEmail} · ${coinsLabel}${originalTx.gameTitle ? ` · ${originalTx.gameTitle}` : ''}`,
