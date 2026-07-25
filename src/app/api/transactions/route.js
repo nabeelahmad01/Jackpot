@@ -702,9 +702,12 @@ export async function PUT(req) {
       updateFields.approvedBy = processedBy;
     }
     if (payoutProof !== undefined) {
-      // Large phone screenshots as raw base64 make this PUT hang for many seconds.
-      // Compress oversized proofs only — small ones and non-images stay untouched.
-      updateFields.payoutProof = await compressDataUrlIfNeeded(payoutProof);
+      // Large phone screenshots as raw base64 make this PUT hang / fail on shared hosting.
+      updateFields.payoutProof = await compressDataUrlIfNeeded(payoutProof, {
+        maxChars: 160_000,
+        maxSize: 1000,
+        quality: 65
+      });
     }
 
     if (status === 'SUCCESS' && payoutHold !== undefined && Number(payoutHold) > 0) {

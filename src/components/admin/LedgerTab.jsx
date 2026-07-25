@@ -179,12 +179,20 @@ export default function LedgerTab({
       if (data?.success) {
         mutate();
       } else {
-        alert(data?.message || 'Failed to process payout.');
+        const hint =
+          response.status === 413 || response.status === 502 || response.status === 504
+            ? ' Receipt photo may be too large — try a smaller/clearer screenshot.'
+            : '';
+        alert((data?.message || `Failed to process payout (${response.status}).`) + hint);
         mutate(); // restore list from server
       }
     } catch (err) {
       console.error(err);
-      alert('Error processing payout.');
+      // Usually: oversized payoutProof base64, proxy timeout, or offline
+      alert(
+        'Error processing payout. Network/timeout — use a smaller receipt screenshot and try again.' +
+          (err?.message ? `\n(${err.message})` : '')
+      );
       mutate();
     } finally {
       setIsProcessingPayout(false);
@@ -194,9 +202,14 @@ export default function LedgerTab({
   const handlePayoutProofChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Payout receipt must be under 2MB. Take a clearer, smaller photo.');
+      e.target.value = '';
+      return;
+    }
     try {
-      // Receipts need readable text — 1280px is enough and keeps upload small/fast.
-      const compressed = await compressImageFile(file, { maxSize: 1280, quality: 0.72 });
+      // Smaller proof = Hostinger/Business proxies won't drop the PUT
+      const compressed = await compressImageFile(file, { maxSize: 1000, quality: 0.62 });
       setPayoutProof(compressed);
     } catch (err) {
       console.error(err);
