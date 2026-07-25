@@ -38,11 +38,18 @@ export default function DeletedPlayersTab() {
   const deletedPlayers = data?.deletedPlayers || [];
 
   const handleRestore = async (email, record) => {
-    const distDeleted = record?.deletedBy === 'distributor' || record?.wipeGameAccess === true;
+    const isDistributor =
+      record?.deletedEntityType === 'distributor' || record?.role === 'distributor';
+    const distDeletedPlayer = record?.deletedBy === 'distributor' || record?.wipeGameAccess === true;
     const gameCount = Array.isArray(record?.restoreGameTitles) ? record.restoreGameTitles.length : 0;
-    const confirmMsg = distDeleted
-      ? `Restore "${email}"?\n\nDistributor-deleted player will be unlinked from that distributor. ${gameCount > 0 ? `${gameCount} game request(s) will go to YOUR Requests tab.` : 'They can Request / Create under HQ.'}`
-      : `Restore "${email}"?\n\nIf this was an HQ delete, their previous game accounts will come back.`;
+    const linkedCount = Array.isArray(record?.linkedPlayerEmails) ? record.linkedPlayerEmails.length : 0;
+
+    let confirmMsg = `Restore "${email}"?\n\nIf this was an HQ delete, their previous game accounts will come back.`;
+    if (isDistributor) {
+      confirmMsg = `Restore distributor "${email}"?\n\n${linkedCount} player(s) will be re-linked — requests/deposits go back to this distributor.`;
+    } else if (distDeletedPlayer) {
+      confirmMsg = `Restore "${email}"?\n\nDistributor-deleted player will be unlinked from that distributor. ${gameCount > 0 ? `${gameCount} game request(s) will go to YOUR Requests tab.` : 'They can Request / Create under HQ.'}`;
+    }
     if (!window.confirm(confirmMsg)) {
       return;
     }

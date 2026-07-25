@@ -4,7 +4,7 @@ import { cache } from '../../../lib/cache';
 import { enrichDistributorsWithStats } from '../../../lib/entityStats';
 import { invalidateTypeBDistributorCache } from '../../../lib/typeBDistributors';
 import { jsonOk } from '../../../lib/apiResponse';
-import { purgeAccountAccess } from '../../../lib/sessionRevoke';
+import { purgeAccountAccess, revokeSession } from '../../../lib/sessionRevoke';
 
 // GET list of distributors (with dynamic statistics)
 export async function GET() {
@@ -109,11 +109,9 @@ export async function PUT(req) {
 }
 
 // DELETE a distributor.
-// The distributor's players are handed over to the super admin: their
-// distributorId is cleared (so they become direct players), their existing game
-// accounts are removed so they must re-request fresh accounts, and all of their
-// records (requests, transactions, coins notifications) are reassigned to the
-// super admin. The distributor's own staff logins are removed too.
+// Players KEEP all game data. They are handed to Super Admin HQ so requests /
+// deposits / coins traffic show under HQ. Undo re-links players back to this
+// distributor. Staff + gateways are removed (distributor portal is gone).
 export async function DELETE(req) {
   try {
     const { searchParams } = new URL(req.url);
@@ -125,34 +123,17 @@ export async function DELETE(req) {
 
     const db = await getDb();
     const distributorsCollection = db.collection('distributors');
+    const usersCollection = db.collection('users');
 
     const distDoc = await distributorsCollection.findOne({ id });
-    const result = await distributorsCollection.deleteOne({ id });
-
-    if (result.deletedCount === 0) {
+    if (!distDoc) {
       return NextResponse.json({ success: false, message: 'Distributor not found.' }, { status: 404 });
     }
 
-    // Archive the deleted distributor so it shows in the "Deleted Accounts" view
-    // and is auto-purged after 30 days (TTL index on the Date `deletedAt`).
-    if (distDoc) {
-      const deletedCollection = db.collection('deletedUsers');
-      await deletedCollection.createIndex({ deletedAt: 1 }, { expireAfterSeconds: 2592000 });
-      const { _id, ...distFields } = distDoc;
-      await deletedCollection.insertOne({
-        ...distFields,
-        deletedEntityType: 'distributor',
-        deletedAt: new Date()
-      });
-    }
-
-    const usersCollection = db.collection('users');
-
-    // Players belonging to this distributor.
+    // Snapshot players BEFORE clearing links (needed for Undo re-link)
     const players = await usersCollection
       .find({ distributorId: id, role: 'user' }, { projection: { email: 1 } })
       .toArray();
-    // gameAccounts / accountRequests always store lowercased emails
     const playerEmails = [
       ...new Set(
         players
@@ -161,54 +142,80 @@ export async function DELETE(req) {
       )
     ];
 
-    // Remove their game accounts AND their old account requests so each player
-    // starts fresh: the lobby will show the "Request / Create Account" option
-    // again, and the new request will route to the super admin (their
-    // distributorId is now cleared).
-    if (playerEmails.length > 0) {
-      const emailMatchers = playerEmails.map(
-        (email) => new RegExp(`^${email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
-      );
-      await db.collection('gameAccounts').deleteMany({ userEmail: { $in: emailMatchers } });
-      await db.collection('accountRequests').deleteMany({ userEmail: { $in: emailMatchers } });
-    }
+    const hqClear = {
+      distributorId: '',
+      distributorType: '',
+      distributorName: ''
+    };
 
-    // Hand players (and their financial records) over to the super admin.
-    await usersCollection.updateMany(
-      { distributorId: id, role: 'user' },
-      { $set: { distributorId: '' } }
-    );
-    await db.collection('transactions').updateMany(
-      { distributorId: id },
-      { $set: { distributorId: '' } }
-    );
-    await db.collection('coinsNotifications').updateMany(
-      { distributorId: id },
-      { $set: { distributorId: '' } }
-    );
+    // KEEP gameAccounts. Reassign ops tags → HQ (clear Type B so Super Admin sees them).
+    await Promise.all([
+      usersCollection.updateMany(
+        { distributorId: id, role: 'user' },
+        { $set: { distributorId: '', formerDistributorId: id } }
+      ),
+      db.collection('accountRequests').updateMany(
+        { $or: [{ distributorId: id }, ...(playerEmails.length ? [{ userEmail: { $in: playerEmails } }] : [])] },
+        { $set: hqClear }
+      ),
+      db.collection('transactions').updateMany(
+        { $or: [{ distributorId: id }, ...(playerEmails.length ? [{ userEmail: { $in: playerEmails } }] : [])] },
+        { $set: hqClear }
+      ),
+      db.collection('coinsNotifications').updateMany(
+        { $or: [{ distributorId: id }, ...(playerEmails.length ? [{ userEmail: { $in: playerEmails } }] : [])] },
+        { $set: hqClear }
+      )
+    ]);
 
-    // Remove the distributor's own staff logins and gateways (they belong to the
-    // now-deleted distributor and would otherwise be orphaned). Force-logout
-    // owner + staff so any open portal session dies immediately.
+    // Remove distributor row
+    await distributorsCollection.deleteOne({ id });
+
+    // Staff + gateways (portal gone). Force-logout owner + staff.
     const staffToKick = await usersCollection
-      .find({ distributorId: id, role: { $ne: 'user' } }, { projection: { email: 1 } })
+      .find({ distributorId: id, role: { $ne: 'user' } }, { projection: { email: 1, name: 1, role: 1, distributorId: 1 } })
       .toArray();
     await usersCollection.deleteMany({ distributorId: id, role: { $ne: 'user' } });
     await db.collection('gateways').deleteMany({ distributorId: id });
 
-    if (distDoc?.email) {
-      await purgeAccountAccess(db, distDoc.email, distDoc);
-    }
     for (const staff of staffToKick) {
-      if (staff?.email) await purgeAccountAccess(db, staff.email, staff);
+      if (staff?.email) await purgeAccountAccess(db, staff.email, staff, { deletedBy: 'admin' });
     }
+
+    // Archive distributor LAST (do not let purge overwrite this row)
+    const deletedCollection = db.collection('deletedUsers');
+    await deletedCollection.createIndex({ deletedAt: 1 }, { expireAfterSeconds: 2592000 });
+    const { _id, ...distFields } = distDoc;
+    const ownerEmail = String(distDoc.email || '').toLowerCase().trim();
+    if (ownerEmail) {
+      revokeSession(ownerEmail);
+      try {
+        await db.collection('pushSubscriptions').deleteMany({ userEmail: ownerEmail });
+      } catch {
+        /* ignore */
+      }
+    }
+    await deletedCollection.updateOne(
+      { email: ownerEmail || `distributor:${id}` },
+      {
+        $set: {
+          ...distFields,
+          email: ownerEmail || `distributor:${id}`,
+          deletedEntityType: 'distributor',
+          deletedAt: new Date(),
+          linkedPlayerEmails: playerEmails,
+          formerDistributorId: id
+        }
+      },
+      { upsert: true }
+    );
 
     cache.del('admin_stats');
     cache.del('distributors_enriched');
     invalidateTypeBDistributorCache();
     return NextResponse.json({
       success: true,
-      message: `Distributor deleted. ${playerEmails.length} player(s) moved to super admin; their game accounts were reset.`
+      message: `Distributor deleted. ${playerEmails.length} player(s) kept with full data — requests/deposits now go to Super Admin. Undo will return them to this distributor.`
     });
   } catch (err) {
     console.error('Delete Distributor API Error:', err);

@@ -136,7 +136,7 @@ export default function DistributorsTab() {
   };
 
   const handleDeleteClick = async (id, name) => {
-    if (window.confirm(`Are you sure you want to delete distributor "${name}"? Referred players will remain in database but the link relationship stats will no longer sync.`)) {
+    if (window.confirm(`Delete distributor "${name}"?\n\nPlayers keep all game data. Their requests, deposits & coins go to Super Admin until you Undo — then they return to this distributor.`)) {
       try {
         const response = await fetch(`/api/distributors?id=${id}`, {
           method: 'DELETE'

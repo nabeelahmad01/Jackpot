@@ -1,7 +1,7 @@
 /**
  * If a player's distributorId points at a distributor that no longer exists,
- * clear the link and wipe their game accounts + account requests so they can
- * re-request under super admin — same outcome as distributor DELETE.
+ * hand them to Super Admin HQ — KEEP game accounts / data, only clear the link
+ * and strip Type B tags so HQ can see their requests & deposits.
  */
 export async function healOrphanedDistributorPlayer(db, user) {
   if (!user || user.role !== 'user') return user;
@@ -16,10 +16,23 @@ export async function healOrphanedDistributorPlayer(db, user) {
   if (!email) return user;
 
   await Promise.all([
-    db.collection('users').updateOne({ email }, { $set: { distributorId: '' } }),
-    db.collection('gameAccounts').deleteMany({ userEmail: email }),
-    db.collection('accountRequests').deleteMany({ userEmail: email })
+    db.collection('users').updateOne(
+      { email },
+      { $set: { distributorId: '', formerDistributorId: distId } }
+    ),
+    db.collection('accountRequests').updateMany(
+      { userEmail: email },
+      { $set: { distributorId: '', distributorType: '', distributorName: '' } }
+    ),
+    db.collection('transactions').updateMany(
+      { userEmail: email },
+      { $set: { distributorId: '', distributorType: '', distributorName: '' } }
+    ),
+    db.collection('coinsNotifications').updateMany(
+      { userEmail: email },
+      { $set: { distributorId: '', distributorType: '', distributorName: '' } }
+    )
   ]);
 
-  return { ...user, distributorId: '' };
+  return { ...user, distributorId: '', formerDistributorId: distId };
 }
