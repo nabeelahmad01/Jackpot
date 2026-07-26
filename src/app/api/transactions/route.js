@@ -4,7 +4,7 @@ import { cache } from '../../../lib/cache';
 import { buildRemainderClaimAvailableAt } from '../../../lib/claimWait';
 import { calcCommissionFromProfit } from '../../../lib/commission';
 import { typeBExclusionFilter } from '../../../lib/typeBDistributors';
-import { notifyStaffAndDistributorAsync, notifyStaffAsync } from '../../../lib/pushNotifications';
+import { notifyStaffAndDistributorAsync } from '../../../lib/pushNotifications';
 import { publishAdminEvent } from '../../../lib/adminEvents';
 import { accountLookupKey, buildGameUsernameMap } from '../../../lib/resolveGameUsername';
 import { compressDataUrlIfNeeded } from '../../../lib/serverImageCompress';
@@ -983,14 +983,14 @@ export async function PUT(req) {
           const coinsLabel = isFreeplayNoti
             ? `Freeplay $${parseFloat(originalTx.amount || 0).toFixed(2)}`
             : `Deposit $${amount.toFixed(2)} → ${totalCoins} coins`;
-          notifyStaffAsync(db, {
+          notifyStaffAndDistributorAsync(db, {
             title: 'Coins allotment ready',
             body: `${userEmail} · ${coinsLabel}${originalTx.gameTitle ? ` · ${originalTx.gameTitle}` : ''}`,
             url: '/admin',
             tag: `coins-${originalTx.id}`,
             gameTitle: originalTx.gameTitle || '',
             alertKind: 'coins'
-          });
+          }, originalTx.distributorId);
           publishAdminEvent('coins', {
             distributorId: originalTx.distributorId || '',
             transactionId: originalTx.id

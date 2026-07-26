@@ -197,19 +197,6 @@ const STAFF_PUSH_ROLES = [
   'operation_admin'
 ];
 
-const ALERT_KIND_ROLES = {
-  // Finance queue: new deposits / withdraws awaiting money review
-  game: ['admin', 'operation_admin', 'financial_admin'],
-  // Coins allotment ready + account/credential requests (coins / ops staff)
-  coins: ['admin', 'operation_admin', 'coins_admin'],
-  // Player support chat
-  support: ['admin', 'operation_admin', 'support_admin'],
-  // Affiliate campaign requests
-  campaign: ['admin', 'operation_admin'],
-  // Fallback — super/ops only (no spam to specialized staff)
-  general: ['admin', 'operation_admin']
-};
-
 function parseStaffRoles(role) {
   return String(role || '')
     .toLowerCase()
@@ -228,6 +215,30 @@ function isEnvSuperAdminEmail(email) {
   return Boolean(envEmail && clean === envEmail);
 }
 
+function staffCanReceiveAlert(roles, kind, { gameTitle, gameTitleLower, skipGameTitles, gamesById, allowedGameIds } = {}) {
+  // Super / ops: every HQ alert kind
+  if (roles.includes('admin') || roles.includes('operation_admin')) {
+    return true;
+  }
+
+  // OR across assigned roles — multi-role staff get each role's alerts only
+  if (roles.includes('financial_admin') && kind === 'game') {
+    return true;
+  }
+  if (roles.includes('support_admin') && kind === 'support') {
+    return true;
+  }
+  if (roles.includes('coins_admin') && kind === 'coins') {
+    // Coins staff: only their allowed games when a real game title is present
+    if (!gameTitleLower || skipGameTitles.has(String(gameTitle || ''))) return true;
+    const allowedIds = Array.isArray(allowedGameIds) ? allowedGameIds.map(String) : [];
+    if (allowedIds.length === 0) return false;
+    if (!gamesById) return false;
+    return allowedIds.some((id) => String(gamesById.get(id) || '').toLowerCase() === gameTitleLower);
+  }
+  return false;
+}
+
 /**
  * Keep only staff devices that should see this alert:
  * - role match for alertKind
@@ -237,7 +248,6 @@ async function filterStaffSubscriptionsForAlert(db, subscriptions, { gameTitle, 
   if (!subscriptions.length) return subscriptions;
 
   const kind = String(alertKind || (gameTitle ? 'game' : 'general')).toLowerCase();
-  const allowedRoles = ALERT_KIND_ROLES[kind] || ALERT_KIND_ROLES.general;
   const skipGameTitles = new Set(['Lobby', 'Referral Reward', 'Distributor Payout', 'Platform Fees', '']);
 
   const emails = Array.from(
@@ -251,7 +261,10 @@ async function filterStaffSubscriptionsForAlert(db, subscriptions, { gameTitle, 
   const users = emails.length
     ? await db
         .collection('users')
-        .find({ email: { $in: emails } }, { projection: { email: 1, role: 1, allowedGameIds: 1 } })
+        .find(
+          { email: { $in: emails }, $or: [{ distributorId: { $exists: false } }, { distributorId: '' }, { distributorId: null }] },
+          { projection: { email: 1, role: 1, allowedGameIds: 1, distributorId: 1 } }
+        )
         .toArray()
     : [];
   const userByEmail = new Map(
@@ -278,35 +291,17 @@ async function filterStaffSubscriptionsForAlert(db, subscriptions, { gameTitle, 
 
     const user = userByEmail.get(email);
     if (!user) return false;
+    // Distributor-office staff must never receive Jackpot Portal (HQ) pushes
+    if (user.distributorId) return false;
 
     const roles = parseStaffRoles(user.role);
-    if (!roles.some((r) => allowedRoles.includes(r))) return false;
-
-    // Full portal / ops always receive alerts they're role-eligible for
-    if (roles.includes('admin') || roles.includes('operation_admin')) {
-      return true;
-    }
-
-    // Finance gets money alerts, not account-request / support spam
-    if (roles.includes('financial_admin')) {
-      return kind === 'game' || kind === 'general';
-    }
-
-    // support / campaign already role-gated above
-    if (kind === 'support' || kind === 'campaign' || kind === 'general') {
-      return true;
-    }
-
-    // coins_admin: only their allowed games (when a gameTitle is present)
-    if (roles.includes('coins_admin') && (kind === 'game' || kind === 'coins')) {
-      if (!gameTitleLower || skipGameTitles.has(String(gameTitle || ''))) return true;
-      const allowedIds = Array.isArray(user.allowedGameIds) ? user.allowedGameIds.map(String) : [];
-      if (allowedIds.length === 0) return false; // restricted coins staff with no games → no game alerts
-      if (!gamesById) return false;
-      return allowedIds.some((id) => String(gamesById.get(id) || '').toLowerCase() === gameTitleLower);
-    }
-
-    return false;
+    return staffCanReceiveAlert(roles, kind, {
+      gameTitle,
+      gameTitleLower,
+      skipGameTitles,
+      gamesById,
+      allowedGameIds: user.allowedGameIds
+    });
   });
 }
 
@@ -440,6 +435,37 @@ export function notifyStaffAsync(db, alert) {
     .catch((err) => console.error('notifyStaffAsync failed:', err));
 }
 
+function distributorStaffCanReceiveAlert(
+  roles,
+  kind,
+  { gameTitle, gameTitleLower, skipGameTitles, gamesById, allowedGameIds } = {}
+) {
+  // Owner-equivalent / full-office tags
+  if (
+    roles.includes('admin') ||
+    roles.includes('operation_admin') ||
+    roles.includes('distributor') ||
+    roles.includes('distributor_staff')
+  ) {
+    return true;
+  }
+
+  if (roles.includes('financial_admin') && kind === 'game') {
+    return true;
+  }
+  if (roles.includes('support_admin') && kind === 'support') {
+    return true;
+  }
+  if (roles.includes('coins_admin') && kind === 'coins') {
+    if (!gameTitleLower || skipGameTitles.has(String(gameTitle || ''))) return true;
+    const allowedIds = Array.isArray(allowedGameIds) ? allowedGameIds.map(String) : [];
+    if (allowedIds.length === 0) return false;
+    if (!gamesById) return false;
+    return allowedIds.some((id) => String(gamesById.get(id) || '').toLowerCase() === gameTitleLower);
+  }
+  return false;
+}
+
 /**
  * Distributor APK: only staff whose role/games match the alert.
  * Owner account (role distributor / no restricted staff role) gets everything.
@@ -453,7 +479,6 @@ async function filterDistributorSubscriptionsForAlert(
 
   const distId = String(distributorId || '').trim();
   const kind = String(alertKind || (gameTitle ? 'game' : 'general')).toLowerCase();
-  const allowedRoles = ALERT_KIND_ROLES[kind] || ALERT_KIND_ROLES.general;
   const skipGameTitles = new Set(['Lobby', 'Referral Reward', 'Distributor Payout', 'Platform Fees', '']);
 
   const emails = Array.from(
@@ -511,38 +536,16 @@ async function filterDistributorSubscriptionsForAlert(
     if (ownerEmails.has(email)) return true;
 
     const user = userByEmail.get(email);
-    if (!user) {
-      // Token registered but no staff user row — treat as owner-side device only if email matches none
-      return false;
-    }
+    if (!user) return false;
 
     const roles = parseStaffRoles(user.role);
-    // Legacy full-access staff tags on distributor
-    if (roles.includes('admin') || roles.includes('operation_admin') || roles.includes('distributor')) {
-      return true;
-    }
-
-    if (!roles.some((r) => allowedRoles.includes(r))) return false;
-
-    if (roles.includes('financial_admin')) {
-      return kind === 'game' || kind === 'general';
-    }
-
-    if (kind === 'support' || kind === 'campaign' || kind === 'general') {
-      return true;
-    }
-
-    if (roles.includes('coins_admin') && (kind === 'game' || kind === 'coins')) {
-      // coins staff on distributor only get coins/account alerts (kind coins), not finance game
-      if (kind === 'game') return false;
-      if (!gameTitleLower || skipGameTitles.has(String(gameTitle || ''))) return true;
-      const allowedIds = Array.isArray(user.allowedGameIds) ? user.allowedGameIds.map(String) : [];
-      if (allowedIds.length === 0) return false;
-      if (!gamesById) return false;
-      return allowedIds.some((id) => String(gamesById.get(id) || '').toLowerCase() === gameTitleLower);
-    }
-
-    return false;
+    return distributorStaffCanReceiveAlert(roles, kind, {
+      gameTitle,
+      gameTitleLower,
+      skipGameTitles,
+      gamesById,
+      allowedGameIds: user.allowedGameIds
+    });
   });
 }
 
@@ -680,17 +683,15 @@ export function notifyDistributorAsync(db, alert) {
 }
 
 /**
- * Notify the owning distributor when distributorId is present.
- * Jackpot Portal staff are notified only for main-platform / Type A traffic —
- * Type B (independent) distributors handle their own ops; HQ must not get alerts.
+ * Route ops alerts to the correct APK only:
+ * - Has distributorId → Distributor APK (that office + their role-filtered staff)
+ * - No distributorId → Jackpot Portal / HQ staff (role-filtered)
+ * Never dual-send distributor traffic to the Portal APK.
  */
 export function notifyStaffAndDistributorAsync(db, alert, distributorId) {
   const distId = String(distributorId || '').trim();
   Promise.resolve()
-    .then(async () => {
-      const { isTypeBDistributor } = await import('./typeBDistributors');
-      const typeB = distId ? await isTypeBDistributor(db, distId) : false;
-
+    .then(() => {
       if (distId) {
         notifyDistributorAsync(db, {
           ...alert,
@@ -699,14 +700,13 @@ export function notifyStaffAndDistributorAsync(db, alert, distributorId) {
           gameTitle: alert?.gameTitle || '',
           alertKind: alert?.alertKind || ''
         });
+        return;
       }
 
-      if (!typeB) {
-        notifyStaffAsync(db, {
-          ...alert,
-          url: alert?.url || '/admin'
-        });
-      }
+      notifyStaffAsync(db, {
+        ...alert,
+        url: alert?.url || '/admin'
+      });
     })
     .catch((err) => console.error('notifyStaffAndDistributorAsync failed:', err));
 }

@@ -217,12 +217,25 @@ export default function AdminDashboard({
       return;
     }
 
+    // Only alert for queues this staff role can actually open
+    const roles = String(adminUser?.role || '')
+      .toLowerCase()
+      .split(',')
+      .map((r) => r.trim())
+      .filter(Boolean);
+    const isFull = roles.includes('admin') || roles.includes('operation_admin');
+    const canRequests = isFull || roles.includes('coins_admin');
+    const canTx = isFull || roles.includes('financial_admin');
+    const canCoins = isFull || roles.includes('coins_admin');
+    const canChats = isFull || roles.includes('support_admin');
+    const canCampaigns = roles.includes('admin') && !adminUser?.distributorId;
+
     const prev = prevCountsRef.current;
-    const hasNewRequest = counts.requests > prev.requests;
-    const hasNewTx = counts.transactions > prev.transactions;
-    const hasNewCoin = counts.coins > prev.coins;
-    const hasNewChat = counts.chats > prev.chats;
-    const hasNewCampaign = counts.campaigns > prev.campaigns;
+    const hasNewRequest = canRequests && counts.requests > prev.requests;
+    const hasNewTx = canTx && counts.transactions > prev.transactions;
+    const hasNewCoin = canCoins && counts.coins > prev.coins;
+    const hasNewChat = canChats && counts.chats > prev.chats;
+    const hasNewCampaign = canCampaigns && counts.campaigns > prev.campaigns;
 
     if (hasNewRequest || hasNewTx || hasNewCoin || hasNewChat || hasNewCampaign) {
       try {
@@ -257,7 +270,7 @@ export default function AdminDashboard({
     }
 
     prevCountsRef.current = counts;
-  }, [statsData]);
+  }, [statsData, adminUser?.role, adminUser?.distributorId]);
 
   useEffect(() => {
     if (!adminUser?.email) return;

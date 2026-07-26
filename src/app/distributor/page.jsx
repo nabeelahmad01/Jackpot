@@ -449,10 +449,17 @@ export default function DistributorPortal() {
       return;
     }
 
+    // Owner / non-staff: all queues. Staff: only their role's queues.
+    const isOwner = !distSession?.isStaff;
+    const staffRole = String(distSession?.staffRole || distSession?.role || '').toLowerCase().trim();
+    const canRequests = isOwner || staffRole === 'coins_admin';
+    const canCoins = isOwner || staffRole === 'coins_admin';
+    const canLedger = isOwner || staffRole === 'financial_admin';
+
     const prev = prevCountsRef.current;
-    const hasNewRequest = counts.requests > prev.requests;
-    const hasNewCoin = counts.coins > prev.coins;
-    const hasNewLedger = counts.ledger > prev.ledger;
+    const hasNewRequest = canRequests && counts.requests > prev.requests;
+    const hasNewCoin = canCoins && counts.coins > prev.coins;
+    const hasNewLedger = canLedger && counts.ledger > prev.ledger;
 
     if (hasNewRequest || hasNewCoin || hasNewLedger) {
       try {
@@ -497,6 +504,9 @@ export default function DistributorPortal() {
     prevCountsRef.current = counts;
   }, [
     distId,
+    distSession?.isStaff,
+    distSession?.staffRole,
+    distSession?.role,
     pendingAccountRequestsCount,
     pendingCoinsCount,
     statsData?.stats?.pendingLedgerCount,
