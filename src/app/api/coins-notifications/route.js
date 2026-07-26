@@ -66,6 +66,40 @@ export async function GET(req) {
     // slim=1: skip username join — Shift/Coins polls stay fast (list doesn't need it every 1s)
     const slim = searchParams.get('slim') === '1';
 
+    // Heal stuck HOLD rows staff marked "Already loaded" instead of DONE
+    try {
+      const stuck = await notificationsCollection
+        .find({
+          status: { $in: ['HOLD', 'CLAIM_REQUESTED'] },
+          holdNote: { $regex: /already\s*load/i }
+        })
+        .project({ id: 1, transactionId: 1, _id: 1 })
+        .limit(50)
+        .toArray();
+      if (stuck.length > 0) {
+        const ids = stuck.map((n) => n.id).filter((id) => id != null);
+        await notificationsCollection.updateMany(
+          { id: { $in: ids } },
+          { $set: { status: 'COMPLETED', read: true } }
+        );
+        const txIds = stuck.map((n) => n.transactionId).filter(Boolean);
+        if (txIds.length > 0) {
+          const variants = txIds.flatMap((tid) => [tid, String(tid)]);
+          await db.collection('transactions').updateMany(
+            {
+              id: { $in: variants },
+              status: 'COINS_LOADING',
+              type: { $in: ['DEPOSIT', 'BONUS'] }
+            },
+            { $set: { status: 'SUCCESS', coinsAllottedAt: new Date().toISOString() } }
+          );
+        }
+        cache.del('admin_stats');
+      }
+    } catch (healErr) {
+      console.warn('coins already-loaded heal:', healErr?.message || healErr);
+    }
+
     // Parallel count + page fetch (same results, one less serial round-trip)
     const [totalNotifications, notifications] = await Promise.all([
       notificationsCollection.countDocuments(query),
@@ -162,15 +196,32 @@ export async function PUT(req) {
     // Keep this path FAST — no first-deposit bonus recount (finance already approved).
     if (!originalNoti && idStr.startsWith('tx-coins-')) {
       const txId = idStr.slice('tx-coins-'.length);
+      const tidVariants = [txId, String(txId)];
+      if (!Number.isNaN(Number(txId)) && String(Number(txId)) === String(txId)) {
+        tidVariants.push(Number(txId));
+      }
       const tx =
-        (await db.collection('transactions').findOne({ id: txId })) ||
-        (await db.collection('transactions').findOne({ id: String(txId) }));
+        (await db.collection('transactions').findOne({ id: { $in: tidVariants } }));
       if (tx && (tx.type === 'DEPOSIT' || tx.type === 'BONUS')) {
         const existingByTx = await notificationsCollection.findOne({
-          transactionId: { $in: [tx.id, String(tx.id)] }
+          transactionId: { $in: [tx.id, String(tx.id), ...tidVariants] }
         });
         if (existingByTx) {
           originalNoti = existingByTx;
+          // Already Loaded — do not create a second PENDING task for this deposit
+          if (String(existingByTx.status || '').toUpperCase() === 'COMPLETED') {
+            if (String(tx.status || '').toUpperCase() === 'COINS_LOADING') {
+              await db.collection('transactions').updateOne(
+                { id: tx.id },
+                { $set: { status: 'SUCCESS', coinsAllottedAt: new Date().toISOString() } }
+              );
+            }
+            return NextResponse.json({
+              success: true,
+              message: 'This deposit was already loaded.',
+              alreadyCompleted: true
+            });
+          }
         } else {
           const amount = parseFloat(tx.amount || 0);
           const isFreeplay = tx.type === 'BONUS' && (tx.code === 'SIGNUP-FREE3' || tx.code === 'FREEPLAY');
@@ -216,13 +267,24 @@ export async function PUT(req) {
 
     const updateFields = {};
     if (status !== undefined) {
-      if (status === 'HOLD' && originalNoti.totalCoins < 0) {
+      // Player reclaim after staff already marked Loaded / "Already loaded" → keep COMPLETED
+      if (status === 'CLAIM_REQUESTED') {
+        const priorNote = String(originalNoti.holdNote || '').toLowerCase();
+        const alreadyLoadedNote = /already\s*load/.test(priorNote);
+        if (String(originalNoti.status || '').toUpperCase() === 'COMPLETED' || alreadyLoadedNote) {
+          updateFields.status = 'COMPLETED';
+          updateFields.read = true;
+          if (alreadyLoadedNote && !originalNoti.processedBy) {
+            updateFields.processedBy = processedBy || 'system';
+          }
+        } else {
+          updateFields.status = 'CLAIM_REQUESTED';
+          updateFields.timestamp = new Date().toISOString();
+        }
+      } else if (status === 'HOLD' && originalNoti.totalCoins < 0) {
         updateFields.status = 'FAILED';
       } else {
         updateFields.status = status;
-      }
-      if (status === 'CLAIM_REQUESTED') {
-        updateFields.timestamp = new Date().toISOString();
       }
     }
     if (read !== undefined) {

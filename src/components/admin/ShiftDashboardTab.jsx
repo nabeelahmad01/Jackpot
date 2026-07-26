@@ -100,15 +100,16 @@ export default function ShiftDashboardTab({ adminUser }) {
         return true;
       })
       .map((tx) => ({
-        id: `tx-coins-${tx.id}`,
+        id: `tx-coins-${String(tx.id)}`,
         userEmail: tx.userEmail,
+        // Always this transaction's game — never borrow another game's username/amount
         gameTitle: tx.gameTitle || 'Lobby',
         gameUsername: tx.gameUsername || '',
         depositAmount: parseFloat(tx.amount || 0),
         bonusApplied: 0,
         totalCoins: parseFloat(tx.amount || 0),
         status: 'PENDING',
-        transactionId: tx.id,
+        transactionId: String(tx.id),
         timestamp: tx.createdAt || tx.date || new Date().toISOString(),
         fromCoinsLoadingTx: true
       }))

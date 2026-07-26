@@ -28,16 +28,19 @@ export default function CoinsAllotmentTab({
     return () => clearTimeout(handler);
   }, [search]);
 
-  // slim=1: username is stored on each row at approve time — skip heavy join every poll
+  // Active queue only — COMPLETED must never sit in "Pending" (was causing
+  // "Already loaded" / old deposits to look like new work after refresh).
   const { data, error, mutate } = usePollingSWR(
-    `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED,HOLD,COMPLETED&page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}&slim=1`,
+    `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED,HOLD&page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}&slim=1`,
     POLL.LIVE,
     { refreshWhenHidden: true, keepPreviousData: false, dedupingInterval: 200 }
   );
 
-  // Hide only optimistic in-progress rows; keep COMPLETED history visible
   const notifications = (data?.coinsNotifications || []).filter(
-    (n) => n.status === 'COMPLETED' || !completedActionIds[n.id]
+    (n) =>
+      ['PENDING', 'CLAIM_REQUESTED', 'HOLD'].includes(String(n.status || '').toUpperCase()) &&
+      !completedActionIds[n.id] &&
+      !completedActionIds[String(n.id)]
   );
   const totalNotifications = data?.totalNotifications || 0;
   const totalPages = data?.totalPages || 1;

@@ -971,55 +971,85 @@ export async function PUT(req) {
           console.warn('gameUsername resolve on approve:', unameErr?.message || unameErr);
         }
 
-        const notiDoc = isFreeplayNoti
-          ? {
-              id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
-              userEmail,
-              gameTitle: gameTitleForNoti,
-              gameUsername,
-              depositAmount: 0,
-              bonusApplied: -3, // indicates signup freeplay
-              isFreeplay: true,
-              totalCoins: Math.floor(parseFloat(originalTx.amount) || 0),
-              status: 'PENDING',
-              read: false,
-              timestamp: new Date().toISOString(),
-              transactionId: originalTx.id,
-              distributorId: originalTx.distributorId || ''
-            }
-          : {
-              id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
-              userEmail,
-              gameTitle: gameTitleForNoti,
-              gameUsername,
-              depositAmount: amount,
-              bonusApplied: bonusPercentage,
-              totalCoins,
-              status: 'PENDING',
-              read: false,
-              timestamp: new Date().toISOString(),
-              transactionId: originalTx.id, // Linked parent transaction!
-              distributorId: originalTx.distributorId || ''
-            };
+        // Always string — prevents duplicate tasks when id is number in one path / string in another
+        const txIdKey = String(originalTx.id);
+        const tidVariants = [originalTx.id, txIdKey];
+        if (!Number.isNaN(Number(txIdKey)) && String(Number(txIdKey)) === txIdKey) {
+          tidVariants.push(Number(txIdKey));
+        }
 
-        const coinTaskResult = await notificationsCollection.updateOne(
-          { transactionId: originalTx.id },
-          { $setOnInsert: notiDoc },
-          { upsert: true }
-        );
-        const createdCoinTask = coinTaskResult.upsertedCount === 1;
+        const existingCoinTask = await notificationsCollection.findOne({
+          transactionId: { $in: tidVariants }
+        });
 
-        // Publish COINS_LOADING only after the real notification (with bonus) exists.
-        await transactionsCollection.updateOne(
-          {
-            id,
-            status: { $ne: 'COINS_LOADING' }
-          },
-          { $set: updateFields }
-        );
+        let createdCoinTask = false;
+        let shouldNotifyCoins = false;
+        const existingStatus = String(existingCoinTask?.status || '').toUpperCase();
+
+        if (existingCoinTask) {
+          // Already have a task for this deposit — never insert a duplicate.
+          // Only re-ping staff if it is still waiting to be loaded.
+          shouldNotifyCoins = existingStatus === 'PENDING' || existingStatus === 'CLAIM_REQUESTED';
+        } else {
+          const notiDoc = isFreeplayNoti
+            ? {
+                id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
+                userEmail,
+                gameTitle: gameTitleForNoti,
+                gameUsername,
+                depositAmount: 0,
+                bonusApplied: -3, // indicates signup freeplay
+                isFreeplay: true,
+                totalCoins: Math.floor(parseFloat(originalTx.amount) || 0),
+                status: 'PENDING',
+                read: false,
+                timestamp: new Date().toISOString(),
+                transactionId: txIdKey,
+                distributorId: originalTx.distributorId || '',
+                distributorType: originalTx.distributorType || ''
+              }
+            : {
+                id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
+                userEmail,
+                gameTitle: gameTitleForNoti,
+                gameUsername,
+                depositAmount: amount,
+                bonusApplied: bonusPercentage,
+                totalCoins,
+                status: 'PENDING',
+                read: false,
+                timestamp: new Date().toISOString(),
+                transactionId: txIdKey,
+                distributorId: originalTx.distributorId || '',
+                distributorType: originalTx.distributorType || ''
+              };
+
+          const coinTaskResult = await notificationsCollection.updateOne(
+            { transactionId: txIdKey },
+            { $setOnInsert: notiDoc },
+            { upsert: true }
+          );
+          createdCoinTask = coinTaskResult.upsertedCount === 1;
+          shouldNotifyCoins = createdCoinTask || coinTaskResult.matchedCount > 0;
+        }
+
+        // If this deposit was already Loaded, force SUCCESS (even if stuck on COINS_LOADING)
+        if (existingStatus === 'COMPLETED') {
+          updateFields.status = 'SUCCESS';
+          await transactionsCollection.updateOne({ id }, { $set: updateFields });
+        } else {
+          // Publish COINS_LOADING only after the real notification (with bonus) exists.
+          await transactionsCollection.updateOne(
+            {
+              id,
+              status: { $ne: 'COINS_LOADING' }
+            },
+            { $set: updateFields }
+          );
+        }
 
         // Ping coins staff / Shift APK + SSE so open tabs refresh instantly
-        if (createdCoinTask || coinTaskResult.matchedCount > 0) {
+        if (shouldNotifyCoins && existingStatus !== 'COMPLETED' && existingStatus !== 'HOLD') {
           const coinsLabel = isFreeplayNoti
             ? `Freeplay $${parseFloat(originalTx.amount || 0).toFixed(2)}`
             : `Deposit $${amount.toFixed(2)} → ${totalCoins} coins`;
