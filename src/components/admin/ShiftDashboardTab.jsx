@@ -11,10 +11,11 @@ export default function ShiftDashboardTab({ adminUser }) {
     { refreshWhenHidden: true }
   );
 
-  // Include HOLD so Invalid'd rows are known and not re-created from COINS_LOADING txs.
+  // Include HOLD + COMPLETED so Loaded/Invalid rows are known and never
+  // re-created from leftover COINS_LOADING transactions (synthetic fallback).
   // No slim here — Verified Deposits must always show gameUsername (pending queue is small).
   const { data: coinData, mutate: mutateCoins } = usePollingSWR(
-    `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED,HOLD&limit=100&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
+    `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED,HOLD,COMPLETED&limit=150&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
     POLL.LIVE,
     { refreshWhenHidden: true, dedupingInterval: 200 }
   );
@@ -56,7 +57,8 @@ export default function ShiftDashboardTab({ adminUser }) {
   }, [reqData?.accountRequests, hiddenRequestIds]);
   const pendingCoins = useMemo(() => {
     const allNotis = coinData?.coinsNotifications || [];
-    // Any existing noti for a tx (incl. HOLD/COMPLETED) must block synthetic re-create
+    // Any existing noti for a tx (incl. HOLD/COMPLETED) must block synthetic re-create.
+    // Without COMPLETED in this set, Loaded rows come back after refresh from COINS_LOADING.
     const seenTx = new Set(
       allNotis.map((n) => String(n.transactionId || '')).filter(Boolean)
     );

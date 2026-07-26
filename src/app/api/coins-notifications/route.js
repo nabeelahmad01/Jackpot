@@ -285,11 +285,19 @@ export async function PUT(req) {
         if (!originalNoti.transactionId) return;
         try {
           const transactionsCollection = db.collection('transactions');
+          const tid = originalNoti.transactionId;
+          const tidVariants = [tid, String(tid)];
+          if (!Number.isNaN(Number(tid)) && String(Number(tid)) === String(tid)) {
+            tidVariants.push(Number(tid));
+          }
           const parentTx = await transactionsCollection.findOne({
-            id: { $in: [originalNoti.transactionId, String(originalNoti.transactionId)] }
+            id: { $in: tidVariants }
           });
           if (!parentTx) return;
-          const txUpdate = { allottedBy: processedBy || originalNoti.processedBy || 'system' };
+          const txUpdate = {
+            allottedBy: processedBy || originalNoti.processedBy || 'system',
+            coinsAllottedAt: new Date().toISOString()
+          };
           if (parentTx.type === 'WITHDRAW') {
             txUpdate.status = 'PENDING';
             if (originalNoti.isFreeplayWithdraw) {
@@ -299,11 +307,28 @@ export async function PUT(req) {
               txUpdate.note = 'Freeplay win capped at $30 max cashout.';
             }
           } else if (parentTx.type === 'DEPOSIT' || parentTx.type === 'BONUS') {
+            // Must leave COINS_LOADING or Shift Dashboard synthetic row returns after refresh
             txUpdate.status = 'SUCCESS';
           }
           await transactionsCollection.updateOne(
             parentTx._id ? { _id: parentTx._id } : { id: parentTx.id },
             { $set: txUpdate }
+          );
+
+          // Close any duplicate PENDING/CLAIM rows for the same deposit
+          await notificationsCollection.updateMany(
+            {
+              transactionId: { $in: tidVariants },
+              status: { $in: ['PENDING', 'CLAIM_REQUESTED'] },
+              id: { $ne: originalNoti.id }
+            },
+            {
+              $set: {
+                status: 'COMPLETED',
+                read: true,
+                processedBy: processedBy || originalNoti.processedBy || 'system'
+              }
+            }
           );
         } catch (txErr) {
           console.error('Failed to update parent transaction on allotment complete:', txErr);

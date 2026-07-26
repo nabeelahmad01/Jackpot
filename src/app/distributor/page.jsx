@@ -691,7 +691,12 @@ export default function DistributorPortal() {
   };
 
   const handleDeletePlayer = async (email) => {
-    if (!window.confirm(`Are you sure you want to delete player account "${email}"? This player account will be soft-deleted.`)) {
+    if (!window.confirm(
+      `Delete player "${email}" from your panel?\n\n` +
+      `• Player is soft-deleted (cannot login)\n` +
+      `• Their game accounts are cleared\n` +
+      `• Super Admin can Undo from Deleted Accounts — then the player goes to HQ (not back to you)`
+    )) {
       return;
     }
     try {

@@ -2,11 +2,35 @@ import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/mongodb';
 import { cache } from '../../../../lib/cache';
 import { invalidateTypeBDistributorCache } from '../../../../lib/typeBDistributors';
+import { publishAdminEvent } from '../../../../lib/adminEvents';
 import {
   clearSessionRevoke,
   createHqPendingAccountRequests,
   wipePlayerGameAccess
 } from '../../../../lib/sessionRevoke';
+
+/** Strip distributor ownership so HQ Super Admin owns this player's ops. */
+async function movePlayerOpsToHq(db, cleanEmail, formerDistributorId = '') {
+  const hqTag = {
+    distributorId: '',
+    distributorType: '',
+    distributorName: ''
+  };
+  const emailFilter = { userEmail: cleanEmail };
+  await Promise.all([
+    db.collection('transactions').updateMany(emailFilter, {
+      $set: {
+        ...hqTag,
+        ...(formerDistributorId
+          ? { formerDistributorId: String(formerDistributorId) }
+          : {})
+      }
+    }),
+    db.collection('coinsNotifications').updateMany(emailFilter, { $set: hqTag }),
+    db.collection('supportMessages').updateMany(emailFilter, { $set: hqTag }),
+    db.collection('accountRequests').updateMany(emailFilter, { $set: hqTag })
+  ]);
+}
 
 // GET deleted players list (Super Admin only)
 export async function GET(req) {
@@ -146,19 +170,27 @@ export async function POST(req) {
 
     // Distributor-deleted player → unlink from distributor so new work is HQ Super Admin.
     const restoreUser = { ...original };
+    const formerDistributorId = String(original.distributorId || '').trim();
     let requeued = 0;
     if (mustWipeGames) {
       restoreUser.distributorId = '';
       delete restoreUser.distributorType;
       delete restoreUser.distributorName;
+      if (formerDistributorId) {
+        restoreUser.formerDistributorId = formerDistributorId;
+      }
     }
 
     await db.collection('users').insertOne(restoreUser);
 
     if (mustWipeGames) {
+      // Old distributor game credentials stay wiped — HQ creates fresh accounts.
       await wipePlayerGameAccess(db, cleanEmail);
 
-      // Re-queue PENDING requests under HQ (no distributor) → Super Admin Requests tab
+      // Move deposits / withdraws / coins / support queues to Super Admin panel
+      await movePlayerOpsToHq(db, cleanEmail, formerDistributorId);
+
+      // Re-queue PENDING create-account options under HQ Requests tab
       const titles = Array.isArray(restoreGameTitles) ? restoreGameTitles : [];
       requeued = await createHqPendingAccountRequests(
         db,
@@ -166,6 +198,10 @@ export async function POST(req) {
         titles,
         restoreUser.name || ''
       );
+
+      publishAdminEvent('requests', { distributorId: '', userEmail: cleanEmail });
+      publishAdminEvent('transactions', { distributorId: '', userEmail: cleanEmail });
+      publishAdminEvent('coins', { distributorId: '', userEmail: cleanEmail });
     }
 
     await db.collection('deletedUsers').deleteOne({ email: cleanEmail });
@@ -178,15 +214,16 @@ export async function POST(req) {
     let message = 'Player restored with their previous game accounts.';
     if (mustWipeGames) {
       message = requeued > 0
-        ? `Player restored under HQ. ${requeued} game request(s) sent to your Requests tab.`
-        : 'Player restored under HQ (unlinked from distributor). No prior games found — player can Request / Create.';
+        ? `Player restored under YOUR panel (HQ). Old game accounts cleared. ${requeued} game(s) are in Requests — create new accounts there. Deposits/withdraws/support now come to you.`
+        : 'Player restored under YOUR panel (HQ). Old game accounts cleared. Unlinked from distributor — player can Request / Create games. Deposits/withdraws/support now come to you.';
     }
 
     return NextResponse.json({
       success: true,
       message,
       wipedGameAccess: mustWipeGames,
-      requeuedRequests: requeued
+      requeuedRequests: requeued,
+      games: Array.isArray(restoreGameTitles) ? restoreGameTitles : []
     });
   } catch (err) {
     console.error('Restore Player Error:', err);

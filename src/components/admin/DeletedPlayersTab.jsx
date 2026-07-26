@@ -49,7 +49,16 @@ export default function DeletedPlayersTab() {
     if (isDistributor) {
       confirmMsg = `Restore distributor "${email}"?\n\n${linkedCount} player(s) will be re-linked — requests/deposits go back to this distributor.`;
     } else if (distDeletedPlayer) {
-      confirmMsg = `Restore "${email}"?\n\nDistributor-deleted player will be unlinked from that distributor. ${gameCount > 0 ? `${gameCount} game request(s) will go to YOUR Requests tab.` : 'They can Request / Create under HQ.'}`;
+      const gamesList = Array.isArray(record?.restoreGameTitles) && record.restoreGameTitles.length
+        ? `\nGames to recreate: ${record.restoreGameTitles.join(', ')}`
+        : '';
+      confirmMsg =
+        `UNDO distributor delete for "${email}"?\n\n` +
+        `• Player comes under YOUR Super Admin panel (not back to distributor)\n` +
+        `• Old game accounts stay wiped\n` +
+        `• ${gameCount > 0 ? `${gameCount} PENDING request(s) → your Requests tab (Create Account)` : 'No prior games — player can Request / Create'}\n` +
+        `• Deposits / withdraws / support move to HQ` +
+        gamesList;
     }
     if (!window.confirm(confirmMsg)) {
       return;
@@ -100,7 +109,9 @@ export default function DeletedPlayersTab() {
         <div>
           <h3><i className="fa-solid fa-trash-arrow-up gold-text"></i> Deleted Accounts</h3>
           <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-            Deleted players, distributors and staff. You can restore them with the "Undo" button. If not restored, they will be permanently purged after 30 days.
+            Soft-deleted players &amp; distributors. <strong style={{ color: '#c084fc' }}>Distributor → new request</strong>:
+            Undo brings the player under YOUR HQ panel, clears old game accounts, and puts Create Account requests in Requests.
+            Archive auto-purges after 30 days if not restored.
           </p>
         </div>
         <span style={{ fontSize: '0.7rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.25)', padding: '0.35rem 0.6rem', borderRadius: '6px', fontWeight: 'bold' }}>
@@ -117,6 +128,7 @@ export default function DeletedPlayersTab() {
               <th style={{ padding: '0.75rem 0.5rem' }}>EMAIL</th>
               <th style={{ padding: '0.75rem 0.5rem' }}>COINS</th>
               <th style={{ padding: '0.75rem 0.5rem' }}>DELETED BY</th>
+              <th style={{ padding: '0.75rem 0.5rem' }}>GAMES / NOTE</th>
               <th style={{ padding: '0.75rem 0.5rem' }}>DELETED DATE</th>
               <th style={{ padding: '0.75rem 0.5rem' }}>ACTIONS</th>
             </tr>
@@ -124,7 +136,7 @@ export default function DeletedPlayersTab() {
           <tbody>
             {deletedPlayers.length === 0 ? (
               <tr>
-                <td colSpan="7" style={{ textAlign: 'center', padding: '3rem', color: '#666' }}>
+                <td colSpan="8" style={{ textAlign: 'center', padding: '3rem', color: '#666' }}>
                   No deleted accounts recorded in the archive.
                 </td>
               </tr>
@@ -148,9 +160,22 @@ export default function DeletedPlayersTab() {
                   </td>
                   <td style={{ padding: '0.75rem 0.5rem' }}>
                     {player.deletedBy === 'distributor' || player.wipeGameAccess ? (
-                      <span style={{ fontSize: '0.6rem', color: '#c084fc', fontWeight: 'bold' }}>Distributor → new request</span>
+                      <span style={{ fontSize: '0.6rem', color: '#c084fc', fontWeight: 'bold' }}>Distributor → HQ Undo</span>
+                    ) : player.deletedEntityType === 'distributor' || player.role === 'distributor' ? (
+                      <span style={{ fontSize: '0.6rem', color: '#a78bfa', fontWeight: 'bold' }}>Distributor entity</span>
                     ) : (
                       <span style={{ fontSize: '0.6rem', color: '#4ade80', fontWeight: 'bold' }}>HQ → keep games</span>
+                    )}
+                  </td>
+                  <td style={{ padding: '0.75rem 0.5rem', color: '#aaa', fontSize: '0.68rem', maxWidth: '12rem' }}>
+                    {player.deletedBy === 'distributor' || player.wipeGameAccess ? (
+                      Array.isArray(player.restoreGameTitles) && player.restoreGameTitles.length > 0
+                        ? player.restoreGameTitles.join(', ')
+                        : 'No games saved — player can Request'
+                    ) : player.deletedEntityType === 'distributor' || player.role === 'distributor' ? (
+                      `${Array.isArray(player.linkedPlayerEmails) ? player.linkedPlayerEmails.length : 0} linked player(s)`
+                    ) : (
+                      '—'
                     )}
                   </td>
                   <td style={{ padding: '0.75rem 0.5rem', color: '#888' }}>

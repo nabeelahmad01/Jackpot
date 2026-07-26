@@ -158,7 +158,11 @@ export async function GET(req) {
         allottedBy: 1,
         isFreeplayWithdraw: 1,
         gameAmount: 1,
-        proofPending: 1
+        proofPending: 1,
+        coinsHoldNote: 1,
+        coinsHoldAt: 1,
+        distributorId: 1,
+        distributorType: 1
       })
       .sort({ id: -1 })
       .skip(skip)
@@ -195,9 +199,45 @@ export async function GET(req) {
       ).catch(() => {});
     }
 
+    // Heal: deposit already Loaded (COMPLETED coins noti) but parent stuck on COINS_LOADING
+    // — otherwise Shift Dashboard keeps showing the row after every refresh.
+    const statusIsCoinsLoading =
+      status &&
+      String(status)
+        .toUpperCase()
+        .split(',')
+        .map((s) => s.trim())
+        .includes('COINS_LOADING');
+    let visibleTransactions = transactions;
+    if (statusIsCoinsLoading && transactions.length > 0) {
+      const txIds = transactions.map((t) => t.id).filter(Boolean);
+      const txIdStrs = txIds.map(String);
+      const doneNotis = await db.collection('coinsNotifications')
+        .find({
+          transactionId: { $in: [...txIds, ...txIdStrs] },
+          status: 'COMPLETED'
+        })
+        .project({ transactionId: 1 })
+        .toArray();
+      const doneTxIds = new Set(doneNotis.map((n) => String(n.transactionId || '')).filter(Boolean));
+      if (doneTxIds.size > 0) {
+        const toHeal = transactions.filter((t) => doneTxIds.has(String(t.id)));
+        visibleTransactions = transactions.filter((t) => !doneTxIds.has(String(t.id)));
+        const healIds = toHeal.map((t) => t.id);
+        void transactionsCollection.updateMany(
+          {
+            id: { $in: healIds },
+            status: 'COINS_LOADING',
+            type: { $in: ['DEPOSIT', 'BONUS'] }
+          },
+          { $set: { status: 'SUCCESS', coinsAllottedAt: new Date().toISOString() } }
+        ).catch(() => {});
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      transactions,
+      transactions: visibleTransactions,
       totalTransactions,
       totalPages: Math.ceil(totalTransactions / limit),
       currentPage: page

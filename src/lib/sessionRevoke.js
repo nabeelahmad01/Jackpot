@@ -108,7 +108,7 @@ export async function createHqPendingAccountRequests(db, email, gameTitles = [],
     distributorId: '',
     distributorType: '',
     distributorName: '',
-    note: 'Re-queued after distributor delete → Super Admin undo'
+    note: 'Create new account — distributor deleted player, Super Admin Undo → HQ'
   }));
 
   if (docs.length > 0) {
