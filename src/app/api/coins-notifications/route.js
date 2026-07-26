@@ -100,13 +100,31 @@ export async function GET(req) {
       console.warn('coins already-loaded heal:', healErr?.message || healErr);
     }
 
-    // Parallel count + page fetch (same results, one less serial round-trip)
+    // Active queue first (CLAIM / PENDING / HOLD), then COMPLETED history — newest within each group
     const [totalNotifications, notifications] = await Promise.all([
       notificationsCollection.countDocuments(query),
-      notificationsCollection.find(query)
-        .sort({ timestamp: -1 })
-        .skip(skip)
-        .limit(limit)
+      notificationsCollection
+        .aggregate([
+          { $match: query },
+          {
+            $addFields: {
+              _queueRank: {
+                $switch: {
+                  branches: [
+                    { case: { $eq: ['$status', 'CLAIM_REQUESTED'] }, then: 0 },
+                    { case: { $eq: ['$status', 'PENDING'] }, then: 1 },
+                    { case: { $eq: ['$status', 'HOLD'] }, then: 2 }
+                  ],
+                  default: 3
+                }
+              }
+            }
+          },
+          { $sort: { _queueRank: 1, timestamp: -1 } },
+          { $skip: skip },
+          { $limit: limit },
+          { $project: { _queueRank: 0 } }
+        ])
         .toArray()
     ]);
 

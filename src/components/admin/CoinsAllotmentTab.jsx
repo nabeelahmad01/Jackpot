@@ -28,20 +28,20 @@ export default function CoinsAllotmentTab({
     return () => clearTimeout(handler);
   }, [search]);
 
-  // Active queue only — COMPLETED must never sit in "Pending" (was causing
-  // "Already loaded" / old deposits to look like new work after refresh).
+  // New work + history: PENDING/CLAIM/HOLD on top, COMPLETED below (API sorts).
+  // Search covers both. Optimistic hide only for just-completed rows still in-flight.
   const { data, error, mutate } = usePollingSWR(
-    `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED,HOLD&page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}&slim=1`,
+    `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED,HOLD,COMPLETED&page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}&slim=1`,
     POLL.LIVE,
     { refreshWhenHidden: true, keepPreviousData: false, dedupingInterval: 200 }
   );
 
-  const notifications = (data?.coinsNotifications || []).filter(
-    (n) =>
-      ['PENDING', 'CLAIM_REQUESTED', 'HOLD'].includes(String(n.status || '').toUpperCase()) &&
-      !completedActionIds[n.id] &&
-      !completedActionIds[String(n.id)]
-  );
+  const notifications = (data?.coinsNotifications || []).filter((n) => {
+    const st = String(n.status || '').toUpperCase();
+    if (st === 'COMPLETED') return true;
+    if (completedActionIds[n.id] || completedActionIds[String(n.id)]) return false;
+    return ['PENDING', 'CLAIM_REQUESTED', 'HOLD'].includes(st);
+  });
   const totalNotifications = data?.totalNotifications || 0;
   const totalPages = data?.totalPages || 1;
 
@@ -65,7 +65,9 @@ export default function CoinsAllotmentTab({
       <div className="section-card-header" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '0.5rem' }}>
           <h3><i className="fa-solid fa-coins gold-text"></i> Pending Game Coin Allotment Tasks</h3>
-          <span className="game-tap-tip" style={{ float: 'right' }}>Allot calculated coins on external game panels</span>
+          <span className="game-tap-tip" style={{ float: 'right' }}>
+            New requests on top · completed history below · search works on both
+          </span>
         </div>
         
         <div className="input-wrapper search-wrapper" style={{ background: '#0b0d16', width: '100%' }}>
