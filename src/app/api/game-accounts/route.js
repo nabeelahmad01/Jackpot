@@ -1,5 +1,26 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
+import { publishAdminEvent } from '../../../lib/adminEvents';
+
+async function markMatchingRequestsReady(db, cleanEmail, cleanTitle, username, password, processedBy) {
+  const titleRegex = new RegExp(`^${cleanTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+  const update = {
+    status: 'READY',
+    gameAccountUsername: username,
+    gameAccountPassword: password
+  };
+  if (processedBy) update.processedBy = processedBy;
+
+  const result = await db.collection('accountRequests').updateMany(
+    {
+      userEmail: cleanEmail,
+      gameTitle: titleRegex,
+      status: { $in: ['PENDING', 'READY'] }
+    },
+    { $set: update }
+  );
+  return result.modifiedCount || 0;
+}
 
 // GET game credentials (optionally filtered by email)
 export async function GET(req) {
@@ -84,7 +105,7 @@ export async function POST(req) {
 // PUT update or create game credentials manually (Admin adjustment)
 export async function PUT(req) {
   try {
-    const { gameTitle, userEmail, username, password } = await req.json();
+    const { gameTitle, userEmail, username, password, markRequestReady, processedBy } = await req.json();
 
     if (!gameTitle || !userEmail || !username || !password) {
       return NextResponse.json({ success: false, message: 'Missing credentials parameters.' }, { status: 400 });
@@ -95,6 +116,8 @@ export async function PUT(req) {
 
     const cleanEmail = userEmail.toLowerCase().trim();
     const cleanTitle = String(gameTitle).trim();
+    const cleanUser = String(username).trim();
+    const cleanPass = String(password).trim();
     const titleRegex = new RegExp(`^${cleanTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
 
     // Case-insensitive match so "VEGAS X" / "Vegas x" don't create duplicate accounts
@@ -109,8 +132,8 @@ export async function PUT(req) {
         {
           $set: {
             gameTitle: cleanTitle,
-            username: username.trim(),
-            password: password.trim(),
+            username: cleanUser,
+            password: cleanPass,
             status: 'READY'
           }
         }
@@ -126,11 +149,26 @@ export async function PUT(req) {
       await gameAccountsCollection.insertOne({
         gameTitle: cleanTitle,
         userEmail: cleanEmail,
-        username: username.trim(),
-        password: password.trim(),
-        status: 'READY'
+        username: cleanUser,
+        password: cleanPass,
+        status: 'READY',
+        createdAt: new Date().toISOString()
       });
     }
+
+    // Manual "Add Account" should also close matching PENDING requests so list updates
+    if (markRequestReady !== false) {
+      await markMatchingRequestsReady(
+        db,
+        cleanEmail,
+        cleanTitle,
+        cleanUser,
+        cleanPass,
+        processedBy || ''
+      );
+    }
+
+    publishAdminEvent('requests', { gameTitle: cleanTitle });
 
     return NextResponse.json({
       success: true,

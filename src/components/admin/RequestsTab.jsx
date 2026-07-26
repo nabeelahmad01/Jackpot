@@ -63,18 +63,46 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
     }
   }, [selectedPlayerEmail, selectedGameTitle]);
 
+  const looksLikeEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
+
   const handleSelectPlayer = (email) => {
-    setSelectedPlayerEmail(email);
-    setPlayerSearchQuery(email);
+    const clean = String(email || '').toLowerCase().trim();
+    setSelectedPlayerEmail(clean);
+    setPlayerSearchQuery(clean);
     setPlayerDropdownOpen(false);
+  };
+
+  const resolvePlayerEmail = () => {
+    const selected = String(selectedPlayerEmail || '').toLowerCase().trim();
+    if (selected) return selected;
+    const typed = String(playerSearchQuery || '').toLowerCase().trim();
+    return looksLikeEmail(typed) ? typed : '';
   };
 
   const handleAddAccountSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedPlayerEmail || !selectedGameTitle || !customUsername.trim() || !customPassword.trim()) {
-      alert('Please fill all required fields.');
+    e.stopPropagation();
+    if (isUpdatingCreds) return;
+
+    const playerEmail = resolvePlayerEmail();
+    if (!playerEmail) {
+      alert('Please select a player from the list, or type a full Gmail address.');
       return;
     }
+    if (!selectedGameTitle) {
+      alert('Please select a casino game.');
+      return;
+    }
+    if (!customUsername.trim() || !customPassword.trim()) {
+      alert('Please enter game username and password.');
+      return;
+    }
+
+    // Keep state in sync if staff typed the email instead of picking from dropdown
+    if (playerEmail !== selectedPlayerEmail) {
+      setSelectedPlayerEmail(playerEmail);
+    }
+
     setIsUpdatingCreds(true);
     try {
       const response = await fetch('/api/game-accounts', {
@@ -82,28 +110,35 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           gameTitle: selectedGameTitle,
-          userEmail: selectedPlayerEmail,
+          userEmail: playerEmail,
           username: customUsername.trim(),
-          password: customPassword.trim()
+          password: customPassword.trim(),
+          markRequestReady: true,
+          processedBy: adminUser?.email || ''
         })
       });
-      const resData = await response.json();
-      if (resData.success) {
+      let resData = {};
+      try {
+        resData = await response.json();
+      } catch {
+        resData = {};
+      }
+      if (response.ok && resData.success) {
         alert('Game account successfully created/allotted!');
         setAddAccountModalOpen(false);
-        // Reset states
         setSelectedPlayerEmail('');
         setSelectedGameTitle('');
         setCustomUsername('');
         setCustomPassword('');
         setPlayerSearchQuery('');
+        setIsExistingAccount(false);
         mutate();
       } else {
-        alert(resData.message || 'Failed to create/allot game account.');
+        alert(resData.message || `Failed to create/allot game account. (${response.status})`);
       }
     } catch (err) {
       console.error(err);
-      alert('Error creating game account.');
+      alert('Error creating game account. Check internet and try again.');
     } finally {
       setIsUpdatingCreds(false);
     }
@@ -469,14 +504,23 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
                       placeholder="Type player name or email to search..."
                       value={playerSearchQuery}
                       onChange={(e) => {
-                        setPlayerSearchQuery(e.target.value);
+                        const val = e.target.value;
+                        setPlayerSearchQuery(val);
                         setPlayerDropdownOpen(true);
-                        if (!e.target.value.trim()) {
+                        const trimmed = val.trim();
+                        if (!trimmed) {
                           setSelectedPlayerEmail('');
+                        } else if (looksLikeEmail(trimmed)) {
+                          // Typing full email is enough — no need to tap dropdown row
+                          setSelectedPlayerEmail(trimmed.toLowerCase());
                         }
                       }}
                       onFocus={() => setPlayerDropdownOpen(true)}
                       onBlur={() => {
+                        const typed = String(playerSearchQuery || '').toLowerCase().trim();
+                        if (looksLikeEmail(typed)) {
+                          setSelectedPlayerEmail(typed);
+                        }
                         setTimeout(() => setPlayerDropdownOpen(false), 200);
                       }}
                       required
@@ -595,8 +639,14 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
                 <button
                   type="submit"
                   className="submit-btn"
-                  style={{ background: isExistingAccount ? '#10b981' : 'var(--gold-primary)', color: '#000', fontWeight: 'bold' }}
-                  disabled={isUpdatingCreds || !selectedPlayerEmail || !selectedGameTitle}
+                  style={{
+                    background: isExistingAccount ? '#10b981' : 'var(--gold-primary)',
+                    color: '#000',
+                    fontWeight: 'bold',
+                    opacity: isUpdatingCreds ? 0.7 : 1,
+                    cursor: isUpdatingCreds ? 'wait' : 'pointer'
+                  }}
+                  disabled={isUpdatingCreds}
                 >
                   {isUpdatingCreds ? 'SAVING...' : isExistingAccount ? 'UPDATE GAME ACCOUNT' : 'CREATE GAME ACCOUNT'}
                 </button>
