@@ -3,6 +3,7 @@ import PanelModalBackdrop from '../PanelModalBackdrop';
 import usePollingSWR from '../../hooks/usePollingSWR';
 import { POLL } from '../../lib/pollingConfig';
 import { compressImageFile } from '../../lib/imageCompress';
+import { formatDeviceDateTime } from '../../lib/formatDateTime';
 
 export default function WebsitePaymentsTab({
   onInspectProof,
@@ -339,7 +340,7 @@ export default function WebsitePaymentsTab({
                           <td><span className="admin-badge-preview b-hot">{tx.gateway}</span></td>
                           <td><code style={{ fontSize: '0.7rem' }}>{tx.code}</code></td>
                           <td><strong style={{ color: '#00ff66' }}>${parseFloat(tx.amount).toFixed(2)}</strong></td>
-                          <td style={{ fontSize: '0.7rem' }}>{tx.date}</td>
+                          <td style={{ fontSize: '0.7rem' }}>{formatDeviceDateTime(tx.createdAt, tx.date)}</td>
                           <td>
                             {tx.screenshot ? (
                               <button
@@ -407,7 +408,7 @@ export default function WebsitePaymentsTab({
                           <td><span className="admin-badge-preview b-new">{tx.gateway}</span></td>
                           <td><code style={{ fontSize: '0.7rem' }}>{tx.code}</code></td>
                           <td><strong style={{ color: 'var(--gold-primary)' }}>${parseFloat(tx.amount).toFixed(2)}</strong></td>
-                          <td style={{ fontSize: '0.7rem' }}>{tx.date}</td>
+                          <td style={{ fontSize: '0.7rem' }}>{formatDeviceDateTime(tx.createdAt, tx.date)}</td>
                           <td>
                             <div className="table-actions" style={{ justifyContent: 'flex-start', gap: '0.5rem' }}>
                               <button
@@ -482,7 +483,7 @@ export default function WebsitePaymentsTab({
                           ${parseFloat(tx.amount).toFixed(2)}
                         </strong>
                       </td>
-                      <td style={{ fontSize: '0.7rem' }}>{tx.date}</td>
+                      <td style={{ fontSize: '0.7rem' }}>{formatDeviceDateTime(tx.createdAt, tx.date)}</td>
                       <td>
                         <span className={`admin-badge-preview b-${tx.status.toLowerCase() === 'success' ? 'ready' : tx.status.toLowerCase()}`}>
                           {tx.status}

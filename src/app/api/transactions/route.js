@@ -299,7 +299,7 @@ export async function POST(req) {
       const txObject = {
         id: (Date.now() + Math.floor(Math.random() * 100)).toString(),
         userEmail: newTx.userEmail.toLowerCase().trim(),
-        date: new Date().toLocaleString(),
+        date: new Date().toISOString(),
         createdAt: new Date().toISOString(),
         status: 'PENDING', // Directly ready for payout ledger
         type: parentType,
@@ -514,7 +514,7 @@ export async function POST(req) {
     const txObject = {
       id: (Date.now() + Math.floor(Math.random() * 100)).toString(),
       userEmail,
-      date: new Date().toLocaleString(),
+      date: new Date().toISOString(),
       createdAt: new Date().toISOString(),
       // Freeplay goes directly to coins admin (COINS_LOADING), not finance (PENDING)
       status: newTx.type === 'WITHDRAW' ? 'PENDING_COINS' : isFreeplayBonus ? 'COINS_LOADING' : newTx.type === 'BONUS' ? 'SUCCESS' : 'PENDING',

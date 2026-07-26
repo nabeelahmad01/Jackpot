@@ -3,6 +3,7 @@
 import PanelModalBackdrop from './PanelModalBackdrop';
 import React, { useState, useEffect, useRef } from 'react';
 import { compressImageFile } from '../lib/imageCompress';
+import { formatDeviceTime } from '../lib/formatDateTime';
 
 /** Full-screen image viewer for chat attachments / proofs (works with base64; no new tab). */
 export function ImageLightbox({ src, onClose, alt = 'Screenshot' }) {
@@ -257,7 +258,7 @@ export function SupportModal({ isOpen, onClose, currentUser, onMessagesSeen }) {
                       )}
                     </div>
                     <span style={{ fontSize: '0.55rem', opacity: 0.5, marginTop: '0.2rem' }}>
-                      {isMe ? 'You' : 'Support Agent'} • {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {isMe ? 'You' : 'Support Agent'} • {formatDeviceTime(msg.timestamp)}
                     </span>
                   </div>
                 );

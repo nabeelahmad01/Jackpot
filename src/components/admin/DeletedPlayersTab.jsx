@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import useSWR from 'swr';
+import { formatDeviceDateTime } from '../../lib/formatDateTime';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -153,7 +154,7 @@ export default function DeletedPlayersTab() {
                     )}
                   </td>
                   <td style={{ padding: '0.75rem 0.5rem', color: '#888' }}>
-                    {player.deletedAt ? new Date(player.deletedAt).toLocaleString() : 'N/A'}
+                    {formatDeviceDateTime(player.deletedAt)}
                   </td>
                   <td style={{ padding: '0.75rem 0.5rem' }}>
                     <button

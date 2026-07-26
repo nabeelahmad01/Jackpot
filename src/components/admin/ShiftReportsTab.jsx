@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import usePollingSWR from '../../hooks/usePollingSWR';
 import { POLL } from '../../lib/pollingConfig';
+import { formatDeviceDateTime } from '../../lib/formatDateTime';
 
 export default function ShiftReportsTab() {
   const [search, setSearch] = useState('');
@@ -64,7 +65,7 @@ export default function ShiftReportsTab() {
             ) : (
               filteredReports.map((report) => (
                 <tr key={report.id}>
-                  <td style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{report.date}</td>
+                  <td style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{formatDeviceDateTime(report.timestamp, report.date)}</td>
                   <td><strong>{report.staffEmail}</strong></td>
                   <td>
                     <span className="admin-badge-preview b-ready" style={{ fontSize: '0.7rem' }}>

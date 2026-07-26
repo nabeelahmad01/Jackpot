@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { mutate as globalMutate } from 'swr';
 import usePollingSWR from '../../hooks/usePollingSWR';
 import { POLL } from '../../lib/pollingConfig';
+import { formatDeviceDate, formatDeviceDateTime } from '../../lib/formatDateTime';
 
 export default function CampaignRequestsTab({ adminUser, onInspectProof }) {
   const [search, setSearch] = useState('');
@@ -135,7 +136,7 @@ export default function CampaignRequestsTab({ adminUser, onInspectProof }) {
                 const isThisApproving = approvingId === c.id;
                 return (
                   <tr key={c.id}>
-                    <td style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{new Date(c.createdAt).toLocaleDateString()}</td>
+                    <td style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{formatDeviceDateTime(c.createdAt)}</td>
                     <td>
                       <strong>{c.agentEmail}</strong>
                       <div style={{ fontSize: '0.7rem', color: '#aaa' }}>Code: <code>{c.agentCode}</code></div>
@@ -149,8 +150,8 @@ export default function CampaignRequestsTab({ adminUser, onInspectProof }) {
                       {c.notes?.trim() ? c.notes : <span style={{ color: '#666' }}>No notes provided</span>}
                     </td>
                     <td style={{ fontSize: '0.7rem', whiteSpace: 'nowrap' }}>
-                      Start: {new Date(c.startDate).toLocaleDateString()}<br/>
-                      End: {new Date(c.endDate).toLocaleDateString()}
+                      Start: {formatDeviceDate(c.startDate)}<br/>
+                      End: {formatDeviceDate(c.endDate)}
                     </td>
                     <td>
                       {c.paymentProof || c.hasPaymentProof ? (

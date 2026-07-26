@@ -13,6 +13,7 @@ import RemainderClaimAction from '../../components/RemainderClaimAction';
 import { canShowClaimRemainderButton } from '../../lib/remainderClaim';
 import { parseAffiliatePayoutFields } from '../../lib/affiliatePayout';
 import useSessionGuard from '../../hooks/useSessionGuard';
+import { formatDeviceDate, formatDeviceDateTime } from '../../lib/formatDateTime';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -983,7 +984,7 @@ function AffiliatePortal() {
                           )}
                         </td>
                         <td style={{ fontSize: '0.65rem', color: '#888' }}>{tx.note || '—'}</td>
-                        <td style={{ fontSize: '0.65rem', color: '#888' }}>{tx.date ? new Date(tx.date).toLocaleString() : 'N/A'}</td>
+                        <td style={{ fontSize: '0.65rem', color: '#888' }}>{formatDeviceDateTime(tx.createdAt, tx.date)}</td>
                       </tr>
                       );
                     })}
@@ -1180,7 +1181,7 @@ function AffiliatePortal() {
                           )}
                         </td>
                         <td style={{ fontSize: '0.65rem', color: '#888', whiteSpace: 'nowrap' }}>
-                          {member.createdAt ? new Date(member.createdAt).toLocaleDateString() : 'N/A'}
+                          {formatDeviceDate(member.createdAt)}
                         </td>
                       </tr>
                     ))}
@@ -1215,7 +1216,7 @@ function AffiliatePortal() {
                               <td><span className={`admin-badge-preview b-${(p.status || 'ACTIVE').toLowerCase() === 'active' ? 'ready' : 'none'}`}>{p.status || 'ACTIVE'}</span></td>
                               <td style={{ fontWeight: 'bold', color: '#2ecc71' }}>${parseFloat(p.totalDeposits || 0).toFixed(2)}</td>
                               <td style={{ fontWeight: 'bold', color: '#ef4444' }}>${parseFloat(p.totalWithdrawals || 0).toFixed(2)}</td>
-                              <td style={{ fontSize: '0.65rem', color: '#888' }}>{p.createdAt ? new Date(p.createdAt).toLocaleDateString() : 'N/A'}</td>
+                              <td style={{ fontSize: '0.65rem', color: '#888' }}>{formatDeviceDate(p.createdAt)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1922,7 +1923,7 @@ function AffiliatePortal() {
                               <span style={{ opacity: 0.4 }}>Pending Link Assignment</span>
                             )}
                           </td>
-                          <td style={{ fontSize: '0.725rem' }}>{new Date(c.createdAt).toLocaleDateString()}</td>
+                          <td style={{ fontSize: '0.725rem' }}>{formatDeviceDate(c.createdAt)}</td>
                         </tr>
                       ))
                     )}

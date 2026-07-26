@@ -5,6 +5,7 @@ import { POLL } from '../../lib/pollingConfig';
 import { parseRoles } from '../../lib/staffGameAccess';
 import GatewayRevenueBreakdown from './GatewayRevenueBreakdown';
 import { compressImageFile } from '../../lib/imageCompress';
+import { formatDeviceDateTime } from '../../lib/formatDateTime';
 
 export default function LedgerTab({
   onInspectProof,
@@ -327,7 +328,7 @@ export default function LedgerTab({
                         )}
                         {tx.note && <p style={{ fontSize: '0.65rem', color: '#ff8787', margin: '0.2rem 0 0 0' }}>{tx.note}</p>}
                       </td>
-                      <td style={{ fontSize: '0.7rem' }}>{tx.date}</td>
+                      <td style={{ fontSize: '0.7rem' }}>{formatDeviceDateTime(tx.createdAt, tx.date)}</td>
                       <td>
                         <span className={`admin-badge-preview b-${(tx.status === 'PENDING_COINS' || tx.status === 'COINS_LOADING') ? 'new' : (tx.status.toLowerCase() === 'success' ? 'ready' : tx.status.toLowerCase())}`}>
                           {tx.status === 'PENDING_COINS' ? 'VERIFYING COINS' : (tx.status === 'COINS_LOADING' ? 'COINS LOADING' : tx.status)}
@@ -474,7 +475,7 @@ export default function LedgerTab({
                           </div>
                         )}
                       </td>
-                      <td style={{ fontSize: '0.7rem' }}>{tx.date}</td>
+                      <td style={{ fontSize: '0.7rem' }}>{formatDeviceDateTime(tx.createdAt, tx.date)}</td>
                       <td>
                         <span className={`admin-badge-preview b-${(tx.status === 'PENDING_COINS' || tx.status === 'COINS_LOADING') ? 'new' : (tx.status.toLowerCase() === 'success' ? 'ready' : tx.status.toLowerCase())}`}>
                           {tx.status === 'PENDING_COINS' ? 'VERIFYING COINS' : (tx.status === 'COINS_LOADING' ? 'COINS LOADING' : tx.status)}

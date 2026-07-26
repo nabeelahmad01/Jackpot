@@ -11,6 +11,7 @@ import ReferralCenter from './ReferralCenter';
 import RemainderClaimAction from './RemainderClaimAction';
 import { canShowClaimRemainderButton } from '../lib/remainderClaim';
 import { compressImageFile } from '../lib/imageCompress';
+import { formatDeviceDateTime } from '../lib/formatDateTime';
 
 /**
  * Cashout methods:
@@ -2471,7 +2472,7 @@ export default function UserLobby({
                                   </div>
                                 </td>
                                 <td style={{ fontSize: '0.7rem', opacity: 0.7 }}>
-                                  {tx.date}
+                                  {formatDeviceDateTime(tx.createdAt, tx.date)}
                                 </td>
                               </tr>
                             ))

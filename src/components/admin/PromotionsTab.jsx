@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
+import { formatDeviceDate } from '../../lib/formatDateTime';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -482,7 +483,7 @@ export default function PromotionsTab({ adminUser }) {
                     )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.5rem', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
                       <span>Target: <strong style={{ color: 'var(--gold-primary)' }}>{promo.targetGroup.toUpperCase()}</strong></span>
-                      <span>{new Date(promo.timestamp).toLocaleDateString()}</span>
+                      <span>{formatDeviceDate(promo.timestamp)}</span>
                     </div>
                   </div>
                 ))}

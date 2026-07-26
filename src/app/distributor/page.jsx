@@ -21,6 +21,7 @@ import { initAudioUnlock, playNotificationSound } from '../../lib/notificationSo
 import { initDesktopNotifications, notifyStaffActivity } from '../../lib/desktopNotify';
 import { subscribeToDistributorPush } from '../../lib/pushClient';
 import useSessionGuard from '../../hooks/useSessionGuard';
+import { formatDeviceDateTime } from '../../lib/formatDateTime';
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
 export default function DistributorPortal() {
@@ -1990,7 +1991,7 @@ export default function DistributorPortal() {
                             ) : (
                               webPaymentsList.map(tx => (
                                 <tr key={tx.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                                  <td style={{ padding: '0.6rem 0.5rem' }}>{tx.date}</td>
+                                  <td style={{ padding: '0.6rem 0.5rem' }}>{formatDeviceDateTime(tx.createdAt, tx.date)}</td>
                                   <td style={{ padding: '0.6rem 0.5rem' }}>{tx.gateway}</td>
                                   <td style={{ padding: '0.6rem 0.5rem', fontFamily: 'monospace' }}>{tx.code}</td>
                                   <td style={{ padding: '0.6rem 0.5rem', fontWeight: 'bold', color: '#ff4d6d' }}>${parseFloat(tx.amount || 0).toFixed(2)}</td>
@@ -2117,7 +2118,7 @@ export default function DistributorPortal() {
                             ) : (
                               commWithdrawals.map(tx => (
                                 <tr key={tx.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                                  <td style={{ padding: '0.6rem 0.5rem' }}>{tx.date}</td>
+                                  <td style={{ padding: '0.6rem 0.5rem' }}>{formatDeviceDateTime(tx.createdAt, tx.date)}</td>
                                   <td style={{ padding: '0.6rem 0.5rem' }}>{tx.gateway}</td>
                                   <td style={{ padding: '0.6rem 0.5rem' }}>{tx.code}</td>
                                   <td style={{ padding: '0.6rem 0.5rem', fontWeight: 'bold', color: 'var(--gold-primary)' }}>

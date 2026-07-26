@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import usePollingSWR from '../../hooks/usePollingSWR';
 import { POLL } from '../../lib/pollingConfig';
+import { formatDeviceDateTime } from '../../lib/formatDateTime';
 
 export default function TxSearchTab({ onInspectProof, adminUser }) {
   const [historySearch, setHistorySearch] = useState('');
@@ -169,7 +170,7 @@ export default function TxSearchTab({ onInspectProof, adminUser }) {
                       </div>
                     )}
                   </td>
-                  <td style={{ fontSize: '0.7rem' }}>{tx.date}</td>
+                  <td style={{ fontSize: '0.7rem' }}>{formatDeviceDateTime(tx.createdAt, tx.date)}</td>
                   <td>
                     <span className={`admin-badge-preview b-${(tx.status === 'PENDING_COINS' || tx.status === 'COINS_LOADING') ? 'new' : (tx.status.toLowerCase() === 'success' ? 'ready' : tx.status.toLowerCase())}`}>
                       {tx.status === 'PENDING_COINS' ? 'VERIFYING COINS' : (tx.status === 'COINS_LOADING' ? 'COINS LOADING' : tx.status)}

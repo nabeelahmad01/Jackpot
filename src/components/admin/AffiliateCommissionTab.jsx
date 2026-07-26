@@ -4,6 +4,7 @@ import usePollingSWR from '../../hooks/usePollingSWR';
 import { POLL } from '../../lib/pollingConfig';
 import { parseAffiliatePayoutFields } from '../../lib/affiliatePayout';
 import { compressImageFile } from '../../lib/imageCompress';
+import { formatDeviceDateTime } from '../../lib/formatDateTime';
 
 export default function AffiliateCommissionTab({
   onInspectProof,
@@ -223,7 +224,7 @@ export default function AffiliateCommissionTab({
                         </button>
                       ) : <span style={{ color: '#666', fontSize: '0.7rem' }}>—</span>}
                     </td>
-                    <td style={{ fontSize: '0.7rem' }}>{tx.date}</td>
+                    <td style={{ fontSize: '0.7rem' }}>{formatDeviceDateTime(tx.createdAt, tx.date)}</td>
                     <td>
                       <div style={{ display: 'flex', gap: '0.4rem' }}>
                         <button type="button" onClick={() => handleOpenPayoutModal(tx)} className="submit-btn" style={{ background: '#22c55e', color: '#000', margin: 0, padding: '0.35rem 0.65rem', width: 'auto', fontSize: '0.65rem', fontWeight: 'bold' }}>

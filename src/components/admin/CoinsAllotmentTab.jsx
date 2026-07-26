@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import usePollingSWR from '../../hooks/usePollingSWR';
 import { POLL } from '../../lib/pollingConfig';
+import { formatDeviceDateTime } from '../../lib/formatDateTime';
 
 export default function CoinsAllotmentTab({
   onUpdateCoinsNotification,
@@ -158,7 +159,7 @@ export default function CoinsAllotmentTab({
                       <strong style={{ color: '#00ff66', fontSize: '0.9rem' }}><i className="fa-solid fa-coins" style={{ color: '#00ff66', marginRight: '4px' }}></i> {Math.floor(Number(noti.totalCoins) || 0)}</strong>
                     )}
                   </td>
-                  <td style={{ fontSize: '0.7rem' }}>{new Date(noti.timestamp).toLocaleString()}</td>
+                  <td style={{ fontSize: '0.7rem' }}>{formatDeviceDateTime(noti.timestamp, noti.createdAt, noti.date)}</td>
                   <td>
                     <button
                       disabled={processingIds[noti.id]}

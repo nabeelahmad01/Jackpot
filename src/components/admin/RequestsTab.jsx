@@ -4,6 +4,7 @@ import PanelModalBackdrop from '../PanelModalBackdrop';
 import React, { useState, useEffect } from 'react';
 import usePollingSWR from '../../hooks/usePollingSWR';
 import { POLL } from '../../lib/pollingConfig';
+import { formatDeviceDateTime } from '../../lib/formatDateTime';
 
 export default function RequestsTab({ adminUser, onApproveRequest, completedActionIds = {}, processingIds, wrapAction }) {
   const [search, setSearch] = useState('');
@@ -368,7 +369,7 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
                       return <span className="requests-games-empty">No game accounts yet</span>;
                     })()}
                   </td>
-                  <td data-label="Timestamp">{req.date}</td>
+                  <td data-label="Timestamp">{formatDeviceDateTime(req.createdAt, req.date)}</td>
                   <td data-label="Status">
                     <span className={`admin-badge-preview b-${req.status.toLowerCase() === 'ready' ? 'ready' : req.status.toLowerCase()}`}>
                       {req.status}

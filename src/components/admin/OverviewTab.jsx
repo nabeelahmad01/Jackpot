@@ -6,6 +6,7 @@ import { POLL } from '../../lib/pollingConfig';
 import { filterGamesForStaff, parseRoles } from '../../lib/staffGameAccess';
 import GatewayRevenueBreakdown from './GatewayRevenueBreakdown';
 import { notifyStaffActivity } from '../../lib/desktopNotify';
+import { formatDeviceTime } from '../../lib/formatDateTime';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -208,7 +209,7 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
                   <span style={{ color: '#fff', fontWeight: 'bold', marginRight: '6px' }}>[{req.type}]</span>
                   <span style={{ color: '#cbd5e1', flex: 1 }}>{req.detail}</span>
                   <span style={{ color: 'var(--text-muted)', fontSize: '0.625rem', marginLeft: '8px' }}>
-                    {new Date(req.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {formatDeviceTime(req.time)}
                   </span>
                 </div>
               ))}

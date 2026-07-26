@@ -41,7 +41,7 @@ export async function POST(req) {
       id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
       staffEmail: staffEmail.toLowerCase().trim(),
       shiftName: shiftName.trim(),
-      date: new Date().toLocaleString(),
+      date: new Date().toISOString(),
       totalLoaded: loadedAmt,
       notes: (notes || '').trim(),
       timestamp: new Date().toISOString()

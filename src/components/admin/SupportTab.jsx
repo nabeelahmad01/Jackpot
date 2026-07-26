@@ -3,6 +3,7 @@ import usePollingSWR from '../../hooks/usePollingSWR';
 import { POLL } from '../../lib/pollingConfig';
 import { registerNativeBackHandler } from '../../lib/nativeBack';
 import { ImageLightbox } from '../Modals';
+import { formatDeviceTime } from '../../lib/formatDateTime';
 
 export default function SupportTab({ adminUser }) {
   const [chatSearch, setChatSearch] = useState('');
@@ -612,7 +613,7 @@ export default function SupportTab({ adminUser }) {
                         )}
                       </div>
                       <span style={{ fontSize: '0.55rem', opacity: 0.5, marginTop: '0.15rem' }}>
-                        {isMe ? 'You (Agent)' : (msg.userName && !/^support\s*agent$/i.test(msg.userName) ? msg.userName : activeChatDisplayName || 'Player')} • {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {isMe ? 'You (Agent)' : (msg.userName && !/^support\s*agent$/i.test(msg.userName) ? msg.userName : activeChatDisplayName || 'Player')} • {formatDeviceTime(msg.timestamp)}
                       </span>
                     </div>
                   );

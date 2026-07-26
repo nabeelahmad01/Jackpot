@@ -170,7 +170,8 @@ export async function PUT(req) {
       const auditTx = {
         id: (Date.now() + Math.floor(Math.random() * 100)).toString(),
         userEmail: cleanEmail,
-        date: new Date().toLocaleString(),
+        date: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
         status: 'SUCCESS',
         type: 'BONUS',
         amount: amountVal,
