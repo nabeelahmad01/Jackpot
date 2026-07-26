@@ -22,6 +22,7 @@ import { initDesktopNotifications, notifyStaffActivity } from '../../lib/desktop
 import { subscribeToDistributorPush } from '../../lib/pushClient';
 import useSessionGuard from '../../hooks/useSessionGuard';
 import { formatDeviceDateTime } from '../../lib/formatDateTime';
+import PullToRefresh from '../../components/PullToRefresh';
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
 export default function DistributorPortal() {
@@ -1639,7 +1640,23 @@ export default function DistributorPortal() {
 
       {/* PORTAL BODY CONTAINER */}
       <main className={`admin-main-workspace${activeTab === 'support' ? ' admin-main-workspace--support' : ''}`}>
-      <div className="admin-workspace-scroll">
+      <PullToRefresh
+        className="admin-workspace-scroll"
+        enabled={activeTab !== 'support'}
+        onRefresh={async () => {
+          await Promise.all([
+            mutate((key) => typeof key === 'string' && key.includes('/api/distributors/stats')),
+            mutate((key) => typeof key === 'string' && key.includes('/api/account-requests')),
+            mutate((key) => typeof key === 'string' && key.includes('/api/transactions')),
+            mutate((key) => typeof key === 'string' && key.includes('/api/coins-notifications')),
+            mutate((key) => typeof key === 'string' && key.includes('/api/support')),
+            mutate((key) => typeof key === 'string' && key.includes('/api/games')),
+            mutate((key) => typeof key === 'string' && key.includes('/api/distributors/gateways')),
+            mutate((key) => typeof key === 'string' && key.includes('/api/distributors/staff')),
+            mutate((key) => typeof key === 'string' && key.includes('/api/settings'))
+          ]);
+        }}
+      >
         
         {/* TAB: TRANSACTION LOGS */}
         {activeTab === 'tx_logs' && (
@@ -2833,7 +2850,7 @@ export default function DistributorPortal() {
           />
         )}
 
-      </div>
+      </PullToRefresh>
 
       {proofModalUrl && (
         <PanelModalBackdrop onClick={() => setProofModalUrl('')} className="panel-modal-overlay" style={{ cursor: 'pointer' }}>

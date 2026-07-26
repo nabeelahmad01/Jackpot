@@ -634,6 +634,27 @@ export default function Home() {
             setSession(updated);
             localStorage.setItem('jackpot_session', JSON.stringify(updated));
           }}
+          onRefresh={async () => {
+            const email = session?.email ? encodeURIComponent(session.email) : null;
+            await Promise.all([
+              mutate((key) => typeof key === 'string' && key.includes('/api/games')),
+              mutate((key) => typeof key === 'string' && key.includes('/api/gateways')),
+              mutate((key) => typeof key === 'string' && key.includes('/api/settings')),
+              email
+                ? mutate(`/api/account-requests?email=${email}`)
+                : Promise.resolve(),
+              email
+                ? mutate(`/api/game-accounts?email=${email}`)
+                : Promise.resolve(),
+              email
+                ? mutate(`/api/transactions?email=${email}&limit=40`)
+                : Promise.resolve(),
+              email
+                ? mutate(`/api/coins-notifications?email=${email}`)
+                : Promise.resolve(),
+              mutate((key) => typeof key === 'string' && key.includes('/api/promotions'))
+            ]);
+          }}
         />
       )}
 

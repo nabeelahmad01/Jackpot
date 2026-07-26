@@ -31,12 +31,15 @@ export default function NativeChrome() {
     if (isPortalApp()) {
       document.documentElement.classList.add('admin-native-shell');
     }
+    if (/JackpotRoyalsNative/i.test(navigator.userAgent || '')) {
+      document.documentElement.classList.add('player-native-shell');
+    }
 
     const lockPageZoom = () => {
       if (cancelled || typeof document === 'undefined') return;
       const native =
         isPortalApp() ||
-        /JackpotRoyalsNative/i.test(navigator.userAgent || '') ||
+        /JackpotRoyalsNative|JackpotDistributorNative/i.test(navigator.userAgent || '') ||
         window.Capacitor?.isNativePlatform?.() === true;
       if (!native) return;
 
@@ -85,6 +88,16 @@ export default function NativeChrome() {
 
         if (isPortalApp() || window.location.pathname.startsWith('/admin')) {
           document.documentElement.classList.add('admin-native-shell');
+        }
+        if (
+          /JackpotRoyalsNative/i.test(navigator.userAgent || '') ||
+          (Capacitor.isNativePlatform() &&
+            !isPortalApp() &&
+            !/JackpotDistributorNative|JackpotPortalNative/i.test(navigator.userAgent || '') &&
+            !window.location.pathname.startsWith('/admin') &&
+            !window.location.pathname.startsWith('/distributor'))
+        ) {
+          document.documentElement.classList.add('player-native-shell');
         }
 
         const { StatusBar, Style } = await import('@capacitor/status-bar');

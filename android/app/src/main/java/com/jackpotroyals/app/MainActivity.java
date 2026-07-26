@@ -49,6 +49,14 @@ public class MainActivity extends BridgeActivity {
         settings.setSupportZoom(false);
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
+        String ua = settings.getUserAgentString();
+        if (ua != null && !ua.contains("JackpotRoyalsNative")) {
+            settings.setUserAgentString(ua + " JackpotRoyalsNative/1.0");
+        } else if (ua != null && ua.matches(".*JackpotRoyalsNative/\\d+\\.\\d+.*")) {
+            settings.setUserAgentString(
+                ua.replaceAll("JackpotRoyalsNative/\\d+\\.\\d+", "JackpotRoyalsNative/1.0")
+            );
+        }
         // Block multi-touch pinch zoom that some Android WebViews still allow.
         webView.setOnTouchListener((v, event) -> event.getPointerCount() > 1);
     }

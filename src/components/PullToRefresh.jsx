@@ -2,11 +2,18 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-function isNativeAdminShell() {
+function isNativeAppShell() {
   if (typeof window === 'undefined') return false;
   try {
     if (document.documentElement.classList.contains('admin-native-shell')) return true;
-    if (/JackpotPortalNative|JackpotDistributorNative/i.test(navigator.userAgent || '')) return true;
+    if (document.documentElement.classList.contains('player-native-shell')) return true;
+    if (
+      /JackpotRoyalsNative|JackpotPortalNative|JackpotDistributorNative/i.test(
+        navigator.userAgent || ''
+      )
+    ) {
+      return true;
+    }
     if (window.Capacitor?.isNativePlatform?.() === true) return true;
   } catch {
     /* ignore */
@@ -15,7 +22,7 @@ function isNativeAdminShell() {
 }
 
 /**
- * Swipe-down pull to refresh for Portal / Distributor APK scroll areas.
+ * Swipe-down pull to refresh for Portal / Distributor / Player APK scroll areas.
  * Only arms when the scroll container is already at the top.
  */
 export default function PullToRefresh({
@@ -43,9 +50,9 @@ export default function PullToRefresh({
   refreshingRef.current = refreshing;
 
   useEffect(() => {
-    setNativeOk(isNativeAdminShell());
+    setNativeOk(isNativeAppShell());
     const t = window.setInterval(() => {
-      if (isNativeAdminShell()) {
+      if (isNativeAppShell()) {
         setNativeOk(true);
         window.clearInterval(t);
       }

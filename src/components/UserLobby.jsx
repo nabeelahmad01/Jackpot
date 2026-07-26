@@ -12,6 +12,7 @@ import RemainderClaimAction from './RemainderClaimAction';
 import { canShowClaimRemainderButton } from '../lib/remainderClaim';
 import { compressImageFile } from '../lib/imageCompress';
 import { formatDeviceDateTime } from '../lib/formatDateTime';
+import PullToRefresh from './PullToRefresh';
 
 /**
  * Cashout methods:
@@ -43,7 +44,8 @@ export default function UserLobby({
   onRequestAccount,
   onSubmitTransaction,
   frontendSettings = {},
-  onUpdateUser
+  onUpdateUser,
+  onRefresh
 }) {
   // Navigation states
   const [activeGame, setActiveGame] = useState(null); // game object or null
@@ -1116,7 +1118,7 @@ export default function UserLobby({
   const eligibleForSignupBonus = isFirstAccount && !hasClaimedBonus;
 
   return (
-    <div id="view-user-dashboard">
+    <div id="view-user-dashboard" className="player-lobby-shell">
       {/* Dynamic Header */}
       <header className="dashboard-header">
         <div className="lobby-brand" onClick={() => { setActiveGame(null); setActiveInvoice(null); setLobbySubView('main'); }} style={{ cursor: 'pointer' }}>
@@ -1190,6 +1192,15 @@ export default function UserLobby({
       {/* ==============================================================
            VIEW A: MAIN PLAYER LOBBY
            ============================================================== */}
+      <PullToRefresh
+        className="player-lobby-scroll"
+        enabled={!activeInvoice && !withdrawModalOpen}
+        onRefresh={async () => {
+          if (typeof onRefresh === 'function') {
+            await onRefresh();
+          }
+        }}
+      >
       <AnimatePresence mode="wait">
         {lobbySubView === 'referrals' ? (
           <motion.div
@@ -2514,6 +2525,7 @@ export default function UserLobby({
         </motion.div>
       )}
     </AnimatePresence>
+      </PullToRefresh>
 
       {/* Choose Payment Method Modal screen */}
       <PaymentMethodModal
