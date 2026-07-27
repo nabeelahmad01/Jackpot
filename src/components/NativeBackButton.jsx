@@ -3,13 +3,15 @@
 import { useEffect } from 'react';
 import {
   canHistoryGoBack,
+  installHistoryDepthTracker,
   runNativeBackHandlers,
-  tryCloseTopOverlay
+  tryCloseTopOverlay,
+  tryStepUpNestedRoute
 } from '../lib/nativeBack';
 
 /**
- * Android system / gesture back for Capacitor (Portal + player).
- * Order: close modal → page handlers (chat/sidebar) → history.back → exit app.
+ * Android system / gesture back for Capacitor (Player + Portal + Distributor).
+ * Order: close modal → page handlers → history.back → nested route step-up → exit.
  */
 export default function NativeBackButton() {
   useEffect(() => {
@@ -25,6 +27,9 @@ export default function NativeBackButton() {
         return;
       }
 
+      // Cold deep-link / refresh on a nested screen — go to app home first.
+      if (tryStepUpNestedRoute()) return;
+
       try {
         const { App } = await import('@capacitor/app');
         await App.exitApp();
@@ -32,6 +37,8 @@ export default function NativeBackButton() {
         // Browser or plugin missing — nothing else to do.
       }
     };
+
+    installHistoryDepthTracker();
 
     const setup = async () => {
       try {

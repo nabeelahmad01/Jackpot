@@ -12,6 +12,7 @@ import LoadingOverlay from '../components/LoadingOverlay';
 import { SupportModal, GoogleWarningModal } from '../components/Modals';
 import useSessionGuard from '../hooks/useSessionGuard';
 import { compressDataUrl } from '../lib/imageCompress';
+import { trackCompleteRegistration, trackDepositPurchase } from '../lib/metaPixel';
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -395,6 +396,7 @@ export default function Home() {
   };
 
   const handleRegisterSuccess = (newUser) => {
+    trackCompleteRegistration('email');
     setSession(newUser);
     localStorage.setItem('jackpot_session', JSON.stringify(newUser));
     setView('lobby');
@@ -518,6 +520,13 @@ export default function Home() {
         // Already toasted optimistically for deposit / withdraw / freeplay
         if (!isDeposit && !isWithdraw && !isFreeplay && newTx.type !== 'BONUS') {
           showToast(data.message || 'Request submitted.', 'success');
+        }
+        if (isDeposit) {
+          trackDepositPurchase({
+            value: newTx.amount,
+            currency: 'USD',
+            transactionId: data.transaction?.id || data.transaction?._id
+          });
         }
         const url = emailQuery ? `/api/transactions?email=${emailQuery}&limit=40` : null;
         mutate(url);

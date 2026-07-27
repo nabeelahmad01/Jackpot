@@ -13,6 +13,17 @@ import { canShowClaimRemainderButton } from '../lib/remainderClaim';
 import { compressImageFile } from '../lib/imageCompress';
 import { formatDeviceDateTime } from '../lib/formatDateTime';
 import PullToRefresh from './PullToRefresh';
+import { trackInitiateCheckout } from '../lib/metaPixel';
+import { registerNativeBackHandler } from '../lib/nativeBack';
+import {
+  clearPendingDeposit,
+  DEPOSIT_CODE_TTL_MS,
+  generateDepositNoteCode,
+  pendingMatchesGame,
+  readPendingDeposit,
+  remainingSeconds,
+  writePendingDeposit
+} from '../lib/pendingDeposit';
 
 /**
  * Cashout methods:
@@ -487,6 +498,30 @@ export default function UserLobby({
   const [withdrawScreenshot, setWithdrawScreenshot] = useState('');
   const [tagQrScreenshot, setTagQrScreenshot] = useState('');
 
+  // Android back: close deposit invoice / withdraw / payment picker before leaving lobby
+  useEffect(() => {
+    return registerNativeBackHandler(() => {
+      if (paymentModalOpen) {
+        setPaymentModalOpen(false);
+        return true;
+      }
+      if (withdrawModalOpen) {
+        setWithdrawModalOpen(false);
+        return true;
+      }
+      if (activeInvoice) {
+        setActiveInvoice(null);
+        setScreenshotBase64('');
+        return true;
+      }
+      if (appInstallOpen) {
+        setAppInstallOpen(false);
+        return true;
+      }
+      return false;
+    });
+  }, [paymentModalOpen, withdrawModalOpen, activeInvoice, appInstallOpen]);
+
   // Countdown timer ref for live invoice
   const timerRef = useRef(null);
 
@@ -501,28 +536,56 @@ export default function UserLobby({
   ];
   const doubledPayouts = [...payouts, ...payouts];
 
-  // 1. Live countdown timer effect
+  // 1. Live countdown timer — driven by expiresAt so backgrounding stays accurate
   useEffect(() => {
-    if (activeInvoice) {
-      timerRef.current = setInterval(() => {
-        setActiveInvoice((prev) => {
-          if (!prev) return null;
-          if (prev.timeRemaining <= 1) {
-            clearInterval(timerRef.current);
-            showToast('Deposit session expired.', 'error');
-            return null;
-          }
-          return { ...prev, timeRemaining: prev.timeRemaining - 1 };
-        });
-      }, 1000);
-    } else {
+    if (!activeInvoice?.expiresAt) {
       if (timerRef.current) clearInterval(timerRef.current);
+      return undefined;
     }
+
+    timerRef.current = setInterval(() => {
+      setActiveInvoice((prev) => {
+        if (!prev?.expiresAt) return null;
+        const left = remainingSeconds(prev.expiresAt);
+        if (left <= 0) {
+          clearPendingDeposit();
+          showToast('Deposit session expired.', 'error');
+          return null;
+        }
+        if (left === prev.timeRemaining) return prev;
+        return { ...prev, timeRemaining: left };
+      });
+    }, 1000);
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [activeInvoice]);
+  }, [activeInvoice?.expiresAt]);
+
+  // Restore same payment code for 10 min after user leaves (back / lobby) and returns
+  useEffect(() => {
+    if (!activeGame || !currentUserEmail) return;
+    const pending = readPendingDeposit(currentUserEmail);
+    if (!pendingMatchesGame(pending, activeGame.title)) return;
+
+    setActiveInvoice((prev) => {
+      if (prev?.noteCode === pending.noteCode) {
+        return prev;
+      }
+      const left = remainingSeconds(pending.expiresAt);
+      if (left <= 0) {
+        clearPendingDeposit();
+        return null;
+      }
+      return {
+        amount: pending.amount,
+        gateway: pending.gateway,
+        noteCode: pending.noteCode,
+        timeRemaining: left,
+        expiresAt: pending.expiresAt
+      };
+    });
+  }, [activeGame, currentUserEmail]);
 
   // 2. Fetch referrals list effect
   useEffect(() => {
@@ -658,26 +721,35 @@ export default function UserLobby({
   const handleSelectGateway = (gatewayObj) => {
     setPaymentModalOpen(false);
 
-    // Generate Random Transaction Reference Code (e.g. Book321, Car123, Rocky432)
-    const words = [
-      'Book', 'Car', 'Rocky', 'Apple', 'Tiger', 'Lion', 'Sky', 'Tree', 'Star', 
-      'Moon', 'Sun', 'River', 'Bird', 'Fish', 'Ring', 'King', 'Queen', 'Royal', 
-      'Club', 'Jack', 'Gold', 'Card', 'Play', 'Game', 'Win', 'Luck', 'Cash',
-      'Ace', 'Diamond', 'Heart', 'Spade', 'Crown', 'Ruby', 'Pearl', 'Coin'
-    ];
-    const randWord = words[Math.floor(Math.random() * words.length)];
-    const randNum = Math.floor(100 + Math.random() * 900); // 3 digits
-    const code = `${randWord}${randNum}`;
+    const amountVal = parseFloat(depositAmount);
+    const pending = readPendingDeposit(currentUserEmail);
+    const reuse =
+      pendingMatchesGame(pending, activeGame?.title) &&
+      remainingSeconds(pending.expiresAt) > 0;
+
+    const noteCode = reuse ? pending.noteCode : generateDepositNoteCode();
+    const expiresAt = reuse ? pending.expiresAt : Date.now() + DEPOSIT_CODE_TTL_MS;
+    const timeRemaining = remainingSeconds(expiresAt);
 
     setScreenshotBase64('');
 
-    const amountVal = parseFloat(depositAmount);
-    setActiveInvoice({
+    const invoice = {
       amount: amountVal,
-      gateway: gatewayObj, // Keep gateway reference
-      noteCode: code,
-      timeRemaining: 600, // 10 minutes
+      gateway: gatewayObj,
+      noteCode,
+      timeRemaining,
+      expiresAt
+    };
+    setActiveInvoice(invoice);
+    writePendingDeposit({
+      userEmail: currentUserEmail,
+      gameTitle: activeGame?.title || '',
+      amount: amountVal,
+      gateway: gatewayObj,
+      noteCode,
+      expiresAt
     });
+    trackInitiateCheckout({ value: amountVal, currency: 'USD' });
 
     setDepositAmount('');
   };
@@ -713,6 +785,7 @@ export default function UserLobby({
   };
 
   const handleCancelInvoice = () => {
+    clearPendingDeposit();
     setActiveInvoice(null);
     setScreenshotBase64('');
     showToast('Deposit checkout cancelled.', 'info');
@@ -745,6 +818,7 @@ export default function UserLobby({
       gameUsername: gameUsername || ''
     });
 
+    clearPendingDeposit();
     setActiveInvoice(null);
     setScreenshotBase64('');
   };

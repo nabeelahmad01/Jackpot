@@ -23,6 +23,7 @@ import { subscribeToDistributorPush } from '../../lib/pushClient';
 import useSessionGuard from '../../hooks/useSessionGuard';
 import { formatDeviceDateTime } from '../../lib/formatDateTime';
 import PullToRefresh from '../../components/PullToRefresh';
+import { registerNativeBackHandler } from '../../lib/nativeBack';
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
 export default function DistributorPortal() {
@@ -109,9 +110,19 @@ export default function DistributorPortal() {
     if (suppressUrlSyncRef.current) return;
     const targetPath = `/distributor/${activeTab}`;
     if (window.location.pathname !== targetPath) {
-      window.history.replaceState({}, '', targetPath);
+      // pushState so Android back can step through tabs, then exit at root
+      window.history.pushState({ distributorTab: activeTab }, '', targetPath);
     }
   }, [activeTab]);
+
+  // Android back: close mobile sidebar first
+  useEffect(() => {
+    return registerNativeBackHandler(() => {
+      if (!sidebarOpen) return false;
+      setSidebarOpen(false);
+      return true;
+    });
+  }, [sidebarOpen]);
 
   // Hide floating headset FAB while already on Live Support (it covers Reply)
   useEffect(() => {

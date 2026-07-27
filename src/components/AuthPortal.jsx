@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useGoogleLogin } from '@react-oauth/google';
 import { motion, AnimatePresence } from 'framer-motion';
 import { shouldShowInfoOnAuth } from '../lib/infoPage';
+import { trackCompleteRegistration } from '../lib/metaPixel';
 
 const DEFAULT_LOGIN_BG = '/jackpot_royals_bg.png';
 
@@ -75,6 +76,7 @@ export default function AuthPortal({
 
   const finishGoogleLogin = (googleData) => {
     if (googleData.isNewUser) {
+      trackCompleteRegistration('google');
       showToast(`Google account registered! Welcome, ${googleData.user?.name || 'Player'}.`, 'success');
     } else {
       showToast(`Welcome back, ${googleData.user?.name || 'Player'}!`, 'success');
