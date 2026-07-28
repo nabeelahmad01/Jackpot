@@ -199,8 +199,10 @@ export async function GET(req) {
       ).catch(() => {});
     }
 
-    // Heal: deposit already Loaded (COMPLETED coins noti) but parent stuck on COINS_LOADING
-    // — otherwise Shift Dashboard keeps showing the row after every refresh.
+    // COINS_LOADING feed is only for Shift synthetic fallback when a deposit has
+    // NO coinsNotification yet. If any noti exists (PENDING/CLAIM/HOLD/COMPLETED),
+    // hide the tx here — otherwise Verified Deposits shows noti + synthetic twice.
+    // COMPLETED notis also heal the parent out of COINS_LOADING.
     const statusIsCoinsLoading =
       status &&
       String(status)
@@ -212,18 +214,26 @@ export async function GET(req) {
     if (statusIsCoinsLoading && transactions.length > 0) {
       const txIds = transactions.map((t) => t.id).filter(Boolean);
       const txIdStrs = txIds.map(String);
-      const doneNotis = await db.collection('coinsNotifications')
+      const coveringNotis = await db.collection('coinsNotifications')
         .find({
-          transactionId: { $in: [...txIds, ...txIdStrs] },
-          status: 'COMPLETED'
+          transactionId: { $in: [...txIds, ...txIdStrs] }
         })
-        .project({ transactionId: 1 })
+        .project({ transactionId: 1, status: 1 })
         .toArray();
-      const doneTxIds = new Set(doneNotis.map((n) => String(n.transactionId || '')).filter(Boolean));
+      const coveredTxIds = new Set(
+        coveringNotis.map((n) => String(n.transactionId || '')).filter(Boolean)
+      );
+      const doneTxIds = new Set(
+        coveringNotis
+          .filter((n) => String(n.status || '').toUpperCase() === 'COMPLETED')
+          .map((n) => String(n.transactionId || ''))
+          .filter(Boolean)
+      );
+      if (coveredTxIds.size > 0) {
+        visibleTransactions = transactions.filter((t) => !coveredTxIds.has(String(t.id)));
+      }
       if (doneTxIds.size > 0) {
-        const toHeal = transactions.filter((t) => doneTxIds.has(String(t.id)));
-        visibleTransactions = transactions.filter((t) => !doneTxIds.has(String(t.id)));
-        const healIds = toHeal.map((t) => t.id);
+        const healIds = transactions.filter((t) => doneTxIds.has(String(t.id))).map((t) => t.id);
         void transactionsCollection.updateMany(
           {
             id: { $in: healIds },

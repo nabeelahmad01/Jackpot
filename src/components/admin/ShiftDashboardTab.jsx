@@ -115,7 +115,27 @@ export default function ShiftDashboardTab({ adminUser }) {
       }))
       .filter((n) => !seenIds.has(String(n.id)) && !hiddenCoinIds.has(String(n.id)));
 
-    return [...dedupedFromNoti, ...synthetic];
+    // Final pass: one row per transactionId — prefer real coinsNotification over synthetic
+    const merged = [...dedupedFromNoti, ...synthetic];
+    const byTx = new Map();
+    const noTxId = [];
+    for (const row of merged) {
+      const tid = String(row.transactionId || '');
+      if (!tid) {
+        noTxId.push(row);
+        continue;
+      }
+      const prev = byTx.get(tid);
+      if (!prev) {
+        byTx.set(tid, row);
+        continue;
+      }
+      // Keep real noti; drop synthetic duplicate
+      if (prev.fromCoinsLoadingTx && !row.fromCoinsLoadingTx) {
+        byTx.set(tid, row);
+      }
+    }
+    return [...byTx.values(), ...noTxId];
   }, [coinData?.coinsNotifications, coinsLoadingData?.transactions, hiddenCoinIds, hiddenCoinTxIds]);
 
   // Handle saving credentials (optimistic UI + single PUT)

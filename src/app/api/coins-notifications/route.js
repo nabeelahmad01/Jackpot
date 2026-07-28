@@ -264,7 +264,7 @@ export async function PUT(req) {
             status: 'PENDING',
             read: false,
             timestamp: new Date().toISOString(),
-            transactionId: tx.id,
+            transactionId: String(tx.id),
             distributorId: tx.distributorId || '',
             distributorType: tx.distributorType || ''
           };
