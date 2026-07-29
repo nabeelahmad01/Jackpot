@@ -124,6 +124,8 @@ export async function POST(req) {
           subscription: hasWebSubscription ? subscription : null,
           nativeToken: hasNativeSubscription ? nativeToken : null,
           userAgent: String(body.userAgent || '').slice(0, 500),
+          clientKind: String(body.clientKind || '').slice(0, 40) || undefined,
+          standalone: Boolean(body.standalone),
           updatedAt: now
         },
         $setOnInsert: { createdAt: now }

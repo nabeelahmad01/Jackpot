@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PaymentMethodModal } from './Modals';
 import AppInstallModal from './AppInstallModal';
-import { subscribeToPromoPush } from '../lib/pushClient';
+import { getWebPushPromptState, subscribeToPromoPush } from '../lib/pushClient';
 import { shouldShowInfoOnLobby } from '../lib/infoPage';
 import ReferralCenter from './ReferralCenter';
 import RemainderClaimAction from './RemainderClaimAction';
@@ -82,6 +82,9 @@ export default function UserLobby({
   const [claimedRemainderIds, setClaimedRemainderIds] = useState([]);
   const [isFreeplaySession, setIsFreeplaySession] = useState(false);
   const [appInstallOpen, setAppInstallOpen] = useState(false);
+  const [pushBanner, setPushBanner] = useState({ show: false, reason: '', canEnable: false });
+  const [pushBannerBusy, setPushBannerBusy] = useState(false);
+  const [pushBannerDismissed, setPushBannerDismissed] = useState(false);
   const pendingGameSlugRef = useRef(null);
   const pushAutoTriedRef = useRef('');
 
@@ -394,37 +397,101 @@ export default function UserLobby({
     let cancelled = false;
     let registered = false;
 
+    const refreshBanner = () => {
+      if (cancelled) return;
+      try {
+        const dismissed =
+          typeof window !== 'undefined' &&
+          window.sessionStorage?.getItem('jr_push_banner_dismissed') === '1';
+        if (dismissed) {
+          setPushBannerDismissed(true);
+          setPushBanner({ show: false, reason: '', canEnable: false });
+          return;
+        }
+        const state = getWebPushPromptState();
+        setPushBanner({
+          show: Boolean(state.show),
+          reason: state.reason || '',
+          canEnable: Boolean(state.canEnable)
+        });
+      } catch {
+        /* ignore */
+      }
+    };
+
     const register = async () => {
       if (cancelled || registered) return;
+      // iOS must use an explicit Enable tap — mount-time requestPermission is ignored.
+      const state = getWebPushPromptState();
+      if (state.reason === 'ios-needs-homescreen' || state.reason === 'denied') {
+        refreshBanner();
+        return;
+      }
+      if (state.permission === 'default' && state.canEnable) {
+        // Wait for banner tap on web so the OS prompt is tied to a clear CTA.
+        refreshBanner();
+        return;
+      }
       try {
         await subscribeToPromoPush(currentUserEmail);
         registered = true;
         pushAutoTriedRef.current = currentUserEmail;
+        refreshBanner();
       } catch {
-        // Permission may need a gesture, or iOS may still be in a browser tab
-        // (push only works after Add to Home Screen).
+        refreshBanner();
       }
     };
 
+    refreshBanner();
     if (pushAutoTriedRef.current !== currentUserEmail) {
-      register();
+      // Native APK still auto-registers; web waits for banner CTA unless already granted.
+      const state = getWebPushPromptState();
+      if (state.reason === 'native' || state.permission === 'granted') {
+        register();
+      }
     }
 
-    const onInteract = () => {
-      register();
-    };
-    // When user opens the iOS Home Screen app, retry push once it is standalone.
     const onVisibility = () => {
-      if (document.visibilityState === 'visible') register();
+      if (document.visibilityState === 'visible') refreshBanner();
     };
-    window.addEventListener('pointerdown', onInteract, { once: true, passive: true });
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
       cancelled = true;
-      window.removeEventListener('pointerdown', onInteract);
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [currentUserEmail]);
+
+  const handleEnableLockScreenPush = async () => {
+    if (!currentUserEmail || pushBannerBusy) return;
+    setPushBannerBusy(true);
+    try {
+      await subscribeToPromoPush(currentUserEmail);
+      pushAutoTriedRef.current = currentUserEmail;
+      setPushBanner({ show: false, reason: 'granted', canEnable: false });
+      showToast('Lock screen notifications enabled.', 'success');
+    } catch (err) {
+      const msg = String(err?.message || 'Could not enable notifications.');
+      showToast(msg, 'error');
+      const state = getWebPushPromptState();
+      setPushBanner({
+        show: Boolean(state.show),
+        reason: state.reason || '',
+        canEnable: Boolean(state.canEnable)
+      });
+    } finally {
+      setPushBannerBusy(false);
+    }
+  };
+
+  const dismissPushBanner = () => {
+    setPushBannerDismissed(true);
+    setPushBanner({ show: false, reason: '', canEnable: false });
+    try {
+      window.sessionStorage?.setItem('jr_push_banner_dismissed', '1');
+    } catch {
+      /* ignore */
+    }
+  };
 
   const renderFailedStatusWithTooltip = (tx) => {
     const isTooltipActive = activeTooltipId === tx.id;
@@ -1262,6 +1329,98 @@ export default function UserLobby({
           </button>
         </div>
       </header>
+
+      {!pushBannerDismissed && pushBanner.show && (
+        <div
+          role="status"
+          style={{
+            margin: '0.65rem 0.85rem 0',
+            padding: '0.75rem 0.85rem',
+            borderRadius: '12px',
+            border: '1px solid rgba(255, 215, 0, 0.35)',
+            background: 'linear-gradient(135deg, rgba(255,215,0,0.12), rgba(8,10,17,0.95))',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.55rem'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'flex-start' }}>
+            <p style={{ margin: 0, fontSize: '0.78rem', color: '#f5f5f5', lineHeight: 1.4 }}>
+              {pushBanner.reason === 'ios-needs-homescreen' ? (
+                <>
+                  <strong style={{ color: 'var(--gold-primary)' }}>iPhone:</strong> Safari → Share →{' '}
+                  <strong>Add to Home Screen</strong>, open that icon, then enable lock-screen alerts.
+                </>
+              ) : pushBanner.reason === 'denied' ? (
+                <>
+                  Notifications are blocked. Open phone <strong>Settings → Jackpot Royals / Chrome</strong> →
+                  allow Notifications for lock-screen offers.
+                </>
+              ) : (
+                <>
+                  Turn on <strong style={{ color: 'var(--gold-primary)' }}>lock-screen notifications</strong> so
+                  offers reach you even when the app is closed (Chrome, Safari Home Screen, or browser).
+                </>
+              )}
+            </p>
+            <button
+              type="button"
+              onClick={dismissPushBanner}
+              aria-label="Dismiss"
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#888',
+                fontSize: '1.1rem',
+                cursor: 'pointer',
+                lineHeight: 1,
+                padding: '0 0.15rem'
+              }}
+            >
+              &times;
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}>
+            {pushBanner.reason === 'ios-needs-homescreen' ? (
+              <button
+                type="button"
+                className="lobby-nav-btn"
+                onClick={() => setAppInstallOpen(true)}
+                style={{
+                  margin: 0,
+                  width: 'auto',
+                  padding: '0.45rem 0.85rem',
+                  background: 'var(--gold-primary)',
+                  color: '#111',
+                  fontWeight: 700,
+                  fontSize: '0.72rem'
+                }}
+              >
+                How to install
+              </button>
+            ) : pushBanner.canEnable ? (
+              <button
+                type="button"
+                className="lobby-nav-btn"
+                onClick={handleEnableLockScreenPush}
+                disabled={pushBannerBusy}
+                style={{
+                  margin: 0,
+                  width: 'auto',
+                  padding: '0.45rem 0.85rem',
+                  background: 'var(--gold-primary)',
+                  color: '#111',
+                  fontWeight: 700,
+                  fontSize: '0.72rem'
+                }}
+              >
+                <i className="fa-solid fa-bell" aria-hidden="true"></i>{' '}
+                {pushBannerBusy ? 'Enabling…' : 'Enable Lock Screen'}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      )}
 
       {/* ==============================================================
            VIEW A: MAIN PLAYER LOBBY

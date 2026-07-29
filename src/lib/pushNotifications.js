@@ -104,15 +104,26 @@ export async function sendPromotionPush(db, promotion, targetEmails) {
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://jackpotroyals.com')
     .replace(/\/$/, '');
   const remoteImage = /^https?:\/\//i.test(promotion.image || '') ? promotion.image : undefined;
-  const payload = JSON.stringify({
-    title: promotion.title || 'Jackpot Royals',
-    body: promotion.message || 'A new offer is available.',
+
+  // Calm lock-screen copy for web (Chrome often hides flashy marketing as "Possible spam").
+  // Full promo title/message still open inside the lobby when they tap through.
+  const webTitle = 'Jackpot Royals';
+  const webBody = 'A new offer is waiting in your lobby.';
+  const webPayload = JSON.stringify({
+    title: webTitle,
+    body: webBody,
     icon: `${siteUrl}/icon-192.png`,
     badge: `${siteUrl}/icon-192.png`,
-    image: remoteImage,
     tag: `promotion-${promotion.id}`,
     promotionId: promotion.id,
     url: `/lobby?promotion=${encodeURIComponent(promotion.id)}`
+  });
+
+  // Apple PWA (Home Screen) + Android Chrome/PWA web push — both need delivery for lock screen.
+  // Native APK still gets FCM below.
+  const promoWebSubscriptions = webSubscriptions.filter((record) => {
+    const endpoint = String(record.endpoint || record.subscription?.endpoint || '');
+    return Boolean(endpoint);
   });
 
   let sent = 0;
@@ -120,10 +131,10 @@ export async function sendPromotionPush(db, promotion, targetEmails) {
   const expiredEndpoints = [];
 
   if (configureWebPush()) {
-    for (let index = 0; index < webSubscriptions.length; index += 100) {
-      const batch = webSubscriptions.slice(index, index + 100);
+    for (let index = 0; index < promoWebSubscriptions.length; index += 100) {
+      const batch = promoWebSubscriptions.slice(index, index + 100);
       const results = await Promise.allSettled(
-        batch.map((record) => webpush.sendNotification(record.subscription, payload))
+        batch.map((record) => webpush.sendNotification(record.subscription, webPayload))
       );
 
       results.forEach((result, resultIndex) => {

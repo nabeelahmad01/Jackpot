@@ -15,10 +15,17 @@ export async function GET(req) {
     const db = await getDb();
     const pendingCollection = db.collection('pendingReferrals');
 
-    const pending = await pendingCollection.find({
-      referrerEmail: email.toLowerCase().trim(),
-      status: 'PENDING'
-    }).toArray();
+    const pending = searchParams.get('all') === '1'
+      ? await pendingCollection
+          .find({ referrerEmail: email.toLowerCase().trim() })
+          .sort({ timestamp: -1 })
+          .toArray()
+      : await pendingCollection
+          .find({
+            referrerEmail: email.toLowerCase().trim(),
+            status: 'PENDING'
+          })
+          .toArray();
 
     return NextResponse.json({ success: true, pending });
   } catch (err) {

@@ -35,6 +35,11 @@ export function isIosDevice() {
   );
 }
 
+export function isAndroidDevice() {
+  if (typeof window === 'undefined') return false;
+  return /Android/i.test(window.navigator.userAgent || '');
+}
+
 export function isStandaloneDisplay() {
   if (typeof window === 'undefined') return false;
   return (
@@ -55,6 +60,37 @@ export function supportsWebPush() {
     'PushManager' in window &&
     'Notification' in window
   );
+}
+
+/** UI helper: should we show an Enable Lock Screen banner? */
+export function getWebPushPromptState() {
+  if (typeof window === 'undefined') {
+    return { show: false, reason: 'ssr' };
+  }
+  if (isNativePlatform()) {
+    return { show: false, reason: 'native' };
+  }
+  if (isIosDevice() && !isStandaloneDisplay()) {
+    return { show: true, reason: 'ios-needs-homescreen', canEnable: false };
+  }
+  if (!supportsWebPush()) {
+    return { show: false, reason: 'unsupported' };
+  }
+  const permission = typeof Notification !== 'undefined' ? Notification.permission : 'default';
+  if (permission === 'granted') {
+    return { show: false, reason: 'granted', canEnable: false, permission };
+  }
+  if (permission === 'denied') {
+    return { show: true, reason: 'denied', canEnable: false, permission };
+  }
+  return { show: true, reason: 'prompt', canEnable: true, permission: permission || 'default' };
+}
+
+function detectClientKind() {
+  if (isNativePlatform()) return 'native';
+  if (isIosDevice()) return isStandaloneDisplay() ? 'ios-pwa' : 'ios-browser';
+  if (isAndroidDevice()) return isStandaloneDisplay() ? 'android-pwa' : 'android-chrome';
+  return 'desktop';
 }
 
 export async function getExistingPushSubscription() {
@@ -152,7 +188,9 @@ async function subscribeToNativePush(userEmail, { audience = 'player', distribut
       platform: Capacitor?.getPlatform?.() || 'android',
       audience: resolvedAudience,
       distributorId: resolvedAudience === 'distributor' ? String(distributorId || '').trim() : '',
-      userAgent: navigator.userAgent
+      userAgent: navigator.userAgent,
+      clientKind: 'native',
+      standalone: true
     })
   });
   const data = await response.json();
@@ -180,7 +218,7 @@ async function subscribeToNativePush(userEmail, { audience = 'player', distribut
 async function subscribeToWebPush(userEmail, { audience = 'player', distributorId = '' } = {}) {
   if (isIosDevice() && !isStandaloneDisplay()) {
     throw new Error(
-      'On iPhone, open Jackpot Royals from the Home Screen icon first, then enable notifications.'
+      'On iPhone, tap Share → Add to Home Screen, open Jackpot from that icon, then enable notifications.'
     );
   }
   if (
@@ -204,13 +242,23 @@ async function subscribeToWebPush(userEmail, { audience = 'player', distributorI
   }
 
   const registration = await navigator.serviceWorker.ready;
+  const appServerKey = urlBase64ToUint8Array(keyData.publicKey);
   let subscription = await registration.pushManager.getSubscription();
-  if (!subscription) {
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(keyData.publicKey)
-    });
+
+  // Stale subscriptions (rotated VAPID / old Chrome endpoint) never get lock-screen delivery.
+  // Drop and recreate whenever we can, then re-POST to the server.
+  if (subscription) {
+    try {
+      await subscription.unsubscribe();
+    } catch {
+      /* ignore */
+    }
+    subscription = null;
   }
+  subscription = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: appServerKey
+  });
 
   const resolvedAudience =
     audience === 'distributor' ? 'distributor' : audience === 'staff' ? 'staff' : 'player';
@@ -223,7 +271,9 @@ async function subscribeToWebPush(userEmail, { audience = 'player', distributorI
       subscription: subscription.toJSON(),
       audience: resolvedAudience,
       distributorId: resolvedAudience === 'distributor' ? String(distributorId || '').trim() : '',
-      userAgent: navigator.userAgent
+      userAgent: navigator.userAgent,
+      clientKind: detectClientKind(),
+      standalone: isStandaloneDisplay()
     })
   });
   const data = await response.json();

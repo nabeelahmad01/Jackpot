@@ -235,8 +235,19 @@ export default function AppInstallModal({
                   Download Android App (APK)
                 </button>
                 <p className="app-install-hint">
-                  Open the downloaded file → Install. Lock-screen notifications work in the APK.
+                  Best for lock-screen alerts. Open the downloaded file → Install.
                 </p>
+                {currentUserEmail ? (
+                  <button
+                    type="button"
+                    className="pwa-install-fallback"
+                    onClick={enableLockScreenPush}
+                    disabled={pushBusy}
+                  >
+                    <i className="fa-solid fa-bell" aria-hidden="true"></i>{' '}
+                    {pushBusy ? 'Enabling…' : 'Or enable Chrome / Home Screen notifications'}
+                  </button>
+                ) : null}
                 <button type="button" className="pwa-install-fallback" onClick={installIos}>
                   Download iOS app
                 </button>

@@ -131,6 +131,8 @@ export default function PlayerAccountsTab({ adminUser, onDeleteUser }) {
     deposits: [],
     withdrawals: [],
     holdAllotments: [],
+    referrals: [],
+    referralRewards: [],
     loading: false
   });
 
@@ -159,9 +161,12 @@ export default function PlayerAccountsTab({ adminUser, onDeleteUser }) {
     const fetchHistory = async () => {
       setUserHistory((prev) => ({ ...prev, loading: true }));
       try {
-        const [txRes, coinsRes] = await Promise.all([
-          fetch(`/api/transactions?limit=1000&email=${encodeURIComponent(inspectedUser.email)}`).then((r) => r.json()),
-          fetch(`/api/coins-notifications?limit=1000&email=${encodeURIComponent(inspectedUser.email)}`).then((r) => r.json())
+        const emailQ = encodeURIComponent(inspectedUser.email);
+        const [txRes, coinsRes, refsRes, rewardsRes] = await Promise.all([
+          fetch(`/api/transactions?limit=1000&email=${emailQ}`).then((r) => r.json()),
+          fetch(`/api/coins-notifications?limit=1000&email=${emailQ}`).then((r) => r.json()),
+          fetch(`/api/users?referredBy=${emailQ}`).then((r) => r.json()),
+          fetch(`/api/referrals/pending?email=${emailQ}&all=1`).then((r) => r.json())
         ]);
 
         const txs = txRes.transactions || [];
@@ -171,6 +176,8 @@ export default function PlayerAccountsTab({ adminUser, onDeleteUser }) {
           deposits: txs.filter((t) => t.type === 'DEPOSIT'),
           withdrawals: txs.filter((t) => t.type === 'WITHDRAW'),
           holdAllotments: notis.filter((n) => n.status === 'HOLD'),
+          referrals: refsRes.referrals || [],
+          referralRewards: rewardsRes.pending || [],
           loading: false
         });
       } catch (err) {
@@ -445,6 +452,91 @@ export default function PlayerAccountsTab({ adminUser, onDeleteUser }) {
                         Pending Payouts: ${pendingWithdrawalsSum.toFixed(2)}
                       </span>
                     </div>
+                  </div>
+
+                  {/* Referrals — count + bonus claim status (read-only) */}
+                  <div>
+                    <h5 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--gold-primary)', marginBottom: '0.6rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.35rem' }}>
+                      <i className="fa-solid fa-user-group"></i> Referrals
+                    </h5>
+
+                    <div style={{ background: 'rgba(168, 85, 247, 0.06)', border: '1px solid rgba(168, 85, 247, 0.2)', padding: '0.85rem', borderRadius: '8px', marginBottom: '0.75rem' }}>
+                      <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: '#c084fc', fontWeight: 'bold' }}>Total Referred Players</span>
+                      <div style={{ fontSize: '1.15rem', color: '#fff', fontWeight: 'bold', margin: '0.25rem 0' }}>
+                        {userHistory.referrals.length}
+                      </div>
+                      {userHistory.referrals.length > 0 ? (
+                        <ul style={{ margin: '0.35rem 0 0', paddingLeft: '1.1rem', fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.55 }}>
+                          {userHistory.referrals.map((ref) => (
+                            <li key={ref.email || ref.name}>
+                              <strong style={{ color: '#fff' }}>{ref.name || '—'}</strong>
+                              {ref.email ? (
+                                <span style={{ color: 'var(--gold-primary)' }}> · {ref.email}</span>
+                              ) : null}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                          This player has not referred anyone yet.
+                        </span>
+                      )}
+                    </div>
+
+                    <h5 style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#c084fc', marginBottom: '0.5rem' }}>
+                      Referral Bonuses
+                    </h5>
+                    {userHistory.referralRewards.length === 0 ? (
+                      <p style={{ fontSize: '0.725rem', color: 'var(--text-muted)', opacity: 0.7, fontStyle: 'italic', margin: '0.35rem 0' }}>
+                        No referral bonus earned yet for this player.
+                      </p>
+                    ) : (
+                      <div className="table-responsive" style={{ maxHeight: '220px', overflowY: 'auto' }}>
+                        <table className="admin-table" style={{ fontSize: '0.725rem' }}>
+                          <thead>
+                            <tr>
+                              <th>Referral</th>
+                              <th>Coins</th>
+                              <th>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {userHistory.referralRewards.map((reward) => {
+                              const refEmail = String(reward.refereeEmail || '').toLowerCase().trim();
+                              const matched = userHistory.referrals.find(
+                                (r) => String(r.email || '').toLowerCase().trim() === refEmail
+                              );
+                              const displayName = matched?.name || reward.refereeEmail || '—';
+                              const status = String(reward.status || 'PENDING').toUpperCase();
+                              const statusColor =
+                                status === 'CLAIMED'
+                                  ? '#4ade80'
+                                  : status === 'PENDING'
+                                    ? '#fbbf24'
+                                    : '#c084fc';
+                              return (
+                                <tr key={reward.id || `${refEmail}-${reward.timestamp}`}>
+                                  <td>
+                                    <div style={{ color: '#fff', fontWeight: 600 }}>{displayName}</div>
+                                    {matched?.name && reward.refereeEmail ? (
+                                      <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>{reward.refereeEmail}</div>
+                                    ) : null}
+                                  </td>
+                                  <td style={{ color: 'var(--gold-primary)', fontWeight: 'bold' }}>
+                                    {Number(reward.rewardCoins || 0)}
+                                  </td>
+                                  <td>
+                                    <span style={{ color: statusColor, fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.65rem' }}>
+                                      {status === 'PENDING_ACCOUNT_APPROVAL' ? 'PENDING ACCOUNT' : status}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
 
                   {/* Hold Funds / Pending Coin Allotment Block */}

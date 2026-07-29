@@ -84,6 +84,8 @@ self.addEventListener('push', (event) => {
     image: data.image || undefined,
     tag: data.tag || 'jackpot-promo',
     renotify: true,
+    vibrate: [120, 60, 120],
+    requireInteraction: false,
     data: {
       url: data.url || '/lobby',
       promotionId: data.promotionId || null
