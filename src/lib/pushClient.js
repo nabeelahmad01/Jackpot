@@ -42,11 +42,20 @@ export function isAndroidDevice() {
 
 export function isStandaloneDisplay() {
   if (typeof window === 'undefined') return false;
-  return (
-    window.matchMedia?.('(display-mode: standalone)').matches ||
-    window.navigator.standalone === true ||
-    isNativePlatform()
-  );
+  if (isNativePlatform()) return true;
+  try {
+    if (window.navigator.standalone === true) return true;
+  } catch {
+    /* ignore */
+  }
+  try {
+    if (window.matchMedia?.('(display-mode: standalone)').matches) return true;
+    if (window.matchMedia?.('(display-mode: fullscreen)').matches) return true;
+    if (window.matchMedia?.('(display-mode: minimal-ui)').matches) return true;
+  } catch {
+    /* ignore */
+  }
+  return false;
 }
 
 export function supportsWebPush() {
@@ -230,6 +239,15 @@ async function subscribeToWebPush(userEmail, { audience = 'player', distributorI
     throw new Error('Push notifications are not supported on this device.');
   }
 
+  // Ensure SW is controlling this page before PushManager.subscribe (required on iOS PWA).
+  let registration;
+  try {
+    registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+    registration = await navigator.serviceWorker.ready;
+  } catch (err) {
+    throw new Error('Could not start notification service. Close the app and open it again from the Home Screen icon.');
+  }
+
   const keyResponse = await fetch('/api/push-subscriptions', { cache: 'no-store' });
   const keyData = await keyResponse.json();
   if (!keyResponse.ok || !keyData.publicKey) {
@@ -238,47 +256,78 @@ async function subscribeToWebPush(userEmail, { audience = 'player', distributorI
 
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') {
-    throw new Error('Notification permission was not allowed.');
+    throw new Error('Notification permission was not allowed. Check Settings → Notifications for Jackpot Royals.');
   }
 
-  const registration = await navigator.serviceWorker.ready;
   const appServerKey = urlBase64ToUint8Array(keyData.publicKey);
   let subscription = await registration.pushManager.getSubscription();
 
-  // Stale subscriptions (rotated VAPID / old Chrome endpoint) never get lock-screen delivery.
-  // Drop and recreate whenever we can, then re-POST to the server.
-  if (subscription) {
+  // iOS is fragile if we unsubscribe every time — reuse a valid subscription.
+  // Chrome/Android: refresh subscription when missing only; recreate on subscribe failure.
+  if (!subscription) {
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: appServerKey
+    });
+  }
+
+  const resolvedAudience =
+    audience === 'distributor' ? 'distributor' : audience === 'staff' ? 'staff' : 'player';
+
+  const postBody = {
+    email: String(userEmail || '').trim().toLowerCase(),
+    subscription: subscription.toJSON(),
+    audience: resolvedAudience,
+    distributorId: resolvedAudience === 'distributor' ? String(distributorId || '').trim() : '',
+    userAgent: navigator.userAgent,
+    clientKind: detectClientKind(),
+    standalone: isStandaloneDisplay()
+  };
+
+  let response = await fetch('/api/push-subscriptions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(postBody)
+  });
+  let data = await response.json();
+
+  // Stale VAPID / dead endpoint — recreate once (skip aggressive unsubscribe-first on iOS).
+  if (!response.ok || !data.success) {
     try {
       await subscription.unsubscribe();
     } catch {
       /* ignore */
     }
-    subscription = null;
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: appServerKey
+    });
+    postBody.subscription = subscription.toJSON();
+    response = await fetch('/api/push-subscriptions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(postBody)
+    });
+    data = await response.json();
   }
-  subscription = await registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: appServerKey
-  });
 
-  const resolvedAudience =
-    audience === 'distributor' ? 'distributor' : audience === 'staff' ? 'staff' : 'player';
-
-  const response = await fetch('/api/push-subscriptions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      email: String(userEmail || '').trim().toLowerCase(),
-      subscription: subscription.toJSON(),
-      audience: resolvedAudience,
-      distributorId: resolvedAudience === 'distributor' ? String(distributorId || '').trim() : '',
-      userAgent: navigator.userAgent,
-      clientKind: detectClientKind(),
-      standalone: isStandaloneDisplay()
-    })
-  });
-  const data = await response.json();
   if (!response.ok || !data.success) {
     throw new Error(data.message || 'Could not enable notifications.');
+  }
+
+  // Confirm lock-screen path works (local smoke test — does not use remote push).
+  try {
+    if (registration.showNotification) {
+      await registration.showNotification('Jackpot Royals', {
+        body: 'Lock screen notifications are on. You will get offers here.',
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        tag: 'jr-push-enabled',
+        data: { url: '/lobby' }
+      });
+    }
+  } catch {
+    /* some iOS builds only allow remote push display */
   }
 
   return subscription;

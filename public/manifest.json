@@ -6,7 +6,7 @@
   "start_url": "/login?source=pwa",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["standalone", "fullscreen"],
+  "display_override": ["standalone", "fullscreen", "minimal-ui"],
   "background_color": "#080a11",
   "theme_color": "#080a11",
   "orientation": "portrait",

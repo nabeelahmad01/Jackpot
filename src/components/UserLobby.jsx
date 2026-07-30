@@ -5,7 +5,11 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PaymentMethodModal } from './Modals';
 import AppInstallModal from './AppInstallModal';
-import { getWebPushPromptState, subscribeToPromoPush } from '../lib/pushClient';
+import { getWebPushPromptState, getExistingPushSubscription, subscribeToPromoPush, supportsWebPush } from '../lib/pushClient';
+import {
+  findLastSuccessDeposit,
+  getDepositBasedMinWithdraw
+} from '../lib/withdrawRules';
 import { shouldShowInfoOnLobby } from '../lib/infoPage';
 import ReferralCenter from './ReferralCenter';
 import RemainderClaimAction from './RemainderClaimAction';
@@ -390,14 +394,16 @@ export default function UserLobby({
       .catch(err => console.error('Failed to load promotions:', err));
   }, [currentUserEmail]);
 
-  // Auto-register promo push for logged-in users (APK / Chrome / iOS Home Screen app).
+  // Auto-register promo push: first tap in Home Screen / Chrome app asks OS "Allow".
+  // Apple/Google never allow silent grant — only a user gesture can open the prompt.
   useEffect(() => {
     if (!currentUserEmail) return;
 
     let cancelled = false;
     let registered = false;
+    let asking = false;
 
-    const refreshBanner = () => {
+    const refreshBanner = async () => {
       if (cancelled) return;
       try {
         const dismissed =
@@ -409,6 +415,18 @@ export default function UserLobby({
           return;
         }
         const state = getWebPushPromptState();
+        if (!state.show && state.permission === 'granted' && supportsWebPush()) {
+          try {
+            const sub = await getExistingPushSubscription();
+            if (!sub) {
+              setPushBanner({ show: true, reason: 'prompt', canEnable: true });
+              return;
+            }
+          } catch {
+            setPushBanner({ show: true, reason: 'prompt', canEnable: true });
+            return;
+          }
+        }
         setPushBanner({
           show: Boolean(state.show),
           reason: state.reason || '',
@@ -419,37 +437,51 @@ export default function UserLobby({
       }
     };
 
-    const register = async () => {
-      if (cancelled || registered) return;
-      // iOS must use an explicit Enable tap — mount-time requestPermission is ignored.
+    const register = async ({ fromGesture = false } = {}) => {
+      if (cancelled || registered || asking) return;
       const state = getWebPushPromptState();
       if (state.reason === 'ios-needs-homescreen' || state.reason === 'denied') {
         refreshBanner();
         return;
       }
-      if (state.permission === 'default' && state.canEnable) {
-        // Wait for banner tap on web so the OS prompt is tied to a clear CTA.
+      // Without a gesture, browsers ignore requestPermission — wait for first tap.
+      if (state.permission === 'default' && !fromGesture) {
         refreshBanner();
         return;
       }
+      asking = true;
       try {
         await subscribeToPromoPush(currentUserEmail);
         registered = true;
         pushAutoTriedRef.current = currentUserEmail;
-        refreshBanner();
+        setPushBanner({ show: false, reason: 'granted', canEnable: false });
+        if (fromGesture) {
+          showToast('Lock screen notifications enabled.', 'success');
+        }
       } catch {
         refreshBanner();
+      } finally {
+        asking = false;
       }
     };
 
     refreshBanner();
+
+    // Already allowed (or native APK) — subscribe without waiting for a tap.
     if (pushAutoTriedRef.current !== currentUserEmail) {
-      // Native APK still auto-registers; web waits for banner CTA unless already granted.
       const state = getWebPushPromptState();
       if (state.reason === 'native' || state.permission === 'granted') {
-        register();
+        register({ fromGesture: false });
       }
     }
+
+    // First real tap anywhere → OS Allow popup (as automatic as Apple allows).
+    const onFirstGesture = () => {
+      register({ fromGesture: true });
+    };
+    window.addEventListener('pointerdown', onFirstGesture, { once: true, passive: true });
+    window.addEventListener('touchstart', onFirstGesture, { once: true, passive: true });
+    window.addEventListener('click', onFirstGesture, { once: true, passive: true });
 
     const onVisibility = () => {
       if (document.visibilityState === 'visible') refreshBanner();
@@ -457,6 +489,9 @@ export default function UserLobby({
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
       cancelled = true;
+      window.removeEventListener('pointerdown', onFirstGesture);
+      window.removeEventListener('touchstart', onFirstGesture);
+      window.removeEventListener('click', onFirstGesture);
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [currentUserEmail]);
@@ -937,6 +972,22 @@ export default function UserLobby({
       showToast('Freeplay withdraw request must be at least $100.', 'error');
       return;
     }
+    // Last deposit rule: < $50 → ×5 min, ≥ $50 → ×3 min (does not change freeplay / remainder rules)
+    if (!isFreeplaySession) {
+      const lastDep = findLastSuccessDeposit(transactions, {
+        userEmail: currentUserEmail,
+        gameTitle: activeGame?.title
+      });
+      const depositMin = getDepositBasedMinWithdraw(lastDep?.amount);
+      if (depositMin != null && amountVal < depositMin) {
+        const mult = Number(lastDep.amount) < 50 ? 5 : 3;
+        showToast(
+          `Minimum cashout is $${depositMin.toFixed(2)} (last deposit $${parseFloat(lastDep.amount).toFixed(2)} × ${mult}).`,
+          'error'
+        );
+        return;
+      }
+    }
     setWithdrawModalOpen(true);
   };
 
@@ -1353,16 +1404,15 @@ export default function UserLobby({
                 </>
               ) : pushBanner.reason === 'denied' ? (
                 <>
-                  Notifications are blocked. Open phone <strong>Settings → Jackpot Royals / Chrome</strong> →
-                  allow Notifications for lock-screen offers.
+                  Notifications are blocked. Open phone <strong>Settings → Jackpot Royals</strong> →
+                  Notifications → Allow.
                 </>
               ) : (
                 <>
-                  Turn on <strong style={{ color: 'var(--gold-primary)' }}>lock-screen notifications</strong> so
-                  offers reach you even when the app is closed (Chrome, Safari Home Screen, or browser).
+                  Tap anywhere once — iPhone will ask to <strong style={{ color: 'var(--gold-primary)' }}>Allow</strong>{' '}
+                  lock-screen notifications (Apple does not allow silent auto-on).
                 </>
-              )}
-            </p>
+              )}            </p>
             <button
               type="button"
               onClick={dismissPushBanner}
@@ -2539,7 +2589,18 @@ export default function UserLobby({
                             <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
                               {isFreeplaySession
                                 ? 'Request $100 or more. Payout to finance is capped at $30.'
-                                : 'Request payout to your preferred tag.'}
+                                : (() => {
+                                    const lastDep = findLastSuccessDeposit(transactions, {
+                                      userEmail: currentUserEmail,
+                                      gameTitle: activeGame?.title
+                                    });
+                                    const depositMin = getDepositBasedMinWithdraw(lastDep?.amount);
+                                    if (depositMin != null) {
+                                      const mult = Number(lastDep.amount) < 50 ? 5 : 3;
+                                      return `Min cashout $${depositMin.toFixed(2)} (last deposit × ${mult}).`;
+                                    }
+                                    return 'Request payout to your preferred tag. Min $25.00.';
+                                  })()}
                             </p>
                           </div>
                           <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(239,68,68,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f87171' }}>

@@ -9,6 +9,7 @@ import { publishAdminEvent } from '../../../lib/adminEvents';
 import { accountLookupKey, buildGameUsernameMap } from '../../../lib/resolveGameUsername';
 import { compressDataUrlIfNeeded } from '../../../lib/serverImageCompress';
 import { applyStaffGameFilter } from '../../../lib/staffGameAccess';
+import { getDepositBasedMinWithdraw } from '../../../lib/withdrawRules';
 
 // GET transactions (supports filtering by email for users, or returning all for admins)
 export async function GET(req) {
@@ -624,6 +625,34 @@ export async function POST(req) {
           { success: false, message: 'Freeplay withdraw request must be at least $100.' },
           { status: 400 }
         );
+      }
+
+      // Deposit-based cashout floor (skip remainder claims + freeplay withdraw)
+      if (!txObject.isRemainderRequest && !txObject.isFreeplayWithdraw) {
+        const gameTitle = txObject.gameTitle || '';
+        const lastDeposit = await transactionsCollection.findOne(
+          {
+            userEmail: txObject.userEmail,
+            type: 'DEPOSIT',
+            status: 'SUCCESS',
+            ...(gameTitle
+              ? { gameTitle: { $regex: new RegExp(`^${String(gameTitle).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }
+              : {})
+          },
+          { sort: { createdAt: -1, id: -1 } }
+        );
+        const depositMin = getDepositBasedMinWithdraw(lastDeposit?.amount);
+        const askAmount = parseFloat(txObject.amount);
+        if (depositMin != null && Number.isFinite(askAmount) && askAmount < depositMin) {
+          const mult = Number(lastDeposit.amount) < 50 ? 5 : 3;
+          return NextResponse.json(
+            {
+              success: false,
+              message: `Minimum cashout is $${depositMin.toFixed(2)} (last deposit $${parseFloat(lastDeposit.amount).toFixed(2)} × ${mult}).`
+            },
+            { status: 400 }
+          );
+        }
       }
     }
 
