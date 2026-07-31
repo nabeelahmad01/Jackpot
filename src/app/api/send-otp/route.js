@@ -148,9 +148,14 @@ export async function POST(req) {
     const mailOptions = {
       from: `"Jackpot Royals" <${smtpUser}>`,
       to: email,
-      subject: `Your Jackpot Royals Verification Code: ${otp}`,
-      text: `Hello ${name || 'Player'},\n\nYour Jackpot Royals security verification code is: ${otp}\n\nThis code is valid for 10 minutes. Please do not share this code with anyone.\n\nPlay Smarter. Cashout Faster.\n© 2026 JackpotRoyals.com. All rights reserved.`,
-      html: htmlTemplate
+      subject: `${otp} is your verification code`,
+      text: `Hello ${name || 'Player'},\n\nYour security verification code is: ${otp}\n\nThis code is valid for 10 minutes. Please do not share this code with anyone.\n\nThank you,\nJackpot Royals Team`,
+      html: htmlTemplate,
+      headers: {
+        'X-Priority': '1',
+        'X-MSMail-Priority': 'High',
+        'Importance': 'high'
+      }
     };
 
     await transporter.sendMail(mailOptions);
