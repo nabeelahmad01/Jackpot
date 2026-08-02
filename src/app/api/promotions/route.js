@@ -56,11 +56,13 @@ import nodemailer from 'nodemailer';
 export async function POST(req) {
   try {
     const body = await req.json();
-    const { title, message, targetGroup, image, promoType, freeplayAmount, bonusPercent } = body;
+    const { title, message, targetGroup, dispatchChannel = 'all', image, promoType, freeplayAmount, bonusPercent } = body;
 
     if (!title || !message || !targetGroup) {
       return NextResponse.json({ success: false, message: 'Title, message, and target group are required.' }, { status: 400 });
     }
+
+    const channel = ['all', 'push', 'email', 'website'].includes(dispatchChannel) ? dispatchChannel : 'all';
 
     // Offer type: 'message' (plain announcement, no claim button),
     // 'freeplay' (user picks a game and requests freeplay), or
@@ -84,6 +86,7 @@ export async function POST(req) {
       title: title.trim(),
       message: message.trim(),
       targetGroup, // 'all' | 'subscribed' | 'unsubscribed' | 'active'
+      dispatchChannel: channel,
       image: image || '',
       promoType: type,
       freeplayAmount: fpAmount,
@@ -91,7 +94,10 @@ export async function POST(req) {
       timestamp: new Date().toISOString()
     };
 
-    await promotionsCollection.insertOne(promoObject);
+    // Save to website promo banners collection if channel includes website or all
+    if (channel === 'all' || channel === 'website') {
+      await promotionsCollection.insertOne(promoObject);
+    }
 
     // Get matching player emails based on the targetGroup
     // Exclude staff/admin roles — only these roles are excluded, everyone else gets the email
@@ -110,21 +116,25 @@ export async function POST(req) {
       const activeEmails = Array.from(new Set(txs.map(t => t.userEmail.toLowerCase().trim())));
       userQuery.email = { $in: activeEmails };
     }
-    // When targetGroup === 'all' → NO extra filter → ALL registered players get the email
 
     const targetUsers = await db.collection('users').find(userQuery).project({ email: 1 }).toArray();
     const emails = targetUsers.map(u => u.email).filter(Boolean);
     let pushResult = { sent: 0, failed: 0, skipped: true };
-    try {
-      pushResult = await sendPromotionPush(db, promoObject, emails);
-    } catch (pushError) {
-      console.error('Promotion push broadcast error:', pushError);
+
+    // Send push notification if channel includes push or all
+    if (channel === 'all' || channel === 'push') {
+      try {
+        pushResult = await sendPromotionPush(db, promoObject, emails);
+      } catch (pushError) {
+        console.error('Promotion push broadcast error:', pushError);
+      }
     }
 
     const smtpUser = process.env.SMTP_USER;
     const smtpPass = process.env.SMTP_PASS;
 
-    if (emails.length > 0) {
+    // Send email broadcast if channel includes email or all
+    if ((channel === 'all' || channel === 'email') && emails.length > 0) {
       if (smtpUser && smtpPass) {
         const smtpHost = process.env.SMTP_HOST;
         const transporter = smtpHost

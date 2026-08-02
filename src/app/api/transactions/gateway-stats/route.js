@@ -6,29 +6,66 @@ export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const adminDistributorId = searchParams.get('adminDistributorId');
-    const cacheKey = `gateway_stats_${adminDistributorId || 'platform'}`;
+    const monthParam = searchParams.get('month') || 'current'; // 'current' | 'YYYY-MM' | 'all'
+
+    const cacheKey = `gateway_stats_${adminDistributorId || 'platform'}_${monthParam}`;
     const cached = cache.get(cacheKey);
     if (cached) {
-      return NextResponse.json({ success: true, stats: cached });
+      return NextResponse.json({ success: true, stats: cached, month: monthParam });
     }
 
     const db = await getDb();
     const transactionsCollection = db.collection('transactions');
 
-    const matchCriteria = {
-      status: 'SUCCESS',
-      type: { $in: ['DEPOSIT', 'WITHDRAW'] }
-    };
+    const conditions = [
+      { status: 'SUCCESS' },
+      { type: { $in: ['DEPOSIT', 'WITHDRAW'] } }
+    ];
 
     if (adminDistributorId) {
-      matchCriteria.distributorId = adminDistributorId;
+      conditions.push({ distributorId: adminDistributorId });
     } else {
-      matchCriteria.$or = [
-        { distributorId: { $exists: false } },
-        { distributorId: null },
-        { distributorId: '' }
-      ];
+      conditions.push({
+        $or: [
+          { distributorId: { $exists: false } },
+          { distributorId: null },
+          { distributorId: '' }
+        ]
+      });
     }
+
+    if (monthParam !== 'all') {
+      let year, monthIdx;
+      const now = new Date();
+
+      if (monthParam === 'current') {
+        year = now.getFullYear();
+        monthIdx = now.getMonth();
+      } else {
+        const parts = monthParam.split('-');
+        if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+          year = parseInt(parts[0], 10);
+          monthIdx = parseInt(parts[1], 10) - 1;
+        } else {
+          year = now.getFullYear();
+          monthIdx = now.getMonth();
+        }
+      }
+
+      const startOfMonth = new Date(Date.UTC(year, monthIdx, 1, 0, 0, 0, 0));
+      const endOfMonth = new Date(Date.UTC(year, monthIdx + 1, 0, 23, 59, 59, 999));
+      const startIso = startOfMonth.toISOString();
+      const endIso = endOfMonth.toISOString();
+
+      conditions.push({
+        $or: [
+          { createdAt: { $gte: startIso, $lte: endIso } },
+          { date: { $gte: startIso, $lte: endIso } }
+        ]
+      });
+    }
+
+    const matchCriteria = { $and: conditions };
 
     const rows = await transactionsCollection
       .aggregate([
@@ -70,8 +107,8 @@ export async function GET(req) {
       };
     });
 
-    cache.set(cacheKey, stats, 45);
-    return NextResponse.json({ success: true, stats });
+    cache.set(cacheKey, stats, 30);
+    return NextResponse.json({ success: true, stats, month: monthParam });
   } catch (err) {
     console.error('Failed to fetch gateway stats:', err);
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });

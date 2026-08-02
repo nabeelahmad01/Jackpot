@@ -204,17 +204,34 @@ export default function CoinsAllotmentTab({
                           </button>
                           
                           {(noti.status === 'PENDING' || noti.status === 'CLAIM_REQUESTED') && (
-                            <button
-                              onClick={() => {
-                                setActiveHoldId(noti.id);
-                                setHoldNoteText("");
-                              }}
-                              className="submit-btn"
-                              style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: '#000', margin: 0, padding: '0.35rem 0.5rem', width: 'auto', display: 'inline-flex', gap: '0.25rem', alignItems: 'center', fontWeight: 'bold' }}
-                            >
-                              <i className="fa-solid fa-pause"></i>
-                              <span style={{ fontSize: '0.65rem' }}>HOLD</span>
-                            </button>
+                            <>
+                              <button
+                                onClick={() => {
+                                  setActiveHoldId(noti.id);
+                                  setHoldNoteText("");
+                                }}
+                                className="submit-btn"
+                                style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: '#000', margin: 0, padding: '0.35rem 0.5rem', width: 'auto', display: 'inline-flex', gap: '0.25rem', alignItems: 'center', fontWeight: 'bold' }}
+                              >
+                                <i className="fa-solid fa-pause"></i>
+                                <span style={{ fontSize: '0.65rem' }}>HOLD</span>
+                              </button>
+
+                              <button
+                                disabled={processingIds[noti.id]}
+                                onClick={wrapAction(noti.id, async () => {
+                                  if (window.confirm('Are you sure you want to cancel this coins allotment request?')) {
+                                    await handleUpdate(noti.id, 'CANCELLED', true, 'Cancelled by Administrator');
+                                  }
+                                })}
+                                className="submit-btn"
+                                style={{ background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)', color: '#fff', margin: 0, padding: '0.35rem 0.5rem', width: 'auto', display: 'inline-flex', gap: '0.25rem', alignItems: 'center', fontWeight: 'bold', opacity: processingIds[noti.id] ? 0.6 : 1 }}
+                                title="Cancel coins allotment directly"
+                              >
+                                {processingIds[noti.id] ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-xmark"></i>}
+                                <span style={{ fontSize: '0.65rem' }}>CANCEL</span>
+                              </button>
+                            </>
                           )}
                         </div>
 

@@ -428,6 +428,83 @@ export default function ShiftDashboardTab({ adminUser }) {
     }
   };
 
+  // Handle Allotment Direct Cancel (without requiring text note)
+  const handleCoinAllotmentCancel = async (notiId) => {
+    if (!window.confirm('Are you sure you want to cancel this coins allotment directly?')) {
+      return;
+    }
+    if (!notiId) {
+      alert('Missing notification id.');
+      return;
+    }
+
+    const row = findPendingCoin(notiId);
+    const txId = row?.transactionId;
+    setProcessingCoinId(notiId);
+    hideCoinRow(notiId, txId);
+    mutateCoins(
+      (current) => {
+        if (!current?.coinsNotifications) return current;
+        return {
+          ...current,
+          coinsNotifications: current.coinsNotifications.filter((n) => String(n.id) !== String(notiId)),
+          totalNotifications: Math.max(0, (current.totalNotifications || 1) - 1)
+        };
+      },
+      { revalidate: true }
+    );
+    if (txId) {
+      mutateCoinsLoading(
+        (current) => {
+          if (!current?.transactions) return current;
+          return {
+            ...current,
+            transactions: current.transactions.filter((t) => String(t.id) !== String(txId))
+          };
+        },
+        { revalidate: true }
+      );
+    }
+    try {
+      const res = await fetch('/api/coins-notifications', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: notiId,
+          status: 'CANCELLED',
+          read: true,
+          holdNote: 'Cancelled by Administrator',
+          processedBy: adminUser?.email || 'admin@jackpot.com',
+          adminEmail: adminUser?.email || ''
+        })
+      });
+      let data = null;
+      try {
+        data = await res.json();
+      } catch {
+        unhideCoinRow(notiId, txId);
+        mutateCoins();
+        mutateCoinsLoading();
+        alert(`Error cancelling allotment (HTTP ${res.status}). Please try again.`);
+        return;
+      }
+      if (!data.success) {
+        unhideCoinRow(notiId, txId);
+        mutateCoins();
+        mutateCoinsLoading();
+        alert(data.message || 'Failed to cancel allotment.');
+      }
+    } catch (err) {
+      console.error(err);
+      unhideCoinRow(notiId, txId);
+      mutateCoins();
+      mutateCoinsLoading();
+      alert(err?.message ? `Error cancelling allotment: ${err.message}` : 'Error cancelling allotment.');
+    } finally {
+      setProcessingCoinId(null);
+    }
+  };
+
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', animation: 'fade-in 0.2s ease-out' }}>
@@ -596,6 +673,15 @@ export default function ShiftDashboardTab({ adminUser }) {
                             >
                               Invalid
                             </button>
+                            <button
+                              onClick={() => handleCoinAllotmentCancel(noti.id)}
+                              disabled={processingCoinId === noti.id}
+                              className="submit-btn"
+                              style={{ background: '#991b1b', color: '#fff', margin: 0, padding: '0.35rem 0.85rem', width: 'auto', fontSize: '0.7rem', fontWeight: 'bold' }}
+                              title="Cancel coins direct without reason"
+                            >
+                              Cancel Direct
+                            </button>
                           </div>
                           {noti.distributorType === 'B' && (
                             <span style={{ fontSize: '0.6rem', color: '#3b82f6', display: 'block' }}>
@@ -693,6 +779,15 @@ export default function ShiftDashboardTab({ adminUser }) {
                               style={{ background: '#ef4444', color: '#fff', margin: 0, padding: '0.35rem 0.85rem', width: 'auto', fontSize: '0.7rem', fontWeight: 'bold' }}
                             >
                               Invalid
+                            </button>
+                            <button
+                              onClick={() => handleCoinAllotmentCancel(noti.id)}
+                              disabled={processingCoinId === noti.id}
+                              className="submit-btn"
+                              style={{ background: '#991b1b', color: '#fff', margin: 0, padding: '0.35rem 0.85rem', width: 'auto', fontSize: '0.7rem', fontWeight: 'bold' }}
+                              title="Cancel coins direct without reason"
+                            >
+                              Cancel Direct
                             </button>
                           </div>
                           {noti.distributorType === 'B' && (

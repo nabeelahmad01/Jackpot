@@ -40,6 +40,7 @@ export default function PromotionsTab({ adminUser }) {
   const [promoImage, setPromoImage] = useState('');
   const [promoImageError, setPromoImageError] = useState('');
   const [promoTarget, setPromoTarget] = useState('all'); // 'all' | 'subscribed' | 'unsubscribed' | 'active'
+  const [dispatchChannel, setDispatchChannel] = useState('all'); // 'all' | 'push' | 'email' | 'website'
   const [promoType, setPromoType] = useState('message'); // 'message' | 'freeplay' | 'deposit_bonus'
   const [promoFreeplayAmount, setPromoFreeplayAmount] = useState('');
   const [promoBonusPercent, setPromoBonusPercent] = useState('');
@@ -108,6 +109,7 @@ export default function PromotionsTab({ adminUser }) {
           title: promoTitle.trim(),
           message: promoMessage.trim(),
           targetGroup: promoTarget,
+          dispatchChannel,
           image: promoImage.trim(),
           promoType,
           freeplayAmount: promoType === 'freeplay' ? parseFloat(promoFreeplayAmount) || 0 : 0,
@@ -121,6 +123,7 @@ export default function PromotionsTab({ adminUser }) {
         setPromoMessage('');
         setPromoImage('');
         setPromoTarget('all');
+        setDispatchChannel('all');
         setPromoType('message');
         setPromoFreeplayAmount('');
         setPromoBonusPercent('');
@@ -414,7 +417,7 @@ export default function PromotionsTab({ adminUser }) {
                 </div>
               )}
 
-              <div className="input-group" style={{ marginBottom: '1.5rem' }}>
+              <div className="input-group">
                 <label htmlFor="promo-target">Target Player Group Segment</label>
                 <div className="input-wrapper">
                   <i className="fa-solid fa-users-viewfinder input-icon"></i>
@@ -430,6 +433,27 @@ export default function PromotionsTab({ adminUser }) {
                     <option value="active" style={{ background: '#0a0d16' }}>Active Playing Players Only (Depositors)</option>
                   </select>
                 </div>
+              </div>
+
+              <div className="input-group" style={{ marginBottom: '1.5rem' }}>
+                <label htmlFor="promo-channel">Dispatch Channel (Delivery Destination)</label>
+                <div className="input-wrapper">
+                  <i className="fa-solid fa-tower-broadcast input-icon"></i>
+                  <select
+                    id="promo-channel"
+                    value={dispatchChannel}
+                    onChange={(e) => setDispatchChannel(e.target.value)}
+                    className="promotions-select"
+                  >
+                    <option value="all" style={{ background: '#0a0d16' }}>ALL Channels (App Notification + Email + Website Promo Banner)</option>
+                    <option value="push" style={{ background: '#0a0d16' }}>App Push Notification Only</option>
+                    <option value="email" style={{ background: '#0a0d16' }}>Email Broadcast Only</option>
+                    <option value="website" style={{ background: '#0a0d16' }}>Website Promo Banner Only (In-App Lobby)</option>
+                  </select>
+                </div>
+                <span className="game-tap-tip" style={{ marginTop: '0.35rem', display: 'block' }}>
+                  Choose whether this promo goes out as an App Push, Email, Website Lobby Banner, or ALL 3.
+                </span>
               </div>
 
               <button

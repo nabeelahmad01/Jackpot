@@ -416,9 +416,9 @@ export async function PUT(req) {
       })();
 
       await Promise.all([poolPromise, parentPromise]);
-    } else if (status === 'HOLD') {
-      // Withdrawals: Invalid → fail parent tx. Deposits: keep HOLD on noti (reclaimable)
-      // but always stamp the reason on the parent so COINS_LOADING rows don't look "stuck".
+    } else if (status === 'HOLD' || status === 'CANCELLED') {
+      // Withdrawals or direct cancellation: fail parent tx.
+      // Stamp the reason on the parent so COINS_LOADING rows don't look "stuck".
       if (originalNoti.transactionId) {
         const transactionsCollection = db.collection('transactions');
         const parentTx = await transactionsCollection.findOne({
@@ -426,12 +426,12 @@ export async function PUT(req) {
         });
         if (parentTx) {
           const txUpdate = {
-            note: holdNote || 'Declined by Administrator.',
+            note: holdNote || (status === 'CANCELLED' ? 'Cancelled by Administrator.' : 'Declined by Administrator.'),
             allottedBy: processedBy || originalNoti.processedBy || 'system',
-            coinsHoldNote: holdNote || 'Declined by Administrator.',
+            coinsHoldNote: holdNote || (status === 'CANCELLED' ? 'Cancelled by Administrator.' : 'Declined by Administrator.'),
             coinsHoldAt: new Date().toISOString()
           };
-          if (originalNoti.totalCoins < 0) {
+          if (originalNoti.totalCoins < 0 || status === 'CANCELLED') {
             txUpdate.status = 'FAILED';
           }
           await transactionsCollection.updateOne(

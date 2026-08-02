@@ -81,11 +81,11 @@ self.addEventListener('push', (event) => {
     body: data.body || 'A new offer is available.',
     icon: data.icon || '/icon-192.png',
     badge: data.badge || '/icon-192.png',
-    image: data.image || undefined,
     tag: data.tag || 'jackpot-promo',
     renotify: true,
     vibrate: [120, 60, 120],
     requireInteraction: false,
+    ...(data.image ? { image: data.image } : {}),
     data: {
       url: data.url || '/lobby',
       promotionId: data.promotionId || null

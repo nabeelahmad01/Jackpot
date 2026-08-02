@@ -147,15 +147,11 @@ export async function POST(req) {
 
     const mailOptions = {
       from: `"Jackpot Royals" <${smtpUser}>`,
+      replyTo: smtpUser,
       to: email,
       subject: `${otp} is your verification code`,
       text: `Hello ${name || 'Player'},\n\nYour security verification code is: ${otp}\n\nThis code is valid for 10 minutes. Please do not share this code with anyone.\n\nThank you,\nJackpot Royals Team`,
-      html: htmlTemplate,
-      headers: {
-        'X-Priority': '1',
-        'X-MSMail-Priority': 'High',
-        'Importance': 'high'
-      }
+      html: htmlTemplate
     };
 
     await transporter.sendMail(mailOptions);
