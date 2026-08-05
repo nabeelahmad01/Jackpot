@@ -376,7 +376,7 @@ export async function POST(req) {
       hasAttachment: Boolean(attachment && String(attachment).trim()),
       senderType, // 'player' | 'admin'
       senderEmail: senderEmail ? senderEmail.toLowerCase().trim() : '',
-      read: senderType === 'admin', // default to read if admin, unread if player
+      read: false, // newly sent messages are unread by recipient
       timestamp: new Date().toISOString(),
       distributorId: distId,
       distributorType: distType,
@@ -409,19 +409,34 @@ export async function POST(req) {
 // PUT mark support messages as read
 export async function PUT(req) {
   try {
-    const { email } = await req.json();
+    const { email, role } = await req.json();
     if (!email) {
       return NextResponse.json({ success: false, message: 'User email is required.' }, { status: 400 });
     }
 
     const db = await getDb();
     const supportCollection = db.collection('supportMessages');
+    const userEmailKey = email.toLowerCase().trim();
 
-    // Update all player messages for this email to read: true
-    await supportCollection.updateMany(
-      { userEmail: email.toLowerCase().trim(), senderType: 'player', read: false },
-      { $set: { read: true } }
-    );
+    if (role === 'player') {
+      // Player is reading admin messages
+      await supportCollection.updateMany(
+        { userEmail: userEmailKey, senderType: 'admin', read: false },
+        { $set: { read: true, readAt: new Date().toISOString() } }
+      );
+    } else if (role === 'admin') {
+      // Admin is reading player messages
+      await supportCollection.updateMany(
+        { userEmail: userEmailKey, senderType: 'player', read: false },
+        { $set: { read: true, readAt: new Date().toISOString() } }
+      );
+    } else {
+      // Mark all opposing messages as read
+      await supportCollection.updateMany(
+        { userEmail: userEmailKey, read: false },
+        { $set: { read: true, readAt: new Date().toISOString() } }
+      );
+    }
 
     // Invalidate stats cache
     cache.del('admin_stats');

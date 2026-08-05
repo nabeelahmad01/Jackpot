@@ -245,7 +245,7 @@ export default function SupportTab({ adminUser }) {
         await fetch('/api/support', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: activeChatEmail })
+          body: JSON.stringify({ email: activeChatEmail, role: 'admin' })
         });
         mutateConversations();
       } catch (err) {
@@ -612,8 +612,19 @@ export default function SupportTab({ adminUser }) {
                           </div>
                         )}
                       </div>
-                      <span style={{ fontSize: '0.55rem', opacity: 0.5, marginTop: '0.15rem' }}>
+                      <span style={{ fontSize: '0.55rem', opacity: 0.65, marginTop: '0.15rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
                         {isMe ? 'You (Agent)' : (msg.userName && !/^support\s*agent$/i.test(msg.userName) ? msg.userName : activeChatDisplayName || 'Player')} • {formatDeviceTime(msg.timestamp)}
+                        {isMe && (
+                          msg.read ? (
+                            <span style={{ color: '#60a5fa', fontWeight: 'bold', marginLeft: '3px' }}>
+                              • <i className="fa-solid fa-check-double" style={{ fontSize: '0.6rem' }}></i> Seen
+                            </span>
+                          ) : (
+                            <span style={{ opacity: 0.6, marginLeft: '3px' }}>
+                              • <i className="fa-solid fa-check" style={{ fontSize: '0.6rem' }}></i> Sent
+                            </span>
+                          )
+                        )}
                       </span>
                     </div>
                   );

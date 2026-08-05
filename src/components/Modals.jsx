@@ -129,6 +129,15 @@ export function SupportModal({ isOpen, onClose, currentUser, onMessagesSeen }) {
           if (typeof onMessagesSeenRef.current === 'function') {
             onMessagesSeenRef.current(data.messages || []);
           }
+          // Mark admin messages as read by player
+          const hasUnreadAdmin = (data.messages || []).some(m => m.senderType === 'admin' && !m.read);
+          if (hasUnreadAdmin) {
+            fetch('/api/support', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: identity.email, role: 'player' })
+            }).catch(() => {});
+          }
         }
       } catch (err) {
         console.error('Failed to load support chat:', err);
@@ -257,8 +266,19 @@ export function SupportModal({ isOpen, onClose, currentUser, onMessagesSeen }) {
                         />
                       )}
                     </div>
-                    <span style={{ fontSize: '0.55rem', opacity: 0.5, marginTop: '0.2rem' }}>
+                    <span style={{ fontSize: '0.55rem', opacity: 0.65, marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
                       {isMe ? 'You' : 'Support Agent'} • {formatDeviceTime(msg.timestamp)}
+                      {isMe && (
+                        msg.read ? (
+                          <span style={{ color: '#60a5fa', fontWeight: 'bold', marginLeft: '3px' }}>
+                            • <i className="fa-solid fa-check-double" style={{ fontSize: '0.6rem' }}></i> Seen
+                          </span>
+                        ) : (
+                          <span style={{ opacity: 0.6, marginLeft: '3px' }}>
+                            • <i className="fa-solid fa-check" style={{ fontSize: '0.6rem' }}></i> Sent
+                          </span>
+                        )
+                      )}
                     </span>
                   </div>
                 );
