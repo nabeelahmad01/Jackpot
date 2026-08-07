@@ -18,6 +18,7 @@ import { compressImageFile } from '../lib/imageCompress';
 import { formatDeviceDateTime } from '../lib/formatDateTime';
 import PullToRefresh from './PullToRefresh';
 import { trackInitiateCheckout } from '../lib/metaPixel';
+import OfflineBanner from './OfflineBanner';
 import { registerNativeBackHandler } from '../lib/nativeBack';
 import {
   clearPendingDeposit,
@@ -1311,6 +1312,7 @@ export default function UserLobby({
 
   return (
     <div id="view-user-dashboard" className="player-lobby-shell">
+      <OfflineBanner />
       {/* Dynamic Header */}
       <header className="dashboard-header">
         <div className="lobby-brand" onClick={() => { setActiveGame(null); setActiveInvoice(null); setLobbySubView('main'); }} style={{ cursor: 'pointer' }}>

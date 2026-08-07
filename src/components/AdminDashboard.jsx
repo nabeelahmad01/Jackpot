@@ -13,6 +13,7 @@ import { initAudioUnlock, playNotificationSound } from '../lib/notificationSound
 import { initDesktopNotifications, notifyStaffActivity } from '../lib/desktopNotify';
 import { subscribeToStaffPush } from '../lib/pushClient';
 import { registerNativeBackHandler } from '../lib/nativeBack';
+import OfflineBanner from './OfflineBanner';
 
 // Lazy load tab components with automatic retry on chunk failures
 const OverviewTab = lazyWithRetry(() => import('./admin/OverviewTab'));
@@ -83,13 +84,17 @@ export default function AdminDashboard({
     };
   }, []);
 
-  // Keep URL in sync when user switches tabs (pushState so Android back can undo)
   useEffect(() => {
     if (suppressUrlSyncRef.current) return;
     const targetPath = `/admin/${activeTab}`;
     if (window.location.pathname !== targetPath) {
       window.history.pushState({ adminTab: activeTab }, '', targetPath);
     }
+    try {
+      if (typeof window !== 'undefined' && window.location.href.startsWith('http')) {
+        localStorage.setItem('jackpot_last_online_url', window.location.href);
+      }
+    } catch (_) {}
   }, [activeTab]);
 
   // Hide floating headset FAB while already on Live Support (it covers Reply)
@@ -380,6 +385,7 @@ export default function AdminDashboard({
 
   return (
     <div id="view-admin-dashboard" className="admin-dashboard-layout">
+      <OfflineBanner />
       {/* Mobile Top Header Bar */}
       <div className="admin-mobile-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>

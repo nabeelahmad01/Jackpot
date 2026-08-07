@@ -23,6 +23,7 @@ import { subscribeToDistributorPush } from '../../lib/pushClient';
 import useSessionGuard from '../../hooks/useSessionGuard';
 import { formatDeviceDateTime } from '../../lib/formatDateTime';
 import PullToRefresh from '../../components/PullToRefresh';
+import OfflineBanner from '../../components/OfflineBanner';
 import { registerNativeBackHandler } from '../../lib/nativeBack';
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -118,6 +119,11 @@ export default function DistributorPortal() {
       // pushState so Android back can step through tabs, then exit at root
       window.history.pushState({ distributorTab: activeTab }, '', targetPath);
     }
+    try {
+      if (typeof window !== 'undefined' && window.location.href.startsWith('http')) {
+        localStorage.setItem('jackpot_last_online_url', window.location.href);
+      }
+    } catch (_) {}
   }, [activeTab]);
 
   // Android back: close mobile sidebar first
@@ -1349,6 +1355,7 @@ export default function DistributorPortal() {
 
   return (
     <div className="admin-dashboard-layout" style={{ minHeight: '100vh', background: '#060812', color: '#fff', fontFamily: "'Inter', sans-serif" }}>
+      <OfflineBanner />
       <ParticlesBackground />
 
       <div className="admin-mobile-header">
