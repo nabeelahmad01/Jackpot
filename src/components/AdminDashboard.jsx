@@ -75,8 +75,12 @@ export default function AdminDashboard({
       suppressUrlSyncRef.current = false;
     };
     window.addEventListener('popstate', syncFromPath);
+    window.addEventListener('focus', syncFromPath);
     syncFromPath();
-    return () => window.removeEventListener('popstate', syncFromPath);
+    return () => {
+      window.removeEventListener('popstate', syncFromPath);
+      window.removeEventListener('focus', syncFromPath);
+    };
   }, []);
 
   // Keep URL in sync when user switches tabs (pushState so Android back can undo)
@@ -250,10 +254,16 @@ export default function AdminDashboard({
         if (hasNewCoin) parts.push('coins request');
         if (hasNewChat) parts.push('support message');
         if (hasNewCampaign) parts.push('campaign request');
+        let targetUrl = '/admin';
+        if (hasNewCoin) targetUrl = '/admin/coins';
+        else if (hasNewChat) targetUrl = '/admin/support';
+        else if (hasNewCampaign) targetUrl = '/admin/campaign_requests';
+        else if (hasNewRequest || hasNewTx) targetUrl = '/admin/requests';
+
         notifyStaffActivity({
           title: 'Jackpot Royals — New activity',
           body: `New ${parts.join(', ')} received.`,
-          url: '/admin'
+          url: targetUrl
         });
       } catch (_) {
         // never break dashboard for notifications

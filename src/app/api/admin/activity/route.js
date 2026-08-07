@@ -152,7 +152,7 @@ export async function GET(req) {
         notifyStaffAsync(db, {
           title: 'Requests waiting 5+ minutes',
           body: `${pendingCount} pending task(s) need a response. Open Jackpot Portal.`,
-          url: '/admin',
+          url: '/admin/requests',
           tag: 'staff-unresponded-5m',
           alertKind: 'general'
         });

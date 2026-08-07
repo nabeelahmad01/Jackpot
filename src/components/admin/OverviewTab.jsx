@@ -68,7 +68,7 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
         notifyStaffActivity({
           title: 'Requests waiting 5+ minutes',
           body: `${activityData?.pendingCount || 0} pending task(s) need a response.`,
-          url: '/admin'
+          url: '/admin/requests'
         });
       } catch {
         /* ignore */

@@ -95,15 +95,20 @@ export default function DistributorPortal() {
     const syncFromPath = () => {
       const parts = window.location.pathname.split('/').filter(Boolean);
       if (parts[0] === 'distributor' && parts[1]) {
-        setActiveTab(parts[1]);
+        const tab = parts[1] === 'coins' ? 'operations' : parts[1];
+        setActiveTab(tab);
       } else if (parts[0] === 'distributor') {
         setActiveTab('overview');
       }
       suppressUrlSyncRef.current = false;
     };
     window.addEventListener('popstate', syncFromPath);
+    window.addEventListener('focus', syncFromPath);
     syncFromPath();
-    return () => window.removeEventListener('popstate', syncFromPath);
+    return () => {
+      window.removeEventListener('popstate', syncFromPath);
+      window.removeEventListener('focus', syncFromPath);
+    };
   }, []);
 
   useEffect(() => {
@@ -486,10 +491,15 @@ export default function DistributorPortal() {
         if (hasNewRequest) parts.push('account request');
         if (hasNewCoin) parts.push('coins request');
         if (hasNewLedger) parts.push('payout/ledger update');
+        let targetUrl = '/distributor';
+        if (hasNewCoin) targetUrl = '/distributor/operations';
+        else if (hasNewRequest) targetUrl = '/distributor/requests';
+        else if (hasNewLedger) targetUrl = '/distributor/ledger';
+
         notifyStaffActivity({
           title: 'Jackpot Royals — New activity',
           body: `New ${parts.join(', ')} received.`,
-          url: '/distributor'
+          url: targetUrl
         });
       } catch (_) {
         // never break the panel for notifications

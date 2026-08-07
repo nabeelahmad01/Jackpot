@@ -393,7 +393,9 @@ export async function POST(req) {
       notifyStaffAndDistributorAsync(db, {
         title: 'New Support Message',
         body: `${userName || userEmail}: ${(message || 'Attachment').slice(0, 100)}`,
-        url: '/admin',
+        adminUrl: '/admin/support',
+        distributorUrl: '/distributor/support',
+        url: '/admin/support',
         tag: `support-${newMsg.id}`,
         alertKind: 'support'
       }, distId);

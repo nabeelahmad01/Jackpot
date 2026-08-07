@@ -685,7 +685,9 @@ export async function POST(req) {
     notifyStaffAndDistributorAsync(db, {
       title: 'New Account Request',
       body: `${cleanEmail} · ${cleanTitle}`,
-      url: '/admin',
+      adminUrl: '/admin/requests',
+      distributorUrl: '/distributor/requests',
+      url: '/admin/requests',
       tag: `acct-${newRequest.id}`,
       gameTitle: cleanTitle,
       alertKind: 'coins'

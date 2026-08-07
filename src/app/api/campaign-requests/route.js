@@ -124,7 +124,7 @@ export async function POST(req) {
     notifyStaffAsync(db, {
       title: 'New Campaign Request',
       body: `${cleanEmail} · $${budgetVal.toFixed(2)} · ${campaignName.trim()}`,
-      url: '/admin',
+      url: '/admin/campaign_requests',
       tag: `campaign-${newRequest.id}`,
       alertKind: 'campaign'
     });

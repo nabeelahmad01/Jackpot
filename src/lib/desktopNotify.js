@@ -235,6 +235,16 @@ async function showDesktopNotification(title, body, url) {
       } catch {
         // ignore
       }
+      if (targetUrl) {
+        try {
+          const destination = new URL(targetUrl, window.location.origin).href;
+          if (window.location.href !== destination) {
+            window.location.href = targetUrl;
+          }
+        } catch {
+          window.location.href = targetUrl;
+        }
+      }
       notification.close();
     };
   } catch {

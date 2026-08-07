@@ -380,7 +380,9 @@ export async function POST(req) {
       notifyStaffAndDistributorAsync(db, {
         title: 'Remainder Payout Request',
         body: `${txObject.userEmail} · $${parseFloat(txObject.amount || 0).toFixed(2)}`,
-        url: '/admin',
+        adminUrl: '/admin/requests',
+        distributorUrl: '/distributor/requests',
+        url: '/admin/requests',
         tag: `tx-${txObject.id}`,
         gameTitle: txObject.gameTitle || parentTx?.gameTitle || '',
         alertKind: 'game'
@@ -715,7 +717,9 @@ export async function POST(req) {
     notifyStaffAndDistributorAsync(db, {
       title: `New ${alertType}`,
       body: `${txObject.userEmail || 'Player'} · $${parseFloat(txObject.amount || 0).toFixed(2)}${txObject.gameTitle ? ` · ${txObject.gameTitle}` : ''}`,
-      url: '/admin',
+      adminUrl: '/admin/requests',
+      distributorUrl: '/distributor/requests',
+      url: '/admin/requests',
       tag: `tx-${txObject.id}`,
       gameTitle: txObject.gameTitle || '',
       alertKind: 'game'
@@ -1095,7 +1099,9 @@ export async function PUT(req) {
           notifyStaffAndDistributorAsync(db, {
             title: 'Coins allotment ready',
             body: `${userEmail} · ${coinsLabel}${originalTx.gameTitle ? ` · ${originalTx.gameTitle}` : ''}`,
-            url: '/admin',
+            adminUrl: '/admin/coins',
+            distributorUrl: '/distributor/operations',
+            url: '/admin/coins',
             tag: `coins-${originalTx.id}`,
             gameTitle: originalTx.gameTitle || '',
             alertKind: 'coins'

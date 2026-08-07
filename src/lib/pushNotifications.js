@@ -704,10 +704,13 @@ export function notifyStaffAndDistributorAsync(db, alert, distributorId) {
   Promise.resolve()
     .then(() => {
       if (distId) {
+        const distUrl =
+          alert?.distributorUrl ||
+          (alert?.url ? alert.url.replace(/^\/admin/, '/distributor') : '/distributor');
         notifyDistributorAsync(db, {
           ...alert,
           distributorId: distId,
-          url: '/distributor',
+          url: distUrl,
           gameTitle: alert?.gameTitle || '',
           alertKind: alert?.alertKind || ''
         });
@@ -716,7 +719,7 @@ export function notifyStaffAndDistributorAsync(db, alert, distributorId) {
 
       notifyStaffAsync(db, {
         ...alert,
-        url: alert?.url || '/admin'
+        url: alert?.adminUrl || alert?.url || '/admin'
       });
     })
     .catch((err) => console.error('notifyStaffAndDistributorAsync failed:', err));
