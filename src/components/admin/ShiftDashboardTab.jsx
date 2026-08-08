@@ -634,8 +634,8 @@ export default function ShiftDashboardTab({ adminUser }) {
                     </td>
                     <td><span className="admin-badge-preview b-hot" style={{ fontSize: '0.65rem' }}>{noti.gameTitle}</span></td>
                     <td>
-                      <span style={{ fontSize: '0.725rem', color: '#2ecc71', textTransform: 'uppercase', fontWeight: 'bold' }}>
-                        deposit
+                      <span style={{ fontSize: '0.725rem', color: noti.isDepositFromCashout ? '#eab308' : '#2ecc71', textTransform: 'uppercase', fontWeight: 'bold' }}>
+                        {noti.isDepositFromCashout ? 'FROM CASHOUT' : 'deposit'}
                       </span>
                     </td>
                     <td>

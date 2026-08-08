@@ -87,6 +87,49 @@ export default function UserLobby({
   const [claimedRemainderIds, setClaimedRemainderIds] = useState([]);
   const [isFreeplaySession, setIsFreeplaySession] = useState(false);
   const [appInstallOpen, setAppInstallOpen] = useState(false);
+  const [cashoutDepositModalOpen, setCashoutDepositModalOpen] = useState(false);
+  const [cashoutDepositAmount, setCashoutDepositAmount] = useState('');
+  const [submittingCashoutDep, setSubmittingCashoutDep] = useState(false);
+
+  const totalAvailableCashoutHold = useMemo(() => {
+    if (!transactions || !currentUserEmail) return 0;
+    const email = currentUserEmail.toLowerCase().trim();
+    return transactions
+      .filter((t) => (t.userEmail || '').toLowerCase().trim() === email && parseFloat(t.payoutHold || 0) > 0)
+      .reduce((sum, t) => sum + parseFloat(t.payoutHold || 0), 0);
+  }, [transactions, currentUserEmail]);
+
+  const handleConfirmCashoutDeposit = async (e) => {
+    e?.preventDefault();
+    const amt = parseFloat(cashoutDepositAmount);
+    if (!amt || amt <= 0) {
+      showToast('Please enter a valid deposit amount.', 'error');
+      return;
+    }
+    if (amt > totalAvailableCashoutHold) {
+      showToast(`Deposit amount exceeds available cashout hold ($${totalAvailableCashoutHold.toFixed(2)}).`, 'error');
+      return;
+    }
+    setSubmittingCashoutDep(true);
+    try {
+      const allottedAcc = (gameAccounts || []).find((acc) => acc.gameTitle === activeGame?.title);
+      await onSubmitTransaction({
+        gameTitle: activeGame?.title,
+        amount: amt,
+        type: 'DEPOSIT',
+        isDepositFromCashout: true,
+        gameUsername: allottedAcc ? allottedAcc.username : ''
+      });
+      showToast('Deposit from cashout submitted successfully!', 'success');
+      setCashoutDepositModalOpen(false);
+      setCashoutDepositAmount('');
+    } catch (err) {
+      showToast(err?.message || 'Failed to submit deposit from cashout', 'error');
+    } finally {
+      setSubmittingCashoutDep(false);
+    }
+  };
+
   const [pushBanner, setPushBanner] = useState({ show: false, reason: '', canEnable: false });
   const [pushBannerBusy, setPushBannerBusy] = useState(false);
   const [pushBannerDismissed, setPushBannerDismissed] = useState(false);
@@ -2574,6 +2617,51 @@ export default function UserLobby({
                             <span style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>DEPOSIT</span>
                           </button>
                         </form>
+
+                        {totalAvailableCashoutHold > 0 && (
+                          <div style={{
+                            marginTop: '0.85rem',
+                            padding: '0.85rem 1rem',
+                            background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.12) 0%, rgba(168, 85, 247, 0.12) 100%)',
+                            border: '1.5px dashed rgba(234, 179, 8, 0.4)',
+                            borderRadius: '12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justify: 'space-between',
+                            gap: '0.75rem',
+                            flexWrap: 'wrap'
+                          }}>
+                            <div>
+                              <span style={{ fontSize: '0.775rem', fontWeight: 'bold', color: '#ffe16c', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <i className="fa-solid fa-gift" style={{ color: '#eab308' }}></i> Add deposit from cashout
+                              </span>
+                              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.15rem' }}>
+                                Available Cashout Hold: <strong style={{ color: '#4ade80' }}>${totalAvailableCashoutHold.toFixed(2)}</strong>
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCashoutDepositAmount(Math.min(25, totalAvailableCashoutHold).toString());
+                                setCashoutDepositModalOpen(true);
+                              }}
+                              style={{
+                                background: 'linear-gradient(135deg, #eab308 0%, #a855f7 100%)',
+                                color: '#000',
+                                fontWeight: 'bold',
+                                border: 'none',
+                                borderRadius: '8px',
+                                padding: '0.45rem 0.85rem',
+                                fontSize: '0.675rem',
+                                cursor: 'pointer',
+                                letterSpacing: '0.5px',
+                                boxShadow: '0 2px 8px rgba(234, 179, 8, 0.25)'
+                              }}
+                            >
+                              Add deposit from cashout &rarr;
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       {/* Withdraw Box */}
@@ -2744,8 +2832,8 @@ export default function UserLobby({
                               <tr key={tx.id}>
                                 <td>{(txPage - 1) * txLimit + idx + 1}</td>
                                 <td>
-                                  <span className={`admin-badge-preview ${tx.type === 'DEPOSIT' ? 'b-hot' : tx.type === 'BONUS' ? 'b-vip' : 'b-new'}`} style={{ textTransform: 'uppercase', padding: '0.2rem 0.5rem', borderRadius: '4px', background: tx.type === 'BONUS' ? '#a855f7' : undefined, color: tx.type === 'BONUS' ? '#fff' : undefined }}>
-                                    {tx.type}
+                                  <span className={`admin-badge-preview ${tx.isDepositFromCashout ? 'b-vip' : tx.type === 'DEPOSIT' ? 'b-hot' : tx.type === 'BONUS' ? 'b-vip' : 'b-new'}`} style={{ textTransform: 'uppercase', padding: '0.2rem 0.5rem', borderRadius: '4px', background: tx.isDepositFromCashout ? 'linear-gradient(135deg, #eab308, #a855f7)' : tx.type === 'BONUS' ? '#a855f7' : undefined, color: (tx.isDepositFromCashout || tx.type === 'BONUS') ? '#fff' : undefined }}>
+                                    {tx.isDepositFromCashout ? 'CASHOUT DEP' : tx.type}
                                   </span>
                                 </td>
                                 <td>
@@ -2766,7 +2854,7 @@ export default function UserLobby({
                                 <td>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                                     <span style={{ fontSize: '0.725rem', opacity: 0.8 }}>
-                                      {tx.note && tx.status !== 'FAILED' ? tx.note : (tx.code === 'SIGNUP-FREE3' ? 'Freeplay (SIGNUP-FREE3)' : tx.code === 'FREEPLAY' ? 'Freeplay' : `${tx.gateway} (${tx.code})`)}
+                                      {tx.isDepositFromCashout ? 'Added deposit from remaining cashout' : tx.note && tx.status !== 'FAILED' ? tx.note : (tx.code === 'SIGNUP-FREE3' ? 'Freeplay (SIGNUP-FREE3)' : tx.code === 'FREEPLAY' ? 'Freeplay' : `${tx.gateway} (${tx.code})`)}
                                     </span>
                                     {tx.type === 'WITHDRAW' && (
                                       <RemainderClaimAction
@@ -2831,6 +2919,102 @@ export default function UserLobby({
         gateways={gateways}
         onSelectMethod={handleSelectGateway}
       />
+
+      {/* Modal: Add Deposit from Cashout */}
+      {cashoutDepositModalOpen && (
+        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', backdropFilter: 'blur(8px)', animation: 'fade-in 0.25s ease-out' }}>
+          <div className="auth-card" style={{ maxWidth: '460px', width: '100%', padding: '2rem 1.75rem', position: 'relative', animation: 'scale-up 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)' }}>
+            <div className="glow-border-layer"></div>
+
+            <button
+              onClick={() => setCashoutDepositModalOpen(false)}
+              className="close-modal"
+              style={{ position: 'absolute', top: '1rem', right: '1.25rem', background: 'none', border: 'none', color: '#fff', fontSize: '1.25rem', cursor: 'pointer', zIndex: 10 }}
+            >
+              &times;
+            </button>
+
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'linear-gradient(135deg, rgba(234,179,8,0.2), rgba(168,85,247,0.2))', border: '1px solid rgba(234,179,8,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem auto', color: '#eab308', fontSize: '1.25rem' }}>
+                <i className="fa-solid fa-coins"></i>
+              </div>
+              <h3 style={{ fontSize: '1.1rem', color: '#fff', fontWeight: 'bold', marginBottom: '0.35rem' }}>
+                Add Deposit from Cashout
+              </h3>
+              <p style={{ fontSize: '0.725rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                Transfer coins directly into <strong style={{ color: '#ffe16c' }}>{activeGame?.title || 'Game'}</strong> using your remaining cashout on hold.
+              </p>
+            </div>
+
+            <div style={{ background: 'rgba(234, 179, 8, 0.08)', border: '1px solid rgba(234, 179, 8, 0.25)', borderRadius: '12px', padding: '0.85rem 1rem', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.725rem', color: 'var(--text-muted)' }}>Available Cashout Hold:</span>
+              <strong style={{ fontSize: '1rem', color: '#4ade80' }}>${totalAvailableCashoutHold.toFixed(2)}</strong>
+            </div>
+
+            <form onSubmit={handleConfirmCashoutDeposit}>
+              <div className="input-group" style={{ marginBottom: '1rem' }}>
+                <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Deposit Amount ($)
+                </label>
+                <div className="input-wrapper" style={{ background: '#0b0c16' }}>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="1"
+                    max={totalAvailableCashoutHold}
+                    placeholder="Enter deposit amount"
+                    value={cashoutDepositAmount}
+                    onChange={(e) => setCashoutDepositAmount(e.target.value)}
+                    style={{ padding: '0.75rem 1rem' }}
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Quick Preset Buttons */}
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                {[10, 25, 50, totalAvailableCashoutHold].filter((val, i, self) => val > 0 && val <= totalAvailableCashoutHold && self.indexOf(val) === i).map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setCashoutDepositAmount(preset.toString())}
+                    style={{
+                      flex: 1,
+                      padding: '0.4rem',
+                      background: cashoutDepositAmount === preset.toString() ? 'rgba(234, 179, 8, 0.25)' : '#0b0c16',
+                      border: cashoutDepositAmount === preset.toString() ? '1px solid #eab308' : '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: '8px',
+                      color: '#fff',
+                      fontSize: '0.7rem',
+                      fontWeight: 'bold',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {preset === totalAvailableCashoutHold ? 'Max' : `$${preset}`}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="submit"
+                disabled={submittingCashoutDep}
+                className="submit-btn"
+                style={{
+                  background: 'linear-gradient(135deg, #eab308 0%, #a855f7 100%)',
+                  color: '#000',
+                  fontWeight: 'bold',
+                  marginTop: 0,
+                  padding: '0.85rem',
+                  opacity: submittingCashoutDep ? 0.6 : 1,
+                  cursor: submittingCashoutDep ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {submittingCashoutDep ? 'Submitting Request...' : 'CONFIRM DEPOSIT FROM CASHOUT'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Payout Withdrawal Modal Overlay */}
       {withdrawModalOpen && (

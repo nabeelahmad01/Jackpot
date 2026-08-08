@@ -1836,8 +1836,8 @@ export default function DistributorPortal() {
                         <tr key={tx.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
                           <td style={{ padding: '0.6rem 0.5rem' }}>{tx.userEmail}</td>
                           <td style={{ padding: '0.6rem 0.5rem' }}>
-                            <span style={{ color: tx.isFreeplayWithdraw ? '#9b59b6' : (tx.type === 'DEPOSIT' ? '#2ecc71' : '#e74c3c'), fontWeight: 'bold' }}>
-                              {tx.isFreeplayWithdraw ? 'FREEPLAY' : tx.type}
+                            <span style={{ color: tx.isDepositFromCashout ? '#f1c40f' : tx.isFreeplayWithdraw ? '#9b59b6' : (tx.type === 'DEPOSIT' ? '#2ecc71' : '#e74c3c'), fontWeight: 'bold' }}>
+                              {tx.isDepositFromCashout ? 'CASHOUT DEP' : tx.isFreeplayWithdraw ? 'FREEPLAY' : tx.type}
                             </span>
                           </td>
                           <td style={{ padding: '0.6rem 0.5rem', fontWeight: 'bold' }}>${parseFloat(tx.amount || 0).toFixed(2)}</td>

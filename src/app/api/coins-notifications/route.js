@@ -387,13 +387,53 @@ export async function PUT(req) {
               txUpdate.note = 'Freeplay win capped at $30 max cashout.';
             }
           } else if (parentTx.type === 'DEPOSIT' || parentTx.type === 'BONUS') {
-            // Must leave COINS_LOADING or Shift Dashboard synthetic row returns after refresh
             txUpdate.status = 'SUCCESS';
+            if (originalNoti.isDepositFromCashout || parentTx.isDepositFromCashout) {
+              txUpdate.note = 'Added deposit from remaining cashout';
+            }
           }
           await transactionsCollection.updateOne(
             parentTx._id ? { _id: parentTx._id } : { id: parentTx.id },
             { $set: txUpdate }
           );
+
+          // If deposit from cashout: automatically deduct from source withdrawal's payoutHold
+          if (originalNoti.isDepositFromCashout || parentTx.isDepositFromCashout) {
+            const parentWithdrawId = originalNoti.parentTxId || parentTx.parentTxId;
+            let sourceWithdrawTx = null;
+            if (parentWithdrawId) {
+              const widVariants = [parentWithdrawId, String(parentWithdrawId)];
+              if (!Number.isNaN(Number(parentWithdrawId))) widVariants.push(Number(parentWithdrawId));
+              sourceWithdrawTx = await transactionsCollection.findOne({ id: { $in: widVariants } });
+            }
+            if (!sourceWithdrawTx) {
+              // Fallback to user's latest withdrawal transaction with payoutHold > 0
+              sourceWithdrawTx = await transactionsCollection.findOne(
+                {
+                  userEmail: (originalNoti.userEmail || parentTx.userEmail || '').toLowerCase().trim(),
+                  type: { $in: ['WITHDRAW', 'COMMISSION_WITHDRAW', 'AFFILIATE_COMMISSION_WITHDRAW'] },
+                  payoutHold: { $gt: 0 }
+                },
+                { sort: { createdAt: -1, id: -1 } }
+              );
+            }
+            if (sourceWithdrawTx && parseFloat(sourceWithdrawTx.payoutHold || 0) > 0) {
+              const currentHold = parseFloat(sourceWithdrawTx.payoutHold || 0);
+              const depositVal = parseFloat(originalNoti.depositAmount || originalNoti.totalCoins || parentTx.amount || 0);
+              const newHold = Math.max(0, Math.round((currentHold - depositVal) * 100) / 100);
+              const withdrawUpdate = { payoutHold: newHold };
+              if (newHold <= 0) {
+                withdrawUpdate.payoutHold = 0;
+                withdrawUpdate.remainderPaid = true;
+              }
+              await transactionsCollection.updateOne(
+                sourceWithdrawTx._id ? { _id: sourceWithdrawTx._id } : { id: sourceWithdrawTx.id },
+                { $set: withdrawUpdate }
+              );
+              cache.del('admin_stats');
+              publishAdminEvent('transactions', { distributorId: sourceWithdrawTx.distributorId || '' });
+            }
+          }
 
           // Close any duplicate PENDING/CLAIM rows for the same deposit
           await notificationsCollection.updateMany(

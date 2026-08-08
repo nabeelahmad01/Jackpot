@@ -391,6 +391,117 @@ export async function POST(req) {
       return NextResponse.json({ success: true, transaction: txObject, message: 'Remaining payout request submitted successfully!' });
     }
 
+    if (newTx.isDepositFromCashout) {
+      const askAmount = parseFloat(newTx.amount || 0);
+      if (!askAmount || askAmount <= 0) {
+        return NextResponse.json({ success: false, message: 'Please enter a valid deposit amount.' }, { status: 400 });
+      }
+
+      // Find user's withdrawal transactions with payoutHold > 0
+      const holdWithdrawals = await transactionsCollection.find({
+        userEmail: userEmail.toLowerCase().trim(),
+        type: { $in: ['WITHDRAW', 'COMMISSION_WITHDRAW', 'AFFILIATE_COMMISSION_WITHDRAW'] },
+        payoutHold: { $gt: 0 }
+      }).sort({ createdAt: -1, id: -1 }).toArray();
+
+      const totalAvailableHold = holdWithdrawals.reduce((sum, tx) => sum + parseFloat(tx.payoutHold || 0), 0);
+
+      if (totalAvailableHold <= 0) {
+        return NextResponse.json({ success: false, message: 'No remaining cashout balance available to deposit from.' }, { status: 400 });
+      }
+
+      if (askAmount > totalAvailableHold) {
+        return NextResponse.json({
+          success: false,
+          message: `Deposit amount ($${askAmount.toFixed(2)}) exceeds available remaining cashout ($${totalAvailableHold.toFixed(2)}).`
+        }, { status: 400 });
+      }
+
+      // Select parent transaction to deduct from (specific parentTxId or latest with hold)
+      let parentTx = null;
+      if (newTx.parentTxId) {
+        parentTx = holdWithdrawals.find(t => String(t.id) === String(newTx.parentTxId));
+      }
+      if (!parentTx) {
+        parentTx = holdWithdrawals[0];
+      }
+
+      const txObject = {
+        id: (Date.now() + Math.floor(Math.random() * 100)).toString(),
+        userEmail: userEmail.toLowerCase().trim(),
+        date: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        status: 'COINS_LOADING',
+        type: 'DEPOSIT',
+        amount: askAmount,
+        gateway: 'Remaining Cashout',
+        code: 'CASHOUT-DEP',
+        gameTitle: newTx.gameTitle || 'Lobby',
+        gameUsername: newTx.gameUsername || '',
+        note: 'Added deposit from remaining cashout',
+        isDepositFromCashout: true,
+        parentTxId: String(parentTx.id),
+        distributorId: distId,
+        distributorType: distType
+      };
+
+      const notificationsCollection = db.collection('coinsNotifications');
+
+      let coinGameUsername = newTx.gameUsername || '';
+      if (!coinGameUsername) {
+        try {
+          const umap = await buildGameUsernameMap(db, [userEmail.toLowerCase().trim()], { dedupe: false });
+          coinGameUsername = umap[accountLookupKey(userEmail, txObject.gameTitle)] || '';
+        } catch {
+          /* ignore */
+        }
+      }
+
+      const notiObject = {
+        id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
+        userEmail: txObject.userEmail,
+        gameTitle: txObject.gameTitle,
+        gameUsername: coinGameUsername,
+        depositAmount: askAmount,
+        bonusApplied: 0,
+        totalCoins: askAmount,
+        status: 'PENDING',
+        read: false,
+        timestamp: new Date().toISOString(),
+        transactionId: txObject.id,
+        isDepositFromCashout: true,
+        parentTxId: String(parentTx.id),
+        note: 'Added deposit from remaining cashout',
+        distributorId: distId,
+        distributorType: distType
+      };
+
+      await Promise.all([
+        transactionsCollection.insertOne(txObject),
+        notificationsCollection.insertOne(notiObject)
+      ]);
+
+      cache.del('admin_stats');
+      publishAdminEvent('transactions', { distributorId: txObject.distributorId || '' });
+
+      notifyStaffAndDistributorAsync(db, {
+        title: 'Deposit from Cashout',
+        body: `${txObject.userEmail} · $${askAmount.toFixed(2)} · ${txObject.gameTitle}`,
+        adminUrl: '/admin/requests',
+        distributorUrl: '/distributor/requests',
+        url: '/admin/requests',
+        tag: `tx-${txObject.id}`,
+        gameTitle: txObject.gameTitle,
+        alertKind: 'game'
+      }, txObject.distributorId);
+
+      return NextResponse.json({
+        success: true,
+        transaction: txObject,
+        message: 'Deposit from remaining cashout submitted successfully! Coins loading is in progress.'
+      });
+    }
+
     if (!newTx.type) {
       return NextResponse.json({ success: false, message: 'Missing transaction type.' }, { status: 400 });
     }
