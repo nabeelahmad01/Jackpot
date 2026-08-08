@@ -39,7 +39,15 @@ async function aggregateFinancialTotals(db, baseQuery) {
             $cond: [{ $gte: ['$txDate', startOfToday] }, 'today', 'yesterday']
           }
         },
-        total: { $sum: { $toDouble: { $ifNull: ['$amount', 0] } } }
+        total: {
+          $sum: {
+            $cond: [
+              { $eq: ['$type', 'WITHDRAW'] },
+              { $toDouble: { $ifNull: ['$payoutSent', { $ifNull: ['$amount', 0] }] } },
+              { $toDouble: { $ifNull: ['$amount', 0] } }
+            ]
+          }
+        }
       }
     }
   ]).toArray();

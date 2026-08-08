@@ -61,7 +61,7 @@ export async function GET(req) {
             { createdAt: '' }
           ]
         },
-        { projection: { amount: 1, type: 1, date: 1 } }
+        { projection: { amount: 1, payoutSent: 1, type: 1, date: 1 } }
       ).toArray();
 
       txs.forEach(tx => {
@@ -72,7 +72,8 @@ export async function GET(req) {
           if (tx.type === 'DEPOSIT') {
             totalDeposits += amt;
           } else if (tx.type === 'WITHDRAW') {
-            totalWithdrawals += amt;
+            const val = (tx.payoutSent !== undefined && tx.payoutSent !== null) ? parseFloat(tx.payoutSent) : amt;
+            totalWithdrawals += val;
           }
         }
       });

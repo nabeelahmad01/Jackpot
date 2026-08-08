@@ -26,7 +26,15 @@ async function aggregateTxByEmails(db, emails) {
     {
       $group: {
         _id: { email: { $toLower: '$userEmail' }, type: '$type' },
-        total: { $sum: { $toDouble: { $ifNull: ['$amount', 0] } } }
+        total: {
+          $sum: {
+            $cond: [
+              { $eq: ['$type', 'WITHDRAW'] },
+              { $toDouble: { $ifNull: ['$payoutSent', { $ifNull: ['$amount', 0] }] } },
+              { $toDouble: { $ifNull: ['$amount', 0] } }
+            ]
+          }
+        }
       }
     }
   ]).toArray();

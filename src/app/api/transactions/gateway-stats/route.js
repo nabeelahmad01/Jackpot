@@ -86,7 +86,7 @@ export async function GET(req) {
               $sum: {
                 $cond: [
                   { $eq: ['$type', 'WITHDRAW'] },
-                  { $toDouble: { $ifNull: ['$amount', 0] } },
+                  { $toDouble: { $ifNull: ['$payoutSent', { $ifNull: ['$amount', 0] }] } },
                   0
                 ]
               }

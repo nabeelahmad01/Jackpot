@@ -87,7 +87,9 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
   const games = filterGamesForStaff(gamesData?.games || [], adminUser);
   const roles = parseRoles(adminUser?.role);
   const isFinancialAdmin = roles.includes('financial_admin');
+  const isCoinsAdmin = roles.includes('coins_admin');
   const isFullAdminView = roles.includes('admin') || roles.includes('operation_admin');
+  const isPureFinancialAdminOnly = isFinancialAdmin && !isFullAdminView && !isCoinsAdmin && !roles.includes('support_admin');
 
   const [updateModalOpen, setUpdateModalOpen] = React.useState(false);
   const [selectedGame, setSelectedGame] = React.useState(null);
@@ -290,8 +292,8 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
         <GatewayRevenueBreakdown adminDistributorId={adminUser?.distributorId || ''} />
       )}
 
-      {/* End of Shift Coins Loading Report Card (Visible to all admins/staff to submit except financial_admin) */}
-      {adminUser && !adminUser.role?.toLowerCase().split(',').map(r => r.trim()).includes('financial_admin') && (
+      {/* End of Shift Coins Loading Report Card (Visible to all staff with coins/admin access) */}
+      {adminUser && !isPureFinancialAdminOnly && (
         <section className="admin-section-card" style={{ borderLeft: '4px solid var(--gold-primary)', background: '#0a0d16' }}>
           <div className="section-card-header" style={{ marginBottom: '0.75rem' }}>
             <div>
@@ -387,8 +389,8 @@ export default function OverviewTab({ adminUser, onUpdateGameCoinsPool }) {
         </section>
       )}
 
-      {/* Game coins pool status (Hidden for financial_admin) */}
-      {adminUser && !adminUser.role?.toLowerCase().split(',').map(r => r.trim()).includes('financial_admin') && (
+      {/* Game coins pool status (Visible for staff with coins/admin access) */}
+      {adminUser && !isPureFinancialAdminOnly && (
         <section className="admin-section-card">
         <div className="section-card-header">
           <div>

@@ -533,7 +533,7 @@ export async function POST(req) {
           status: 'SUCCESS'
         }).toArray();
         const totalDeposits = playerTxs.filter((tx) => tx.type === 'DEPOSIT').reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
-        const totalWithdrawals = playerTxs.filter((tx) => tx.type === 'WITHDRAW').reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
+        const totalWithdrawals = playerTxs.filter((tx) => tx.type === 'WITHDRAW').reduce((sum, tx) => sum + (tx.payoutSent !== undefined && tx.payoutSent !== null ? parseFloat(tx.payoutSent) : parseFloat(tx.amount || 0)), 0);
         commissionEarned = calcCommissionFromProfit(totalDeposits, totalWithdrawals, distDoc.commissionRate);
       }
 
@@ -569,7 +569,7 @@ export async function POST(req) {
           status: 'SUCCESS'
         }).toArray();
         const totalDeposits = playerTxs.filter((tx) => tx.type === 'DEPOSIT').reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
-        const totalWithdrawals = playerTxs.filter((tx) => tx.type === 'WITHDRAW').reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
+        const totalWithdrawals = playerTxs.filter((tx) => tx.type === 'WITHDRAW').reduce((sum, tx) => sum + (tx.payoutSent !== undefined && tx.payoutSent !== null ? parseFloat(tx.payoutSent) : parseFloat(tx.amount || 0)), 0);
         commissionEarned = calcCommissionFromProfit(totalDeposits, totalWithdrawals, agentDoc.commissionRate);
       }
 

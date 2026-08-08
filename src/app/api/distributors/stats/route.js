@@ -45,7 +45,8 @@ export async function GET(req) {
         if (tx.type === 'DEPOSIT') {
           totalDeposits += parseFloat(tx.amount || 0);
         } else if (tx.type === 'WITHDRAW') {
-          totalWithdrawals += parseFloat(tx.amount || 0);
+          const val = (tx.payoutSent !== undefined && tx.payoutSent !== null) ? parseFloat(tx.payoutSent) : parseFloat(tx.amount || 0);
+          totalWithdrawals += val;
         }
       });
 
