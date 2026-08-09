@@ -209,16 +209,27 @@ async function subscribeToNativePush(userEmail, { audience = 'player', distribut
 
   if (!nativeActionListenerReady) {
     nativeActionListenerReady = true;
-    await PushNotifications.addListener('pushNotificationActionPerformed', ({ notification }) => {
+    PushNotifications.addListener('pushNotificationActionPerformed', ({ notification }) => {
+      const isDist = isDistributorNative();
+      const isPort = isPortalNative();
       const fallback =
-        resolvedAudience === 'distributor'
+        resolvedAudience === 'distributor' || isDist
           ? '/distributor'
-          : resolvedAudience === 'staff'
+          : resolvedAudience === 'staff' || isPort
             ? '/admin'
             : '/lobby';
-      const url = notification?.data?.url || fallback;
-      window.location.assign(url);
-    });
+      let targetUrl =
+        notification?.data?.url ||
+        notification?.data?.adminUrl ||
+        notification?.data?.distributorUrl ||
+        fallback;
+
+      if (/\/ledger|\/payout|\/deposit|\/withdraw/i.test(targetUrl)) {
+        targetUrl = (resolvedAudience === 'distributor' || isDist) ? '/distributor/ledger' : '/admin/ledger';
+      }
+
+      window.location.assign(targetUrl);
+    }).catch(() => {});
   }
 
   return { nativeToken: token };

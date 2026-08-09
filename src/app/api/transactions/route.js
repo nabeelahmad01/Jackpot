@@ -380,9 +380,9 @@ export async function POST(req) {
       notifyStaffAndDistributorAsync(db, {
         title: 'Remainder Payout Request',
         body: `${txObject.userEmail} · $${parseFloat(txObject.amount || 0).toFixed(2)}`,
-        adminUrl: '/admin/requests',
-        distributorUrl: '/distributor/requests',
-        url: '/admin/requests',
+        adminUrl: '/admin/ledger',
+        distributorUrl: '/distributor/ledger',
+        url: '/admin/ledger',
         tag: `tx-${txObject.id}`,
         gameTitle: txObject.gameTitle || parentTx?.gameTitle || '',
         alertKind: 'game'
@@ -487,9 +487,9 @@ export async function POST(req) {
       notifyStaffAndDistributorAsync(db, {
         title: 'Deposit from Cashout',
         body: `${txObject.userEmail} · $${askAmount.toFixed(2)} · ${txObject.gameTitle}`,
-        adminUrl: '/admin/requests',
-        distributorUrl: '/distributor/requests',
-        url: '/admin/requests',
+        adminUrl: '/admin/ledger',
+        distributorUrl: '/distributor/ledger',
+        url: '/admin/ledger',
         tag: `tx-${txObject.id}`,
         gameTitle: txObject.gameTitle,
         alertKind: 'game'
@@ -825,12 +825,16 @@ export async function POST(req) {
 
     // Alert Jackpot Portal + owning Distributor APK — never touches player promo push.
     const alertType = String(txObject.type || 'REQUEST').replace(/_/g, ' ');
+    const isLedgerTx = txObject.type === 'DEPOSIT' || txObject.type === 'WITHDRAW' || txObject.type === 'PAYOUT' || txObject.type === 'COMMISSION_WITHDRAW';
+    const targetAdminUrl = isLedgerTx ? '/admin/ledger' : '/admin/requests';
+    const targetDistributorUrl = isLedgerTx ? '/distributor/ledger' : '/distributor/requests';
+
     notifyStaffAndDistributorAsync(db, {
       title: `New ${alertType}`,
       body: `${txObject.userEmail || 'Player'} · $${parseFloat(txObject.amount || 0).toFixed(2)}${txObject.gameTitle ? ` · ${txObject.gameTitle}` : ''}`,
-      adminUrl: '/admin/requests',
-      distributorUrl: '/distributor/requests',
-      url: '/admin/requests',
+      adminUrl: targetAdminUrl,
+      distributorUrl: targetDistributorUrl,
+      url: targetAdminUrl,
       tag: `tx-${txObject.id}`,
       gameTitle: txObject.gameTitle || '',
       alertKind: 'game'

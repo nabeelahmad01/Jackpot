@@ -96,7 +96,12 @@ export default function DistributorPortal() {
     const syncFromPath = () => {
       const parts = window.location.pathname.split('/').filter(Boolean);
       if (parts[0] === 'distributor' && parts[1]) {
-        const tab = parts[1] === 'coins' ? 'operations' : parts[1];
+        let tab = parts[1];
+        if (['ledger', 'payouts', 'payout', 'deposit', 'deposits', 'withdraw', 'withdrawals', 'financial_ledger'].includes(tab)) {
+          tab = 'ledger';
+        } else if (['coins', 'operations'].includes(tab)) {
+          tab = 'operations';
+        }
         setActiveTab(tab);
       } else if (parts[0] === 'distributor') {
         setActiveTab('overview');

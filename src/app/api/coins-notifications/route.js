@@ -5,6 +5,7 @@ import { applyStaffGameFilter, staffCanAccessGame } from '../../../lib/staffGame
 import { accountLookupKey, buildGameUsernameMap } from '../../../lib/resolveGameUsername';
 import { typeBExclusionFilter } from '../../../lib/typeBDistributors';
 import { publishAdminEvent } from '../../../lib/adminEvents';
+import { notifyStaffAndDistributorAsync } from '../../../lib/pushNotifications';
 
 // GET all coins notifications (supports filtering by email for users, or returning all for admins)
 export async function GET(req) {
@@ -386,6 +387,16 @@ export async function PUT(req) {
               txUpdate.isFreeplayWithdraw = true;
               txUpdate.note = 'Freeplay win capped at $30 max cashout.';
             }
+            notifyStaffAndDistributorAsync(db, {
+              title: 'Withdrawal Payout Ready',
+              body: `${parentTx.userEmail} · $${parseFloat(parentTx.amount || 0).toFixed(2)}${parentTx.gameTitle ? ` · ${parentTx.gameTitle}` : ''}`,
+              adminUrl: '/admin/ledger',
+              distributorUrl: '/distributor/ledger',
+              url: '/admin/ledger',
+              tag: `payout-${parentTx.id}`,
+              gameTitle: parentTx.gameTitle || '',
+              alertKind: 'game'
+            }, parentTx.distributorId);
           } else if (parentTx.type === 'DEPOSIT' || parentTx.type === 'BONUS') {
             txUpdate.status = 'SUCCESS';
             if (originalNoti.isDepositFromCashout || parentTx.isDepositFromCashout) {

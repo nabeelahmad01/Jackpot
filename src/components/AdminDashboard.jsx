@@ -69,7 +69,13 @@ export default function AdminDashboard({
     const syncFromPath = () => {
       const parts = window.location.pathname.split('/').filter(Boolean);
       if (parts[0] === 'admin' && parts[1]) {
-        setActiveTab(parts[1]);
+        let tab = parts[1];
+        if (['ledger', 'payouts', 'payout', 'deposit', 'deposits', 'withdraw', 'withdrawals', 'financial_ledger'].includes(tab)) {
+          tab = 'ledger';
+        } else if (['requests', 'account_requests', 'account-requests'].includes(tab)) {
+          tab = 'requests';
+        }
+        setActiveTab(tab);
       } else if (parts[0] === 'admin') {
         setActiveTab('dashboard');
       }
@@ -263,7 +269,8 @@ export default function AdminDashboard({
         if (hasNewCoin) targetUrl = '/admin/coins';
         else if (hasNewChat) targetUrl = '/admin/support';
         else if (hasNewCampaign) targetUrl = '/admin/campaign_requests';
-        else if (hasNewRequest || hasNewTx) targetUrl = '/admin/requests';
+        else if (hasNewTx) targetUrl = '/admin/ledger';
+        else if (hasNewRequest) targetUrl = '/admin/requests';
 
         notifyStaffActivity({
           title: 'Jackpot Royals — New activity',
