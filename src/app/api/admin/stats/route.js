@@ -16,7 +16,8 @@ async function aggregateFinancialTotals(db, baseQuery) {
       $match: {
         ...baseQuery,
         status: 'SUCCESS',
-        type: { $in: ['DEPOSIT', 'WITHDRAW'] }
+        type: { $in: ['DEPOSIT', 'WITHDRAW'] },
+        isDepositFromCashout: { $ne: true }
       }
     },
     {

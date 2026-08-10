@@ -45,7 +45,8 @@ export async function GET(req) {
       const depositDocs = await transactionsCollection.find({
         userEmail: { $in: playerEmails },
         type: 'DEPOSIT',
-        status: 'SUCCESS'
+        status: 'SUCCESS',
+        isDepositFromCashout: { $ne: true }
       }).toArray();
       totalDeposits = depositDocs.reduce((acc, curr) => acc + parseFloat(curr.amount || 0), 0);
 

@@ -61,7 +61,7 @@ export async function GET(req) {
             { createdAt: '' }
           ]
         },
-        { projection: { amount: 1, payoutSent: 1, type: 1, date: 1 } }
+        { projection: { amount: 1, payoutSent: 1, type: 1, date: 1, isDepositFromCashout: 1 } }
       ).toArray();
 
       txs.forEach(tx => {
@@ -69,7 +69,7 @@ export async function GET(req) {
         const txDate = new Date(tx.date);
         if (txDate.toDateString() === targetDateStr) {
           const amt = parseFloat(tx.amount || 0);
-          if (tx.type === 'DEPOSIT') {
+          if (tx.type === 'DEPOSIT' && !tx.isDepositFromCashout) {
             totalDeposits += amt;
           } else if (tx.type === 'WITHDRAW') {
             const val = (tx.payoutSent !== undefined && tx.payoutSent !== null) ? parseFloat(tx.payoutSent) : amt;

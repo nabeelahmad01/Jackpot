@@ -20,7 +20,8 @@ async function aggregateTxByEmails(db, emails) {
       $match: {
         userEmail: { $in: emails },
         status: 'SUCCESS',
-        type: { $in: ['DEPOSIT', 'WITHDRAW'] }
+        type: { $in: ['DEPOSIT', 'WITHDRAW'] },
+        isDepositFromCashout: { $ne: true }
       }
     },
     {

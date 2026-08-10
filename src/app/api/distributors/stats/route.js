@@ -42,7 +42,7 @@ export async function GET(req) {
       }).toArray();
 
       successTxs.forEach(tx => {
-        if (tx.type === 'DEPOSIT') {
+        if (tx.type === 'DEPOSIT' && !tx.isDepositFromCashout) {
           totalDeposits += parseFloat(tx.amount || 0);
         } else if (tx.type === 'WITHDRAW') {
           const val = (tx.payoutSent !== undefined && tx.payoutSent !== null) ? parseFloat(tx.payoutSent) : parseFloat(tx.amount || 0);

@@ -146,6 +146,49 @@ export async function GET(req) {
 
     const backfillOps = [];
     for (const noti of notifications) {
+      if (noti.isDepositFromCashout && (!noti.bonusApplied || noti.bonusApplied === 0) && noti.depositAmount > 0) {
+        try {
+          const amt = parseFloat(noti.depositAmount);
+          let settings = cache.get('global_settings');
+          let frontendSettings = cache.get('frontend_settings_all');
+          if (!settings || !frontendSettings) {
+            const [s1, s2] = await Promise.all([
+              db.collection('settings').findOne({ id: 'global_settings' }),
+              db.collection('settings').findOne({ id: 'frontend_settings' })
+            ]);
+            if (s1) { settings = s1; cache.set('global_settings', s1, 60); }
+            if (s2) { frontendSettings = s2; cache.set('frontend_settings_all', s2, 60); }
+          }
+          const firstBonusPercent = (frontendSettings && frontendSettings.firstDepositBonus !== undefined)
+            ? Number(frontendSettings.firstDepositBonus)
+            : (settings ? Number(settings.firstDepositBonus) : 300);
+          const regularBonusPercent = (frontendSettings && frontendSettings.regularDepositBonus !== undefined)
+            ? Number(frontendSettings.regularDepositBonus)
+            : (settings ? Number(settings.regularDepositBonus) : 20);
+
+          const priorSuccess = await db.collection('transactions').findOne(
+            { userEmail: String(noti.userEmail || '').toLowerCase().trim(), type: 'DEPOSIT', status: 'SUCCESS', id: { $ne: noti.transactionId } },
+            { projection: { _id: 1 } }
+          );
+          const bPercent = !priorSuccess ? firstBonusPercent : regularBonusPercent;
+          const calcCoins = Math.floor(amt * (1 + bPercent / 100));
+
+          noti.bonusApplied = bPercent;
+          noti.totalCoins = calcCoins;
+
+          if (noti.id != null) {
+            backfillOps.push(
+              notificationsCollection.updateOne(
+                { id: noti.id },
+                { $set: { bonusApplied: bPercent, totalCoins: calcCoins } }
+              )
+            );
+          }
+        } catch {
+          /* ignore backfill errors */
+        }
+      }
+
       const stored = String(noti.gameUsername || '').trim();
       if (stored) {
         noti.gameUsername = stored;

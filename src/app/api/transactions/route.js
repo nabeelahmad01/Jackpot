@@ -426,6 +426,53 @@ export async function POST(req) {
         parentTx = holdWithdrawals[0];
       }
 
+      // Pre-calculate deposit bonus for cashout deposit (first deposit bonus %, claimed promo %, or regular deposit bonus %)
+      let settings = cache.get('global_settings');
+      let frontendSettings = cache.get('frontend_settings_all');
+      const settingsCollection = db.collection('settings');
+
+      const [priorSuccessDeposit, settingsFresh, frontendFresh, depositor] = await Promise.all([
+        transactionsCollection.findOne(
+          { userEmail: userEmail.toLowerCase().trim(), type: 'DEPOSIT', status: 'SUCCESS' },
+          { projection: { _id: 1 } }
+        ),
+        settings ? Promise.resolve(null) : settingsCollection.findOne({ id: 'global_settings' }),
+        frontendSettings ? Promise.resolve(null) : settingsCollection.findOne({ id: 'frontend_settings' }),
+        db.collection('users').findOne(
+          { email: userEmail.toLowerCase().trim() },
+          { projection: { email: 1, referredBy: 1, pendingDepositBonusPercent: 1, pendingBonusFreeplay: 1, pendingBonusPromoId: 1, pendingBonusPromoTitle: 1 } }
+        )
+      ]);
+      if (settingsFresh) {
+        settings = settingsFresh;
+        cache.set('global_settings', settingsFresh, 60);
+      }
+      if (frontendFresh) {
+        frontendSettings = frontendFresh;
+        cache.set('frontend_settings_all', frontendFresh, 60);
+      }
+
+      const isFirstDeposit = !priorSuccessDeposit;
+
+      const firstBonusPercent = (frontendSettings && frontendSettings.firstDepositBonus !== undefined)
+        ? Number(frontendSettings.firstDepositBonus)
+        : (settings ? Number(settings.firstDepositBonus) : 300);
+
+      const regularBonusPercent = (frontendSettings && frontendSettings.regularDepositBonus !== undefined)
+        ? Number(frontendSettings.regularDepositBonus)
+        : (settings ? Number(settings.regularDepositBonus) : 20);
+
+      const rawPromoBonus = depositor ? depositor.pendingDepositBonusPercent : undefined;
+      const promoBonusPercent = (rawPromoBonus !== undefined && rawPromoBonus !== null) ? Number(rawPromoBonus) : null;
+      const usePromoBonus = promoBonusPercent !== null && promoBonusPercent > 0;
+
+      const bonusPercentage = usePromoBonus
+        ? promoBonusPercent
+        : (isFirstDeposit ? firstBonusPercent : regularBonusPercent);
+
+      const rawCoins = askAmount * (1 + bonusPercentage / 100);
+      const totalCoins = Math.floor(Number(rawCoins) || 0);
+
       const txObject = {
         id: (Date.now() + Math.floor(Math.random() * 100)).toString(),
         userEmail: userEmail.toLowerCase().trim(),
@@ -463,8 +510,8 @@ export async function POST(req) {
         gameTitle: txObject.gameTitle,
         gameUsername: coinGameUsername,
         depositAmount: askAmount,
-        bonusApplied: 0,
-        totalCoins: askAmount,
+        bonusApplied: bonusPercentage,
+        totalCoins: totalCoins,
         status: 'PENDING',
         read: false,
         timestamp: new Date().toISOString(),
@@ -476,10 +523,39 @@ export async function POST(req) {
         distributorType: distType
       };
 
-      await Promise.all([
+      const asyncOps = [
         transactionsCollection.insertOne(txObject),
         notificationsCollection.insertOne(notiObject)
-      ]);
+      ];
+
+      if (usePromoBonus) {
+        asyncOps.push(
+          db.collection('users').updateOne(
+            { email: userEmail.toLowerCase().trim() },
+            { $unset: { pendingDepositBonusPercent: '', pendingBonusFreeplay: '', pendingBonusPromoId: '', pendingBonusPromoTitle: '' } }
+          )
+        );
+      }
+
+      if (isFirstDeposit && depositor && depositor.referredBy) {
+        const referrerEmail = depositor.referredBy.toLowerCase().trim();
+        const refBonusPercent = (settings && settings.referralBonus !== undefined) ? Number(settings.referralBonus) : 10;
+        if (refBonusPercent > 0) {
+          const rewardCoins = askAmount * (refBonusPercent / 100);
+          asyncOps.push(
+            db.collection('pendingReferrals').insertOne({
+              id: Date.now().toString() + Math.floor(Math.random() * 100 + 1).toString(),
+              referrerEmail,
+              refereeEmail: userEmail.toLowerCase().trim(),
+              rewardCoins: Math.round(rewardCoins * 100) / 100,
+              status: 'PENDING',
+              timestamp: new Date().toISOString()
+            })
+          );
+        }
+      }
+
+      await Promise.all(asyncOps);
 
       cache.del('admin_stats');
       publishAdminEvent('transactions', { distributorId: txObject.distributorId || '' });
@@ -532,7 +608,7 @@ export async function POST(req) {
           type: { $in: ['DEPOSIT', 'WITHDRAW'] },
           status: 'SUCCESS'
         }).toArray();
-        const totalDeposits = playerTxs.filter((tx) => tx.type === 'DEPOSIT').reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
+        const totalDeposits = playerTxs.filter((tx) => tx.type === 'DEPOSIT' && !tx.isDepositFromCashout).reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
         const totalWithdrawals = playerTxs.filter((tx) => tx.type === 'WITHDRAW').reduce((sum, tx) => sum + (tx.payoutSent !== undefined && tx.payoutSent !== null ? parseFloat(tx.payoutSent) : parseFloat(tx.amount || 0)), 0);
         commissionEarned = calcCommissionFromProfit(totalDeposits, totalWithdrawals, distDoc.commissionRate);
       }
@@ -568,7 +644,7 @@ export async function POST(req) {
           type: { $in: ['DEPOSIT', 'WITHDRAW'] },
           status: 'SUCCESS'
         }).toArray();
-        const totalDeposits = playerTxs.filter((tx) => tx.type === 'DEPOSIT').reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
+        const totalDeposits = playerTxs.filter((tx) => tx.type === 'DEPOSIT' && !tx.isDepositFromCashout).reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
         const totalWithdrawals = playerTxs.filter((tx) => tx.type === 'WITHDRAW').reduce((sum, tx) => sum + (tx.payoutSent !== undefined && tx.payoutSent !== null ? parseFloat(tx.payoutSent) : parseFloat(tx.amount || 0)), 0);
         commissionEarned = calcCommissionFromProfit(totalDeposits, totalWithdrawals, agentDoc.commissionRate);
       }
