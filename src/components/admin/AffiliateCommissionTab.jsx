@@ -278,7 +278,11 @@ export default function AffiliateCommissionTab({
                     <td><span className={`admin-badge-preview b-${tx.status === 'SUCCESS' ? 'ready' : 'none'}`}>{tx.status}</span></td>
                     <td style={{ fontSize: '0.7rem' }}>
                       {tx.payoutSent !== undefined ? (
-                        <>Paid: ${parseFloat(tx.payoutSent || 0).toFixed(2)}<br />Hold: ${parseFloat(tx.payoutHold || 0).toFixed(2)}</>
+                        tx.status === 'SUCCESS' && parseFloat(tx.payoutHold || 0) > 0 ? (
+                          <>Paid: ${parseFloat(tx.payoutSent || 0).toFixed(2)}<br />Hold: ${parseFloat(tx.payoutHold || 0).toFixed(2)}</>
+                        ) : (
+                          <>Paid: ${parseFloat(tx.payoutSent || 0).toFixed(2)}</>
+                        )
                       ) : '—'}
                     </td>
                     <td style={{ fontSize: '0.65rem', color: '#aaa' }}>{tx.note || '—'}</td>

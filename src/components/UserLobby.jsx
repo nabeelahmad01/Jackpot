@@ -95,7 +95,7 @@ export default function UserLobby({
     if (!transactions || !currentUserEmail) return 0;
     const email = currentUserEmail.toLowerCase().trim();
     return transactions
-      .filter((t) => (t.userEmail || '').toLowerCase().trim() === email && parseFloat(t.payoutHold || 0) > 0)
+      .filter((t) => (t.userEmail || '').toLowerCase().trim() === email && t.status === 'SUCCESS' && !t.remainderPaid && parseFloat(t.payoutHold || 0) > 0)
       .reduce((sum, t) => sum + parseFloat(t.payoutHold || 0), 0);
   }, [transactions, currentUserEmail]);
 

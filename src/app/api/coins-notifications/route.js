@@ -466,6 +466,8 @@ export async function PUT(req) {
                 {
                   userEmail: (originalNoti.userEmail || parentTx.userEmail || '').toLowerCase().trim(),
                   type: { $in: ['WITHDRAW', 'COMMISSION_WITHDRAW', 'AFFILIATE_COMMISSION_WITHDRAW'] },
+                  status: 'SUCCESS',
+                  remainderPaid: { $ne: true },
                   payoutHold: { $gt: 0 }
                 },
                 { sort: { createdAt: -1, id: -1 } }
@@ -527,6 +529,8 @@ export async function PUT(req) {
           };
           if (originalNoti.totalCoins < 0 || status === 'CANCELLED') {
             txUpdate.status = 'FAILED';
+            txUpdate.payoutHold = 0;
+            txUpdate.remainderPaid = true;
           }
           await transactionsCollection.updateOne(
             parentTx._id ? { _id: parentTx._id } : { id: parentTx.id },

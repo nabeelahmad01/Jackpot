@@ -166,7 +166,7 @@ export default function TxSearchTab({ onInspectProof, adminUser }) {
                     {tx.payoutSent !== undefined && (
                       <div style={{ fontSize: '0.675rem', marginTop: '0.25rem', color: '#10b981', fontWeight: 'bold' }}>
                         <i className="fa-solid fa-circle-check"></i> Paid: ${parseFloat(tx.payoutSent).toFixed(2)}
-                        {tx.payoutHold > 0 && <span style={{ color: '#f59e0b' }}> • Hold: ${parseFloat(tx.payoutHold).toFixed(2)}</span>}
+                        {tx.status === 'SUCCESS' && tx.payoutHold > 0 && <span style={{ color: '#f59e0b' }}> • Hold: ${parseFloat(tx.payoutHold).toFixed(2)}</span>}
                       </div>
                     )}
                   </td>

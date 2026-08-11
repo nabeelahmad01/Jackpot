@@ -401,6 +401,8 @@ export async function POST(req) {
       const holdWithdrawals = await transactionsCollection.find({
         userEmail: userEmail.toLowerCase().trim(),
         type: { $in: ['WITHDRAW', 'COMMISSION_WITHDRAW', 'AFFILIATE_COMMISSION_WITHDRAW'] },
+        status: 'SUCCESS',
+        remainderPaid: { $ne: true },
         payoutHold: { $gt: 0 }
       }).sort({ createdAt: -1, id: -1 }).toArray();
 
@@ -1003,6 +1005,10 @@ export async function PUT(req) {
         updateFields.remainderPaid = true;
         updateFields.payoutHold = 0;
       }
+    }
+    if (finalStatus === 'FAILED' || finalStatus === 'REJECTED') {
+      updateFields.payoutHold = 0;
+      updateFields.remainderPaid = true;
     }
     if (processedBy !== undefined) {
       updateFields.approvedBy = processedBy;
