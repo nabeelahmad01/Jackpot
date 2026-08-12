@@ -94,9 +94,39 @@ export default function UserLobby({
   const totalAvailableCashoutHold = useMemo(() => {
     if (!transactions || !currentUserEmail) return 0;
     const email = currentUserEmail.toLowerCase().trim();
+
+    // Find all parent tx IDs that have a pending remainder claim or pending cashout deposit
+    const pendingChildParentIds = new Set(
+      transactions
+        .filter((t) => (t.userEmail || '').toLowerCase().trim() === email && (t.status === 'PENDING' || t.status === 'COINS_LOADING') && t.parentTxId)
+        .map((t) => String(t.parentTxId))
+    );
+
+    // Sum up pending cashout deposit amounts by parent tx ID
+    const pendingCashoutDepositsByParent = {};
+    transactions.forEach((t) => {
+      if ((t.userEmail || '').toLowerCase().trim() === email && t.isDepositFromCashout && (t.status === 'PENDING' || t.status === 'COINS_LOADING') && t.parentTxId) {
+        const pid = String(t.parentTxId);
+        pendingCashoutDepositsByParent[pid] = (pendingCashoutDepositsByParent[pid] || 0) + parseFloat(t.amount || 0);
+      }
+    });
+
     return transactions
-      .filter((t) => (t.userEmail || '').toLowerCase().trim() === email && t.status === 'SUCCESS' && !t.remainderPaid && parseFloat(t.payoutHold || 0) > 0)
-      .reduce((sum, t) => sum + parseFloat(t.payoutHold || 0), 0);
+      .filter((t) => {
+        const isUser = (t.userEmail || '').toLowerCase().trim() === email;
+        const isSuccess = t.status === 'SUCCESS';
+        const notPaid = !t.remainderPaid;
+        const notRequested = !t.remainderRequested;
+        const notPendingChild = !pendingChildParentIds.has(String(t.id));
+        const hasHold = parseFloat(t.payoutHold || 0) > 0;
+        return isUser && isSuccess && notPaid && notRequested && notPendingChild && hasHold;
+      })
+      .reduce((sum, t) => {
+        const pid = String(t.id);
+        const pendingDep = pendingCashoutDepositsByParent[pid] || 0;
+        const availableHold = Math.max(0, parseFloat(t.payoutHold || 0) - pendingDep);
+        return sum + availableHold;
+      }, 0);
   }, [transactions, currentUserEmail]);
 
   const handleConfirmCashoutDeposit = async (e) => {

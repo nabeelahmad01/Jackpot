@@ -1074,15 +1074,23 @@ export async function PUT(req) {
       }
     }
 
-    // When a remainder child tx is FAILED, reset parent's remainderRequested so claim button reappears
-    if (status === 'FAILED' && originalTx.parentTxId) {
+    // When a remainder child tx is FAILED or REJECTED, settle ancestor transactions completely so hold balance is cleared
+    if ((finalStatus === 'FAILED' || finalStatus === 'REJECTED') && originalTx.parentTxId) {
       try {
-        await transactionsCollection.updateOne(
-          { id: originalTx.parentTxId },
-          { $set: { remainderRequested: false, remainderStatus: 'FAILED' } }
-        );
+        let ancestorId = originalTx.parentTxId;
+        let guard = 0;
+        while (ancestorId && guard < 25) {
+          const ancestor = await transactionsCollection.findOne({ id: ancestorId });
+          if (!ancestor) break;
+          await transactionsCollection.updateOne(
+            { id: ancestorId },
+            { $set: { remainderPaid: true, remainderStatus: finalStatus, payoutHold: 0, remainderRequested: false } }
+          );
+          ancestorId = ancestor.parentTxId;
+          guard += 1;
+        }
       } catch (err) {
-        console.error('Failed to reset parent transaction remainder status on FAILED:', err);
+        console.error('Failed to settle ancestor transaction remainder status on FAILED/REJECTED:', err);
       }
     }
 
