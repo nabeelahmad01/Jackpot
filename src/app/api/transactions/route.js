@@ -59,11 +59,18 @@ export async function GET(req) {
       Object.assign(query, await typeBExclusionFilter(db));
     }
     if (status) {
-      const statuses = status.split(',').map(s => s.toUpperCase().trim());
-      if (statuses.length > 1) {
-        query.status = { $in: statuses };
+      if (status.toUpperCase() === 'HOLD') {
+        query.$or = [
+          { status: 'HOLD' },
+          { payoutHold: { $gt: 0 } }
+        ];
       } else {
-        query.status = statuses[0];
+        const statuses = status.split(',').map(s => s.toUpperCase().trim());
+        if (statuses.length > 1) {
+          query.status = { $in: statuses };
+        } else {
+          query.status = statuses[0];
+        }
       }
     }
     const isSpecifyingType = type && type.trim() !== '';
@@ -1004,6 +1011,13 @@ export async function PUT(req) {
       if (holdVal <= 0) {
         updateFields.remainderPaid = true;
         updateFields.payoutHold = 0;
+        updateFields.remainderRequested = false;
+        updateFields.remainderStatus = 'SUCCESS';
+        // Settle any pending remainder child requests created for this transaction
+        await transactionsCollection.updateMany(
+          { parentTxId: id, status: 'PENDING' },
+          { $set: { status: 'SUCCESS', remainderPaid: true, remainderStatus: 'SUCCESS', payoutHold: 0, remainderRequested: false } }
+        );
       }
     }
     if (finalStatus === 'FAILED' || finalStatus === 'REJECTED') {
