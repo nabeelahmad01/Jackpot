@@ -132,21 +132,25 @@ export default function LedgerTab({
   const handleProcessPayoutSubmit = async (e) => {
     e.preventDefault();
     if (!selectedPayoutTx) return;
-    if (!payoutProof) {
+    const sentVal = parseFloat(payoutSentAmount || 0);
+    const holdVal = parseFloat(payoutHoldAmount || 0);
+
+    // Only require payout screenshot if money is actually being sent now (> 0).
+    // When placing on hold with $0 sent now, screenshot is optional.
+    if (sentVal > 0 && !payoutProof) {
       alert('Please upload a payout receipt screenshot before confirming.');
       return;
     }
 
     const txId = selectedPayoutTx.id;
-    const holdVal = parseFloat(payoutHoldAmount || 0);
     const payload = {
       id: txId,
       status: 'SUCCESS',
       note: payoutCustomNote.trim() || `Payout processed to ${payoutGateway}`,
-      payoutSent: parseFloat(payoutSentAmount || 0),
+      payoutSent: sentVal,
       payoutHold: holdVal,
       processedBy: adminUser?.email || 'admin@jackpot.com',
-      payoutProof
+      payoutProof: payoutProof || ''
     };
     if (holdVal > 0) {
       payload.remainderWaitHours = Math.max(0, Number(remainderWaitHours) || 0);
@@ -739,7 +743,9 @@ export default function LedgerTab({
 
                 {/* Payout receipt proof uploader */}
                 <div className="input-group" style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.75rem', marginBottom: '0.25rem' }}>Upload Payout Receipt Screenshot (Paid Proof)</label>
+                  <label style={{ display: 'block', fontSize: '0.75rem', marginBottom: '0.25rem' }}>
+                    Upload Payout Receipt Screenshot {parseFloat(payoutSentAmount || 0) > 0 ? '(Paid Proof)' : '(Optional - On Hold)'}
+                  </label>
                   <input
                     type="file"
                     accept="image/*"

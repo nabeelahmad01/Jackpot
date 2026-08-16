@@ -68,19 +68,23 @@ export default function AffiliateCommissionTab({
   const handlePayoutSubmit = async (e) => {
     e.preventDefault();
     if (!selectedTx) return;
-    if (!payoutProof) {
+    const sentVal = Number(payoutSent);
+    const holdVal = Number(payoutHold);
+
+    // Only require payout screenshot if money is actually being sent now (> 0).
+    // When placing on hold with $0 sent now, screenshot is optional.
+    if (sentVal > 0 && !payoutProof) {
       alert('Please upload a payout receipt screenshot before completing.');
       return;
     }
 
     const txId = selectedTx.id;
-    const holdVal = Number(payoutHold);
     const payload = {
       id: txId,
       status: 'SUCCESS',
       note: payoutNote.trim() || 'Affiliate payout processed',
-      payoutProof,
-      payoutSent: Number(payoutSent),
+      payoutProof: payoutProof || '',
+      payoutSent: sentVal,
       payoutHold: holdVal,
       processedBy: adminUser?.email || 'admin@jackpot.com'
     };
@@ -370,7 +374,7 @@ export default function AffiliateCommissionTab({
                   <input type="text" value={payoutNote} onChange={(e) => setPayoutNote(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '0.5rem', borderRadius: '6px' }} />
                 </div>
                 <div className="input-group">
-                  <label>Upload Payout Receipt</label>
+                  <label>Upload Payout Receipt {Number(payoutSent) > 0 ? '(Paid Proof)' : '(Optional - On Hold)'}</label>
                   <input type="file" accept="image/*" onChange={handlePayoutProofChange} style={{ color: '#888', fontSize: '0.75rem' }} />
                 </div>
                 <button type="submit" disabled={isProcessing} className="submit-btn" style={{ background: 'var(--gold-primary)', color: '#000', fontWeight: 'bold' }}>

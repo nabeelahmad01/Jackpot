@@ -141,19 +141,23 @@ export default function WebsitePaymentsTab({
   const handlePayoutSubmit = async (e) => {
     e.preventDefault();
     if (!selectedTx) return;
-    if (!payoutProof) {
+    const sentVal = Number(payoutSent);
+    const holdVal = Number(payoutHold);
+
+    // Only require payout screenshot if money is actually being sent now (> 0).
+    // When placing on hold with $0 sent now, screenshot is optional.
+    if (sentVal > 0 && !payoutProof) {
       alert('Please upload a paid proof screenshot before completing.');
       return;
     }
 
     const txId = selectedTx.id;
-    const holdVal = Number(payoutHold);
     const payload = {
       id: txId,
       status: 'SUCCESS',
       note: payoutNote.trim() || 'Distributor payout processed',
-      payoutProof,
-      payoutSent: Number(payoutSent),
+      payoutProof: payoutProof || '',
+      payoutSent: sentVal,
       payoutHold: holdVal,
       processedBy: adminUser?.email || 'admin@jackpot.com'
     };
@@ -639,7 +643,9 @@ export default function WebsitePaymentsTab({
                 </div>
 
                 <div className="input-group">
-                  <label style={{ display: 'block', fontSize: '0.75rem', marginBottom: '0.25rem' }}>Upload Payout Receipt Screenshot (Paid Proof)</label>
+                  <label style={{ display: 'block', fontSize: '0.75rem', marginBottom: '0.25rem' }}>
+                    Upload Payout Receipt Screenshot {Number(payoutSent) > 0 ? '(Paid Proof)' : '(Optional - On Hold)'}
+                  </label>
                   <input
                     type="file"
                     accept="image/*"
