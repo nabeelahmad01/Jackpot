@@ -2308,8 +2308,8 @@ export default function UserLobby({
                       marginBottom: '1rem'
                     }}
                   >
-                    <label htmlFor="screenshot-receipt-linkpay" style={{ fontSize: '0.55rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                      Upload Payment Screenshot (Required)
+                    <label htmlFor="screenshot-receipt-linkpay" style={{ fontSize: '0.75rem', color: '#e2e8f0', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      UPLOAD PAYMENT SCREENSHOT (REQUIRED)
                     </label>
                     <input
                       type="file"
@@ -2397,10 +2397,10 @@ export default function UserLobby({
 
                   <div className="tag-details-box" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
 
-                    <div className="tag-field-row" style={{ background: '#0b0c16', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="tag-field-row" style={{ background: '#0b0c16', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
-                        <span style={{ fontSize: '0.55rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.15rem' }}>PAYMENT TAG ({activeInvoice.gateway.name})</span>
-                        <code style={{ fontSize: '0.85rem', color: '#fff', fontWeight: 'bold' }}>
+                        <span style={{ fontSize: '0.72rem', color: '#e2e8f0', fontWeight: '800', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem', letterSpacing: '0.04em' }}>PAYMENT TAG ({activeInvoice.gateway.name})</span>
+                        <code style={{ fontSize: '0.95rem', color: '#fff', fontWeight: '900' }}>
                           {activeInvoice.gateway.tag}
                         </code>
                       </div>
@@ -2409,10 +2409,10 @@ export default function UserLobby({
                       </button>
                     </div>
 
-                    <div className="tag-field-row" style={{ background: '#0b0c16', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="tag-field-row" style={{ background: '#0b0c16', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
-                        <span style={{ fontSize: '0.55rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.15rem' }}>LINKED NUMBER / NETWORK</span>
-                        <code style={{ fontSize: '0.85rem', color: '#fff', fontWeight: 'bold' }}>
+                        <span style={{ fontSize: '0.72rem', color: '#e2e8f0', fontWeight: '800', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem', letterSpacing: '0.04em' }}>LINKED NUMBER / NETWORK</span>
+                        <code style={{ fontSize: '0.95rem', color: '#fff', fontWeight: '900' }}>
                           {activeInvoice.gateway.phone}
                         </code>
                       </div>
@@ -2421,11 +2421,11 @@ export default function UserLobby({
                       </button>
                     </div>
 
-                    <div className="tag-field-row" style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '12px', padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="tag-field-row" style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.35)', borderRadius: '12px', padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ paddingRight: '0.5rem' }}>
-                        <span style={{ fontSize: '0.55rem', color: '#f59e0b', textTransform: 'uppercase', display: 'block', marginBottom: '0.15rem', fontWeight: 'bold' }}>IMPORTANT: TRANSACTION REFERENCE CODE</span>
-                        <code style={{ fontSize: '1.05rem', color: '#f59e0b', fontWeight: '900', letterSpacing: '1px' }}>{activeInvoice.noteCode}</code>
-                        <span style={{ fontSize: '0.6rem', color: 'rgba(255, 255, 255, 0.65)', display: 'block', marginTop: '0.25rem', lineHeight: '1.3' }}>
+                        <span style={{ fontSize: '0.72rem', color: '#f59e0b', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem', fontWeight: '900', letterSpacing: '0.04em' }}>IMPORTANT: TRANSACTION REFERENCE CODE</span>
+                        <code style={{ fontSize: '1.15rem', color: '#f59e0b', fontWeight: '900', letterSpacing: '1px' }}>{activeInvoice.noteCode}</code>
+                        <span style={{ fontSize: '0.68rem', color: 'rgba(255, 255, 255, 0.8)', display: 'block', marginTop: '0.25rem', lineHeight: '1.35', fontWeight: '600' }}>
                           *You MUST write this code in the Payment Note / Message / Reference field in your payment app while transferring the money.
                         </span>
                       </div>
@@ -2434,27 +2434,27 @@ export default function UserLobby({
                       </button>
                     </div>
 
-                    <div className="tag-field-row" style={{ background: '#0b0c16', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '0.75rem 1rem' }}>
-                      <span style={{ fontSize: '0.55rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.15rem' }}>TIME REMAINING</span>
-                      <strong style={{ fontSize: '1rem', color: '#eab308', fontFamily: 'var(--font-heading)' }}>{formatTimer(activeInvoice.timeRemaining)}</strong>
+                    <div className="tag-field-row" style={{ background: '#0b0c16', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '0.75rem 1rem' }}>
+                      <span style={{ fontSize: '0.72rem', color: '#e2e8f0', fontWeight: '800', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem', letterSpacing: '0.04em' }}>TIME REMAINING</span>
+                      <strong style={{ fontSize: '1.05rem', color: '#eab308', fontFamily: 'var(--font-heading)', fontWeight: '900' }}>{formatTimer(activeInvoice.timeRemaining)}</strong>
                     </div>
 
-                    <div className="tag-field-row" style={{ background: '#0b0c16', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.5rem' }}>
-                      <label htmlFor="screenshot-receipt" style={{ fontSize: '0.55rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                        Upload Payment Screenshot (Required)
+                    <div className="tag-field-row" style={{ background: '#0b0c16', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.5rem' }}>
+                      <label htmlFor="screenshot-receipt" style={{ fontSize: '0.75rem', color: '#e2e8f0', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        UPLOAD PAYMENT SCREENSHOT (REQUIRED)
                       </label>
                       <input
                         type="file"
                         id="screenshot-receipt"
                         accept="image/*"
                         onChange={handleScreenshotChange}
-                        style={{ border: 'none', background: 'none', color: '#fff', fontSize: '0.75rem', cursor: 'pointer', width: '100%' }}
+                        style={{ border: 'none', background: 'none', color: '#fff', fontSize: '0.78rem', cursor: 'pointer', width: '100%', fontWeight: '600' }}
                         required
                       />
                       {screenshotBase64 && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem' }}>
-                          <i className="fa-solid fa-circle-check text-green" style={{ fontSize: '0.8rem' }}></i>
-                          <span style={{ fontSize: '0.65rem', color: '#4ade80', fontWeight: 'bold' }}>Screenshot proof selected.</span>
+                          <i className="fa-solid fa-circle-check text-green" style={{ fontSize: '0.85rem' }}></i>
+                          <span style={{ fontSize: '0.72rem', color: '#4ade80', fontWeight: '800' }}>Screenshot proof selected.</span>
                         </div>
                       )}
                     </div>
@@ -3196,10 +3196,10 @@ export default function UserLobby({
 
               {frontendSettings?.withdrawRequireGameScreenshot === true && (
               <div className="input-group" style={{ marginTop: '0.5rem' }}>
-                <label htmlFor="withdraw-screenshot-receipt" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.35rem' }}>
+                <label htmlFor="withdraw-screenshot-receipt" style={{ fontSize: '0.82rem', color: '#e2e8f0', fontWeight: '800', display: 'block', marginBottom: '0.35rem', letterSpacing: '0.03em' }}>
                   Upload Game Screenshot (Required)
                 </label>
-                <p style={{ fontSize: '0.6rem', color: 'var(--text-muted)', margin: '0.1rem 0 0.5rem' }}>
+                <p style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.7)', margin: '0.1rem 0 0.5rem' }}>
                   Please upload a full screen screenshot of your game balance showing your wins.
                 </p>
                 <div className="input-wrapper" style={{ background: '#0b0c16', position: 'relative' }}>
@@ -3212,7 +3212,7 @@ export default function UserLobby({
                     style={{ opacity: 0, position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', cursor: 'pointer', zIndex: 5 }}
                     required
                   />
-                  <span style={{ fontSize: '0.75rem', paddingLeft: '2.5rem', color: withdrawScreenshot ? '#4ade80' : 'rgba(255,255,255,0.4)', lineHeight: '40px', pointerEvents: 'none' }}>
+                  <span style={{ fontSize: '0.75rem', paddingLeft: '2.5rem', color: withdrawScreenshot ? '#4ade80' : 'rgba(255,255,255,0.6)', lineHeight: '40px', pointerEvents: 'none', fontWeight: '600' }}>
                     {withdrawScreenshot ? 'Game screenshot selected ✓' : 'Choose screenshot image...'}
                   </span>
                 </div>
@@ -3221,10 +3221,10 @@ export default function UserLobby({
 
               {frontendSettings?.withdrawRequireTagQrScreenshot !== false && (
               <div className="input-group" style={{ marginTop: '0.75rem' }}>
-                <label htmlFor="withdraw-tag-qr-screenshot" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.35rem' }}>
+                <label htmlFor="withdraw-tag-qr-screenshot" style={{ fontSize: '0.82rem', color: '#e2e8f0', fontWeight: '800', display: 'block', marginBottom: '0.35rem', letterSpacing: '0.03em' }}>
                   Upload Tag QR Screenshot (Required)
                 </label>
-                <p style={{ fontSize: '0.6rem', color: 'var(--text-muted)', margin: '0.1rem 0 0.5rem' }}>
+                <p style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.7)', margin: '0.1rem 0 0.5rem' }}>
                   Please upload a clear screenshot of your payment tag QR code.
                 </p>
                 <div className="input-wrapper" style={{ background: '#0b0c16', position: 'relative' }}>
