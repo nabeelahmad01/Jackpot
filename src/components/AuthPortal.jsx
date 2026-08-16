@@ -7,6 +7,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { shouldShowInfoOnAuth } from '../lib/infoPage';
 import { trackCompleteRegistration } from '../lib/metaPixel';
 import { getDevicePayload } from '../lib/deviceId';
+import SignupBonusModal from './SignupBonusCard';
+import { DeviceAlertModal } from './Modals';
 
 const DEFAULT_LOGIN_BG = '/jackpot_royals_bg.png';
 
@@ -101,8 +103,10 @@ export default function AuthPortal({
           console.error('Google Login Error:', err);
           if (err.message && err.message.toLowerCase().includes('device')) {
             setDeviceLockError(err.message);
+            setDeviceModalOpen(true);
+          } else {
+            showToast(err.message || 'Google Sign-In failed or was cancelled.', 'error');
           }
-          showToast(err.message || 'Google Sign-In failed or was cancelled.', 'error');
         }
       });
     },
@@ -283,6 +287,8 @@ export default function AuthPortal({
 
   const [activeTab, setActiveTab] = useState('login'); // 'login' | 'register' | 'forgot' | 'otp'
   const [showPassword, setShowPassword] = useState(false);
+  const [bonusModalOpen, setBonusModalOpen] = useState(true);
+  const [deviceModalOpen, setDeviceModalOpen] = useState(false);
 
   // Sync activeTab state changes to browser URL pathnames
   useEffect(() => {
@@ -512,7 +518,7 @@ export default function AuthPortal({
       
       if (checkData.deviceRegistered) {
         setDeviceLockError(checkData.message || 'You already have an account from this device.');
-        showToast(checkData.message || 'You already have an account from this device.', 'error');
+        setDeviceModalOpen(true);
         return;
       }
 
@@ -638,8 +644,8 @@ export default function AuthPortal({
               if (data.message && data.message.toLowerCase().includes('device')) {
                 setDeviceLockError(data.message);
                 resetOtpState();
-                switchTab('register');
-                showToast(data.message, 'error');
+                switchTab('login');
+                setDeviceModalOpen(true);
               } else {
                 setErrors({ otp: data.message || 'Server error during registration.' });
               }
@@ -692,6 +698,19 @@ export default function AuthPortal({
     setErrors({});
     setActiveTab(tab);
     resetOtpState();
+  };
+
+  const handleGoToRegister = () => {
+    switchTab('register');
+    const bonusVal = frontendSettings?.firstDepositBonus || 300;
+    showToast(`Create your free account below to claim your ${bonusVal}% bonus & deposit!`, 'success');
+    setTimeout(() => {
+      const regInput = document.getElementById('reg-name') || document.getElementById('auth-card');
+      if (regInput) {
+        regInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        regInput.focus?.();
+      }
+    }, 150);
   };
 
   return (
@@ -1159,6 +1178,38 @@ export default function AuthPortal({
           </button>
         )}
       </div>
+
+      {/* Floating Bonus Trigger Button (shown when modal is dismissed) */}
+      {!bonusModalOpen && (
+        <button
+          type="button"
+          className="auth-floating-bonus-trigger"
+          onClick={() => setBonusModalOpen(true)}
+          aria-label="Open Signup Bonus Offer"
+        >
+          <span className="floating-bonus-pulse"></span>
+          <i className="fa-solid fa-gift"></i>
+          <span>{frontendSettings.firstDepositBonus || 300}% BONUS</span>
+        </button>
+      )}
+
+      {/* Floating Signup Bonus Modal */}
+      <SignupBonusModal
+        isOpen={bonusModalOpen}
+        onClose={() => setBonusModalOpen(false)}
+        frontendSettings={frontendSettings}
+        onGoToRegister={handleGoToRegister}
+      />
+
+      {/* Centered Device Alert Modal (Replaces top toast error) */}
+      <DeviceAlertModal
+        isOpen={deviceModalOpen}
+        onClose={() => setDeviceModalOpen(false)}
+        message={deviceLockError}
+        onGoToLogin={() => switchTab('login')}
+        onGoToForgot={() => switchTab('forgot')}
+        onOpenSupport={onOpenSupport}
+      />
     </div>
   );
 }

@@ -401,6 +401,197 @@ export function GoogleWarningModal({ isOpen, onClose }) {
   );
 }
 
+// --- B2) DEVICE LOCK / DUPLICATE ACCOUNT ALERT MODAL ---
+export function DeviceAlertModal({ isOpen, onClose, message, onGoToLogin, onGoToForgot, onOpenSupport }) {
+  if (!isOpen) return null;
+
+  return (
+    <PanelModalBackdrop onClick={onClose}>
+      <div
+        className="modal-content border-red"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: '400px',
+          width: '92%',
+          background: 'linear-gradient(180deg, #18111e 0%, #0d0f18 100%)',
+          border: '1.5px solid rgba(239, 68, 68, 0.45)',
+          borderRadius: '22px',
+          padding: '1.65rem 1.25rem 1.4rem',
+          textAlign: 'center',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.9), 0 0 30px rgba(239, 68, 68, 0.2)',
+          position: 'relative',
+          margin: 'auto'
+        }}
+      >
+        <button
+          type="button"
+          className="close-modal"
+          onClick={onClose}
+          aria-label="Close"
+          style={{
+            position: 'absolute',
+            top: '0.85rem',
+            right: '0.85rem',
+            width: '32px',
+            height: '32px',
+            borderRadius: '50%',
+            background: 'rgba(255, 255, 255, 0.08)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            color: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '1.1rem',
+            cursor: 'pointer',
+            zIndex: 10
+          }}
+        >
+          &times;
+        </button>
+
+        {/* Glowing Alert Icon */}
+        <div
+          style={{
+            width: '60px',
+            height: '60px',
+            borderRadius: '50%',
+            background: 'rgba(239, 68, 68, 0.12)',
+            border: '2px solid rgba(239, 68, 68, 0.35)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 0.85rem',
+            fontSize: '1.6rem',
+            color: '#f87171',
+            boxShadow: '0 0 20px rgba(239, 68, 68, 0.3)'
+          }}
+        >
+          <i className="fa-solid fa-mobile-screen-button"></i>
+        </div>
+
+        <h3
+          style={{
+            fontFamily: 'var(--font-heading, sans-serif)',
+            fontSize: '1.2rem',
+            fontWeight: '900',
+            color: '#fff',
+            margin: '0 0 0.45rem',
+            textTransform: 'uppercase',
+            letterSpacing: '0.03em'
+          }}
+        >
+          Account Detected
+        </h3>
+
+        <p
+          style={{
+            fontSize: '0.82rem',
+            color: '#fca5a5',
+            lineHeight: '1.4',
+            margin: '0 0 0.6rem',
+            fontWeight: '700'
+          }}
+        >
+          {message || 'You already have an account from this device.'}
+        </p>
+
+        <p
+          style={{
+            fontSize: '0.72rem',
+            color: 'rgba(255, 255, 255, 0.6)',
+            lineHeight: '1.4',
+            margin: '0 0 1.25rem'
+          }}
+        >
+          Only one account is allowed per device. Please log in with your existing account or reset your password.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+          <button
+            type="button"
+            className="submit-btn slanted-green-btn"
+            onClick={() => {
+              if (onGoToLogin) onGoToLogin();
+              onClose();
+            }}
+            style={{
+              width: '100%',
+              background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+              color: '#fff',
+              border: 'none',
+              padding: '0.75rem 1rem',
+              borderRadius: '12px',
+              fontWeight: '900',
+              fontSize: '0.82rem',
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase',
+              boxShadow: '0 4px 15px rgba(34, 197, 94, 0.35)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.45rem'
+            }}
+          >
+            <i className="fa-solid fa-right-to-bracket"></i>
+            <span>LOGIN TO EXISTING ACCOUNT</span>
+          </button>
+
+          <div style={{ display: 'flex', gap: '0.45rem' }}>
+            <button
+              type="button"
+              onClick={() => {
+                if (onGoToForgot) onGoToForgot();
+                onClose();
+              }}
+              style={{
+                flex: 1,
+                background: 'rgba(255, 255, 255, 0.06)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                color: '#fff',
+                padding: '0.6rem 0.5rem',
+                borderRadius: '10px',
+                fontSize: '0.72rem',
+                fontWeight: '700',
+                cursor: 'pointer'
+              }}
+            >
+              Forgot Password?
+            </button>
+
+            {onOpenSupport && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (onOpenSupport) onOpenSupport();
+                  onClose();
+                }}
+                style={{
+                  flex: 1,
+                  background: 'rgba(56, 189, 248, 0.12)',
+                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                  color: '#38bdf8',
+                  padding: '0.6rem 0.5rem',
+                  borderRadius: '10px',
+                  fontSize: '0.72rem',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.35rem'
+                }}
+              >
+                <i className="fa-solid fa-headset"></i> Support
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </PanelModalBackdrop>
+  );
+}
+
 // --- C) ADMIN GAME ADD/EDIT MODAL (LOGO UPLOADER INTEGRATED) ---
 export function AdminGameModal({ isOpen, onClose, onSave, editGame }) {
   const [title, setTitle] = useState('');

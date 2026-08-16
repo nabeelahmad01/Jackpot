@@ -1150,15 +1150,16 @@ export default function UserLobby({
     setLobbySubView('referrals');
   };
 
-  const handleDownloadApp = () => {
+  const handlePlayGame = () => {
     if (activeGame && activeGame.link) {
       window.open(activeGame.link, '_blank', 'noopener,noreferrer');
     } else if (onInstallApp) {
       onInstallApp();
     } else {
-      showToast('To Install App: Click browser settings menu and select "Add to Home Screen".', 'info');
+      showToast('Game link not available right now.', 'info');
     }
   };
+  const handleDownloadApp = handlePlayGame;
 
   const handleFreeplayClaim = () => {
     if (!freeplayGate.canClaim) {
@@ -2177,8 +2178,8 @@ export default function UserLobby({
               <button onClick={handleReferEarn} className="lobby-nav-btn app-btn" style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '0.5rem 0.85rem' }}>
                 <i className="fa-solid fa-link"></i> <span style={{ fontSize: '0.75rem' }}>INVITE</span>
               </button>
-              <button onClick={handleDownloadApp} className="lobby-nav-btn app-btn" style={{ background: '#eab308', color: '#111', padding: '0.5rem 0.85rem' }}>
-                <i className="fa-solid fa-download"></i> <span style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>DOWNLOAD</span>
+              <button onClick={handlePlayGame} className="lobby-nav-btn app-btn" style={{ background: '#eab308', color: '#111', padding: '0.5rem 0.85rem' }}>
+                <i className="fa-solid fa-gamepad"></i> <span style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>PLAY GAME</span>
               </button>
             </div>
           </div>
