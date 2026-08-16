@@ -9,7 +9,7 @@ function generateReferralCode() {
 
 export async function POST(req) {
   try {
-    const { email, name, referredBy, distributorId, agentCode, campaign } = await req.json();
+    const { email, name, referredBy, distributorId, agentCode, campaign, deviceId, deviceFingerprint } = await req.json();
 
     if (!email || !name) {
       return NextResponse.json(
@@ -18,10 +18,13 @@ export async function POST(req) {
       );
     }
 
+    const cleanEmail = email.toLowerCase().trim();
+    const cleanDeviceId = typeof deviceId === 'string' ? deviceId.trim() : '';
+    const cleanFingerprint = typeof deviceFingerprint === 'string' ? deviceFingerprint.trim() : '';
+
     const db = await getDb();
     const usersCollection = db.collection('users');
 
-    const cleanEmail = email.toLowerCase().trim();
     let matchedUser = await usersCollection.findOne({ email: cleanEmail });
     let isNewUser = false;
 
@@ -33,6 +36,30 @@ export async function POST(req) {
     }
 
     if (!matchedUser) {
+      // Check Device Multi-Account Enforcement for NEW Google registrations
+      const settingsDoc = await db.collection('settings').findOne({ id: 'global_settings' });
+      const enforceDeviceLock = settingsDoc?.preventDuplicateDeviceAccounts !== false;
+
+      if (enforceDeviceLock && (cleanDeviceId || cleanFingerprint)) {
+        const deviceConditions = [];
+        if (cleanDeviceId) deviceConditions.push({ deviceId: cleanDeviceId });
+        if (cleanFingerprint) deviceConditions.push({ deviceFingerprint: cleanFingerprint });
+
+        if (deviceConditions.length > 0) {
+          const existingDeviceAccount = await usersCollection.findOne({
+            role: { $in: ['user', 'player', '', null] },
+            $or: deviceConditions
+          });
+
+          if (existingDeviceAccount) {
+            return NextResponse.json(
+              { success: false, message: 'You already have an account from this device.' },
+              { status: 400 }
+            );
+          }
+        }
+      }
+
       // Generate a unique referral code
       let referralCode = generateReferralCode();
       while (await usersCollection.findOne({ referralCode })) {
@@ -56,6 +83,12 @@ export async function POST(req) {
         }
       }
 
+      const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+                       req.headers.get('x-real-ip') ||
+                       req.headers.get('cf-connecting-ip') ||
+                       'unknown';
+      const userAgent = req.headers.get('user-agent') || '';
+
       // Automatically register brand-new Google users
       matchedUser = {
         name: name.trim(),
@@ -68,11 +101,23 @@ export async function POST(req) {
         distributorId: (distributorId && distributorId !== 'null' && distributorId !== 'undefined') ? distributorId : (inheritedDistributorId || ''),
         agentCode: (agentCode && agentCode !== 'null' && agentCode !== 'undefined') ? agentCode : (inheritedAgentCode || ''),
         campaign: campaign || 'organic',
+        deviceId: cleanDeviceId,
+        deviceFingerprint: cleanFingerprint,
+        registrationIp: clientIp,
+        registrationUserAgent: userAgent,
         createdAt: new Date().toISOString()
       };
       const result = await usersCollection.insertOne(matchedUser);
       matchedUser._id = result.insertedId;
       isNewUser = true;
+    } else {
+      // Existing user logging in: update deviceId if empty
+      if (cleanDeviceId && !matchedUser.deviceId) {
+        await usersCollection.updateOne(
+          { _id: matchedUser._id },
+          { $set: { deviceId: cleanDeviceId, ...(cleanFingerprint ? { deviceFingerprint: cleanFingerprint } : {}) } }
+        );
+      }
     }
 
     // Deleted distributor → player stays, but game accounts reset so they can re-request.

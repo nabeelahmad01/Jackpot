@@ -9,6 +9,7 @@ export default function SettingsTab({ onUpdateSettings }) {
   const [firstBonusInput, setFirstBonusInput] = useState(300);
   const [regularBonusInput, setRegularBonusInput] = useState(20);
   const [referralBonusInput, setReferralBonusInput] = useState(10);
+  const [preventDuplicateDeviceAccounts, setPreventDuplicateDeviceAccounts] = useState(true);
   const [usdtAddressInput, setUsdtAddressInput] = useState('');
   const [usdtQrCodeInput, setUsdtQrCodeInput] = useState('');
   const [affiliatePayoutNetwork, setAffiliatePayoutNetwork] = useState('TRC20');
@@ -28,6 +29,7 @@ export default function SettingsTab({ onUpdateSettings }) {
       setFirstBonusInput(settingsData.settings.firstDepositBonus);
       setRegularBonusInput(settingsData.settings.regularDepositBonus);
       setReferralBonusInput(settingsData.settings.referralBonus || 10);
+      setPreventDuplicateDeviceAccounts(settingsData.settings.preventDuplicateDeviceAccounts !== false);
       setUsdtAddressInput(settingsData.settings.usdtAddress || '');
       setUsdtQrCodeInput(settingsData.settings.usdtQrCode || '');
       setAffiliatePayoutNetwork(settingsData.settings.affiliatePayoutNetwork || 'TRC20');
@@ -58,25 +60,25 @@ export default function SettingsTab({ onUpdateSettings }) {
   const handleAffiliateQrChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setAffiliatePayoutQrCode(reader.result);
-      alert('Affiliate payout QR loaded. Click Save configurations to update!');
-    };
+    reader.onloadend = () => setAffiliatePayoutQrCode(reader.result);
     reader.readAsDataURL(file);
   };
 
-  const handleAffiliateQrBep20Change = (e) => {
+  const handleAffiliateQrBEP20Change = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
     const reader = new FileReader();
     reader.onloadend = () => setAffiliatePayoutQrBEP20(reader.result);
     reader.readAsDataURL(file);
   };
 
-  const handleAdQrChange = (e) => {
+  const handleAdPaymentQrChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
     const reader = new FileReader();
     reader.onloadend = () => setAdPaymentQrCode(reader.result);
     reader.readAsDataURL(file);
@@ -92,6 +94,7 @@ export default function SettingsTab({ onUpdateSettings }) {
           firstDepositBonus: firstBonusInput,
           regularDepositBonus: regularBonusInput,
           referralBonus: referralBonusInput,
+          preventDuplicateDeviceAccounts,
           usdtAddress: usdtAddressInput,
           usdtQrCode: usdtQrCodeInput,
           affiliatePayoutNetwork,
@@ -190,6 +193,38 @@ export default function SettingsTab({ onUpdateSettings }) {
             <span style={{ paddingRight: '1rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>%</span>
           </div>
           <span className="game-tap-tip">Calculates reward coins allotted to the referrer when their referred friend makes a deposit (e.g. 10% sends 10% of deposit value to referrer).</span>
+        </div>
+
+        <div className="input-group" style={{ marginTop: '1.5rem', background: 'rgba(255, 255, 255, 0.03)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-muted)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <label style={{ margin: 0, fontWeight: 'bold', fontSize: '0.85rem', color: '#fff' }}>
+                <i className="fa-solid fa-shield-halved" style={{ color: 'var(--red-primary)', marginRight: '0.5rem' }}></i>
+                Anti-Fraud: Prevent Multiple Accounts Per Device
+              </label>
+              <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                Blocks players from registering multiple accounts on the same phone, browser, or device.
+              </p>
+            </div>
+            <label className="toggle-switch" style={{ position: 'relative', display: 'inline-block', width: '48px', height: '24px', flexShrink: 0, marginLeft: '1rem', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={preventDuplicateDeviceAccounts}
+                onChange={(e) => setPreventDuplicateDeviceAccounts(e.target.checked)}
+                style={{ opacity: 0, width: 0, height: 0 }}
+              />
+              <span style={{
+                position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: preventDuplicateDeviceAccounts ? '#00ff66' : '#444',
+                transition: '.3s', borderRadius: '24px'
+              }}>
+                <span style={{
+                  position: 'absolute', height: '18px', width: '18px', left: preventDuplicateDeviceAccounts ? '26px' : '3px', bottom: '3px',
+                  backgroundColor: 'white', transition: '.3s', borderRadius: '50%'
+                }} />
+              </span>
+            </label>
+          </div>
         </div>
 
         <div className="input-group" style={{ marginTop: '1.5rem' }}>

@@ -7,11 +7,54 @@ function generateReferralCode() {
   return crypto.randomBytes(4).toString('hex').toUpperCase(); // e.g. "A3F8B12C"
 }
 
-// GET checks if an email exists and returns registration details for otp flows
+// GET checks if an email exists and returns registration details for otp flows, or checks device status
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const email = searchParams.get('email');
+    const deviceId = searchParams.get('deviceId');
+    const deviceFingerprint = searchParams.get('deviceFingerprint');
+    const checkDeviceOnly = searchParams.get('checkDevice') === 'true';
+
+    const db = await getDb();
+    const usersCollection = db.collection('users');
+
+    // 1. Device Lock Pre-check
+    const settingsDoc = await db.collection('settings').findOne({ id: 'global_settings' });
+    const enforceDeviceLock = settingsDoc?.preventDuplicateDeviceAccounts !== false;
+
+    if (enforceDeviceLock && (deviceId || deviceFingerprint)) {
+      const deviceConditions = [];
+      if (deviceId && typeof deviceId === 'string' && deviceId.trim()) {
+        deviceConditions.push({ deviceId: deviceId.trim() });
+      }
+      if (deviceFingerprint && typeof deviceFingerprint === 'string' && deviceFingerprint.trim()) {
+        deviceConditions.push({ deviceFingerprint: deviceFingerprint.trim() });
+      }
+
+      if (deviceConditions.length > 0) {
+        const existingDeviceUser = await usersCollection.findOne({
+          role: { $in: ['user', 'player', '', null] },
+          $or: deviceConditions
+        });
+
+        if (existingDeviceUser) {
+          // If checking device only or if email matches a DIFFERENT user
+          if (checkDeviceOnly || !email || existingDeviceUser.email.toLowerCase() !== email.toLowerCase().trim()) {
+            return NextResponse.json({
+              success: true,
+              exists: false,
+              deviceRegistered: true,
+              message: 'You already have an account from this device.'
+            });
+          }
+        }
+      }
+    }
+
+    if (checkDeviceOnly) {
+      return NextResponse.json({ success: true, exists: false, deviceRegistered: false });
+    }
 
     if (!email) {
       return NextResponse.json(
@@ -19,19 +62,17 @@ export async function GET(req) {
         { status: 400 }
       );
     }
-
-    const db = await getDb();
-    const usersCollection = db.collection('users');
     
     const user = await usersCollection.findOne({ email: email.toLowerCase().trim() });
     
     if (!user) {
-      return NextResponse.json({ success: true, exists: false });
+      return NextResponse.json({ success: true, exists: false, deviceRegistered: false });
     }
 
     return NextResponse.json({
       success: true,
       exists: true,
+      deviceRegistered: false,
       name: user.name
     });
   } catch (err) {
@@ -46,7 +87,7 @@ export async function GET(req) {
 // POST registers a new user
 export async function POST(req) {
   try {
-    const { email, password, name, role, referredBy, distributorId, agentCode, campaign, allowedGameIds } = await req.json();
+    const { email, password, name, role, referredBy, distributorId, agentCode, campaign, allowedGameIds, deviceId, deviceFingerprint } = await req.json();
 
     if (!email || !password || !name) {
       return NextResponse.json(
@@ -55,16 +96,47 @@ export async function POST(req) {
       );
     }
 
+    const cleanEmail = email.toLowerCase().trim();
+    const cleanDeviceId = typeof deviceId === 'string' ? deviceId.trim() : '';
+    const cleanFingerprint = typeof deviceFingerprint === 'string' ? deviceFingerprint.trim() : '';
+
     const db = await getDb();
     const usersCollection = db.collection('users');
 
-    // Check if user already exists
-    const existingUser = await usersCollection.findOne({ email: email.toLowerCase() });
+    // Check if user already exists with this email
+    const existingUser = await usersCollection.findOne({ email: cleanEmail });
     if (existingUser) {
       return NextResponse.json(
         { success: false, message: 'An account with this email is already registered.' },
         { status: 400 }
       );
+    }
+
+    // Check Device Multi-Account Enforcement (Only for standard player accounts)
+    const roleStr = (role || 'user').toLowerCase();
+    const isPlayer = roleStr === 'user' || roleStr === 'player' || roleStr === '';
+
+    const settingsDoc = await db.collection('settings').findOne({ id: 'global_settings' });
+    const enforceDeviceLock = settingsDoc?.preventDuplicateDeviceAccounts !== false;
+
+    if (enforceDeviceLock && isPlayer && (cleanDeviceId || cleanFingerprint)) {
+      const deviceConditions = [];
+      if (cleanDeviceId) deviceConditions.push({ deviceId: cleanDeviceId });
+      if (cleanFingerprint) deviceConditions.push({ deviceFingerprint: cleanFingerprint });
+
+      if (deviceConditions.length > 0) {
+        const existingDeviceAccount = await usersCollection.findOne({
+          role: { $in: ['user', 'player', '', null] },
+          $or: deviceConditions
+        });
+
+        if (existingDeviceAccount) {
+          return NextResponse.json(
+            { success: false, message: 'You already have an account from this device.' },
+            { status: 400 }
+          );
+        }
+      }
     }
 
     // Generate a unique referral code for this new user
@@ -91,9 +163,16 @@ export async function POST(req) {
       }
     }
 
+    // Client IP & User Agent extraction
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+                     req.headers.get('x-real-ip') ||
+                     req.headers.get('cf-connecting-ip') ||
+                     'unknown';
+    const userAgent = req.headers.get('user-agent') || '';
+
     const newUser = {
       name: name.trim(),
-      email: email.toLowerCase().trim(),
+      email: cleanEmail,
       password, // Stored as-is to preserve local credentials migration compatibility
       role: role || 'user',
       coins: 100,
@@ -102,10 +181,13 @@ export async function POST(req) {
       distributorId: distributorId || inheritedDistributorId || '',
       agentCode: agentCode || inheritedAgentCode || '',
       campaign: campaign || 'organic',
+      deviceId: cleanDeviceId,
+      deviceFingerprint: cleanFingerprint,
+      registrationIp: clientIp,
+      registrationUserAgent: userAgent,
       createdAt: new Date().toISOString()
     };
 
-    const roleStr = (role || 'user').toLowerCase();
     if (roleStr.split(',').map((r) => r.trim()).includes('coins_admin')) {
       const { validateAllowedGameIds } = await import('../../../../lib/staffGameAccess');
       const validation = await validateAllowedGameIds(db, allowedGameIds || []);

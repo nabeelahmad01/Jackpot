@@ -17,11 +17,16 @@ export async function GET() {
     
     // Seed defaults if missing
     if (!settings) {
-      settings = { id: 'global_settings', firstDepositBonus: 300, regularDepositBonus: 20, referralBonus: 10, usdtAddress: '', usdtQrCode: '', affiliatePayoutNetwork: 'TRC20', affiliatePayoutWallet: '', affiliatePayoutQrCode: '', affiliatePayoutWalletBEP20: '', affiliatePayoutQrBEP20: '', affiliatePlatformCommissionRate: 90, adPaymentNetwork: 'BEP20', adPaymentWallet: '', adPaymentQrCode: '', adBudgetLimit: 6000 };
+      settings = { id: 'global_settings', firstDepositBonus: 300, regularDepositBonus: 20, referralBonus: 10, preventDuplicateDeviceAccounts: true, usdtAddress: '', usdtQrCode: '', affiliatePayoutNetwork: 'TRC20', affiliatePayoutWallet: '', affiliatePayoutQrCode: '', affiliatePayoutWalletBEP20: '', affiliatePayoutQrBEP20: '', affiliatePlatformCommissionRate: 90, adPaymentNetwork: 'BEP20', adPaymentWallet: '', adPaymentQrCode: '', adBudgetLimit: 6000 };
       await settingsCollection.insertOne(settings);
     } else {
       let needsUpdate = false;
       const updates = {};
+      if (settings.preventDuplicateDeviceAccounts === undefined) {
+        updates.preventDuplicateDeviceAccounts = true;
+        settings.preventDuplicateDeviceAccounts = true;
+        needsUpdate = true;
+      }
       if (settings.referralBonus === undefined) {
         updates.referralBonus = 10;
         settings.referralBonus = 10;
@@ -85,7 +90,7 @@ export async function GET() {
 // PUT / POST update settings (Super Admin only)
 export async function PUT(req) {
   try {
-    const { firstDepositBonus, regularDepositBonus, referralBonus, usdtAddress, usdtQrCode, affiliatePayoutNetwork, affiliatePayoutWallet, affiliatePayoutQrCode, affiliatePayoutWalletBEP20, affiliatePayoutQrBEP20, affiliatePlatformCommissionRate, adPaymentNetwork, adPaymentWallet, adPaymentQrCode, adBudgetLimit } = await req.json();
+    const { firstDepositBonus, regularDepositBonus, referralBonus, preventDuplicateDeviceAccounts, usdtAddress, usdtQrCode, affiliatePayoutNetwork, affiliatePayoutWallet, affiliatePayoutQrCode, affiliatePayoutWalletBEP20, affiliatePayoutQrBEP20, affiliatePlatformCommissionRate, adPaymentNetwork, adPaymentWallet, adPaymentQrCode, adBudgetLimit } = await req.json();
 
     const db = await getDb();
     const settingsCollection = db.collection('settings');
@@ -99,6 +104,9 @@ export async function PUT(req) {
     }
     if (referralBonus !== undefined) {
       updateFields.referralBonus = Number(referralBonus);
+    }
+    if (preventDuplicateDeviceAccounts !== undefined) {
+      updateFields.preventDuplicateDeviceAccounts = Boolean(preventDuplicateDeviceAccounts);
     }
     if (usdtAddress !== undefined) {
       updateFields.usdtAddress = String(usdtAddress).trim();

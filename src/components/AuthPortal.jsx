@@ -6,6 +6,7 @@ import { useGoogleLogin } from '@react-oauth/google';
 import { motion, AnimatePresence } from 'framer-motion';
 import { shouldShowInfoOnAuth } from '../lib/infoPage';
 import { trackCompleteRegistration } from '../lib/metaPixel';
+import { getDevicePayload } from '../lib/deviceId';
 
 const DEFAULT_LOGIN_BG = '/jackpot_royals_bg.png';
 
@@ -33,6 +34,8 @@ async function loginWithGoogleProfile(accessToken) {
     throw new Error('Failed to fetch email profile from Google.');
   }
 
+  const { deviceId, deviceFingerprint } = getDevicePayload();
+
   const googleRes = await fetch('/api/auth/google', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -42,7 +45,9 @@ async function loginWithGoogleProfile(accessToken) {
       referredBy: localStorage.getItem('jackpot_ref_code') || '',
       distributorId: localStorage.getItem('jackpot_distributor_id') || '',
       agentCode: localStorage.getItem('jackpot_agent_code') || '',
-      campaign: localStorage.getItem('jackpot_campaign') || ''
+      campaign: localStorage.getItem('jackpot_campaign') || '',
+      deviceId,
+      deviceFingerprint
     })
   });
   const googleData = await googleRes.json();
@@ -90,9 +95,13 @@ export default function AuthPortal({
       triggerLoading(1500, async () => {
         try {
           const googleData = await loginWithGoogleProfile(tokenResponse.access_token);
+          setDeviceLockError('');
           finishGoogleLogin(googleData);
         } catch (err) {
           console.error('Google Login Error:', err);
+          if (err.message && err.message.toLowerCase().includes('device')) {
+            setDeviceLockError(err.message);
+          }
           showToast(err.message || 'Google Sign-In failed or was cancelled.', 'error');
         }
       });
@@ -318,6 +327,7 @@ export default function AuthPortal({
 
   // Error Hooks
   const [errors, setErrors] = useState({});
+  const [deviceLockError, setDeviceLockError] = useState('');
 
   // OTP Countdown States
   const [countdown, setCountdown] = useState(30);
@@ -496,13 +506,22 @@ export default function AuthPortal({
     }
 
     try {
-      const checkRes = await fetch(`/api/auth/register?email=${encodeURIComponent(regEmail.trim())}`);
+      const { deviceId, deviceFingerprint } = getDevicePayload();
+      const checkRes = await fetch(`/api/auth/register?email=${encodeURIComponent(regEmail.trim())}&deviceId=${encodeURIComponent(deviceId)}&deviceFingerprint=${encodeURIComponent(deviceFingerprint)}`);
       const checkData = await checkRes.json();
       
+      if (checkData.deviceRegistered) {
+        setDeviceLockError(checkData.message || 'You already have an account from this device.');
+        showToast(checkData.message || 'You already have an account from this device.', 'error');
+        return;
+      }
+
       if (checkData.success && checkData.exists) {
         setErrors({ regEmail: 'An account is already registered with this email' });
         return;
       }
+
+      setDeviceLockError('');
 
       const newUser = {
         name: regName.trim(),
@@ -512,7 +531,9 @@ export default function AuthPortal({
         referredBy: localStorage.getItem('jackpot_ref_code') || '',
         distributorId: localStorage.getItem('jackpot_distributor_id') || '',
         agentCode: localStorage.getItem('jackpot_agent_code') || '',
-        campaign: localStorage.getItem('jackpot_campaign') || ''
+        campaign: localStorage.getItem('jackpot_campaign') || '',
+        deviceId,
+        deviceFingerprint
       };
 
       triggerLoading(1200, () => {
@@ -609,11 +630,19 @@ export default function AuthPortal({
           .then(res => res.json())
           .then(data => {
             if (data.success) {
+              setDeviceLockError('');
               onRegisterSuccess(data.user);
               resetOtpState();
               resetFormFields();
             } else {
-              setErrors({ otp: data.message || 'Server error during registration.' });
+              if (data.message && data.message.toLowerCase().includes('device')) {
+                setDeviceLockError(data.message);
+                resetOtpState();
+                switchTab('register');
+                showToast(data.message, 'error');
+              } else {
+                setErrors({ otp: data.message || 'Server error during registration.' });
+              }
             }
           })
           .catch(err => {
@@ -724,6 +753,15 @@ export default function AuthPortal({
                 >
                   <h3 className="sr-only" id="login-header">Login Account</h3>
                   
+                  {deviceLockError && (
+                    <div className="device-lock-banner" role="alert">
+                      <div className="device-lock-banner-inner">
+                        <p className="device-lock-title">Please fix the errors below:</p>
+                        <p className="device-lock-desc">{deviceLockError}</p>
+                      </div>
+                    </div>
+                  )}
+
                   <button type="button" className="google-auth-btn" onClick={handleGoogleClick}>
                     <svg className="google-svg" viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
                       <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -817,6 +855,15 @@ export default function AuthPortal({
                 >
                   <h3 className="panel-heading" id="register-header">{frontendSettings.landingQuickSignup || 'Quick signup'}</h3>
                   
+                  {deviceLockError && (
+                    <div className="device-lock-banner" role="alert">
+                      <div className="device-lock-banner-inner">
+                        <p className="device-lock-title">Please fix the errors below:</p>
+                        <p className="device-lock-desc">{deviceLockError}</p>
+                      </div>
+                    </div>
+                  )}
+
                   <button type="button" className="google-auth-btn" onClick={handleGoogleClick}>
                     <svg className="google-svg" viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
                       <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
