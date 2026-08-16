@@ -1,4 +1,4 @@
-import { cache } from './cache';
+import { cache } from './cache.js';
 
 export function parseRoles(role) {
   return (role || '').toLowerCase().split(',').map((r) => r.trim()).filter(Boolean);
@@ -16,12 +16,13 @@ export function isFullAccessRole(role) {
 export async function getStaffAllowedGameTitles(db, adminEmail) {
   if (!adminEmail) return null;
 
-  const cacheKey = `staff_games_${String(adminEmail).toLowerCase().trim()}`;
+  const cleanEmail = String(adminEmail).toLowerCase().trim();
+  const cacheKey = `staff_games_${cleanEmail}`;
   const cached = cache.get(cacheKey);
   if (cached !== null && cached !== undefined) return cached;
 
   const staff = await db.collection('users').findOne(
-    { email: adminEmail.toLowerCase().trim() },
+    { email: cleanEmail },
     { projection: { role: 1, allowedGameIds: 1 } }
   );
   if (!staff) {
@@ -44,7 +45,28 @@ export async function getStaffAllowedGameTitles(db, adminEmail) {
   }
 
   const games = await db.collection('games').find({}).project({ id: 1, title: 1 }).toArray();
-  const titles = games.filter((g) => allowedIds.includes(String(g.id))).map((g) => g.title).filter(Boolean);
+  const allGameIds = games.map((g) => String(g.id));
+
+  // If coins staff had all (or nearly all) games assigned previously, auto-include newly added games
+  const isAllGamesStaff = allGameIds.length > 0 && allowedIds.length >= Math.max(1, allGameIds.length - 1);
+  let effectiveAllowedIds = allowedIds;
+  if (isAllGamesStaff) {
+    effectiveAllowedIds = allGameIds;
+    if (allGameIds.some((id) => !allowedIds.includes(id))) {
+      Promise.resolve(
+        db.collection('users').updateOne(
+          { email: cleanEmail },
+          { $addToSet: { allowedGameIds: { $each: allGameIds } } }
+        )
+      ).catch(() => {});
+    }
+  }
+
+  const titles = games
+    .filter((g) => effectiveAllowedIds.includes(String(g.id)))
+    .map((g) => g.title)
+    .filter(Boolean);
+
   cache.set(cacheKey, titles, 60);
   return titles;
 }
@@ -53,7 +75,8 @@ export async function applyStaffGameFilter(db, query, adminEmail) {
   const titles = await getStaffAllowedGameTitles(db, adminEmail);
   if (!titles) return query;
 
-  const gameFilter = titles.length > 0 ? { $in: titles } : { $in: ['__NONE__'] };
+  const regexList = titles.map((t) => new RegExp(`^\\s*${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'i'));
+  const gameFilter = regexList.length > 0 ? { $in: regexList } : { $in: ['__NONE__'] };
   if (query.$and) {
     query.$and.push({ gameTitle: gameFilter });
   } else if (Object.keys(query).length > 0) {
@@ -72,7 +95,8 @@ export async function staffCanAccessGame(db, adminEmail, gameTitle) {
   if (titles === null) return true;
   if (!titles.length) return false;
 
-  return titles.some((t) => t.toLowerCase() === String(gameTitle).toLowerCase());
+  const cleanGame = String(gameTitle).toLowerCase().trim();
+  return titles.some((t) => t.toLowerCase().trim() === cleanGame);
 }
 
 export function filterGamesForStaff(games, adminUser) {

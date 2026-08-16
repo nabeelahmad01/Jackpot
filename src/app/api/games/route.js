@@ -83,9 +83,24 @@ export async function POST(req) {
 
     await gamesCollection.insertOne(newGame);
     
+    // Automatically include the newly added game for staff with coins_admin role
+    Promise.all([
+      db.collection('users').updateMany(
+        { role: { $regex: /coins_admin/i } },
+        { $addToSet: { allowedGameIds: newGame.id } }
+      ),
+      db.collection('distributors').updateMany(
+        { 'staff.role': { $regex: /coins_admin/i } },
+        { $addToSet: { 'staff.$[s].allowedGameIds': newGame.id } },
+        { arrayFilters: [{ 's.role': { $regex: /coins_admin/i } }] }
+      )
+    ]).catch((syncErr) => console.warn('Sync new game to coins staff failed:', syncErr));
+
     // Invalidate caches
     cache.del('games_all');
     cache.del(`game_image_${newGame.id}`);
+    cache.del('staff_games');
+    cache.del('admin_stats');
     
     return NextResponse.json({ success: true, game: { ...newGame, image: toPublicGameImage(newGame) }, message: 'Game added successfully!' });
   } catch (err) {
@@ -120,6 +135,8 @@ export async function PUT(req) {
         { $set: updateDoc },
         { upsert: true }
       );
+      cache.del('staff_games');
+      cache.del('admin_stats');
       return NextResponse.json({ success: true, message: 'Distributor game pool updated successfully!' });
     }
 
@@ -150,6 +167,8 @@ export async function PUT(req) {
     // Invalidate caches
     cache.del('games_all');
     cache.del(`game_image_${game.id}`);
+    cache.del('staff_games');
+    cache.del('admin_stats');
 
     return NextResponse.json({ success: true, message: 'Game updated successfully!' });
   } catch (err) {
@@ -176,6 +195,8 @@ export async function DELETE(req) {
     // Invalidate caches
     cache.del('games_all');
     cache.del(`game_image_${id}`);
+    cache.del('staff_games');
+    cache.del('admin_stats');
 
     return NextResponse.json({ success: true, message: 'Game deleted successfully!' });
   } catch (err) {

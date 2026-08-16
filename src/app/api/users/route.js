@@ -182,8 +182,10 @@ export async function PUT(req) {
       await transactionsCollection.insertOne(auditTx);
     }
 
-    // Invalidate stats cache since coin/user edits could influence calculations
+    // Invalidate stats and staff game caches
     cache.del('admin_stats');
+    cache.del('staff_games');
+    cache.del(`staff_games_${cleanEmail}`);
 
     return NextResponse.json({ success: true, message: 'User details updated successfully!' });
   } catch (err) {

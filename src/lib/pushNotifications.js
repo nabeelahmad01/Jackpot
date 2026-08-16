@@ -243,7 +243,7 @@ function staffCanReceiveAlert(roles, kind, { gameTitle, gameTitleLower, skipGame
     // Coins staff: only their allowed games when a real game title is present
     if (!gameTitleLower || skipGameTitles.has(String(gameTitle || ''))) return true;
     const allowedIds = Array.isArray(allowedGameIds) ? allowedGameIds.map(String) : [];
-    if (allowedIds.length === 0) return false;
+    if (allowedIds.length === 0) return true;
     if (!gamesById) return false;
     return allowedIds.some((id) => String(gamesById.get(id) || '').toLowerCase() === gameTitleLower);
   }
@@ -470,7 +470,7 @@ function distributorStaffCanReceiveAlert(
   if (roles.includes('coins_admin') && kind === 'coins') {
     if (!gameTitleLower || skipGameTitles.has(String(gameTitle || ''))) return true;
     const allowedIds = Array.isArray(allowedGameIds) ? allowedGameIds.map(String) : [];
-    if (allowedIds.length === 0) return false;
+    if (allowedIds.length === 0) return true;
     if (!gamesById) return false;
     return allowedIds.some((id) => String(gamesById.get(id) || '').toLowerCase() === gameTitleLower);
   }

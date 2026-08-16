@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/mongodb';
 import { purgeAccountAccess } from '../../../../lib/sessionRevoke';
+import { cache } from '../../../../lib/cache';
 
 // GET distributor staff list
 export async function GET(req) {
@@ -70,6 +71,10 @@ export async function POST(req) {
 
     await usersCollection.insertOne(newStaff);
 
+    cache.del('staff_games');
+    cache.del(`staff_games_${email.toLowerCase().trim()}`);
+    cache.del('admin_stats');
+
     return NextResponse.json({ success: true, staff: newStaff, message: 'Staff member registered successfully!' });
   } catch (err) {
     console.error('Create Distributor Staff API Error:', err);
@@ -116,6 +121,10 @@ export async function PUT(req) {
       return NextResponse.json({ success: false, message: 'Staff member not found or access denied.' }, { status: 404 });
     }
 
+    cache.del('staff_games');
+    cache.del(`staff_games_${email.toLowerCase().trim()}`);
+    cache.del('admin_stats');
+
     return NextResponse.json({ success: true, message: 'Staff details updated successfully!' });
   } catch (err) {
     console.error('Update Distributor Staff API Error:', err);
@@ -153,6 +162,10 @@ export async function DELETE(req) {
     }
 
     await purgeAccountAccess(db, cleanEmail, userDoc);
+
+    cache.del('staff_games');
+    cache.del(`staff_games_${cleanEmail}`);
+    cache.del('admin_stats');
 
     return NextResponse.json({ success: true, message: 'Staff member deleted successfully!' });
   } catch (err) {
