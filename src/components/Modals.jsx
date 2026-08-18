@@ -402,7 +402,7 @@ export function GoogleWarningModal({ isOpen, onClose }) {
 }
 
 // --- B2) DEVICE LOCK / DUPLICATE ACCOUNT ALERT MODAL ---
-export function DeviceAlertModal({ isOpen, onClose, message, onGoToLogin, onGoToForgot, onOpenSupport }) {
+export function DeviceAlertModal({ isOpen, onClose, message, existingEmail, onGoToLogin, onGoToForgot, onOpenSupport }) {
   if (!isOpen) return null;
 
   return (
@@ -495,6 +495,49 @@ export function DeviceAlertModal({ isOpen, onClose, message, onGoToLogin, onGoTo
           {message || 'You already have an account from this device.'}
         </p>
 
+        {/* Registered Email Display Badge */}
+        {existingEmail && (
+          <div
+            style={{
+              background: 'rgba(0, 210, 255, 0.06)',
+              border: '1px solid rgba(0, 210, 255, 0.3)',
+              borderRadius: '12px',
+              padding: '0.65rem 0.85rem',
+              margin: '0 0 0.85rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.6rem',
+              boxShadow: '0 0 15px rgba(0, 210, 255, 0.08)'
+            }}
+          >
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                background: 'rgba(0, 210, 255, 0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#00d2ff',
+                fontSize: '0.9rem',
+                flexShrink: 0
+              }}
+            >
+              <i className="fa-solid fa-envelope"></i>
+            </div>
+            <div style={{ textAlign: 'left', minWidth: 0 }}>
+              <span style={{ display: 'block', fontSize: '0.58rem', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '0.04em' }}>
+                Your Registered Email
+              </span>
+              <span style={{ fontSize: '0.85rem', color: '#00d2ff', fontWeight: '900', wordBreak: 'break-all', display: 'block' }}>
+                {existingEmail}
+              </span>
+            </div>
+          </div>
+        )}
+
         <p
           style={{
             fontSize: '0.72rem',
@@ -511,7 +554,7 @@ export function DeviceAlertModal({ isOpen, onClose, message, onGoToLogin, onGoTo
             type="button"
             className="submit-btn slanted-green-btn"
             onClick={() => {
-              if (onGoToLogin) onGoToLogin();
+              if (onGoToLogin) onGoToLogin(existingEmail);
               onClose();
             }}
             style={{

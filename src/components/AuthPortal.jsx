@@ -54,7 +54,10 @@ async function loginWithGoogleProfile(accessToken) {
   });
   const googleData = await googleRes.json();
   if (!googleRes.ok || !googleData.success) {
-    throw new Error(googleData.message || 'Google registration/login failed on server.');
+    const error = new Error(googleData.message || 'Google registration/login failed on server.');
+    error.existingEmail = googleData.existingEmail;
+    error.deviceRegistered = googleData.deviceRegistered;
+    throw error;
   }
   return googleData;
 }
@@ -82,6 +85,11 @@ export default function AuthPortal({
   };
 
   const finishGoogleLogin = (googleData) => {
+    if (googleData.user?.email) {
+      try {
+        localStorage.setItem('jackpot_last_email', googleData.user.email.toLowerCase().trim());
+      } catch (_) {}
+    }
     if (googleData.isNewUser) {
       trackCompleteRegistration('google');
       showToast(`Google account registered! Welcome, ${googleData.user?.name || 'Player'}.`, 'success');
@@ -101,8 +109,10 @@ export default function AuthPortal({
           finishGoogleLogin(googleData);
         } catch (err) {
           console.error('Google Login Error:', err);
-          if (err.message && err.message.toLowerCase().includes('device')) {
-            setDeviceLockError(err.message);
+          if (err.deviceRegistered || (err.message && err.message.toLowerCase().includes('device'))) {
+            const foundEmail = err.existingEmail || localStorage.getItem('jackpot_last_email') || '';
+            if (foundEmail) setExistingAccountEmail(foundEmail);
+            setDeviceLockError(err.message || 'You already have an account from this device.');
             setDeviceModalOpen(true);
           } else {
             showToast(err.message || 'Google Sign-In failed or was cancelled.', 'error');
@@ -289,6 +299,17 @@ export default function AuthPortal({
   const [showPassword, setShowPassword] = useState(false);
   const [bonusModalOpen, setBonusModalOpen] = useState(true);
   const [deviceModalOpen, setDeviceModalOpen] = useState(false);
+  const [existingAccountEmail, setExistingAccountEmail] = useState('');
+
+  // Preload saved email if previously remembered
+  useEffect(() => {
+    try {
+      const savedEmail = localStorage.getItem('jackpot_last_email');
+      if (savedEmail) {
+        setExistingAccountEmail(savedEmail);
+      }
+    } catch (_) {}
+  }, []);
 
   // Sync activeTab state changes to browser URL pathnames
   useEffect(() => {
@@ -482,6 +503,9 @@ export default function AuthPortal({
       const data = await response.json();
       
       if (data.success) {
+        try {
+          localStorage.setItem('jackpot_last_email', loginEmail.trim().toLowerCase());
+        } catch (_) {}
         triggerLoading(1500, () => {
           onLoginSuccess(data.user);
           setLoginEmail('');
@@ -517,6 +541,10 @@ export default function AuthPortal({
       const checkData = await checkRes.json();
       
       if (checkData.deviceRegistered) {
+        const foundEmail = checkData.existingEmail || localStorage.getItem('jackpot_last_email') || '';
+        if (foundEmail) {
+          setExistingAccountEmail(foundEmail);
+        }
         setDeviceLockError(checkData.message || 'You already have an account from this device.');
         setDeviceModalOpen(true);
         return;
@@ -709,6 +737,27 @@ export default function AuthPortal({
       if (regInput) {
         regInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
         regInput.focus?.();
+      }
+    }, 150);
+  };
+
+  const handleGoToExistingLogin = (emailToFill) => {
+    switchTab('login');
+    const targetEmail = emailToFill || existingAccountEmail || localStorage.getItem('jackpot_last_email') || '';
+    if (targetEmail) {
+      setLoginEmail(targetEmail);
+    }
+    setTimeout(() => {
+      const passInput = document.getElementById('login-password');
+      if (passInput) {
+        passInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        passInput.focus?.();
+      } else {
+        const emailInput = document.getElementById('login-email');
+        if (emailInput) {
+          emailInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          emailInput.focus?.();
+        }
       }
     }, 150);
   };
@@ -1206,7 +1255,8 @@ export default function AuthPortal({
         isOpen={deviceModalOpen}
         onClose={() => setDeviceModalOpen(false)}
         message={deviceLockError}
-        onGoToLogin={() => switchTab('login')}
+        existingEmail={existingAccountEmail}
+        onGoToLogin={handleGoToExistingLogin}
         onGoToForgot={() => switchTab('forgot')}
         onOpenSupport={onOpenSupport}
       />

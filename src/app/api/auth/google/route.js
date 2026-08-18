@@ -53,7 +53,13 @@ export async function POST(req) {
 
           if (existingDeviceAccount) {
             return NextResponse.json(
-              { success: false, message: 'You already have an account from this device.' },
+              {
+                success: false,
+                deviceRegistered: true,
+                existingEmail: existingDeviceAccount.email,
+                existingName: existingDeviceAccount.name || '',
+                message: 'You already have an account from this device.'
+              },
               { status: 400 }
             );
           }

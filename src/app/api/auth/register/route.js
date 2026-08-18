@@ -45,6 +45,8 @@ export async function GET(req) {
               success: true,
               exists: false,
               deviceRegistered: true,
+              existingEmail: existingDeviceUser.email,
+              existingName: existingDeviceUser.name || '',
               message: 'You already have an account from this device.'
             });
           }
