@@ -6,7 +6,9 @@ export default function SignupBonusModal({
   isOpen = false,
   onClose,
   frontendSettings = {},
-  onGoToRegister
+  onGoToRegister,
+  onGoToDeposit,
+  isLoggedIn = false
 }) {
   const [depositAmount, setDepositAmount] = useState(10);
   const [customAmount, setCustomAmount] = useState('');
@@ -61,8 +63,10 @@ export default function SignupBonusModal({
 
   const handleCtaClick = (e) => {
     e.preventDefault();
-    if (onGoToRegister) {
-      onGoToRegister();
+    if (onGoToDeposit) {
+      onGoToDeposit(activeDeposit);
+    } else if (onGoToRegister) {
+      onGoToRegister(activeDeposit);
     }
     if (onClose) {
       onClose();
@@ -98,7 +102,7 @@ export default function SignupBonusModal({
         <div className="bonus-badge-top">
           <span className="bonus-pulse-dot"></span>
           <i className="fa-solid fa-gift bonus-badge-icon"></i>
-          <span>REGISTRATION BONUS READY</span>
+          <span>{isLoggedIn ? 'FIRST DEPOSIT BONUS READY' : 'REGISTRATION BONUS READY'}</span>
         </div>
 
         {/* Hero 3D Gift Icon & Glow Header */}
@@ -119,8 +123,17 @@ export default function SignupBonusModal({
           </h2>
 
           <p className="bonus-subtitle">
-            Sign up today to claim your <strong style={{ color: '#ffd700' }}>{bonusPercent}% Instant Match</strong>{' '}
-            on your first deposit + <strong style={{ color: '#4ade80' }}>${freeplayAmount} Freeplay</strong>!
+            {isLoggedIn ? (
+              <>
+                Make your first deposit to get your <strong style={{ color: '#ffd700' }}>{bonusPercent}% Instant Match</strong>{' '}
+                + <strong style={{ color: '#4ade80' }}>${freeplayAmount} Freeplay</strong>!
+              </>
+            ) : (
+              <>
+                Sign up today to claim your <strong style={{ color: '#ffd700' }}>{bonusPercent}% Instant Match</strong>{' '}
+                on your first deposit + <strong style={{ color: '#4ade80' }}>${freeplayAmount} Freeplay</strong>!
+              </>
+            )}
           </p>
         </div>
 

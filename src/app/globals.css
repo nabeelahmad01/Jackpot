@@ -5447,6 +5447,13 @@ html.player-native-shell .player-lobby-scroll {
   box-shadow: 0 12px 30px rgba(255, 215, 0, 0.65);
 }
 
+.auth-floating-bonus-trigger--lobby {
+  bottom: calc(25px + env(safe-area-inset-bottom, 0px));
+  left: calc(20px + env(safe-area-inset-left, 0px));
+  right: auto;
+  z-index: 998;
+}
+
 .floating-bonus-pulse {
   width: 8px;
   height: 8px;

@@ -789,10 +789,21 @@ export async function POST(req) {
       if (requireTagQr && (!txObject.tagQrScreenshot || String(txObject.tagQrScreenshot).trim() === '')) {
         return NextResponse.json({ success: false, message: 'Tag QR screenshot is required for withdrawals.' }, { status: 400 });
       }
-      // Server-side freeplay session: last action was freeplay, no deposit or freeplay cashout after it
+      // Server-side freeplay session: scoped to the specific game being cashed out from
       try {
+        const gameTitle = txObject.gameTitle || '';
+        const gameCondition = gameTitle
+          ? { gameTitle: { $regex: new RegExp(`^${String(gameTitle).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }
+          : {};
+
         const lastFreeplay = await transactionsCollection.findOne(
-          { userEmail: txObject.userEmail, type: 'BONUS', code: { $in: ['SIGNUP-FREE3', 'FREEPLAY'] }, status: 'SUCCESS' },
+          {
+            userEmail: txObject.userEmail,
+            type: 'BONUS',
+            code: { $in: ['SIGNUP-FREE3', 'FREEPLAY'] },
+            status: 'SUCCESS',
+            ...gameCondition
+          },
           { sort: { id: -1 } }
         );
         if (lastFreeplay) {
@@ -800,12 +811,14 @@ export async function POST(req) {
             userEmail: txObject.userEmail,
             type: 'DEPOSIT',
             status: 'SUCCESS',
+            ...gameCondition,
             id: { $gt: lastFreeplay.id }
           });
           const hasFreeplayWithdrawAfter = await transactionsCollection.findOne({
             userEmail: txObject.userEmail,
             type: 'WITHDRAW',
             isFreeplayWithdraw: true,
+            ...gameCondition,
             id: { $gt: lastFreeplay.id }
           });
           txObject.isFreeplayWithdraw = !hasDepositAfterFreeplay && !hasFreeplayWithdrawAfter;

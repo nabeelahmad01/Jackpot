@@ -17,6 +17,7 @@ import { canShowClaimRemainderButton } from '../lib/remainderClaim';
 import { compressImageFile } from '../lib/imageCompress';
 import { formatDeviceDateTime } from '../lib/formatDateTime';
 import PullToRefresh from './PullToRefresh';
+import SignupBonusModal from './SignupBonusCard';
 import { trackInitiateCheckout } from '../lib/metaPixel';
 import OfflineBanner from './OfflineBanner';
 import { registerNativeBackHandler } from '../lib/nativeBack';
@@ -90,6 +91,18 @@ export default function UserLobby({
   const [cashoutDepositModalOpen, setCashoutDepositModalOpen] = useState(false);
   const [cashoutDepositAmount, setCashoutDepositAmount] = useState('');
   const [submittingCashoutDep, setSubmittingCashoutDep] = useState(false);
+  const [bonusModalOpen, setBonusModalOpen] = useState(true);
+
+  const hasSuccessfulDeposit = useMemo(() => {
+    if (!transactions || !currentUserEmail) return false;
+    const email = currentUserEmail.toLowerCase().trim();
+    return transactions.some(
+      (t) =>
+        String(t.type || '').toUpperCase() === 'DEPOSIT' &&
+        String(t.status || '').toUpperCase() === 'SUCCESS' &&
+        (t.userEmail || '').toLowerCase().trim() === email
+    );
+  }, [transactions, currentUserEmail]);
 
   const totalAvailableCashoutHold = useMemo(() => {
     if (!transactions || !currentUserEmail) return 0;
@@ -241,17 +254,26 @@ export default function UserLobby({
     }
   }, [games]);
 
-  // Active freeplay session: last action was a successful freeplay claim, with no deposit or freeplay cashout after it
+  // Active freeplay session: scoped to activeGame (last action on THIS game was freeplay, no deposit or freeplay cashout on this game after it)
   useEffect(() => {
+    if (!activeGame?.title) {
+      setIsFreeplaySession(false);
+      return;
+    }
+
     const isAfter = (tx, ref) => {
       if (tx.id && ref.id) return parseFloat(tx.id) > parseFloat(ref.id);
       return new Date(tx.createdAt || tx.date || 0) > new Date(ref.createdAt || ref.date || 0);
     };
 
-    const sorted = [...(transactions || [])].sort((a, b) => {
-      if (a.id && b.id) return parseFloat(b.id) - parseFloat(a.id);
-      return new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0);
-    });
+    const activeGameTitle = String(activeGame.title).toLowerCase().trim();
+
+    const sorted = [...(transactions || [])]
+      .filter((t) => String(t.gameTitle || '').toLowerCase().trim() === activeGameTitle)
+      .sort((a, b) => {
+        if (a.id && b.id) return parseFloat(b.id) - parseFloat(a.id);
+        return new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0);
+      });
 
     const lastFreeplay = sorted.find(
       (t) => t.type === 'BONUS' && (t.code === 'SIGNUP-FREE3' || t.code === 'FREEPLAY') && t.status === 'SUCCESS'
@@ -271,7 +293,7 @@ export default function UserLobby({
     );
 
     setIsFreeplaySession(!hasDepositAfterFreeplay && !hasFreeplayWithdrawAfter);
-  }, [transactions]);
+  }, [transactions, activeGame]);
 
   // Signup freeplay (one game) OR deposit $25+ freeplay. Hide claim once a request
   // is already pending/processing until the next eligibility window.
@@ -852,6 +874,47 @@ export default function UserLobby({
     } catch (err) {
       console.error(err);
       showToast('Could not load Tag QR screenshot. Try another image.', 'error');
+    }
+  };
+
+  const handleLobbyDepositCta = (selectedAmount) => {
+    setBonusModalOpen(false);
+    const amtStr = String(selectedAmount || 10);
+    setDepositAmount(amtStr);
+
+    // If activeGame is selected and has a ready account:
+    if (activeGame && hasReadyAccount) {
+      setTimeout(() => {
+        const depInput = document.querySelector('input[placeholder="Deposit amount"]') || document.querySelector('.wallet-side-box input');
+        if (depInput) {
+          depInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          depInput.focus();
+        }
+      }, 150);
+      showToast(`Selected $${amtStr} deposit. Complete your payment below!`, 'success');
+      return;
+    }
+
+    // If user has existing game accounts, activate the first one
+    if (gameAccounts && gameAccounts.length > 0) {
+      const firstAcc = gameAccounts[0];
+      const matchedGame = games.find((g) => (g.title || '').toLowerCase() === (firstAcc.gameTitle || '').toLowerCase());
+      if (matchedGame) {
+        setActiveGame(matchedGame);
+        showToast(`Selected ${matchedGame.title}. Enter your deposit amount to activate bonus!`, 'success');
+        return;
+      }
+    }
+
+    // Otherwise activate the first game or scroll to games
+    if (games && games.length > 0) {
+      setActiveGame(games[0]);
+      showToast(`Selected ${games[0].title}. Request your account or deposit to claim your bonus!`, 'success');
+    } else {
+      const gamesGrid = document.querySelector('.games-grid');
+      if (gamesGrid) {
+        gamesGrid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     }
   };
 
@@ -3605,6 +3668,31 @@ export default function UserLobby({
           </div>
         </div>
       </div>
+
+      {/* Floating Bonus Trigger Button (shown in Lobby when modal is dismissed and user hasn't deposited yet) */}
+      {!hasSuccessfulDeposit && !bonusModalOpen && (
+        <button
+          type="button"
+          className="auth-floating-bonus-trigger auth-floating-bonus-trigger--lobby"
+          onClick={() => setBonusModalOpen(true)}
+          aria-label="Open Signup Bonus Offer"
+        >
+          <span className="floating-bonus-pulse"></span>
+          <i className="fa-solid fa-gift"></i>
+          <span>{frontendSettings.firstDepositBonus || 300}% BONUS</span>
+        </button>
+      )}
+
+      {/* Floating Signup Bonus Modal (shown to players until they make their first deposit) */}
+      {!hasSuccessfulDeposit && (
+        <SignupBonusModal
+          isOpen={bonusModalOpen}
+          onClose={() => setBonusModalOpen(false)}
+          frontendSettings={frontendSettings}
+          onGoToDeposit={handleLobbyDepositCta}
+          isLoggedIn={true}
+        />
+      )}
     </div>
   );
 }
