@@ -7,12 +7,14 @@ export default function SignupBonusModal({
   onClose,
   frontendSettings = {},
   onGoToRegister,
+  onGoToLogin,
   onGoToDeposit,
   isLoggedIn = false
 }) {
   const [depositAmount, setDepositAmount] = useState(10);
   const [customAmount, setCustomAmount] = useState('');
   const [isCustom, setIsCustom] = useState(false);
+  const [authMode, setAuthMode] = useState('register'); // 'register' | 'login'
 
   // Read live bonus & freeplay settings from system
   const bonusPercent = Number(
@@ -63,10 +65,22 @@ export default function SignupBonusModal({
 
   const handleCtaClick = (e) => {
     e.preventDefault();
-    if (onGoToDeposit) {
-      onGoToDeposit(activeDeposit);
-    } else if (onGoToRegister) {
-      onGoToRegister(activeDeposit);
+    if (isLoggedIn) {
+      if (onGoToDeposit) {
+        onGoToDeposit(activeDeposit);
+      }
+    } else {
+      if (authMode === 'login') {
+        if (onGoToLogin) {
+          onGoToLogin(activeDeposit);
+        } else if (onGoToRegister) {
+          onGoToRegister(activeDeposit, 'login');
+        }
+      } else {
+        if (onGoToRegister) {
+          onGoToRegister(activeDeposit, 'register');
+        }
+      }
     }
     if (onClose) {
       onClose();
@@ -105,6 +119,26 @@ export default function SignupBonusModal({
           <span>{isLoggedIn ? 'FIRST DEPOSIT BONUS READY' : 'REGISTRATION BONUS READY'}</span>
         </div>
 
+        {/* Auth Option Toggle Bar for Guest Users */}
+        {!isLoggedIn && (
+          <div className="bonus-auth-toggle-row">
+            <button
+              type="button"
+              className={`bonus-auth-toggle-btn ${authMode === 'register' ? 'active' : ''}`}
+              onClick={() => setAuthMode('register')}
+            >
+              <i className="fa-solid fa-user-plus"></i> REGISTER NOW
+            </button>
+            <button
+              type="button"
+              className={`bonus-auth-toggle-btn ${authMode === 'login' ? 'active' : ''}`}
+              onClick={() => setAuthMode('login')}
+            >
+              <i className="fa-solid fa-right-to-bracket"></i> LOGIN NOW
+            </button>
+          </div>
+        )}
+
         {/* Hero 3D Gift Icon & Glow Header */}
         <div className="bonus-hero-header">
           <div className="bonus-gift-box-wrapper">
@@ -130,8 +164,7 @@ export default function SignupBonusModal({
               </>
             ) : (
               <>
-                Sign up today to claim your <strong style={{ color: '#ffd700' }}>{bonusPercent}% Instant Match</strong>{' '}
-                on your first deposit + <strong style={{ color: '#4ade80' }}>${freeplayAmount} Freeplay</strong>!
+                {authMode === 'login' ? 'Log in to select your game & claim your deposit bonus!' : 'Sign up today to claim your bonus on your first deposit!'}
               </>
             )}
           </p>
@@ -145,9 +178,9 @@ export default function SignupBonusModal({
                 <i className="fa-solid fa-coins"></i>
               </div>
               <div>
-                <h4 className="bonus-calc-title">DEPOSIT NOW TO CLAIM YOUR BONUS</h4>
+                <h4 className="bonus-calc-title">CHOOSE DEPOSIT AMOUNT</h4>
                 <p className="bonus-calc-desc">
-                  Make your first deposit now and unlock your <strong>{bonusPercent}% Bonus</strong> Instantly.
+                  Select your deposit amount to calculate your <strong>{bonusPercent}% Bonus</strong>.
                 </p>
               </div>
             </div>
@@ -226,7 +259,7 @@ export default function SignupBonusModal({
             </span>
           </div>
 
-          {/* Main CTA Deposit / Register Button */}
+          {/* Main CTA Deposit / Register / Login Button */}
           <button
             type="button"
             onClick={handleCtaClick}
@@ -234,9 +267,30 @@ export default function SignupBonusModal({
             id="bonus-deposit-cta"
           >
             <span className="cta-icon">🚀</span>
-            <span className="cta-text">DEPOSIT NOW</span>
+            <span className="cta-text">
+              {isLoggedIn
+                ? `DEPOSIT $${activeDeposit} & CHOOSE GAME`
+                : authMode === 'login'
+                ? `LOGIN NOW & DEPOSIT $${activeDeposit}`
+                : `REGISTER NOW & CLAIM BONUS`}
+            </span>
             <i className="fa-solid fa-arrow-right cta-arrow"></i>
           </button>
+
+          {/* Mode Switch Helper Link */}
+          {!isLoggedIn && (
+            <div className="bonus-auth-switch-note" style={{ marginTop: '0.65rem', fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)' }}>
+              {authMode === 'register' ? (
+                <span onClick={() => setAuthMode('login')} style={{ cursor: 'pointer' }}>
+                  Already have an account? <strong style={{ color: '#ffd700', textDecoration: 'underline' }}>Login Now &rarr;</strong>
+                </span>
+              ) : (
+                <span onClick={() => setAuthMode('register')} style={{ cursor: 'pointer' }}>
+                  Don't have an account yet? <strong style={{ color: '#ffd700', textDecoration: 'underline' }}>Register Now &rarr;</strong>
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Trust Badges */}
           <div className="bonus-trust-badges">
@@ -256,7 +310,7 @@ export default function SignupBonusModal({
 
           {/* Footer Guidance */}
           <p className="bonus-footer-note">
-            Choose your favorite game, make your first deposit, and activate your signup bonus.
+            Choose your deposit amount, select your favorite game, and activate your signup bonus.
           </p>
         </div>
       </div>

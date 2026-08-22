@@ -92,6 +92,23 @@ export default function UserLobby({
   const [cashoutDepositAmount, setCashoutDepositAmount] = useState('');
   const [submittingCashoutDep, setSubmittingCashoutDep] = useState(false);
   const [bonusModalOpen, setBonusModalOpen] = useState(true);
+  const [gameSelectionModalOpen, setGameSelectionModalOpen] = useState(false);
+
+  // Auto-trigger game selection modal if player selected an amount before logging in/registering
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const pendingAmt = localStorage.getItem('jackpot_pending_deposit_amount');
+      if (pendingAmt) {
+        localStorage.removeItem('jackpot_pending_deposit_amount');
+        setDepositAmount(String(pendingAmt));
+        setBonusModalOpen(false);
+        setGameSelectionModalOpen(true);
+      }
+    } catch (e) {
+      /* ignore */
+    }
+  }, []);
 
   const hasSuccessfulDeposit = useMemo(() => {
     if (!transactions || !currentUserEmail) return false;
@@ -881,40 +898,45 @@ export default function UserLobby({
     setBonusModalOpen(false);
     const amtStr = String(selectedAmount || 10);
     setDepositAmount(amtStr);
+    setGameSelectionModalOpen(true);
+  };
 
-    // If activeGame is selected and has a ready account:
-    if (activeGame && hasReadyAccount) {
-      setTimeout(() => {
-        const depInput = document.querySelector('input[placeholder="Deposit amount"]') || document.querySelector('.wallet-side-box input');
-        if (depInput) {
-          depInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          depInput.focus();
-        }
-      }, 150);
-      showToast(`Selected $${amtStr} deposit. Complete your payment below!`, 'success');
-      return;
-    }
+  const handleSelectGameForDeposit = (selectedGame) => {
+    if (!selectedGame) return;
+    setActiveGame(selectedGame);
+    setGameSelectionModalOpen(false);
 
-    // If user has existing game accounts, activate the first one
-    if (gameAccounts && gameAccounts.length > 0) {
-      const firstAcc = gameAccounts[0];
-      const matchedGame = games.find((g) => (g.title || '').toLowerCase() === (firstAcc.gameTitle || '').toLowerCase());
-      if (matchedGame) {
-        setActiveGame(matchedGame);
-        showToast(`Selected ${matchedGame.title}. Enter your deposit amount to activate bonus!`, 'success');
-        return;
-      }
-    }
+    const norm = (t) => String(t || '').toLowerCase().trim();
+    const readyAcc = (gameAccounts || []).find(
+      (a) => norm(a.gameTitle) === norm(selectedGame.title) && String(a.status || '').toUpperCase() === 'READY'
+    );
 
-    // Otherwise activate the first game or scroll to games
-    if (games && games.length > 0) {
-      setActiveGame(games[0]);
-      showToast(`Selected ${games[0].title}. Request your account or deposit to claim your bonus!`, 'success');
+    if (readyAcc) {
+      // Account ALREADY created/READY -> direct deposit system
+      showToast(
+        `Selected ${selectedGame.title}! Enter payment details below for your $${depositAmount || '10'} deposit.`,
+        'success'
+      );
+      setPaymentModalOpen(true);
     } else {
-      const gamesGrid = document.querySelector('.games-grid');
-      if (gamesGrid) {
-        gamesGrid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // Account NOT created yet -> auto request account creation & open direct deposit system
+      const pendingReq = (accountRequests || []).find(
+        (r) => norm(r.gameTitle) === norm(selectedGame.title) && String(r.status || '').toUpperCase() === 'PENDING'
+      );
+
+      if (!pendingReq && onRequestAccount) {
+        onRequestAccount(selectedGame.title);
+        showToast(
+          `Account creation request submitted for ${selectedGame.title}! Complete your $${depositAmount || '10'} deposit now to load your account.`,
+          'info'
+        );
+      } else {
+        showToast(
+          `Account request pending for ${selectedGame.title}. Complete your $${depositAmount || '10'} deposit now to accelerate approval!`,
+          'info'
+        );
       }
+      setPaymentModalOpen(true);
     }
   };
 
@@ -3692,6 +3714,112 @@ export default function UserLobby({
           onGoToDeposit={handleLobbyDepositCta}
           isLoggedIn={true}
         />
+      )}
+
+      {/* Step 2: Game Selection Modal for Deposit Flow */}
+      {gameSelectionModalOpen && (
+        <div
+          className="bonus-modal-overlay"
+          onClick={() => setGameSelectionModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="bonus-modal-card game-selection-modal-card"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '540px', width: '94%', padding: '1.5rem 1.25rem' }}
+          >
+            <button
+              type="button"
+              onClick={() => setGameSelectionModalOpen(false)}
+              className="bonus-modal-close-btn"
+              aria-label="Close Game Selection"
+            >
+              <i className="fa-solid fa-xmark"></i>
+            </button>
+
+            <div className="bonus-modal-top-glow"></div>
+
+            <div className="bonus-badge-top" style={{ borderColor: 'rgba(56, 189, 248, 0.4)' }}>
+              <span className="bonus-pulse-dot" style={{ background: '#38bdf8' }}></span>
+              <i className="fa-solid fa-gamepad" style={{ color: '#38bdf8' }}></i>
+              <span>CHOOSE YOUR GAME</span>
+            </div>
+
+            <h2 className="bonus-main-title" style={{ marginTop: '0.5rem', fontSize: '1.35rem' }}>
+              CHOOSE A GAME FOR YOUR <span className="bonus-highlight-gold">${depositAmount || '10'}</span> DEPOSIT
+            </h2>
+            <p className="bonus-subtitle" style={{ fontSize: '0.85rem', marginBottom: '1.15rem' }}>
+              Select your game. If an account is not created yet, an account creation request will be sent automatically!
+            </p>
+
+            {/* Games Grid */}
+            <div className="game-select-modal-grid">
+              {(games && games.length > 0
+                ? games
+                : [
+                    { id: 'fire-kirin', title: 'Fire Kirin', subtitle: 'Fish & Slot Arcade', category: 'Fish & Slots' },
+                    { id: 'orion-stars', title: 'Orion Stars', subtitle: 'Sweepstakes & Reel', category: 'Sweepstakes' },
+                    { id: 'game-vault', title: 'GameVault', subtitle: 'High Payout Reels', category: 'Slots' },
+                    { id: 'juwa', title: 'Juwa', subtitle: 'Classic Arcade Jackpot', category: 'Arcade' },
+                    { id: 'ultra-panda', title: 'Ultra Panda', subtitle: 'Ultra Bonus Spins', category: 'Slots' },
+                    { id: 'milky-way', title: 'Milky Way', subtitle: 'Galactic Casino', category: 'Slots' }
+                  ]
+              ).map((g) => {
+                const title = g.title || g.name || 'Game';
+                const norm = (t) => String(t || '').toLowerCase().trim();
+                const readyAcc = (gameAccounts || []).find(
+                  (a) => norm(a.gameTitle) === norm(title) && String(a.status || '').toUpperCase() === 'READY'
+                );
+                const pendingReq = (accountRequests || []).find(
+                  (r) => norm(r.gameTitle) === norm(title) && String(r.status || '').toUpperCase() === 'PENDING'
+                );
+
+                return (
+                  <div
+                    key={g.id || g._id || title}
+                    className="game-select-card"
+                    onClick={() => handleSelectGameForDeposit(g)}
+                  >
+                    <div className="game-select-card-header">
+                      {g.image || g.logo ? (
+                        <img src={g.image || g.logo} alt={title} className="game-select-icon-img" />
+                      ) : (
+                        <div className="game-select-icon-fallback">
+                          <i className="fa-solid fa-gamepad"></i>
+                        </div>
+                      )}
+                      <div className="game-select-info">
+                        <h4 className="game-select-title">{title}</h4>
+                        <span className="game-select-subtitle">{g.subtitle || g.category || 'Casino Game'}</span>
+                      </div>
+                    </div>
+
+                    <div className="game-select-status-wrap">
+                      {readyAcc ? (
+                        <span className="game-status-badge ready">
+                          <i className="fa-solid fa-circle-check"></i> Account Ready
+                        </span>
+                      ) : pendingReq ? (
+                        <span className="game-status-badge pending">
+                          <i className="fa-solid fa-clock"></i> Request Pending
+                        </span>
+                      ) : (
+                        <span className="game-status-badge new">
+                          <i className="fa-solid fa-user-plus"></i> Auto-Create Request
+                        </span>
+                      )}
+
+                      <button type="button" className="game-select-btn">
+                        {readyAcc ? 'DEPOSIT NOW 🚀' : 'CHOOSE & DEPOSIT 🚀'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

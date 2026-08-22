@@ -728,7 +728,18 @@ export default function AuthPortal({
     resetOtpState();
   };
 
-  const handleGoToRegister = () => {
+  const handleGoToRegister = (depositAmt, targetMode = 'register') => {
+    if (depositAmt) {
+      try {
+        localStorage.setItem('jackpot_pending_deposit_amount', String(depositAmt));
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    if (targetMode === 'login') {
+      handleGoToExistingLogin();
+      return;
+    }
     switchTab('register');
     const bonusVal = frontendSettings?.firstDepositBonus || 300;
     showToast(`Create your free account below to claim your ${bonusVal}% bonus & deposit!`, 'success');
@@ -737,6 +748,25 @@ export default function AuthPortal({
       if (regInput) {
         regInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
         regInput.focus?.();
+      }
+    }, 150);
+  };
+
+  const handleGoToLoginFromBonus = (depositAmt) => {
+    if (depositAmt) {
+      try {
+        localStorage.setItem('jackpot_pending_deposit_amount', String(depositAmt));
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    switchTab('login');
+    showToast('Log in to choose your game and complete your deposit!', 'info');
+    setTimeout(() => {
+      const emailInput = document.getElementById('login-email') || document.getElementById('auth-card');
+      if (emailInput) {
+        emailInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        emailInput.focus?.();
       }
     }, 150);
   };
@@ -1248,6 +1278,7 @@ export default function AuthPortal({
         onClose={() => setBonusModalOpen(false)}
         frontendSettings={frontendSettings}
         onGoToRegister={handleGoToRegister}
+        onGoToLogin={handleGoToLoginFromBonus}
       />
 
       {/* Centered Device Alert Modal (Replaces top toast error) */}
