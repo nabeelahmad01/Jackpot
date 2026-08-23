@@ -162,107 +162,198 @@ export async function POST(req) {
                 cid: 'promo-flyer',
                 contentType: match[1]
               });
-              imageHtml = '<img class="promo-image" src="cid:promo-flyer" alt="Special Promotion Flyer" />';
+              imageHtml = `<div style="text-align: center; margin-bottom: 25px;"><img src="cid:promo-flyer" alt="Special Promotion Flyer" style="max-width: 100%; height: auto; border-radius: 12px; border: 1px solid rgba(255,215,0,0.3); box-shadow: 0 8px 25px rgba(0,0,0,0.5);" /></div>`;
             }
           } else {
             const imgSrc = image.startsWith('http') ? image : `${siteUrl}${image.startsWith('/') ? '' : '/'}${image}`;
-            imageHtml = `<img class="promo-image" src="${imgSrc}" alt="Special Promotion Flyer" />`;
+            imageHtml = `<div style="text-align: center; margin-bottom: 25px;"><img src="${imgSrc}" alt="Special Promotion Flyer" style="max-width: 100%; height: auto; border-radius: 12px; border: 1px solid rgba(255,215,0,0.3); box-shadow: 0 8px 25px rgba(0,0,0,0.5);" /></div>`;
           }
+        }
+
+        // Smart plain-text to HTML formatter
+        const renderMessageHtml = (rawMessage) => {
+          if (!rawMessage) return '';
+          const paragraphs = rawMessage.trim().split(/\n\n+/);
+          return paragraphs.map(p => {
+            const lines = p.split('\n');
+            const isList = lines.length > 1 && lines.every(line => /^\s*[\-\*\•\d\.]\s+/.test(line));
+            if (isList) {
+              const listItems = lines.map(line => {
+                const cleanLine = line.replace(/^\s*[\-\*\•\d\.]\s+/, '');
+                return `<li style="margin-bottom: 10px; color: #e2e8f0; font-size: 15px; line-height: 1.6;">${cleanLine}</li>`;
+              }).join('');
+              return `<ul style="background: #121829; border: 1px solid rgba(255, 215, 0, 0.2); border-radius: 12px; padding: 18px 20px 18px 36px; margin: 20px 0;">${listItems}</ul>`;
+            } else {
+              const formattedText = p.replace(/\n/g, '<br/>');
+              return `<p style="margin: 0 0 18px 0; color: #cbd5e1; font-size: 16px; line-height: 1.7;">${formattedText}</p>`;
+            }
+          }).join('');
+        };
+
+        const formattedMessageHtml = renderMessageHtml(message);
+
+        let buttonText = '🚀 CLAIM VIP BONUS & PLAY NOW';
+        if (type === 'freeplay' && fpAmount > 0) {
+          buttonText = `🚀 CLAIM $${fpAmount} FREEPLAY NOW`;
+        } else if (type === 'deposit_bonus' && bPercent > 0) {
+          buttonText = `🚀 CLAIM ${bPercent}% DEPOSIT BONUS`;
         }
 
         const htmlContent = `
           <!DOCTYPE html>
-          <html>
+          <html lang="en">
           <head>
             <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>${title}</title>
             <style>
               body {
-                background-color: #030409;
+                background-color: #060812;
                 color: #ffffff;
-                font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
                 margin: 0;
                 padding: 0;
+                -webkit-font-smoothing: antialiased;
+              }
+              .wrapper {
+                width: 100%;
+                background-color: #060812;
+                padding: 30px 10px;
               }
               .email-container {
-                max-width: 600px;
-                margin: 40px auto;
-                background-color: #0b0c16;
-                border: 1px solid #ffd700;
-                border-radius: 16px;
+                max-width: 580px;
+                margin: 0 auto;
+                background: linear-gradient(180deg, #0f1526 0%, #090c17 100%);
+                border: 1px solid rgba(255, 215, 0, 0.3);
+                border-radius: 20px;
                 overflow: hidden;
-                box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                box-shadow: 0 20px 50px rgba(0,0,0,0.8);
               }
               .email-header {
-                background: linear-gradient(135deg, #ffd700 0%, #b8860b 100%);
-                padding: 30px;
+                background: linear-gradient(180deg, #141b30 0%, #0f1526 100%);
+                padding: 32px 20px 24px 20px;
                 text-align: center;
+                border-bottom: 1px solid rgba(255, 215, 0, 0.15);
               }
-              .email-header h1 {
-                color: #000000;
-                margin: 0;
-                font-size: 24px;
-                font-weight: bold;
+              .brand-crown {
+                font-size: 34px;
+                line-height: 1;
+                display: block;
+                margin-bottom: 6px;
+              }
+              .brand-name {
+                color: #ffd700;
+                font-size: 28px;
+                font-weight: 900;
+                letter-spacing: 3px;
                 text-transform: uppercase;
+                margin: 0;
+                text-shadow: 0 0 15px rgba(255, 215, 0, 0.35);
+              }
+              .brand-tagline {
+                color: #94a3b8;
+                font-size: 11px;
+                font-weight: 700;
                 letter-spacing: 2px;
+                text-transform: uppercase;
+                margin: 6px 0 18px 0;
+              }
+              .vip-badge {
+                display: inline-block;
+                background: rgba(255, 215, 0, 0.1);
+                border: 1px solid #ffd700;
+                border-radius: 50px;
+                padding: 6px 20px;
+                color: #ffd700;
+                font-size: 12px;
+                font-weight: 800;
+                letter-spacing: 1.5px;
+                text-transform: uppercase;
               }
               .email-body {
-                padding: 40px 30px;
-                line-height: 1.6;
-                font-size: 16px;
-                color: #e2e8f0;
+                padding: 35px 28px;
               }
-              .promo-image {
-                width: 100%;
-                max-width: 100%;
-                border-radius: 8px;
-                margin-bottom: 25px;
-                border: 1px solid rgba(255,215,0,0.2);
+              .headline {
+                color: #ffffff;
+                font-size: 24px;
+                font-weight: 800;
+                text-align: center;
+                margin: 0 0 22px 0;
+                line-height: 1.35;
               }
-              .email-body p {
-                margin: 0 0 20px 0;
+              .cta-container {
+                text-align: center;
+                margin: 32px 0 16px 0;
               }
               .cta-button {
                 display: inline-block;
-                background: linear-gradient(135deg, #ffd700 0%, #b8860b 100%);
+                background: linear-gradient(135deg, #ff9900 0%, #ff5500 100%);
+                background-color: #ff8c00;
                 color: #000000 !important;
-                font-weight: bold;
-                text-decoration: none;
-                padding: 14px 35px;
-                border-radius: 8px;
-                text-align: center;
                 font-size: 16px;
+                font-weight: 900;
+                text-decoration: none;
+                padding: 16px 36px;
+                border-radius: 12px;
                 text-transform: uppercase;
                 letter-spacing: 1px;
-                margin: 20px 0;
+                box-shadow: 0 8px 25px rgba(255, 140, 0, 0.45);
+                border: none;
+              }
+              .security-badge {
+                text-align: center;
+                color: #94a3b8;
+                font-size: 12px;
+                margin-top: 14px;
               }
               .email-footer {
-                background-color: #05060b;
-                padding: 20px;
+                background-color: #080a14;
+                padding: 24px;
                 text-align: center;
                 font-size: 12px;
-                color: #718096;
-                border-top: 1px solid rgba(255,255,255,0.05);
+                color: #64748b;
+                line-height: 1.6;
+                border-top: 1px solid rgba(255, 255, 255, 0.05);
+              }
+              .footer-link {
+                color: #94a3b8;
+                text-decoration: underline;
               }
             </style>
           </head>
           <body>
-            <div class="email-container">
-              <div class="email-header">
-                <h1>JACKPOT ROYALS</h1>
-              </div>
-              <div class="email-body">
-                ${imageHtml}
-                <p>Hello Player,</p>
-                <h2 style="color: #ffd700; margin-top: 0;">${title}</h2>
-                <p style="white-space: pre-wrap;">${message}</p>
-                <div style="text-align: center;">
-                  <a href="${siteUrl}" class="cta-button">Play Now</a>
+            <div class="wrapper">
+              <div class="email-container">
+                <!-- HEADER -->
+                <div class="email-header">
+                  <span class="brand-crown">👑</span>
+                  <h1 class="brand-name">JACKPOT ROYALS</h1>
+                  <div class="brand-tagline">CELESTIAL VEGAS CASINO &amp; INSTANT CASHOUTS</div>
+                  <div class="vip-badge">⭐ OFFICIAL VIP INVITATION ⭐</div>
                 </div>
-              </div>
-              <div class="email-footer">
-                &copy; 2026 Jackpot Royals. All Rights Reserved.<br>
-                You received this email because you are a registered player.
+
+                <!-- BODY -->
+                <div class="email-body">
+                  ${imageHtml}
+                  
+                  <h2 class="headline">${title}</h2>
+                  
+                  <div class="message-container">
+                    ${formattedMessageHtml}
+                  </div>
+
+                  <!-- CTA BUTTON -->
+                  <div class="cta-container">
+                    <a href="${siteUrl}" class="cta-button">${buttonText}</a>
+                    <div class="security-badge">🔒 100% Safe, Secure &amp; Instant Access • No Download Required</div>
+                  </div>
+                </div>
+
+                <!-- FOOTER -->
+                <div class="email-footer">
+                  You are receiving this invitation as a valued gamer. To opt out, reply "Unsubscribe".<br/><br/>
+                  &copy; 2026 Jackpot Royals Casino • <a href="${siteUrl}" class="footer-link">jackpotroyals.com</a>
+                </div>
               </div>
             </div>
           </body>
