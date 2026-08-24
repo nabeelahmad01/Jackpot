@@ -142,7 +142,10 @@ export async function POST(req) {
               host: smtpHost,
               port: Number(process.env.SMTP_PORT || 465),
               secure: Number(process.env.SMTP_PORT || 465) === 465,
-              auth: { user: smtpUser, pass: smtpPass }
+              auth: { user: smtpUser, pass: smtpPass },
+              pool: true,
+              maxConnections: 5,
+              maxMessages: 100
             })
           : nodemailer.createTransport({
               service: 'gmail',
@@ -150,22 +153,12 @@ export async function POST(req) {
             });
 
         const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://jackpotroyals.com').replace(/\/$/, '');
-        const attachments = [];
         let imageHtml = '';
         if (image) {
-          if (image.startsWith('data:')) {
-            const match = image.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
-            if (match) {
-              attachments.push({
-                filename: 'promo-flyer.png',
-                content: Buffer.from(match[2], 'base64'),
-                cid: 'promo-flyer',
-                contentType: match[1]
-              });
-              imageHtml = `<div style="text-align: center; margin-bottom: 25px;"><img src="cid:promo-flyer" alt="Special Promotion Flyer" style="max-width: 100%; height: auto; border-radius: 12px; border: 1px solid rgba(255,215,0,0.3); box-shadow: 0 8px 25px rgba(0,0,0,0.5);" /></div>`;
-            }
+          if (image.startsWith('data:') || image.startsWith('http')) {
+            imageHtml = `<div style="text-align: center; margin-bottom: 25px;"><img src="${image}" alt="Special Promotion Flyer" style="max-width: 100%; height: auto; border-radius: 12px; border: 1px solid rgba(255,215,0,0.3); box-shadow: 0 8px 25px rgba(0,0,0,0.5);" /></div>`;
           } else {
-            const imgSrc = image.startsWith('http') ? image : `${siteUrl}${image.startsWith('/') ? '' : '/'}${image}`;
+            const imgSrc = `${siteUrl}${image.startsWith('/') ? '' : '/'}${image}`;
             imageHtml = `<div style="text-align: center; margin-bottom: 25px;"><img src="${imgSrc}" alt="Special Promotion Flyer" style="max-width: 100%; height: auto; border-radius: 12px; border: 1px solid rgba(255,215,0,0.3); box-shadow: 0 8px 25px rgba(0,0,0,0.5);" /></div>`;
           }
         }
@@ -360,18 +353,29 @@ export async function POST(req) {
           </html>
         `;
 
-        const mailOptions = {
-          from: `"Jackpot Royals" <${smtpUser}>`,
-          to: smtpUser,
-          bcc: emails,
-          subject: `🔥 Special Offer: ${title}`,
-          html: htmlContent,
-          attachments
-        };
+        // Asynchronous background email delivery loop to all player inboxes
+        (async () => {
+          let emailSentCount = 0;
+          let emailFailCount = 0;
 
-        transporter.sendMail(mailOptions).catch(err => {
-          console.error('Nodemailer promo broadcast error:', err);
-        });
+          for (const recipientEmail of emails) {
+            try {
+              await transporter.sendMail({
+                from: `"Jackpot Royals" <${smtpUser}>`,
+                to: recipientEmail,
+                subject: `🔥 Special Offer: ${title}`,
+                html: htmlContent
+              });
+              emailSentCount++;
+            } catch (err) {
+              console.error(`Failed to send promo email to ${recipientEmail}:`, err.message);
+              emailFailCount++;
+            }
+          }
+
+          if (transporter.close) transporter.close();
+          console.log(`[PROMO EMAIL BROADCAST COMPLETE] Delivered: ${emailSentCount}, Failed: ${emailFailCount}`);
+        })();
       } else {
         console.log(`[SMTP SIMULATOR] Broadcasting promo "${title}" to ${emails.length} players:`, emails);
       }
