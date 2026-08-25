@@ -14,7 +14,12 @@ export default function SupportTab({ adminUser }) {
   const [playerHits, setPlayerHits] = useState([]);
   const [playerSearchLoading, setPlayerSearchLoading] = useState(false);
   const [openedPlayers, setOpenedPlayers] = useState({}); // email -> { email, name }
+  const [replyTo, setReplyTo] = useState(null);
+  const [editingMsg, setEditingMsg] = useState(null);
+  const [deleteModalMsg, setDeleteModalMsg] = useState(null);
   const chatEndRef = useRef(null);
+
+  const quickEmojis = ['🎰', '🔥', '💰', '👍', '👑', '💎', '🚀', '❤️', '😂'];
 
   const distQueryParam = adminUser?.distributorId ? `&adminDistributorId=${adminUser.distributorId}` : '';
 
@@ -31,7 +36,7 @@ export default function SupportTab({ adminUser }) {
     });
   }, [activeChatEmail, lightboxSrc]);
 
-  const { data: convData, mutate: mutateConversations, error: convError } = usePollingSWR(
+  const { data: convData, mutate: mutateConversations } = usePollingSWR(
     `/api/support?limit=200${distQueryParam}`,
     POLL.SUPPORT
   );
@@ -103,8 +108,6 @@ export default function SupportTab({ adminUser }) {
     };
   }, [chatSearch, adminUser?.distributorId]);
 
-  const allMessages = convData?.messages || [];
-  // Only show messages for the currently selected email (guards against any stale cache)
   const activeChatMessages = (() => {
     const msgs = activeChatData?.messages || [];
     if (!activeChatEmail || !msgs.length) return msgs;
@@ -130,8 +133,6 @@ export default function SupportTab({ adminUser }) {
     return emailKey.split('@')[0] || 'Guest';
   };
 
-  // Prefer server-built conversation list (includes unread threads that raw
-  // message windows used to drop). Fall back to grouping messages.
   let conversations = [];
   if (Array.isArray(convData?.conversations)) {
     conversations = convData.conversations.map((c) => ({
@@ -141,40 +142,6 @@ export default function SupportTab({ adminUser }) {
       timestamp: c.timestamp,
       unread: !!c.unread
     })).filter((c) => c.email);
-  } else {
-    const groups = {};
-    allMessages.forEach((msg) => {
-      const email = (msg.userEmail || '').toLowerCase();
-      if (!email) return;
-
-      if (!groups[email]) {
-        groups[email] = {
-          email: msg.userEmail,
-          name: null,
-          lastMessage: msg.message || (msg.attachment ? '[Image]' : ''),
-          timestamp: msg.timestamp,
-          unread: false
-        };
-      }
-
-      const g = groups[email];
-      const candidate =
-        msg.playerName ||
-        (msg.senderType === 'player' ? msg.userName : '') ||
-        '';
-      if (candidate && !/^support\s*agent$/i.test(String(candidate))) {
-        g.name = candidate;
-      }
-      if (msg.senderType === 'player' && msg.read === false) {
-        g.unread = true;
-      }
-    });
-
-    conversations = Object.values(groups).map((c) => ({
-      ...c,
-      email: String(c.email || '').toLowerCase().trim(),
-      name: resolveDisplayName(c.email, c.name)
-    }));
   }
 
   // Keep manually opened registered players in the list even before first message
@@ -231,6 +198,8 @@ export default function SupportTab({ adminUser }) {
     setPlayerHits([]);
     setAdminReplyText('');
     setAdminAttachment('');
+    setReplyTo(null);
+    setEditingMsg(null);
   };
 
   useEffect(() => {
@@ -255,6 +224,114 @@ export default function SupportTab({ adminUser }) {
 
     markAsRead();
   }, [activeChatEmail, activeChatMessages.length, mutateConversations]);
+
+  const handleToggleReaction = async (messageId, emoji) => {
+    if (!adminUser) return;
+    try {
+      const res = await fetch('/api/support', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'react',
+          messageId,
+          emoji,
+          userEmail: adminUser.email
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        mutateActiveChat(
+          (curr) => ({
+            ...curr,
+            messages: (curr?.messages || []).map((m) =>
+              m.id === messageId ? { ...m, reactions: data.reactions } : m
+            )
+          }),
+          false
+        );
+      }
+    } catch (err) {
+      console.error('Toggle reaction error:', err);
+    }
+  };
+
+  const handleStartEdit = (msg) => {
+    setEditingMsg(msg);
+    setAdminReplyText(msg.message || '');
+    setReplyTo(null);
+  };
+
+  const handleStartReply = (msg) => {
+    const isMe = msg.senderType === 'admin';
+    setReplyTo({
+      id: msg.id,
+      message: msg.message || (msg.attachment ? '[Image]' : ''),
+      senderName: isMe ? 'You (Agent)' : (msg.userName || activeChatDisplayName || 'Player')
+    });
+    setEditingMsg(null);
+  };
+
+  const handleDeleteForMe = async (msgId) => {
+    if (!adminUser) return;
+    try {
+      const res = await fetch('/api/support', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete_for_me',
+          messageId: msgId,
+          userEmail: adminUser.email
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        mutateActiveChat(
+          (curr) => ({
+            ...curr,
+            messages: (curr?.messages || []).filter((m) => m.id !== msgId)
+          }),
+          false
+        );
+      }
+    } catch (err) {
+      console.error('Delete for me error:', err);
+    } finally {
+      setDeleteModalMsg(null);
+    }
+  };
+
+  const handleDeleteForEveryone = async (msgId) => {
+    if (!adminUser) return;
+    try {
+      const res = await fetch('/api/support', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete_for_everyone',
+          messageId: msgId,
+          userEmail: adminUser.email
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        mutateActiveChat(
+          (curr) => ({
+            ...curr,
+            messages: (curr?.messages || []).map((m) =>
+              m.id === msgId
+                ? { ...m, message: 'This message was deleted', isDeleted: true, attachment: '' }
+                : m
+            )
+          }),
+          false
+        );
+      }
+    } catch (err) {
+      console.error('Delete for everyone error:', err);
+    } finally {
+      setDeleteModalMsg(null);
+    }
+  };
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -285,10 +362,47 @@ export default function SupportTab({ adminUser }) {
     e.preventDefault();
     if ((!adminReplyText.trim() && !adminAttachment) || !activeChatEmail || !adminUser) return;
 
+    if (editingMsg) {
+      const editedText = adminReplyText.trim();
+      setAdminReplyText('');
+      const targetId = editingMsg.id;
+      setEditingMsg(null);
+
+      try {
+        const response = await fetch('/api/support', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'edit',
+            messageId: targetId,
+            text: editedText,
+            userEmail: adminUser.email
+          })
+        });
+        const data = await response.json();
+        if (data.success) {
+          mutateActiveChat(
+            (curr) => ({
+              ...curr,
+              messages: (curr?.messages || []).map((m) =>
+                m.id === targetId ? { ...m, message: editedText, isEdited: true } : m
+              )
+            }),
+            false
+          );
+        }
+      } catch (err) {
+        console.error('Edit support msg error:', err);
+      }
+      return;
+    }
+
     const replyMsg = adminReplyText.trim();
     setAdminReplyText('');
     const replyAttachment = adminAttachment;
     setAdminAttachment('');
+    const currentReply = replyTo;
+    setReplyTo(null);
 
     const tempId = 'temp-' + Date.now();
     const tempMessage = {
@@ -299,7 +413,8 @@ export default function SupportTab({ adminUser }) {
       attachment: replyAttachment,
       senderType: 'admin',
       senderEmail: adminUser.email,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      replyTo: currentReply
     };
 
     mutateActiveChat(
@@ -317,7 +432,8 @@ export default function SupportTab({ adminUser }) {
           message: replyMsg,
           attachment: replyAttachment,
           senderType: 'admin',
-          senderEmail: adminUser.email
+          senderEmail: adminUser.email,
+          replyTo: currentReply
         })
       });
       const data = await response.json();
@@ -326,14 +442,11 @@ export default function SupportTab({ adminUser }) {
         const confirmed = {
           ...saved,
           playerName: activeChatDisplayName,
-          // Keep inline preview if we just uploaded; otherwise use lazy URL
           attachment: replyAttachment
             || (saved.hasAttachment && saved.id
               ? `/api/support?attachmentId=${encodeURIComponent(saved.id)}`
               : '')
         };
-        // Replace temp bubble with saved message — don't wait on a full refetch that
-        // can briefly wipe the thread (and used to drop newest msgs past the old limit).
         mutateActiveChat(
           (current) => {
             const prev = current?.messages || activeChatMessages;
@@ -349,7 +462,6 @@ export default function SupportTab({ adminUser }) {
         );
         mutateConversations();
       } else {
-        // Roll back optimistic bubble on failure
         mutateActiveChat(
           (current) => ({
             success: true,
@@ -453,16 +565,8 @@ export default function SupportTab({ adminUser }) {
           )}
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem', minHeight: 0 }}>
-          {!convData && !convError ? (
-            <p style={{ fontSize: '0.75rem', opacity: 0.5, textAlign: 'center', margin: 'auto' }}>
-              <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: '6px' }}></i> Loading chats...
-            </p>
-          ) : convError ? (
-            <p style={{ fontSize: '0.75rem', color: '#f87171', textAlign: 'center', margin: 'auto' }}>
-              Could not load chats. Pull to refresh or reopen this tab.
-            </p>
-          ) : filteredConversations.length === 0 ? (
+        <div className="support-chat-list" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem', minHeight: 0 }}>
+          {filteredConversations.length === 0 ? (
             <p style={{ fontSize: '0.75rem', opacity: 0.5, textAlign: 'center', margin: 'auto' }}>No chats found.</p>
           ) : (
             filteredConversations.map((chat) => (
@@ -472,6 +576,8 @@ export default function SupportTab({ adminUser }) {
                   setActiveChatEmail(chat.email);
                   setAdminReplyText('');
                   setAdminAttachment('');
+                  setReplyTo(null);
+                  setEditingMsg(null);
                 }}
                 style={{
                   padding: '0.75rem',
@@ -541,9 +647,6 @@ export default function SupportTab({ adminUser }) {
                   <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {activeChatEmail}
                   </span>
-                  <span className="support-chat-player-status">
-                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }}></span> Active Live Chat Support
-                  </span>
                 </div>
               </div>
               <button
@@ -571,6 +674,7 @@ export default function SupportTab({ adminUser }) {
               ) : (
                 activeChatMessages.map((msg) => {
                   const isMe = msg.senderType === 'admin';
+                  const isDeleted = Boolean(msg.isDeleted);
                   return (
                     <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
                       <div style={{
@@ -583,10 +687,21 @@ export default function SupportTab({ adminUser }) {
                         fontSize: '0.8rem',
                         maxWidth: 'min(75%, 100%)',
                         fontWeight: isMe ? '600' : 'normal',
-                        wordBreak: 'break-word'
+                        wordBreak: 'break-word',
+                        opacity: isDeleted ? 0.6 : 1,
+                        fontStyle: isDeleted ? 'italic' : 'normal'
                       }}>
+                        {/* Quote Reply if present */}
+                        {msg.replyTo && (
+                          <div style={{ background: isMe ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.1)', borderLeft: `3px solid ${isMe ? '#000' : 'var(--gold-primary)'}`, padding: '0.2rem 0.45rem', borderRadius: '4px', fontSize: '0.68rem', marginBottom: '0.4rem' }}>
+                            <strong style={{ display: 'block', fontSize: '0.62rem', opacity: 0.9 }}>{msg.replyTo.senderName}</strong>
+                            {msg.replyTo.message}
+                          </div>
+                        )}
+
                         {msg.message}
-                        {msg.attachment && (
+
+                        {msg.attachment && !isDeleted && (
                           <div style={{ marginTop: '0.5rem' }}>
                             <img
                               src={msg.attachment}
@@ -611,10 +726,90 @@ export default function SupportTab({ adminUser }) {
                             />
                           </div>
                         )}
+
+                        {/* Display Badged Reactions */}
+                        {msg.reactions && Object.keys(msg.reactions).length > 0 && (
+                          <div style={{ display: 'flex', gap: '4px', marginTop: '0.35rem', flexWrap: 'wrap' }}>
+                            {Object.entries(msg.reactions).map(([emoji, uList]) => {
+                              if (!Array.isArray(uList) || uList.length === 0) return null;
+                              return (
+                                <span
+                                  key={emoji}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleReaction(msg.id, emoji);
+                                  }}
+                                  style={{
+                                    background: isMe ? 'rgba(0,0,0,0.2)' : 'rgba(255,215,0,0.2)',
+                                    border: `1px solid ${isMe ? 'rgba(0,0,0,0.3)' : 'rgba(255,215,0,0.4)'}`,
+                                    borderRadius: '10px',
+                                    padding: '0.05rem 0.35rem',
+                                    fontSize: '0.65rem',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '2px',
+                                    fontWeight: 'bold',
+                                    color: isMe ? '#000' : '#fff'
+                                  }}
+                                >
+                                  {emoji} {uList.length}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                      <span style={{ fontSize: '0.55rem', opacity: 0.65, marginTop: '0.15rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
+
+                      {/* Action Buttons + Info Row */}
+                      {!isDeleted && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '0.2rem', fontSize: '0.65rem', opacity: 0.8 }}>
+                          <button
+                            type="button"
+                            onClick={() => handleStartReply(msg)}
+                            style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0, fontSize: '0.65rem', display: 'flex', alignItems: 'center', gap: '2px' }}
+                          >
+                            <i className="fa-solid fa-reply"></i> Reply
+                          </button>
+
+                          {isMe && (
+                            <button
+                              type="button"
+                              onClick={() => handleStartEdit(msg)}
+                              style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0, fontSize: '0.65rem', display: 'flex', alignItems: 'center', gap: '2px' }}
+                            >
+                              <i className="fa-solid fa-pen-to-square"></i> Edit
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => setDeleteModalMsg(msg)}
+                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0, fontSize: '0.65rem', display: 'flex', alignItems: 'center', gap: '2px' }}
+                          >
+                            <i className="fa-solid fa-trash"></i> Delete
+                          </button>
+
+                          {/* Quick Reaction Emojis */}
+                          <div style={{ display: 'inline-flex', gap: '4px', marginLeft: '2px' }}>
+                            {['❤️', '👍', '🔥'].map((emoji) => (
+                              <span
+                                key={emoji}
+                                onClick={() => handleToggleReaction(msg.id, emoji)}
+                                style={{ cursor: 'pointer', transition: 'transform 0.1s' }}
+                                title={`React ${emoji}`}
+                              >
+                                {emoji}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <span style={{ fontSize: '0.55rem', opacity: 0.65, marginTop: '0.1rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
                         {isMe ? 'You (Agent)' : (msg.userName && !/^support\s*agent$/i.test(msg.userName) ? msg.userName : activeChatDisplayName || 'Player')} • {formatDeviceTime(msg.timestamp)}
-                        {isMe && (
+                        {msg.isEdited && <span style={{ color: 'var(--gold-primary)', fontStyle: 'italic', marginLeft: '3px' }}>(edited)</span>}
+                        {isMe && !isDeleted && (
                           msg.read ? (
                             <span style={{ color: '#60a5fa', fontWeight: 'bold', marginLeft: '3px' }}>
                               • <i className="fa-solid fa-check-double" style={{ fontSize: '0.6rem' }}></i> Seen
@@ -633,7 +828,30 @@ export default function SupportTab({ adminUser }) {
               <div ref={chatEndRef} />
             </div>
 
-            <form onSubmit={handleSendAdminReply} style={{ display: 'flex', flexDirection: 'column', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.75rem', gap: '0.5rem', flexShrink: 0 }}>
+            <form onSubmit={handleSendAdminReply} style={{ display: 'flex', flexDirection: 'column', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.5rem', gap: '0.4rem', flexShrink: 0 }}>
+              {/* Replying Banner Header */}
+              {replyTo && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,215,0,0.1)', padding: '0.35rem 0.6rem', borderRadius: '8px', borderLeft: '3px solid var(--gold-primary)' }}>
+                  <i className="fa-solid fa-reply" style={{ color: 'var(--gold-primary)', fontSize: '0.75rem' }}></i>
+                  <div style={{ flex: 1, overflow: 'hidden' }}>
+                    <span style={{ fontSize: '0.65rem', color: 'var(--gold-primary)', fontWeight: 'bold', display: 'block' }}>Replying to {replyTo.senderName}</span>
+                    <span style={{ fontSize: '0.65rem', color: '#ccc', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', display: 'block' }}>{replyTo.message}</span>
+                  </div>
+                  <button type="button" onClick={() => setReplyTo(null)} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.9rem', cursor: 'pointer' }}>&times;</button>
+                </div>
+              )}
+
+              {/* Editing Banner Header */}
+              {editingMsg && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(168,85,247,0.1)', padding: '0.35rem 0.6rem', borderRadius: '8px', borderLeft: '3px solid #a855f7' }}>
+                  <i className="fa-solid fa-pen-to-square" style={{ color: '#a855f7', fontSize: '0.75rem' }}></i>
+                  <div style={{ flex: 1 }}>
+                    <span style={{ fontSize: '0.65rem', color: '#a855f7', fontWeight: 'bold' }}>Editing Message</span>
+                  </div>
+                  <button type="button" onClick={() => { setEditingMsg(null); setAdminReplyText(''); }} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.9rem', cursor: 'pointer' }}>&times;</button>
+                </div>
+              )}
+
               {adminAttachment && (
                 <div style={{ alignSelf: 'flex-start' }}>
                   <div style={{ position: 'relative', display: 'inline-block', background: 'rgba(255,255,255,0.05)', padding: '0.5rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}>
@@ -663,6 +881,21 @@ export default function SupportTab({ adminUser }) {
                   </div>
                 </div>
               )}
+
+              {/* Quick Emoji Bar */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.03)', padding: '0.25rem 0.5rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)', overflowX: 'auto' }}>
+                <span style={{ fontSize: '0.6rem', color: '#888', fontWeight: 'bold', letterSpacing: '0.5px' }}>QUICK:</span>
+                {quickEmojis.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => setAdminReplyText((prev) => prev + emoji)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', padding: '2px' }}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
 
               {(() => {
                 const isTypeBSupportChat = activeChatMessages.some(m => m.distributorType === 'B');
@@ -707,7 +940,7 @@ export default function SupportTab({ adminUser }) {
 
                     <input
                       type="text"
-                      placeholder={activeChatMessages.length === 0 ? 'Write first message to player...' : 'Type reply to player...'}
+                      placeholder={editingMsg ? 'Edit message...' : (activeChatMessages.length === 0 ? 'Write first message to player...' : 'Type reply to player...')}
                       value={adminReplyText}
                       onChange={(e) => setAdminReplyText(e.target.value)}
                       style={{
@@ -728,7 +961,7 @@ export default function SupportTab({ adminUser }) {
                       className="submit-btn support-chat-reply-btn"
                       style={{ margin: 0, padding: '0.65rem 1.25rem', width: 'auto', background: 'linear-gradient(135deg, #ffd700 0%, #cca000 100%)', color: '#000', fontWeight: 'bold', flexShrink: 0 }}
                     >
-                      {activeChatMessages.length === 0 ? 'Send' : 'Reply'}
+                      {editingMsg ? 'Save' : (activeChatMessages.length === 0 ? 'Send' : 'Reply')}
                     </button>
                   </div>
                 );
@@ -742,7 +975,54 @@ export default function SupportTab({ adminUser }) {
           </div>
         )}
       </div>
-      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc('')} alt="Chat screenshot" />
+
+      {/* Delete Option Modal / Popup for Admin */}
+      {deleteModalMsg && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+          onClick={() => setDeleteModalMsg(null)}
+        >
+          <div
+            className="modal-content border-gold"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '360px', padding: '1.25rem', background: '#0b0d16', borderRadius: '12px', textAlign: 'center' }}
+          >
+            <h4 style={{ color: '#fff', fontSize: '0.95rem', fontWeight: 'bold', marginBottom: '0.75rem' }}>
+              <i className="fa-solid fa-trash text-red"></i> Delete Message
+            </h4>
+            <p style={{ fontSize: '0.75rem', color: '#aaa', marginBottom: '1.25rem' }}>
+              Choose how you want to delete this message:
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              <button
+                type="button"
+                onClick={() => handleDeleteForMe(deleteModalMsg.id)}
+                style={{ background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '0.6rem', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.8rem', cursor: 'pointer' }}
+              >
+                Delete for me
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteForEveryone(deleteModalMsg.id)}
+                style={{ background: '#ef4444', border: 'none', color: '#fff', padding: '0.6rem', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.8rem', cursor: 'pointer' }}
+              >
+                Delete for everyone
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeleteModalMsg(null)}
+                style={{ background: 'none', border: 'none', color: '#888', padding: '0.4rem', fontSize: '0.75rem', cursor: 'pointer', marginTop: '0.2rem' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {lightboxSrc && (
+        <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc('')} alt="Chat screenshot" />
+      )}
     </div>
   );
 }

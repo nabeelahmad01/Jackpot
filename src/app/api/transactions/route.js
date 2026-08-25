@@ -490,7 +490,7 @@ export async function POST(req) {
         status: 'COINS_LOADING',
         type: 'DEPOSIT',
         amount: askAmount,
-        gateway: 'Remaining Cashout',
+        gateway: 'Deposit from Cashout',
         code: 'CASHOUT-DEP',
         gameTitle: newTx.gameTitle || 'Lobby',
         gameUsername: newTx.gameUsername || '',

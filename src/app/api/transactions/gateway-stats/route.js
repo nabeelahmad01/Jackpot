@@ -72,7 +72,7 @@ export async function GET(req) {
         { $match: matchCriteria },
         {
           $group: {
-            _id: { $ifNull: ['$gateway', 'Unknown'] },
+            _id: { $toUpper: { $trim: { input: { $ifNull: ['$gateway', 'Unknown'] } } } },
             received: {
               $sum: {
                 $cond: [
@@ -96,11 +96,24 @@ export async function GET(req) {
       ])
       .toArray();
 
-    const stats = rows.map((item) => {
+    const statsMap = {};
+    for (const item of rows) {
+      let normName = String(item._id || 'UNKNOWN').trim().toUpperCase();
+      if (normName === 'REMAINING CASHOUT' || normName === 'REMAINING_CASHOUT' || normName === 'CASHOUT-DEP' || normName === 'DEPOSIT FROM CASHOUT') {
+        normName = 'DEPOSIT FROM CASHOUT';
+      }
+      if (!statsMap[normName]) {
+        statsMap[normName] = { gateway: normName, received: 0, withdrawn: 0 };
+      }
+      statsMap[normName].received += item.received || 0;
+      statsMap[normName].withdrawn += item.withdrawn || 0;
+    }
+
+    const stats = Object.values(statsMap).map((item) => {
       const received = Math.round((item.received || 0) * 100) / 100;
       const withdrawn = Math.round((item.withdrawn || 0) * 100) / 100;
       return {
-        gateway: String(item._id || 'Unknown').trim() || 'Unknown',
+        gateway: item.gateway,
         received,
         withdrawn,
         net: Math.round((received - withdrawn) * 100) / 100

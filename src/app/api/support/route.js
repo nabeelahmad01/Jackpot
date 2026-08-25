@@ -90,13 +90,20 @@ export async function GET(req) {
           timestamp: 1,
           distributorId: 1,
           distributorType: 1,
-          hasAttachment: 1
+          hasAttachment: 1,
+          reactions: 1,
+          replyTo: 1,
+          isEdited: 1,
+          editedAt: 1,
+          isDeleted: 1,
+          deletedForEveryone: 1,
+          deletedFor: 1
         })
         .sort({ timestamp: -1 })
         .skip(Math.max(0, (page - 1) * threadLimit))
         .limit(threadLimit)
         .toArray();
-      const messages = newestFirst.reverse();
+      const rawMessages = newestFirst.reverse();
 
       const isGuest =
         emailKey.includes('@jackpotguest.com') || emailKey.startsWith('guest_');
@@ -108,7 +115,7 @@ export async function GET(req) {
         );
         playerName = (userDoc?.name || '').trim();
         if (!playerName) {
-          const fromMsg = [...messages].reverse().find((m) => {
+          const fromMsg = [...rawMessages].reverse().find((m) => {
             const raw = String(m.userName || '').trim();
             return raw && !/^support\s*agent$/i.test(raw) && !/^player$/i.test(raw);
           });
@@ -119,18 +126,30 @@ export async function GET(req) {
         }
       }
 
-      const leanMessages = messages.map((m) => {
-        // New rows set hasAttachment; older rows may omit it — still offer lazy URL
-        // (404s are hidden in the UI) so proofs keep working without bloating this JSON.
-        const showAttachment = m.hasAttachment !== false && Boolean(m.id);
-        return {
-          ...m,
-          playerName,
-          attachment: showAttachment
-            ? `/api/support?attachmentId=${encodeURIComponent(m.id)}`
-            : ''
-        };
-      });
+      const reqUserEmail = emailKey;
+      const leanMessages = rawMessages
+        .filter((m) => {
+          if (Array.isArray(m.deletedFor) && m.deletedFor.includes(reqUserEmail)) {
+            return false;
+          }
+          return true;
+        })
+        .map((m) => {
+          const isForEveryoneDeleted = Boolean(m.deletedForEveryone || m.isDeleted);
+          const showAttachment = !isForEveryoneDeleted && m.hasAttachment !== false && Boolean(m.id);
+          return {
+            ...m,
+            message: isForEveryoneDeleted ? 'This message was deleted' : m.message,
+            playerName,
+            reactions: m.reactions || {},
+            replyTo: m.replyTo || null,
+            isEdited: Boolean(m.isEdited),
+            isDeleted: isForEveryoneDeleted,
+            attachment: showAttachment
+              ? `/api/support?attachmentId=${encodeURIComponent(m.id)}`
+              : ''
+          };
+        });
 
       return NextResponse.json({ success: true, messages: leanMessages, playerName });
     }
@@ -329,7 +348,7 @@ export async function GET(req) {
 // POST new support message (Player or Admin reply)
 export async function POST(req) {
   try {
-    const { userEmail, userName, message, attachment, senderType, senderEmail } = await req.json();
+    const { userEmail, userName, message, attachment, senderType, senderEmail, replyTo } = await req.json();
 
     if (!userEmail || !senderType) {
       return NextResponse.json({ success: false, message: 'User email and sender type are required.' }, { status: 400 });
@@ -374,6 +393,15 @@ export async function POST(req) {
       message: message ? message.trim() : '',
       attachment: attachment || '',
       hasAttachment: Boolean(attachment && String(attachment).trim()),
+      replyTo: replyTo && typeof replyTo === 'object' ? {
+        id: String(replyTo.id || ''),
+        message: String(replyTo.message || '').slice(0, 200),
+        senderName: String(replyTo.senderName || 'User')
+      } : null,
+      reactions: {},
+      deletedFor: [],
+      deletedForEveryone: false,
+      isEdited: false,
       senderType, // 'player' | 'admin'
       senderEmail: senderEmail ? senderEmail.toLowerCase().trim() : '',
       read: false, // newly sent messages are unread by recipient
@@ -446,6 +474,98 @@ export async function PUT(req) {
     return NextResponse.json({ success: true, message: 'Messages marked as read.' });
   } catch (err) {
     console.error('Update Support Messages Error:', err);
+    return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
+  }
+}
+
+// PATCH reactions, edits, and deletions
+export async function PATCH(req) {
+  try {
+    const body = await req.json();
+    const { action, messageId, emoji, userEmail, text } = body;
+    if (!messageId || !action) {
+      return NextResponse.json({ success: false, message: 'messageId and action required.' }, { status: 400 });
+    }
+
+    const db = await getDb();
+    const supportCollection = db.collection('supportMessages');
+    const msg = await supportCollection.findOne({ id: String(messageId) });
+
+    if (!msg) {
+      return NextResponse.json({ success: false, message: 'Message not found.' }, { status: 404 });
+    }
+
+    if (action === 'react') {
+      const emailKey = (userEmail || '').toLowerCase().trim();
+      if (!emoji || !emailKey) {
+        return NextResponse.json({ success: false, message: 'Emoji and userEmail required.' }, { status: 400 });
+      }
+      const reactions = msg.reactions || {};
+      const currentList = Array.isArray(reactions[emoji]) ? reactions[emoji] : [];
+      let updatedList;
+      if (currentList.includes(emailKey)) {
+        updatedList = currentList.filter((e) => e !== emailKey);
+      } else {
+        updatedList = [...currentList, emailKey];
+      }
+      if (updatedList.length === 0) {
+        delete reactions[emoji];
+      } else {
+        reactions[emoji] = updatedList;
+      }
+      await supportCollection.updateOne({ id: String(messageId) }, { $set: { reactions } });
+      publishAdminEvent('support', { distributorId: msg.distributorId || '' });
+      return NextResponse.json({ success: true, reactions });
+    }
+
+    if (action === 'edit') {
+      if (!text || !text.trim()) {
+        return NextResponse.json({ success: false, message: 'Message text cannot be empty.' }, { status: 400 });
+      }
+      await supportCollection.updateOne(
+        { id: String(messageId) },
+        {
+          $set: {
+            message: text.trim(),
+            isEdited: true,
+            editedAt: new Date().toISOString()
+          }
+        }
+      );
+      publishAdminEvent('support', { distributorId: msg.distributorId || '' });
+      return NextResponse.json({ success: true, message: 'Message edited.' });
+    }
+
+    if (action === 'delete_for_me') {
+      const emailKey = (userEmail || '').toLowerCase().trim();
+      const deletedFor = Array.isArray(msg.deletedFor) ? [...msg.deletedFor] : [];
+      if (!deletedFor.includes(emailKey)) {
+        deletedFor.push(emailKey);
+        await supportCollection.updateOne({ id: String(messageId) }, { $set: { deletedFor } });
+      }
+      return NextResponse.json({ success: true, message: 'Message deleted for you.' });
+    }
+
+    if (action === 'delete_for_everyone') {
+      await supportCollection.updateOne(
+        { id: String(messageId) },
+        {
+          $set: {
+            deletedForEveryone: true,
+            isDeleted: true,
+            message: 'This message was deleted',
+            attachment: '',
+            hasAttachment: false
+          }
+        }
+      );
+      publishAdminEvent('support', { distributorId: msg.distributorId || '' });
+      return NextResponse.json({ success: true, message: 'Message deleted for everyone.' });
+    }
+
+    return NextResponse.json({ success: false, message: 'Invalid action.' }, { status: 400 });
+  } catch (err) {
+    console.error('PATCH Support Message Error:', err);
     return NextResponse.json({ success: false, message: 'Server error: ' + err.message }, { status: 500 });
   }
 }

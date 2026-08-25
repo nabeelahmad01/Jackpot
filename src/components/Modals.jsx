@@ -77,10 +77,15 @@ export function SupportModal({ isOpen, onClose, currentUser, onMessagesSeen }) {
   const [input, setInput] = useState('');
   const [attachment, setAttachment] = useState('');
   const [lightboxSrc, setLightboxSrc] = useState('');
+  const [replyTo, setReplyTo] = useState(null);
+  const [editingMsg, setEditingMsg] = useState(null);
+  const [deleteModalMsg, setDeleteModalMsg] = useState(null);
   const fileInputRef = useRef(null);
   const chatEndRef = useRef(null);
   const onMessagesSeenRef = useRef(onMessagesSeen);
   onMessagesSeenRef.current = onMessagesSeen;
+
+  const quickEmojis = ['🎰', '🔥', '💰', '👍', '👑', '💎', '🚀', '❤️', '😂'];
 
   // Get active email & name for chat (either logged-in user or guest)
   const getChatIdentity = () => {
@@ -99,7 +104,6 @@ export function SupportModal({ isOpen, onClose, currentUser, onMessagesSeen }) {
         localStorage.setItem('jackpot_guest_email', email);
         localStorage.setItem('jackpot_guest_name', name);
       } else {
-        // Normalize older "Guest #123456" labels
         name = 'Guest';
         localStorage.setItem('jackpot_guest_name', name);
       }
@@ -150,7 +154,7 @@ export function SupportModal({ isOpen, onClose, currentUser, onMessagesSeen }) {
     };
 
     fetchMessages();
-    const interval = setInterval(fetchMessages, 3000); // Poll replies every 3 seconds
+    const interval = setInterval(fetchMessages, 3000);
 
     return () => clearInterval(interval);
   }, [isOpen, currentUser]);
@@ -159,16 +163,141 @@ export function SupportModal({ isOpen, onClose, currentUser, onMessagesSeen }) {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const handleToggleReaction = async (messageId, emoji) => {
+    const { email: userEmail } = getChatIdentity();
+    try {
+      const res = await fetch('/api/support', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'react',
+          messageId,
+          emoji,
+          userEmail
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === messageId ? { ...m, reactions: data.reactions } : m))
+        );
+      }
+    } catch (err) {
+      console.error('Toggle reaction error:', err);
+    }
+  };
+
+  const handleStartEdit = (msg) => {
+    setEditingMsg(msg);
+    setInput(msg.message || '');
+    setReplyTo(null);
+  };
+
+  const handleStartReply = (msg) => {
+    const isMe = msg.senderType === 'player';
+    setReplyTo({
+      id: msg.id,
+      message: msg.message || (msg.attachment ? '[Image]' : ''),
+      senderName: isMe ? 'You' : 'Support Agent'
+    });
+    setEditingMsg(null);
+  };
+
+  const handleDeleteForMe = async (msgId) => {
+    const { email: userEmail } = getChatIdentity();
+    try {
+      const res = await fetch('/api/support', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete_for_me',
+          messageId: msgId,
+          userEmail
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMessages((prev) => prev.filter((m) => m.id !== msgId));
+      }
+    } catch (err) {
+      console.error('Delete for me error:', err);
+    } finally {
+      setDeleteModalMsg(null);
+    }
+  };
+
+  const handleDeleteForEveryone = async (msgId) => {
+    const { email: userEmail } = getChatIdentity();
+    try {
+      const res = await fetch('/api/support', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete_for_everyone',
+          messageId: msgId,
+          userEmail
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === msgId
+              ? { ...m, message: 'This message was deleted', isDeleted: true, attachment: '' }
+              : m
+          )
+        );
+      }
+    } catch (err) {
+      console.error('Delete for everyone error:', err);
+    } finally {
+      setDeleteModalMsg(null);
+    }
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!input.trim() && !attachment) return;
 
     const { email: userEmail, name: userName } = getChatIdentity();
+
+    if (editingMsg) {
+      const editedText = input;
+      setInput('');
+      const targetId = editingMsg.id;
+      setEditingMsg(null);
+      try {
+        const response = await fetch('/api/support', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'edit',
+            messageId: targetId,
+            text: editedText,
+            userEmail
+          })
+        });
+        const data = await response.json();
+        if (data.success) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === targetId ? { ...m, message: editedText.trim(), isEdited: true } : m
+            )
+          );
+        }
+      } catch (err) {
+        console.error('Edit support msg error:', err);
+      }
+      return;
+    }
+
     const msgText = input;
     const currentAttachment = attachment;
+    const currentReply = replyTo;
 
     setInput('');
     setAttachment('');
+    setReplyTo(null);
 
     try {
       const response = await fetch('/api/support', {
@@ -180,7 +309,8 @@ export function SupportModal({ isOpen, onClose, currentUser, onMessagesSeen }) {
           message: msgText,
           attachment: currentAttachment,
           senderType: 'player',
-          senderEmail: userEmail
+          senderEmail: userEmail,
+          replyTo: currentReply
         })
       });
       const data = await response.json();
@@ -197,8 +327,8 @@ export function SupportModal({ isOpen, onClose, currentUser, onMessagesSeen }) {
   return (
     <>
     <PanelModalBackdrop onClick={onClose}>
-      <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px', height: '550px', display: 'flex', flexDirection: 'column' }}>
-        <div className="modal-header" style={{ padding: '1rem 1.25rem' }}>
+      <div className="modal-content border-gold" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px', height: '580px', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        <div className="modal-header" style={{ padding: '0.9rem 1.25rem' }}>
           <h3 style={{ fontSize: '1.05rem', fontWeight: 'bold' }}>
             <i className="fa-solid fa-headset gold-text"></i> Live Customer Support
           </h3>
@@ -207,12 +337,12 @@ export function SupportModal({ isOpen, onClose, currentUser, onMessagesSeen }) {
           </button>
         </div>
         
-        <div className="modal-body" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '1rem', overflow: 'hidden', background: '#080a10' }}>
-          <p style={{ fontSize: '0.75rem', opacity: 0.7, marginBottom: '0.75rem', textAlign: 'center' }}>
+        <div className="modal-body" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '0.85rem', overflow: 'hidden', background: '#080a10' }}>
+          <p style={{ fontSize: '0.72rem', opacity: 0.7, marginBottom: '0.6rem', textAlign: 'center' }}>
             Experiencing login, OTP, coin or withdrawal issues? Text our support agent.
           </p>
 
-          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingRight: '0.25rem', marginBottom: '1rem' }}>
+          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingRight: '0.25rem', marginBottom: '0.5rem' }}>
             {loadingChat ? (
               <div style={{ margin: 'auto', textAlign: 'center', opacity: 0.7, fontSize: '0.8rem' }}>
                 <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '1.5rem', display: 'block', marginBottom: '0.5rem', color: 'var(--gold-primary)' }}></i>
@@ -226,6 +356,7 @@ export function SupportModal({ isOpen, onClose, currentUser, onMessagesSeen }) {
             ) : (
               messages.map((msg) => {
                 const isMe = msg.senderType === 'player';
+                const isDeleted = Boolean(msg.isDeleted);
                 return (
                   <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
                     <div style={{
@@ -238,10 +369,21 @@ export function SupportModal({ isOpen, onClose, currentUser, onMessagesSeen }) {
                       fontSize: '0.8rem',
                       maxWidth: '80%',
                       fontWeight: isMe ? '600' : 'normal',
-                      wordBreak: 'break-word'
+                      wordBreak: 'break-word',
+                      opacity: isDeleted ? 0.6 : 1,
+                      fontStyle: isDeleted ? 'italic' : 'normal'
                     }}>
+                      {/* Quote Reply if present */}
+                      {msg.replyTo && (
+                        <div style={{ background: isMe ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.1)', borderLeft: `3px solid ${isMe ? '#000' : 'var(--gold-primary)'}`, padding: '0.2rem 0.45rem', borderRadius: '4px', fontSize: '0.68rem', marginBottom: '0.4rem' }}>
+                          <strong style={{ display: 'block', fontSize: '0.62rem', opacity: 0.9 }}>{msg.replyTo.senderName}</strong>
+                          {msg.replyTo.message}
+                        </div>
+                      )}
+                      
                       {msg.message}
-                      {msg.attachment && (
+
+                      {msg.attachment && !isDeleted && (
                         <img
                           src={msg.attachment}
                           alt="Support Attachment"
@@ -265,10 +407,90 @@ export function SupportModal({ isOpen, onClose, currentUser, onMessagesSeen }) {
                           title="Tap to enlarge"
                         />
                       )}
+
+                      {/* Display Badged Reactions */}
+                      {msg.reactions && Object.keys(msg.reactions).length > 0 && (
+                        <div style={{ display: 'flex', gap: '4px', marginTop: '0.35rem', flexWrap: 'wrap' }}>
+                          {Object.entries(msg.reactions).map(([emoji, uList]) => {
+                            if (!Array.isArray(uList) || uList.length === 0) return null;
+                            return (
+                              <span
+                                key={emoji}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleReaction(msg.id, emoji);
+                                }}
+                                style={{
+                                  background: isMe ? 'rgba(0,0,0,0.2)' : 'rgba(255,215,0,0.2)',
+                                  border: `1px solid ${isMe ? 'rgba(0,0,0,0.3)' : 'rgba(255,215,0,0.4)'}`,
+                                  borderRadius: '10px',
+                                  padding: '0.05rem 0.35rem',
+                                  fontSize: '0.65rem',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '2px',
+                                  fontWeight: 'bold',
+                                  color: isMe ? '#000' : '#fff'
+                                }}
+                              >
+                                {emoji} {uList.length}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                    <span style={{ fontSize: '0.55rem', opacity: 0.65, marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
+
+                    {/* Action buttons + Info Row */}
+                    {!isDeleted && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '0.2rem', fontSize: '0.65rem', opacity: 0.8 }}>
+                        <button
+                          type="button"
+                          onClick={() => handleStartReply(msg)}
+                          style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0, fontSize: '0.65rem', display: 'flex', alignItems: 'center', gap: '2px' }}
+                        >
+                          <i className="fa-solid fa-reply"></i> Reply
+                        </button>
+
+                        {isMe && (
+                          <button
+                            type="button"
+                            onClick={() => handleStartEdit(msg)}
+                            style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0, fontSize: '0.65rem', display: 'flex', alignItems: 'center', gap: '2px' }}
+                          >
+                            <i className="fa-solid fa-pen-to-square"></i> Edit
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => setDeleteModalMsg(msg)}
+                          style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0, fontSize: '0.65rem', display: 'flex', alignItems: 'center', gap: '2px' }}
+                        >
+                          <i className="fa-solid fa-trash"></i> Delete
+                        </button>
+
+                        {/* Quick Reaction Emojis */}
+                        <div style={{ display: 'inline-flex', gap: '4px', marginLeft: '2px' }}>
+                          {['❤️', '👍', '🔥'].map((emoji) => (
+                            <span
+                              key={emoji}
+                              onClick={() => handleToggleReaction(msg.id, emoji)}
+                              style={{ cursor: 'pointer', transition: 'transform 0.1s' }}
+                              title={`React ${emoji}`}
+                            >
+                              {emoji}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <span style={{ fontSize: '0.55rem', opacity: 0.65, marginTop: '0.1rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
                       {isMe ? 'You' : 'Support Agent'} • {formatDeviceTime(msg.timestamp)}
-                      {isMe && (
+                      {msg.isEdited && <span style={{ color: 'var(--gold-primary)', fontStyle: 'italic', marginLeft: '3px' }}>(edited)</span>}
+                      {isMe && !isDeleted && (
                         msg.read ? (
                           <span style={{ color: '#60a5fa', fontWeight: 'bold', marginLeft: '3px' }}>
                             • <i className="fa-solid fa-check-double" style={{ fontSize: '0.6rem' }}></i> Seen
@@ -287,6 +509,29 @@ export function SupportModal({ isOpen, onClose, currentUser, onMessagesSeen }) {
             <div ref={chatEndRef} />
           </div>
 
+          {/* Replying Banner Header */}
+          {replyTo && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,215,0,0.1)', padding: '0.35rem 0.6rem', borderRadius: '8px', borderLeft: '3px solid var(--gold-primary)', marginBottom: '0.4rem' }}>
+              <i className="fa-solid fa-reply" style={{ color: 'var(--gold-primary)', fontSize: '0.75rem' }}></i>
+              <div style={{ flex: 1, overflow: 'hidden' }}>
+                <span style={{ fontSize: '0.65rem', color: 'var(--gold-primary)', fontWeight: 'bold', display: 'block' }}>Replying to {replyTo.senderName}</span>
+                <span style={{ fontSize: '0.65rem', color: '#ccc', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', display: 'block' }}>{replyTo.message}</span>
+              </div>
+              <button type="button" onClick={() => setReplyTo(null)} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.9rem', cursor: 'pointer' }}>&times;</button>
+            </div>
+          )}
+
+          {/* Editing Banner Header */}
+          {editingMsg && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(168,85,247,0.1)', padding: '0.35rem 0.6rem', borderRadius: '8px', borderLeft: '3px solid #a855f7', marginBottom: '0.4rem' }}>
+              <i className="fa-solid fa-pen-to-square" style={{ color: '#a855f7', fontSize: '0.75rem' }}></i>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: '0.65rem', color: '#a855f7', fontWeight: 'bold' }}>Editing Message</span>
+              </div>
+              <button type="button" onClick={() => { setEditingMsg(null); setInput(''); }} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.9rem', cursor: 'pointer' }}>&times;</button>
+            </div>
+          )}
+
           {attachment && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.03)', padding: '0.4rem 0.6rem', borderRadius: '8px', border: '1px solid rgba(255,215,0,0.3)', marginBottom: '0.5rem' }}>
               <img src={attachment} alt="attachment preview" style={{ width: '35px', height: '35px', objectFit: 'cover', borderRadius: '4px' }} />
@@ -295,7 +540,22 @@ export function SupportModal({ isOpen, onClose, currentUser, onMessagesSeen }) {
             </div>
           )}
 
-          <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.75rem', alignItems: 'center' }}>
+          {/* Quick Emoji Toolbar (matching user's screenshot) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.03)', padding: '0.3rem 0.5rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '0.4rem', overflowX: 'auto' }}>
+            <span style={{ fontSize: '0.6rem', color: '#888', fontWeight: 'bold', letterSpacing: '0.5px' }}>QUICK:</span>
+            {quickEmojis.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => setInput((prev) => prev + emoji)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', padding: '2px', transition: 'transform 0.1s' }}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+
+          <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.5rem', alignItems: 'center' }}>
             <input
               type="file"
               ref={fileInputRef}
@@ -342,7 +602,7 @@ export function SupportModal({ isOpen, onClose, currentUser, onMessagesSeen }) {
             </button>
             <input
               type="text"
-              placeholder="Type message here..."
+              placeholder={editingMsg ? "Edit message..." : "Type your message..."}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               style={{
@@ -358,14 +618,75 @@ export function SupportModal({ isOpen, onClose, currentUser, onMessagesSeen }) {
               }}
               required={!attachment}
             />
-            <button type="submit" style={{ margin: 0, padding: 0, width: '40px', height: '40px', background: 'linear-gradient(135deg, #ffd700 0%, #cca000 100%)', border: 'none', borderRadius: '8px', color: '#000', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+            <button
+              type="submit"
+              style={{
+                background: 'var(--gold-primary)',
+                border: 'none',
+                borderRadius: '8px',
+                color: '#000',
+                fontWeight: 'bold',
+                padding: '0 1rem',
+                height: '40px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.3rem',
+                fontSize: '0.85rem'
+              }}
+            >
               <i className="fa-solid fa-paper-plane"></i>
             </button>
           </form>
         </div>
       </div>
     </PanelModalBackdrop>
-    <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc('')} alt="Chat screenshot" />
+
+    {/* Delete Option Modal / Popup */}
+    {deleteModalMsg && (
+      <PanelModalBackdrop onClick={() => setDeleteModalMsg(null)}>
+        <div
+          className="modal-content border-gold"
+          onClick={(e) => e.stopPropagation()}
+          style={{ maxWidth: '360px', padding: '1.25rem', background: '#0b0d16', borderRadius: '12px', textAlign: 'center' }}
+        >
+          <h4 style={{ color: '#fff', fontSize: '0.95rem', fontWeight: 'bold', marginBottom: '0.75rem' }}>
+            <i className="fa-solid fa-trash text-red"></i> Delete Message
+          </h4>
+          <p style={{ fontSize: '0.75rem', color: '#aaa', marginBottom: '1.25rem' }}>
+            Choose how you want to delete this message:
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+            <button
+              type="button"
+              onClick={() => handleDeleteForMe(deleteModalMsg.id)}
+              style={{ background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '0.6rem', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.8rem', cursor: 'pointer' }}
+            >
+              Delete for me
+            </button>
+            <button
+              type="button"
+              onClick={() => handleDeleteForEveryone(deleteModalMsg.id)}
+              style={{ background: '#ef4444', border: 'none', color: '#fff', padding: '0.6rem', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.8rem', cursor: 'pointer' }}
+            >
+              Delete for everyone
+            </button>
+            <button
+              type="button"
+              onClick={() => setDeleteModalMsg(null)}
+              style={{ background: 'none', border: 'none', color: '#888', padding: '0.4rem', fontSize: '0.75rem', cursor: 'pointer', marginTop: '0.2rem' }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </PanelModalBackdrop>
+    )}
+
+    {lightboxSrc && (
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc('')} />
+    )}
     </>
   );
 }
