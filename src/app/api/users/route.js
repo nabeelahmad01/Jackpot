@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
 import { cache } from '../../../lib/cache';
-import { isCoinsAdminRole } from '../../../lib/staffGameAccess';
+import { isCoinsAdminRole, parseRoles } from '../../../lib/staffGameAccess';
 import { getTypeBDistributorIds } from '../../../lib/typeBDistributors';
-import { purgeAccountAccess } from '../../../lib/sessionRevoke';
+import { purgeAccountAccess, isProtectedSuperAdminEmail } from '../../../lib/sessionRevoke';
 
 // GET users (Admin listing, or referrals query)
 export async function GET(req) {
@@ -19,6 +19,7 @@ export async function GET(req) {
 
     if (referredBy) {
       // referredBy parameter is the referrer's email — find users referred by that email
+      // Safe referral query returning only name and email for referrer stats
       const referrals = await usersCollection.find(
         { referredBy: referredBy.toLowerCase().trim() },
         { projection: { name: 1, email: 1 } }
@@ -26,12 +27,61 @@ export async function GET(req) {
       return NextResponse.json({ success: true, referrals });
     }
 
+    // Require staff/admin authorization for full user listings to prevent public data leaks
+    const adminEmail = (searchParams.get('adminEmail') || '').toLowerCase().trim();
+    const adminDistributorId = searchParams.get('adminDistributorId');
+    const adminRole = (searchParams.get('adminRole') || '').toLowerCase().trim();
+
+    let isAuthorized = false;
+
+    if (adminEmail) {
+      if (isProtectedSuperAdminEmail(adminEmail)) {
+        isAuthorized = true;
+      } else {
+        const staffUser = await usersCollection.findOne(
+          { email: adminEmail },
+          { projection: { role: 1, status: 1 } }
+        );
+        if (staffUser && String(staffUser.status || '').toUpperCase() !== 'SUSPENDED') {
+          const roles = parseRoles(staffUser.role);
+          if (roles.some((r) => ['admin', 'operation_admin', 'coins_admin', 'financial_admin', 'support_admin', 'manager', 'staff', 'distributor'].includes(r))) {
+            isAuthorized = true;
+          }
+        }
+        if (!isAuthorized) {
+          const distDoc = await db.collection('distributors').findOne(
+            { email: adminEmail },
+            { projection: { status: 1 } }
+          );
+          if (distDoc && String(distDoc.status || '').toUpperCase() !== 'SUSPENDED') {
+            isAuthorized = true;
+          }
+        }
+      }
+    } else if (adminDistributorId) {
+      const distDoc = await db.collection('distributors').findOne(
+        { id: adminDistributorId },
+        { projection: { status: 1 } }
+      );
+      if (distDoc && String(distDoc.status || '').toUpperCase() !== 'SUSPENDED') {
+        isAuthorized = true;
+      }
+    } else if (adminRole && ['admin', 'operation_admin', 'coins_admin', 'financial_admin', 'support_admin', 'manager', 'staff'].includes(adminRole)) {
+      isAuthorized = true;
+    }
+
+    if (!isAuthorized) {
+      return NextResponse.json(
+        { success: false, message: 'Unauthorized. Staff or Admin authentication is required to access user list.' },
+        { status: 401 }
+      );
+    }
+
     const segment = searchParams.get('segment');
 
     // Prepare search query
     let query = {};
 
-    const adminDistributorId = searchParams.get('adminDistributorId');
     // The super-admin Player Accounts tab passes this to also surface Type B
     // distributor players (so they can be seen/kept even if the distributor is
     // later deleted). Other callers (promo targeting, etc.) omit it and keep the

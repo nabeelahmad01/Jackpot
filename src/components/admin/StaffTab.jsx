@@ -13,7 +13,10 @@ const AVAILABLE_ROLES = [
 ];
 
 export default function StaffTab({ adminUser, onCreateAdmin, onDeleteUser }) {
-  const { data: usersData, mutate } = useSWR('/api/users?limit=200&segment=staff', fetcher);
+  const { data: usersData, mutate } = useSWR(
+    `/api/users?limit=200&segment=staff&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
+    fetcher
+  );
   const { data: gamesData } = useSWR('/api/games', fetcher);
   const [staffSearch, setStaffSearch] = useState('');
 

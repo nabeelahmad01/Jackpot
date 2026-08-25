@@ -26,7 +26,7 @@ export default function PromotionsTab({ adminUser }) {
 
   // Fetch segmented users
   const { data: userData, mutate: mutateUsers, error: userError } = useSWR(
-    `/api/users?segment=${segment}&search=${encodeURIComponent(debouncedSearch)}&page=${page}&limit=${limit}`,
+    `/api/users?segment=${segment}&search=${encodeURIComponent(debouncedSearch)}&page=${page}&limit=${limit}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`,
     fetcher
   );
 
