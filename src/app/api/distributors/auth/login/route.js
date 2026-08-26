@@ -1,16 +1,24 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../../lib/mongodb';
+import { isDeviceBlocked, trackDeviceSession } from '../../../../../lib/deviceBlock';
 
 // POST login distributor or distributor staff
 export async function POST(req) {
   try {
-    const { email, password } = await req.json();
+    const { email, password, deviceId, deviceFingerprint } = await req.json();
 
     if (!email || !password) {
       return NextResponse.json({ success: false, message: 'Email and password are required.' }, { status: 400 });
     }
 
     const db = await getDb();
+
+    if (await isDeviceBlocked(db, deviceId, deviceFingerprint)) {
+      return NextResponse.json(
+        { success: false, message: 'This device has been permanently blocked by Super Admin.' },
+        { status: 403 }
+      );
+    }
     
     // 1. Try finding in distributors collection
     const distributorsCollection = db.collection('distributors');
@@ -20,6 +28,18 @@ export async function POST(req) {
     });
 
     if (matchedDistributor) {
+      const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || '';
+      const userAgent = req.headers.get('user-agent') || '';
+      trackDeviceSession(db, {
+        email: matchedDistributor.email,
+        name: matchedDistributor.name,
+        role: 'distributor',
+        deviceId,
+        deviceFingerprint,
+        userAgent,
+        ip
+      }).catch(() => {});
+
       return NextResponse.json({
         success: true,
         message: 'Login successful!',

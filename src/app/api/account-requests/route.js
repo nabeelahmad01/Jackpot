@@ -682,9 +682,15 @@ export async function POST(req) {
     cache.del('admin_stats');
     publishAdminEvent('requests', { distributorId: distId || '', gameTitle: cleanTitle });
 
+    let playerDisplayName = cleanEmail;
+    if (cleanEmail) {
+      const uDoc = await db.collection('users').findOne({ email: cleanEmail }, { projection: { name: 1 } });
+      if (uDoc?.name) playerDisplayName = uDoc.name.trim();
+    }
+
     notifyStaffAndDistributorAsync(db, {
       title: 'New Account Request',
-      body: `${cleanEmail} · ${cleanTitle}`,
+      body: `${playerDisplayName} · ${cleanTitle}`,
       adminUrl: '/admin/requests',
       distributorUrl: '/distributor/requests',
       url: '/admin/requests',

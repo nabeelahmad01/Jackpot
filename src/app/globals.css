@@ -1137,6 +1137,20 @@ select option {
   transform: translateY(-2px);
 }
 
+.profile-nav-btn {
+  background: rgba(250, 204, 21, 0.08);
+  border: 1px solid rgba(250, 204, 21, 0.3);
+  color: #facc15;
+}
+
+.profile-nav-btn:hover {
+  background: rgba(250, 204, 21, 0.18);
+  border-color: #facc15;
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(250, 204, 21, 0.2);
+}
+
 .lobby-content-container {
   width: 100%;
   max-width: 1100px;

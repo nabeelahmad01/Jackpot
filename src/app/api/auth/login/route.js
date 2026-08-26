@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/mongodb';
 import { healOrphanedDistributorPlayer } from '../../../../lib/orphanDistributorPlayer';
+import { isDeviceBlocked, trackDeviceSession } from '../../../../lib/deviceBlock';
 
 export async function POST(req) {
   try {
-    const { email, password } = await req.json();
+    const { email, password, deviceId, deviceFingerprint } = await req.json();
 
     if (!email || !password) {
       return NextResponse.json(
@@ -14,6 +15,15 @@ export async function POST(req) {
     }
 
     const inputEmail = email.toLowerCase().trim();
+    const db = await getDb();
+
+    // Device block check
+    if (await isDeviceBlocked(db, deviceId, deviceFingerprint)) {
+      return NextResponse.json(
+        { success: false, message: 'This device has been permanently blocked by Super Admin.' },
+        { status: 403 }
+      );
+    }
 
     // -------------------------------------------------------------
     // Env-driven super admin (single source of truth).
@@ -61,7 +71,6 @@ export async function POST(req) {
       }
     }
 
-    const db = await getDb();
     const usersCollection = db.collection('users');
 
     const matchedUser = await usersCollection.findOne({
@@ -85,6 +94,18 @@ export async function POST(req) {
 
     // Deleted distributor → player stays, but game accounts reset so they can re-request.
     const user = await healOrphanedDistributorPlayer(db, matchedUser);
+
+    const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || '';
+    const userAgent = req.headers.get('user-agent') || '';
+    trackDeviceSession(db, {
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      deviceId,
+      deviceFingerprint,
+      userAgent,
+      ip
+    }).catch(() => {});
 
     return NextResponse.json({
       success: true,

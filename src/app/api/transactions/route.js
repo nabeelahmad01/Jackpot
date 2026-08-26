@@ -81,24 +81,61 @@ export async function GET(req) {
 
     if (search) {
       const cleanSearch = search.trim();
+      const escapedSearch = cleanSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       
       const gameAccountsCollection = db.collection('gameAccounts');
       const matchingAccs = await gameAccountsCollection.find({
-        username: { $regex: cleanSearch, $options: 'i' }
+        username: { $regex: escapedSearch, $options: 'i' }
       }).project({ userEmail: 1 }).toArray();
-      const matchingEmails = Array.from(new Set(matchingAccs.map(a => a.userEmail.toLowerCase().trim())));
+      
+      const accountRequestsCollection = db.collection('accountRequests');
+      const matchingRequests = await accountRequestsCollection.find({
+        $or: [
+          { noteCode: { $regex: escapedSearch, $options: 'i' } },
+          { note: { $regex: escapedSearch, $options: 'i' } },
+          { cashtag: { $regex: escapedSearch, $options: 'i' } },
+          { transactionId: { $regex: escapedSearch, $options: 'i' } }
+        ]
+      }).project({ userEmail: 1, transactionId: 1 }).toArray();
+
+      const matchingEmails = Array.from(
+        new Set([
+          ...matchingAccs.map(a => (a.userEmail || '').toLowerCase().trim()),
+          ...matchingRequests.map(r => (r.userEmail || '').toLowerCase().trim())
+        ].filter(Boolean))
+      );
+
+      const matchingTxIds = Array.from(
+        new Set(matchingRequests.map(r => r.transactionId).filter(Boolean))
+      );
 
       const searchCriteria = {
         $or: [
-          { userEmail: { $regex: cleanSearch, $options: 'i' } },
-          { gateway: { $regex: cleanSearch, $options: 'i' } },
-          { type: { $regex: cleanSearch, $options: 'i' } },
-          { gameUsername: { $regex: cleanSearch, $options: 'i' } }
+          { userEmail: { $regex: escapedSearch, $options: 'i' } },
+          { gateway: { $regex: escapedSearch, $options: 'i' } },
+          { type: { $regex: escapedSearch, $options: 'i' } },
+          { gameUsername: { $regex: escapedSearch, $options: 'i' } },
+          { gameTitle: { $regex: escapedSearch, $options: 'i' } },
+          { id: { $regex: escapedSearch, $options: 'i' } },
+          { note: { $regex: escapedSearch, $options: 'i' } },
+          { noteCode: { $regex: escapedSearch, $options: 'i' } },
+          { code: { $regex: escapedSearch, $options: 'i' } },
+          { redeemCode: { $regex: escapedSearch, $options: 'i' } },
+          { cashtag: { $regex: escapedSearch, $options: 'i' } },
+          { cashAppTag: { $regex: escapedSearch, $options: 'i' } },
+          { nameOnTag: { $regex: escapedSearch, $options: 'i' } },
+          { phoneOnTag: { $regex: escapedSearch, $options: 'i' } },
+          { coinsHoldNote: { $regex: escapedSearch, $options: 'i' } },
+          { processedBy: { $regex: escapedSearch, $options: 'i' } },
+          { approvedBy: { $regex: escapedSearch, $options: 'i' } }
         ]
       };
 
       if (matchingEmails.length > 0) {
         searchCriteria.$or.push({ userEmail: { $in: matchingEmails } });
+      }
+      if (matchingTxIds.length > 0) {
+        searchCriteria.$or.push({ id: { $in: matchingTxIds } });
       }
 
       if (Object.keys(query).length > 0) {
@@ -384,9 +421,15 @@ export async function POST(req) {
       cache.del('admin_stats');
       publishAdminEvent('transactions', { distributorId: txObject.distributorId || '' });
 
+      let playerDisplayName = txObject.userEmail;
+      if (txObject.userEmail) {
+        const uDoc = await db.collection('users').findOne({ email: txObject.userEmail.toLowerCase().trim() }, { projection: { name: 1 } });
+        if (uDoc?.name) playerDisplayName = uDoc.name.trim();
+      }
+
       notifyStaffAndDistributorAsync(db, {
         title: 'Remainder Payout Request',
-        body: `${txObject.userEmail} · $${parseFloat(txObject.amount || 0).toFixed(2)}`,
+        body: `${playerDisplayName} · $${parseFloat(txObject.amount || 0).toFixed(2)}`,
         adminUrl: '/admin/ledger',
         distributorUrl: '/distributor/ledger',
         url: '/admin/ledger',
@@ -569,9 +612,15 @@ export async function POST(req) {
       cache.del('admin_stats');
       publishAdminEvent('transactions', { distributorId: txObject.distributorId || '' });
 
+      let playerDisplayName = txObject.userEmail;
+      if (txObject.userEmail) {
+        const uDoc = await db.collection('users').findOne({ email: txObject.userEmail.toLowerCase().trim() }, { projection: { name: 1 } });
+        if (uDoc?.name) playerDisplayName = uDoc.name.trim();
+      }
+
       notifyStaffAndDistributorAsync(db, {
         title: 'Deposit from Cashout',
-        body: `${txObject.userEmail} · $${askAmount.toFixed(2)} · ${txObject.gameTitle}`,
+        body: `${playerDisplayName} · $${askAmount.toFixed(2)} · ${txObject.gameTitle}`,
         adminUrl: '/admin/ledger',
         distributorUrl: '/distributor/ledger',
         url: '/admin/ledger',
@@ -927,9 +976,15 @@ export async function POST(req) {
     const targetAdminUrl = isLedgerTx ? '/admin/ledger' : '/admin/requests';
     const targetDistributorUrl = isLedgerTx ? '/distributor/ledger' : '/distributor/requests';
 
+    let playerDisplayName = txObject.userEmail || 'Player';
+    if (txObject.userEmail) {
+      const uDoc = await db.collection('users').findOne({ email: txObject.userEmail.toLowerCase().trim() }, { projection: { name: 1 } });
+      if (uDoc?.name) playerDisplayName = uDoc.name.trim();
+    }
+
     notifyStaffAndDistributorAsync(db, {
       title: `New ${alertType}`,
-      body: `${txObject.userEmail || 'Player'} · $${parseFloat(txObject.amount || 0).toFixed(2)}${txObject.gameTitle ? ` · ${txObject.gameTitle}` : ''}`,
+      body: `${playerDisplayName} · $${parseFloat(txObject.amount || 0).toFixed(2)}${txObject.gameTitle ? ` · ${txObject.gameTitle}` : ''}`,
       adminUrl: targetAdminUrl,
       distributorUrl: targetDistributorUrl,
       url: targetAdminUrl,
@@ -1328,9 +1383,16 @@ export async function PUT(req) {
           const coinsLabel = isFreeplayNoti
             ? `Freeplay $${parseFloat(originalTx.amount || 0).toFixed(2)}`
             : `Deposit $${amount.toFixed(2)} → ${totalCoins} coins`;
+
+          let playerDisplayName = userEmail;
+          if (userEmail) {
+            const uDoc = await db.collection('users').findOne({ email: userEmail.toLowerCase().trim() }, { projection: { name: 1 } });
+            if (uDoc?.name) playerDisplayName = uDoc.name.trim();
+          }
+
           notifyStaffAndDistributorAsync(db, {
             title: 'Coins allotment ready',
-            body: `${userEmail} · ${coinsLabel}${originalTx.gameTitle ? ` · ${originalTx.gameTitle}` : ''}`,
+            body: `${playerDisplayName} · ${coinsLabel}${originalTx.gameTitle ? ` · ${originalTx.gameTitle}` : ''}`,
             adminUrl: '/admin/coins',
             distributorUrl: '/distributor/operations',
             url: '/admin/coins',

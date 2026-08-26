@@ -1,17 +1,33 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/mongodb';
 import { isSessionRevoked, isProtectedSuperAdminEmail } from '../../../../lib/sessionRevoke';
+import { isDeviceBlocked } from '../../../../lib/deviceBlock';
 
 /**
  * Lightweight live-session check. Clients poll this while logged in;
- * if the account was deleted/suspended, they must clear local session.
+ * if the account was deleted/suspended/device blocked, they must clear local session.
  */
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const email = String(searchParams.get('email') || '').toLowerCase().trim();
+    const deviceId = searchParams.get('deviceId');
+    const deviceFingerprint = searchParams.get('deviceFingerprint');
+
     if (!email) {
       return NextResponse.json({ success: false, valid: false, message: 'Email required.' }, { status: 400 });
+    }
+
+    const db = await getDb();
+
+    // Check permanent device ban
+    if (await isDeviceBlocked(db, deviceId, deviceFingerprint)) {
+      return NextResponse.json({
+        success: true,
+        valid: false,
+        reason: 'device_blocked',
+        message: 'This device has been permanently blocked by Super Admin.'
+      });
     }
 
     // Env / legacy super admin is not a DB user — never treat as missing/deleted.
@@ -26,8 +42,6 @@ export async function GET(req) {
         reason: 'revoked'
       });
     }
-
-    const db = await getDb();
 
     const deleted = await db.collection('deletedUsers').findOne(
       { email },

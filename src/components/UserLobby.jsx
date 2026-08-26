@@ -21,6 +21,7 @@ import SignupBonusModal from './SignupBonusCard';
 import { trackInitiateCheckout } from '../lib/metaPixel';
 import OfflineBanner from './OfflineBanner';
 import { registerNativeBackHandler } from '../lib/nativeBack';
+import PlayerProfileModal from './PlayerProfileModal';
 import {
   clearPendingDeposit,
   DEPOSIT_CODE_TTL_MS,
@@ -93,6 +94,7 @@ export default function UserLobby({
   const [submittingCashoutDep, setSubmittingCashoutDep] = useState(false);
   const [bonusModalOpen, setBonusModalOpen] = useState(true);
   const [gameSelectionModalOpen, setGameSelectionModalOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
 
   // Auto-trigger game selection modal if player selected an amount before logging in/registering
   useEffect(() => {
@@ -1536,6 +1538,9 @@ export default function UserLobby({
               <i className="fa-solid fa-circle-info"></i> <span>Info</span>
             </Link>
           )}
+          <button className="lobby-nav-btn profile-nav-btn" onClick={() => setProfileModalOpen(true)} aria-label="Open Profile">
+            <i className="fa-solid fa-user-gear"></i> <span>Profile</span>
+          </button>
           <button className="lobby-nav-btn logout-btn" onClick={onLogout}>
             <i className="fa-solid fa-right-from-bracket"></i> <span>Logout</span>
           </button>
@@ -3821,6 +3826,18 @@ export default function UserLobby({
           </div>
         </div>
       )}
+
+      {/* Player Profile Modal */}
+      <PlayerProfileModal
+        isOpen={profileModalOpen}
+        onClose={() => setProfileModalOpen(false)}
+        currentUser={currentUser}
+        currentUserEmail={currentUserEmail}
+        gameAccounts={gameAccounts}
+        transactions={transactions}
+        onUpdateUser={onUpdateUser}
+        showToast={showToast}
+      />
     </div>
   );
 }

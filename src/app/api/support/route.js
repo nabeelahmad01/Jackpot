@@ -418,9 +418,15 @@ export async function POST(req) {
     publishAdminEvent('support', { distributorId: distId || '', senderType });
 
     if (senderType === 'player') {
+      let playerDisplayName = userName || userEmail;
+      if (!userName && userEmail) {
+        const uDoc = await db.collection('users').findOne({ email: userEmail.toLowerCase().trim() }, { projection: { name: 1 } });
+        if (uDoc?.name) playerDisplayName = uDoc.name.trim();
+      }
+
       notifyStaffAndDistributorAsync(db, {
         title: 'New Support Message',
-        body: `${userName || userEmail}: ${(message || 'Attachment').slice(0, 100)}`,
+        body: `${playerDisplayName}: ${(message || 'Attachment').slice(0, 100)}`,
         adminUrl: '/admin/support',
         distributorUrl: '/distributor/support',
         url: '/admin/support',

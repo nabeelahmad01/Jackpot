@@ -430,9 +430,15 @@ export async function PUT(req) {
               txUpdate.isFreeplayWithdraw = true;
               txUpdate.note = 'Freeplay win capped at $30 max cashout.';
             }
+            let playerDisplayName = parentTx.userEmail;
+            if (parentTx.userEmail) {
+              const uDoc = await db.collection('users').findOne({ email: parentTx.userEmail.toLowerCase().trim() }, { projection: { name: 1 } });
+              if (uDoc?.name) playerDisplayName = uDoc.name.trim();
+            }
+
             notifyStaffAndDistributorAsync(db, {
               title: 'Withdrawal Payout Ready',
-              body: `${parentTx.userEmail} · $${parseFloat(parentTx.amount || 0).toFixed(2)}${parentTx.gameTitle ? ` · ${parentTx.gameTitle}` : ''}`,
+              body: `${playerDisplayName} · $${parseFloat(parentTx.amount || 0).toFixed(2)}${parentTx.gameTitle ? ` · ${parentTx.gameTitle}` : ''}`,
               adminUrl: '/admin/ledger',
               distributorUrl: '/distributor/ledger',
               url: '/admin/ledger',

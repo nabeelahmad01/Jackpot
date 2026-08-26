@@ -317,6 +317,51 @@ async function filterStaffSubscriptionsForAlert(db, subscriptions, { gameTitle, 
 }
 
 /**
+ * Helper to replace raw email addresses in push notification text with the player's Full Name.
+ * Ensures player email addresses are never exposed in mobile push notifications.
+ */
+export async function sanitizeNotificationBody(db, body) {
+  if (!body || typeof body !== 'string') return body || '';
+
+  const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g;
+  const matches = body.match(emailRegex);
+
+  if (!matches || matches.length === 0) {
+    return body;
+  }
+
+  let cleanBody = body;
+  for (const emailStr of matches) {
+    const cleanEmail = emailStr.toLowerCase().trim();
+    try {
+      const user = await db.collection('users').findOne(
+        { email: cleanEmail },
+        { projection: { name: 1, email: 1 } }
+      );
+
+      let displayName = '';
+      if (user && user.name && user.name.trim() !== '') {
+        displayName = user.name.trim();
+      } else {
+        const prefix = cleanEmail.split('@')[0];
+        const formatted = prefix
+          .replace(/[._-]/g, ' ')
+          .replace(/\b\w/g, (char) => char.toUpperCase());
+        displayName = formatted || 'Player';
+      }
+
+      cleanBody = cleanBody.replace(emailStr, displayName);
+    } catch (err) {
+      console.error('Error resolving player name for notification:', err);
+      const prefix = cleanEmail.split('@')[0];
+      cleanBody = cleanBody.replace(emailStr, prefix);
+    }
+  }
+
+  return cleanBody;
+}
+
+/**
  * Lock-screen / native alerts for the Jackpot Portal (admin + staff) APK.
  * Only devices registered with audience: 'staff' receive these — the player APK
  * subscriptions are never touched.
@@ -349,8 +394,9 @@ export async function sendStaffPush(
 
     const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://jackpotroyals.com')
       .replace(/\/$/, '');
+    const sanitizedBody = await sanitizeNotificationBody(db, body);
     const safeTitle = String(title || 'Jackpot Portal').slice(0, 80);
-    const safeBody = String(body || 'New request waiting in the portal.').slice(0, 180);
+    const safeBody = String(sanitizedBody || 'New request waiting in the portal.').slice(0, 180);
     const safeUrl = String(url || '/admin');
     const payload = JSON.stringify({
       title: safeTitle,
@@ -606,8 +652,9 @@ export async function sendDistributorPush(
 
     const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://jackpotroyals.com')
       .replace(/\/$/, '');
+    const sanitizedBody = await sanitizeNotificationBody(db, body);
     const safeTitle = String(title || 'Jackpot Distributor').slice(0, 80);
-    const safeBody = String(body || 'New request waiting in your portal.').slice(0, 180);
+    const safeBody = String(sanitizedBody || 'New request waiting in your portal.').slice(0, 180);
     const safeUrl = String(url || '/distributor');
     const payload = JSON.stringify({
       title: safeTitle,

@@ -37,6 +37,7 @@ const DeletedPlayersTab = lazyWithRetry(() => import('./admin/DeletedPlayersTab'
 const AffiliateCommissionTab = lazyWithRetry(() => import('./admin/AffiliateCommissionTab'));
 const WebsitePaymentsTab = lazyWithRetry(() => import('./admin/WebsitePaymentsTab'));
 const CampaignRequestsTab = lazyWithRetry(() => import('./admin/CampaignRequestsTab'));
+const DevicesTab = lazyWithRetry(() => import('./admin/DevicesTab'));
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json());
 
@@ -972,6 +973,31 @@ export default function AdminDashboard({
             </button>
           )}
 
+          {!adminUser?.distributorId && isSuperAdmin() && (
+            <button
+              onClick={() => { setActiveTab('devices'); setSidebarOpen(false); }}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                background: activeTab === 'devices' ? 'var(--gold-primary)' : 'none',
+                color: activeTab === 'devices' ? '#111' : '#fff',
+                fontSize: '0.8rem',
+                fontWeight: 'bold',
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <i className="fa-solid fa-laptop-mobile" style={{ width: '18px' }}></i>
+              <span>Device Management</span>
+            </button>
+          )}
+
           {hasAccess('settings') && (
             <button
               onClick={() => { setActiveTab('settings'); setSidebarOpen(false); }}
@@ -1170,6 +1196,9 @@ export default function AdminDashboard({
                   adminUser={adminUser}
                   onInspectProof={onInspectProof}
                 />
+              )}
+              {activeTab === 'devices' && !adminUser?.distributorId && isSuperAdmin() && (
+                <DevicesTab adminUser={adminUser} />
               )}
               {activeTab === 'settings' && hasAccess('settings') && (
                 <SettingsTab onUpdateSettings={onUpdateSettings} />

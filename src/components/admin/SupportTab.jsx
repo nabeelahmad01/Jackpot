@@ -759,54 +759,68 @@ export default function SupportTab({ adminUser }) {
                             })}
                           </div>
                         )}
+
+                        {/* Action buttons + Reactions (INSIDE message container) */}
+                        {!isDeleted && (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '8px',
+                            marginTop: '0.45rem',
+                            paddingTop: '0.35rem',
+                            borderTop: isMe ? '1px solid rgba(0,0,0,0.12)' : '1px solid rgba(255,255,255,0.08)',
+                            fontSize: '0.675rem'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleStartReply(msg)}
+                                style={{ background: 'none', border: 'none', color: isMe ? 'rgba(0,0,0,0.75)' : '#cbd5e1', fontWeight: '600', cursor: 'pointer', padding: 0, fontSize: '0.675rem', display: 'flex', alignItems: 'center', gap: '3px' }}
+                              >
+                                <i className="fa-solid fa-reply"></i> Reply
+                              </button>
+
+                              {isMe && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEdit(msg)}
+                                  style={{ background: 'none', border: 'none', color: isMe ? 'rgba(0,0,0,0.75)' : '#cbd5e1', fontWeight: '600', cursor: 'pointer', padding: 0, fontSize: '0.675rem', display: 'flex', alignItems: 'center', gap: '3px' }}
+                                >
+                                  <i className="fa-solid fa-pen-to-square"></i> Edit
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => setDeleteModalMsg(msg)}
+                                style={{ background: 'none', border: 'none', color: isMe ? '#b91c1c' : '#ef4444', fontWeight: '600', cursor: 'pointer', padding: 0, fontSize: '0.675rem', display: 'flex', alignItems: 'center', gap: '3px' }}
+                              >
+                                <i className="fa-solid fa-trash"></i> Delete
+                              </button>
+                            </div>
+
+                            {/* Quick Reaction Emojis inside bubble */}
+                            <div style={{ display: 'inline-flex', gap: '5px' }}>
+                              {['❤️', '👍', '🔥'].map((emoji) => (
+                                <span
+                                  key={emoji}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleReaction(msg.id, emoji);
+                                  }}
+                                  style={{ cursor: 'pointer', fontSize: '0.75rem', transition: 'transform 0.1s' }}
+                                  title={`React ${emoji}`}
+                                >
+                                  {emoji}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
 
-                      {/* Action Buttons + Info Row */}
-                      {!isDeleted && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '0.2rem', fontSize: '0.65rem', opacity: 0.8 }}>
-                          <button
-                            type="button"
-                            onClick={() => handleStartReply(msg)}
-                            style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0, fontSize: '0.65rem', display: 'flex', alignItems: 'center', gap: '2px' }}
-                          >
-                            <i className="fa-solid fa-reply"></i> Reply
-                          </button>
-
-                          {isMe && (
-                            <button
-                              type="button"
-                              onClick={() => handleStartEdit(msg)}
-                              style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0, fontSize: '0.65rem', display: 'flex', alignItems: 'center', gap: '2px' }}
-                            >
-                              <i className="fa-solid fa-pen-to-square"></i> Edit
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => setDeleteModalMsg(msg)}
-                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0, fontSize: '0.65rem', display: 'flex', alignItems: 'center', gap: '2px' }}
-                          >
-                            <i className="fa-solid fa-trash"></i> Delete
-                          </button>
-
-                          {/* Quick Reaction Emojis */}
-                          <div style={{ display: 'inline-flex', gap: '4px', marginLeft: '2px' }}>
-                            {['❤️', '👍', '🔥'].map((emoji) => (
-                              <span
-                                key={emoji}
-                                onClick={() => handleToggleReaction(msg.id, emoji)}
-                                style={{ cursor: 'pointer', transition: 'transform 0.1s' }}
-                                title={`React ${emoji}`}
-                              >
-                                {emoji}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      <span style={{ fontSize: '0.55rem', opacity: 0.65, marginTop: '0.1rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <span style={{ fontSize: '0.55rem', opacity: 0.65, marginTop: '0.15rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
                         {isMe ? 'You (Agent)' : (msg.userName && !/^support\s*agent$/i.test(msg.userName) ? msg.userName : activeChatDisplayName || 'Player')} • {formatDeviceTime(msg.timestamp)}
                         {msg.isEdited && <span style={{ color: 'var(--gold-primary)', fontStyle: 'italic', marginLeft: '3px' }}>(edited)</span>}
                         {isMe && !isDeleted && (
