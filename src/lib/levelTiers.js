@@ -149,3 +149,58 @@ export function calculatePlayerLevel(cumulativeDeposit = 0) {
     progressPercent: progress
   };
 }
+
+/**
+ * Calculates milestone rewards earned based on total cumulative deposit:
+ * - Bronze ($1,000 to $5,000): $5 per completed $1,000 milestone (e.g. $1,000 -> $5, $2,000 -> +$5, up to $5,000 -> $25 total)
+ * - Silver ($5,001 to $10,000): $10 per completed $1,000 milestone (e.g. $6,000 -> +$10, up to $10,000 -> $50 total)
+ * - Gold ($10,001 to $15,000): $15 per completed $1,000 milestone (e.g. $11,000 -> +$15, up to $15,000 -> $75 total)
+ * - Platinum ($15,001 to $20,000): $20 per completed $1,000 milestone (e.g. $16,000 -> +$20, up to $20,000 -> $100 total)
+ */
+export function calculateMilestoneRewards(cumulativeDeposit = 0, claimedAmount = 0) {
+  const deposit = Math.max(0, Number(cumulativeDeposit) || 0);
+  const claimed = Math.max(0, Number(claimedAmount) || 0);
+
+  let totalEarned = 0;
+  const milestones = [];
+
+  // Iterate over each $1,000 milestone from $1,000 to $20,000
+  for (let m = 1000; m <= 20000; m += 1000) {
+    if (deposit >= m) {
+      let bonusForMilestone = 0;
+      if (m <= 5000) bonusForMilestone = 5;
+      else if (m <= 10000) bonusForMilestone = 10;
+      else if (m <= 15000) bonusForMilestone = 15;
+      else if (m <= 20000) bonusForMilestone = 20;
+
+      totalEarned += bonusForMilestone;
+      milestones.push({
+        milestoneDeposit: m,
+        bonus: bonusForMilestone,
+        achieved: true
+      });
+    }
+  }
+
+  const unclaimed = Math.max(0, totalEarned - claimed);
+
+  // Next milestone calculation
+  let nextMilestoneDeposit = 1000;
+  for (let m = 1000; m <= 20000; m += 1000) {
+    if (deposit < m) {
+      nextMilestoneDeposit = m;
+      break;
+    }
+  }
+
+  return {
+    cumulativeDeposit: deposit,
+    totalEarned,
+    totalClaimed: claimed,
+    unclaimedAmount: unclaimed,
+    canClaim: unclaimed > 0,
+    milestones,
+    nextMilestoneDeposit,
+    neededForNextMilestone: Math.max(0, nextMilestoneDeposit - deposit)
+  };
+}

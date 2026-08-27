@@ -542,7 +542,7 @@ export default function ShiftDashboardTab({ adminUser }) {
                   return (
                   <tr key={reqKey || `${req.userEmail}-${req.gameTitle}`}>
                     <td>
-                      <strong>{req.userName || '—'}</strong>
+                      <strong>{req.userName || req.userEmail || '—'}</strong>
                       <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '0.15rem', wordBreak: 'break-all' }}>
                         {req.userEmail}
                       </div>
@@ -630,12 +630,12 @@ export default function ShiftDashboardTab({ adminUser }) {
                 pendingCoins.filter(n => n.totalCoins >= 0).map((noti) => (
                   <tr key={noti.id}>
                     <td>
-                      <strong>{noti.gameUsername || '—'}</strong>
+                      <strong>{noti.gameUsername || noti.userEmail || '—'}</strong>
                     </td>
                     <td><span className="admin-badge-preview b-hot" style={{ fontSize: '0.65rem' }}>{noti.gameTitle}</span></td>
                     <td>
-                      <span style={{ fontSize: '0.725rem', color: noti.isDepositFromCashout ? '#eab308' : '#2ecc71', textTransform: 'uppercase', fontWeight: 'bold' }}>
-                        {noti.isDepositFromCashout ? 'FROM CASHOUT' : 'deposit'}
+                      <span style={{ fontSize: '0.725rem', color: noti.isDepositFromCashout ? '#eab308' : noti.isLevelReward ? '#facc15' : '#2ecc71', textTransform: 'uppercase', fontWeight: 'bold' }}>
+                        {noti.isDepositFromCashout ? 'FROM CASHOUT' : noti.isLevelReward ? 'LEVEL REWARD' : 'deposit'}
                       </span>
                     </td>
                     <td>
@@ -728,7 +728,7 @@ export default function ShiftDashboardTab({ adminUser }) {
                 pendingCoins.filter(n => n.totalCoins < 0).map((noti) => (
                   <tr key={noti.id}>
                     <td>
-                      <strong>{noti.gameUsername || '—'}</strong>
+                      <strong>{noti.gameUsername || noti.userEmail || '—'}</strong>
                     </td>
                     <td>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.2rem' }}>

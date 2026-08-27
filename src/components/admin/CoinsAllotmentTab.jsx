@@ -147,6 +147,8 @@ export default function CoinsAllotmentTab({
                       <span style={{ color: '#ff4d6d' }}>${parseFloat(noti.depositAmount).toFixed(2)} (Cashout)</span>
                     ) : noti.bonusApplied === -2 ? (
                       <span style={{ color: 'var(--gold-primary)', fontWeight: 'bold' }}>Referral Claim</span>
+                    ) : noti.bonusApplied === -4 || noti.isLevelReward ? (
+                      <span style={{ color: '#facc15', fontWeight: 'bold' }}>Milestone Reward</span>
                     ) : (
                       `$${parseFloat(noti.depositAmount).toFixed(2)}`
                     )}
@@ -156,6 +158,8 @@ export default function CoinsAllotmentTab({
                       <span style={{ color: '#ff4d6d', fontWeight: 'bold' }}>DEDUCTION</span>
                     ) : noti.bonusApplied === -2 ? (
                       <span style={{ color: '#a855f7', fontWeight: 'bold' }}>100% REFERRAL</span>
+                    ) : noti.bonusApplied === -4 || noti.isLevelReward ? (
+                      <span style={{ color: '#facc15', fontWeight: 'bold' }}>👑 VIP LEVEL REWARD</span>
                     ) : noti.bonusApplied === -3 || noti.isFreeplay || (noti.bonusApplied === 100 && parseFloat(noti.depositAmount || 0) === 0) ? (
                       <span style={{ color: '#00ff66', fontWeight: 'bold' }}>FREEPLAY</span>
                     ) : (

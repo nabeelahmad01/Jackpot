@@ -469,8 +469,8 @@ export default function PlayerAccountsTab({ adminUser, onDeleteUser }) {
                         <ul style={{ margin: '0.35rem 0 0', paddingLeft: '1.1rem', fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.55 }}>
                           {userHistory.referrals.map((ref) => (
                             <li key={ref.email || ref.name}>
-                              <strong style={{ color: '#fff' }}>{ref.name || '—'}</strong>
-                              {ref.email ? (
+                              <strong style={{ color: '#fff' }}>{ref.name || ref.email || '—'}</strong>
+                              {ref.name && ref.email ? (
                                 <span style={{ color: 'var(--gold-primary)' }}> · {ref.email}</span>
                               ) : null}
                             </li>

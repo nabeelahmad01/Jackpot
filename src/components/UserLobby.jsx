@@ -896,6 +896,44 @@ export default function UserLobby({
     }
   };
 
+  const [uploadingProofTxId, setUploadingProofTxId] = useState(null);
+
+  const handleUploadTxProof = async (tx, file) => {
+    if (!file || !tx) return;
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('Payment proof screenshot must be less than 2MB.', 'error');
+      return;
+    }
+    setUploadingProofTxId(tx.id);
+    try {
+      const compressed = await compressImageFile(file, {
+        maxSize: 960,
+        quality: 0.62,
+        maxChars: 140_000
+      });
+      const res = await fetch('/api/transactions/proof', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: tx.id,
+          screenshot: compressed,
+          userEmail: currentUserEmail
+        })
+      });
+      const data = await res.json();
+      if (data?.success) {
+        showToast('Payment receipt screenshot attached! Coins team will verify shortly.', 'success');
+      } else {
+        showToast(data?.message || 'Failed to upload screenshot.', 'error');
+      }
+    } catch (err) {
+      console.error('Error uploading proof:', err);
+      showToast('Error uploading payment receipt.', 'error');
+    } finally {
+      setUploadingProofTxId(null);
+    }
+  };
+
   const handleLobbyDepositCta = (selectedAmount) => {
     setBonusModalOpen(false);
     const amtStr = String(selectedAmount || 10);
@@ -1452,7 +1490,11 @@ export default function UserLobby({
   }, [activeGame]);
 
   const filteredTransactions = activeGame
-    ? transactions.filter((t) => t.gameTitle === activeGame.title && t.userEmail === currentUserEmail)
+    ? (transactions || []).filter(
+        (t) =>
+          normTitle(t.gameTitle) === normTitle(activeGame.title) &&
+          normEmail(t.userEmail) === normEmail(currentUserEmail)
+      )
     : [];
 
   const txLimit = 10;
@@ -2938,60 +2980,128 @@ export default function UserLobby({
                             <th>Amount in Game</th>
                             <th>Status</th>
                             <th>Note / Gateway</th>
+                            <th>Proof / Receipt</th>
                             <th>Time</th>
                           </tr>
                         </thead>
                         <tbody>
                           {paginatedTransactions.length === 0 ? (
                             <tr>
-                              <td colSpan="7" className="text-center text-muted" style={{ padding: '1.5rem' }}>
+                              <td colSpan="8" className="text-center text-muted" style={{ padding: '1.5rem' }}>
                                 No transactions recorded yet.
                               </td>
                             </tr>
                           ) : (
-                            paginatedTransactions.map((tx, idx) => (
-                              <tr key={tx.id}>
-                                <td>{(txPage - 1) * txLimit + idx + 1}</td>
-                                <td>
-                                  <span className={`admin-badge-preview ${tx.isDepositFromCashout ? 'b-vip' : tx.type === 'DEPOSIT' ? 'b-hot' : tx.type === 'BONUS' ? 'b-vip' : 'b-new'}`} style={{ textTransform: 'uppercase', padding: '0.2rem 0.5rem', borderRadius: '4px', background: tx.isDepositFromCashout ? 'linear-gradient(135deg, #eab308, #a855f7)' : tx.type === 'BONUS' ? '#a855f7' : undefined, color: (tx.isDepositFromCashout || tx.type === 'BONUS') ? '#fff' : undefined }}>
-                                    {tx.isDepositFromCashout ? 'CASHOUT DEP' : tx.type}
-                                  </span>
-                                </td>
-                                <td>
-                                  <strong>${parseFloat(tx.amount).toFixed(2)}</strong>
-                                </td>
-                                <td>
-                                  {tx.status === 'SUCCESS' ? `$${parseFloat(tx.amount).toFixed(2)}` : '—'}
-                                </td>
-                                <td>
-                                  {tx.status === 'FAILED' ? (
-                                    renderFailedStatusWithTooltip(tx)
-                                  ) : (
-                                    <span className={`admin-badge-preview b-${(tx.status === 'PENDING_COINS' || tx.status === 'COINS_LOADING') ? 'new' : (tx.status.toLowerCase() === 'success' ? 'ready' : tx.status.toLowerCase())}`}>
-                                      {tx.status === 'PENDING_COINS' ? 'VERIFYING COINS' : (tx.status === 'COINS_LOADING' ? 'COINS LOADING' : tx.status)}
+                            paginatedTransactions.map((tx, idx) => {
+                              const isSuccess = String(tx.status || '').toUpperCase() === 'SUCCESS';
+                              const isPending = String(tx.status || '').toUpperCase() === 'PENDING';
+                              const isCoinsLoading = String(tx.status || '').toUpperCase() === 'COINS_LOADING';
+                              const isVerifying = String(tx.status || '').toUpperCase() === 'PENDING_COINS';
+                              const isHold = String(tx.status || '').toUpperCase() === 'HOLD' || parseFloat(tx.payoutHold || 0) > 0;
+                              const isFailed = String(tx.status || '').toUpperCase() === 'FAILED' || String(tx.status || '').toUpperCase() === 'CANCELLED' || String(tx.status || '').toUpperCase() === 'REJECTED';
+
+                              const hasProofImg = Boolean(tx.screenshot || tx.hasScreenshot || tx.proofUrl);
+
+                              return (
+                                <tr key={tx.id}>
+                                  <td>{(txPage - 1) * txLimit + idx + 1}</td>
+                                  <td>
+                                    <span className={`admin-badge-preview ${tx.isDepositFromCashout ? 'b-vip' : tx.type === 'DEPOSIT' ? 'b-hot' : tx.type === 'BONUS' ? 'b-vip' : 'b-new'}`} style={{ textTransform: 'uppercase', padding: '0.2rem 0.5rem', borderRadius: '4px', background: tx.isDepositFromCashout ? 'linear-gradient(135deg, #eab308, #a855f7)' : tx.type === 'BONUS' ? '#a855f7' : undefined, color: (tx.isDepositFromCashout || tx.type === 'BONUS') ? '#fff' : undefined }}>
+                                      {tx.isDepositFromCashout ? 'CASHOUT DEP' : tx.type}
                                     </span>
-                                  )}
-                                </td>
-                                <td>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                    <span style={{ fontSize: '0.725rem', opacity: 0.8 }}>
-                                      {tx.isDepositFromCashout ? 'Added deposit from remaining cashout' : tx.note && tx.status !== 'FAILED' ? tx.note : (tx.code === 'SIGNUP-FREE3' ? 'Freeplay (SIGNUP-FREE3)' : tx.code === 'FREEPLAY' ? 'Freeplay' : `${tx.gateway} (${tx.code})`)}
-                                    </span>
-                                    {tx.type === 'WITHDRAW' && (
-                                      <RemainderClaimAction
-                                        tx={tx}
-                                        claimedIds={claimedRemainderIds}
-                                        onClaim={handleClaimRemainder}
-                                        actionLoading={actionLoading}
-                                      />
+                                  </td>
+                                  <td>
+                                    <strong>${parseFloat(tx.amount).toFixed(2)}</strong>
+                                  </td>
+                                  <td>
+                                    {isSuccess ? `$${parseFloat(tx.amount).toFixed(2)}` : '—'}
+                                  </td>
+                                  <td>
+                                    {isFailed ? (
+                                      renderFailedStatusWithTooltip(tx)
+                                    ) : isHold ? (
+                                      <span className="admin-badge-preview" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', border: '1px solid #f59e0b' }}>
+                                        ON HOLD
+                                      </span>
+                                    ) : (
+                                      <span className={`admin-badge-preview b-${(isVerifying || isCoinsLoading) ? 'new' : (isSuccess ? 'ready' : isPending ? 'new' : 'ready')}`}>
+                                        {isVerifying ? 'VERIFYING COINS' : (isCoinsLoading ? 'COINS LOADING' : isPending ? 'PENDING' : tx.status)}
+                                      </span>
                                     )}
-                                  </div>
-                                </td>
-                                <td style={{ fontSize: '0.7rem', opacity: 0.7 }}>
-                                  {formatDeviceDateTime(tx.createdAt, tx.date)}
-                                </td>
-                              </tr>
-                            ))
+                                  </td>
+                                  <td>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                      <span style={{ fontSize: '0.725rem', opacity: 0.8 }}>
+                                        {tx.isDepositFromCashout ? 'Added deposit from remaining cashout' : tx.note && !isFailed ? tx.note : (tx.code === 'SIGNUP-FREE3' ? 'Freeplay (SIGNUP-FREE3)' : tx.code === 'FREEPLAY' ? 'Freeplay' : `${tx.gateway || 'Direct'} (${tx.code || tx.noteCode || tx.id})`)}
+                                      </span>
+                                      {tx.type === 'WITHDRAW' && (
+                                        <RemainderClaimAction
+                                          tx={tx}
+                                          claimedIds={claimedRemainderIds}
+                                          onClaim={handleClaimRemainder}
+                                          actionLoading={actionLoading}
+                                        />
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td>
+                                    {hasProofImg ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => setLightboxImage(tx.screenshot || tx.proofUrl || `/api/transactions/proof?id=${tx.id}`)}
+                                        style={{
+                                          background: 'rgba(250, 204, 21, 0.12)',
+                                          border: '1px solid rgba(250, 204, 21, 0.4)',
+                                          color: '#facc15',
+                                          borderRadius: '6px',
+                                          padding: '0.25rem 0.55rem',
+                                          fontSize: '0.675rem',
+                                          cursor: 'pointer',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '0.35rem',
+                                          fontWeight: '700'
+                                        }}
+                                      >
+                                        <i className="fa-solid fa-receipt"></i> View Proof
+                                      </button>
+                                    ) : (tx.type === 'DEPOSIT' || isPending || isFailed || tx.proofPending) ? (
+                                      <label
+                                        style={{
+                                          background: 'rgba(56, 189, 248, 0.12)',
+                                          border: '1px dashed rgba(56, 189, 248, 0.5)',
+                                          color: '#38bdf8',
+                                          borderRadius: '6px',
+                                          padding: '0.25rem 0.55rem',
+                                          fontSize: '0.675rem',
+                                          cursor: 'pointer',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '0.35rem',
+                                          fontWeight: '700'
+                                        }}
+                                      >
+                                        <i className={`fa-solid ${uploadingProofTxId === tx.id ? 'fa-spinner fa-spin' : 'fa-camera'}`}></i>
+                                        <span>{uploadingProofTxId === tx.id ? 'Uploading...' : 'Attach Proof'}</span>
+                                        <input
+                                          type="file"
+                                          accept="image/*"
+                                          onChange={(e) => {
+                                            if (e.target.files?.[0]) handleUploadTxProof(tx, e.target.files[0]);
+                                          }}
+                                          style={{ display: 'none' }}
+                                        />
+                                      </label>
+                                    ) : (
+                                      <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>—</span>
+                                    )}
+                                  </td>
+                                  <td style={{ fontSize: '0.7rem', opacity: 0.7 }}>
+                                    {formatDeviceDateTime(tx.createdAt, tx.date)}
+                                  </td>
+                                </tr>
+                              );
+                            })
                           )}
                         </tbody>
                       </table>

@@ -116,10 +116,17 @@ export async function trackDeviceSession(db, { email, name, role, deviceId, devi
   if (!email) return;
 
   const cleanEmail = email.toLowerCase().trim();
-  const cleanId = typeof deviceId === 'string' ? deviceId.trim() : '';
   const cleanFp = typeof deviceFingerprint === 'string' ? deviceFingerprint.trim() : '';
+  let cleanId = typeof deviceId === 'string' ? deviceId.trim() : '';
 
-  if (!cleanId && !cleanFp) return;
+  if (!cleanId) {
+    if (cleanFp) {
+      cleanId = `fp-${cleanFp.slice(0, 16)}`;
+    } else {
+      // Deterministic fallback ID based on user and user-agent
+      cleanId = `dev-${Buffer.from(`${cleanEmail}:${userAgent || 'web'}`).toString('hex').slice(0, 16)}`;
+    }
+  }
 
   const uaParsed = parseUserAgent(userAgent);
   const postInfo = getRolePostTitle(role);
@@ -141,8 +148,10 @@ export async function trackDeviceSession(db, { email, name, role, deviceId, devi
     status: 'ACTIVE'
   };
 
+  const lookupKey = cleanId ? { email: cleanEmail, deviceId: cleanId } : { email: cleanEmail };
+
   await db.collection('deviceSessions').updateOne(
-    { email: cleanEmail, deviceId: cleanId },
+    lookupKey,
     {
       $set: sessionDoc,
       $setOnInsert: { createdAt: new Date() }

@@ -79,43 +79,49 @@ export async function GET(req) {
       query.type = type.toUpperCase().trim();
     }
 
+    let searchSummary = null;
+
     if (search) {
       const cleanSearch = search.trim();
       const escapedSearch = cleanSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const isEmail = cleanSearch.includes('@');
       
       const gameAccountsCollection = db.collection('gameAccounts');
-      const matchingAccs = await gameAccountsCollection.find({
-        username: { $regex: escapedSearch, $options: 'i' }
-      }).project({ userEmail: 1 }).toArray();
-      
       const accountRequestsCollection = db.collection('accountRequests');
-      const matchingRequests = await accountRequestsCollection.find({
-        $or: [
-          { noteCode: { $regex: escapedSearch, $options: 'i' } },
-          { note: { $regex: escapedSearch, $options: 'i' } },
-          { cashtag: { $regex: escapedSearch, $options: 'i' } },
-          { transactionId: { $regex: escapedSearch, $options: 'i' } }
-        ]
-      }).project({ userEmail: 1, transactionId: 1 }).toArray();
 
-      const matchingEmails = Array.from(
-        new Set([
-          ...matchingAccs.map(a => (a.userEmail || '').toLowerCase().trim()),
-          ...matchingRequests.map(r => (r.userEmail || '').toLowerCase().trim())
-        ].filter(Boolean))
-      );
+      let searchCriteria = {};
 
-      const matchingTxIds = Array.from(
-        new Set(matchingRequests.map(r => r.transactionId).filter(Boolean))
-      );
+      if (isEmail) {
+        // Email search: match all transactions for this user email
+        searchCriteria = {
+          $or: [
+            { userEmail: { $regex: escapedSearch, $options: 'i' } }
+          ]
+        };
+      } else {
+        // Username / Gateway / Note / Code search:
+        // 1. Find matching game accounts for this username
+        const matchingAccs = await gameAccountsCollection.find({
+          username: { $regex: escapedSearch, $options: 'i' }
+        }).project({ userEmail: 1, gameTitle: 1, username: 1 }).toArray();
 
-      const searchCriteria = {
-        $or: [
-          { userEmail: { $regex: escapedSearch, $options: 'i' } },
+        const matchingRequests = await accountRequestsCollection.find({
+          $or: [
+            { noteCode: { $regex: escapedSearch, $options: 'i' } },
+            { note: { $regex: escapedSearch, $options: 'i' } },
+            { cashtag: { $regex: escapedSearch, $options: 'i' } },
+            { transactionId: { $regex: escapedSearch, $options: 'i' } }
+          ]
+        }).project({ userEmail: 1, transactionId: 1 }).toArray();
+
+        const matchingTxIds = Array.from(
+          new Set(matchingRequests.map(r => r.transactionId).filter(Boolean))
+        );
+
+        const orClauses = [
+          { gameUsername: { $regex: escapedSearch, $options: 'i' } },
           { gateway: { $regex: escapedSearch, $options: 'i' } },
           { type: { $regex: escapedSearch, $options: 'i' } },
-          { gameUsername: { $regex: escapedSearch, $options: 'i' } },
-          { gameTitle: { $regex: escapedSearch, $options: 'i' } },
           { id: { $regex: escapedSearch, $options: 'i' } },
           { note: { $regex: escapedSearch, $options: 'i' } },
           { noteCode: { $regex: escapedSearch, $options: 'i' } },
@@ -128,14 +134,26 @@ export async function GET(req) {
           { coinsHoldNote: { $regex: escapedSearch, $options: 'i' } },
           { processedBy: { $regex: escapedSearch, $options: 'i' } },
           { approvedBy: { $regex: escapedSearch, $options: 'i' } }
-        ]
-      };
+        ];
 
-      if (matchingEmails.length > 0) {
-        searchCriteria.$or.push({ userEmail: { $in: matchingEmails } });
-      }
-      if (matchingTxIds.length > 0) {
-        searchCriteria.$or.push({ id: { $in: matchingTxIds } });
+        // If username matched specific game account(s), match specifically for (userEmail + that gameTitle)
+        // NOT all other games of that user!
+        if (matchingAccs.length > 0) {
+          for (const acc of matchingAccs) {
+            if (acc.userEmail && acc.gameTitle) {
+              orClauses.push({
+                userEmail: acc.userEmail.toLowerCase().trim(),
+                gameTitle: { $regex: new RegExp(`^${acc.gameTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+              });
+            }
+          }
+        }
+
+        if (matchingTxIds.length > 0) {
+          orClauses.push({ id: { $in: matchingTxIds } });
+        }
+
+        searchCriteria = { $or: orClauses };
       }
 
       if (Object.keys(query).length > 0) {
@@ -290,12 +308,61 @@ export async function GET(req) {
       }
     }
 
+    if (search) {
+      try {
+        const cleanSearch = search.trim();
+        const isEmail = cleanSearch.includes('@');
+
+        const allMatchingStats = await transactionsCollection.find(query).project({
+          type: 1,
+          amount: 1,
+          payoutSent: 1,
+          status: 1,
+          totalCoins: 1,
+          gameTitle: 1,
+          gameUsername: 1,
+          userEmail: 1
+        }).toArray();
+
+        const totalDeposits = allMatchingStats
+          .filter(t => t.type === 'DEPOSIT' && String(t.status).toUpperCase() === 'SUCCESS')
+          .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+
+        const totalRedeems = allMatchingStats
+          .filter(t => t.type === 'WITHDRAW' && String(t.status).toUpperCase() === 'SUCCESS')
+          .reduce((sum, t) => sum + (parseFloat(t.payoutSent || t.amount) || 0), 0);
+
+        const totalCoinsLoaded = allMatchingStats
+          .filter(t => String(t.status).toUpperCase() === 'SUCCESS' && t.totalCoins)
+          .reduce((sum, t) => sum + (parseFloat(t.totalCoins) || 0), 0);
+
+        const uniqueGames = Array.from(new Set(allMatchingStats.map(t => t.gameTitle).filter(Boolean)));
+        const uniqueEmails = Array.from(new Set(allMatchingStats.map(t => t.userEmail).filter(Boolean)));
+
+        searchSummary = {
+          query: cleanSearch,
+          isEmailSearch: isEmail,
+          isUsernameSearch: !isEmail,
+          matchedGame: uniqueGames.length > 0 ? uniqueGames.join(', ') : '',
+          userEmail: uniqueEmails.length > 0 ? uniqueEmails[0] : '',
+          totalDeposits,
+          totalRedeems,
+          netProfit: totalDeposits - totalRedeems,
+          totalCoinsLoaded,
+          count: totalTransactions
+        };
+      } catch (sumErr) {
+        console.error('Error computing search summary:', sumErr);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       transactions: visibleTransactions,
       totalTransactions,
       totalPages: Math.ceil(totalTransactions / limit),
-      currentPage: page
+      currentPage: page,
+      searchSummary
     });
   } catch (err) {
     console.error('Fetch Transactions API Error:', err);
@@ -424,7 +491,9 @@ export async function POST(req) {
       let playerDisplayName = txObject.userEmail;
       if (txObject.userEmail) {
         const uDoc = await db.collection('users').findOne({ email: txObject.userEmail.toLowerCase().trim() }, { projection: { name: 1 } });
-        if (uDoc?.name) playerDisplayName = uDoc.name.trim();
+        if (uDoc?.name && uDoc.name.trim() && uDoc.name.trim() !== '-' && uDoc.name.trim() !== '—') {
+          playerDisplayName = uDoc.name.trim();
+        }
       }
 
       notifyStaffAndDistributorAsync(db, {
@@ -615,7 +684,9 @@ export async function POST(req) {
       let playerDisplayName = txObject.userEmail;
       if (txObject.userEmail) {
         const uDoc = await db.collection('users').findOne({ email: txObject.userEmail.toLowerCase().trim() }, { projection: { name: 1 } });
-        if (uDoc?.name) playerDisplayName = uDoc.name.trim();
+        if (uDoc?.name && uDoc.name.trim() && uDoc.name.trim() !== '-' && uDoc.name.trim() !== '—') {
+          playerDisplayName = uDoc.name.trim();
+        }
       }
 
       notifyStaffAndDistributorAsync(db, {
@@ -979,7 +1050,9 @@ export async function POST(req) {
     let playerDisplayName = txObject.userEmail || 'Player';
     if (txObject.userEmail) {
       const uDoc = await db.collection('users').findOne({ email: txObject.userEmail.toLowerCase().trim() }, { projection: { name: 1 } });
-      if (uDoc?.name) playerDisplayName = uDoc.name.trim();
+      if (uDoc?.name && uDoc.name.trim() && uDoc.name.trim() !== '-' && uDoc.name.trim() !== '—') {
+        playerDisplayName = uDoc.name.trim();
+      }
     }
 
     notifyStaffAndDistributorAsync(db, {
@@ -1387,7 +1460,9 @@ export async function PUT(req) {
           let playerDisplayName = userEmail;
           if (userEmail) {
             const uDoc = await db.collection('users').findOne({ email: userEmail.toLowerCase().trim() }, { projection: { name: 1 } });
-            if (uDoc?.name) playerDisplayName = uDoc.name.trim();
+            if (uDoc?.name && uDoc.name.trim() && uDoc.name.trim() !== '-' && uDoc.name.trim() !== '—') {
+              playerDisplayName = uDoc.name.trim();
+            }
           }
 
           notifyStaffAndDistributorAsync(db, {

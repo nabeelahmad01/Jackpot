@@ -24,6 +24,27 @@ export default function PlayerProfileModal({
   const [localTotalDeposit, setLocalTotalDeposit] = useState(0);
   const [localGameAccounts, setLocalGameAccounts] = useState([]);
   const [loadingProfile, setLoadingProfile] = useState(false);
+  const [levelRewardsData, setLevelRewardsData] = useState(null);
+  const [selectedRewardGame, setSelectedRewardGame] = useState('');
+  const [claimingReward, setClaimingReward] = useState(false);
+  const [claimSuccessMessage, setClaimSuccessMessage] = useState('');
+  const [showAllAccounts, setShowAllAccounts] = useState(false);
+
+  // Fetch Level Rewards data
+  const fetchLevelRewards = (email) => {
+    if (!email) return;
+    fetch(`/api/user/level-rewards?email=${encodeURIComponent(email)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.success) {
+          setLevelRewardsData(data);
+          if (data.gameAccounts?.length > 0 && !selectedRewardGame) {
+            setSelectedRewardGame(data.gameAccounts[0].gameTitle);
+          }
+        }
+      })
+      .catch((err) => console.error('Failed to fetch level rewards:', err));
+  };
 
   // Compute total deposit from transactions prop or server
   useEffect(() => {
@@ -33,6 +54,7 @@ export default function PlayerProfileModal({
     setPhoneNumber(currentUser?.phone || '');
     setNewPassword('');
     setConfirmPassword('');
+    setClaimSuccessMessage('');
 
     const email = currentUserEmail?.toLowerCase().trim();
     if (email) {
@@ -46,11 +68,16 @@ export default function PlayerProfileModal({
             setLocalTotalDeposit(data.totalDeposit || 0);
             if (Array.isArray(data.gameAccounts)) {
               setLocalGameAccounts(data.gameAccounts);
+              if (data.gameAccounts.length > 0 && !selectedRewardGame) {
+                setSelectedRewardGame(data.gameAccounts[0].gameTitle);
+              }
             }
           }
         })
         .catch((err) => console.error('Failed to fetch detailed profile:', err))
         .finally(() => setLoadingProfile(false));
+
+      fetchLevelRewards(email);
     }
   }, [isOpen, currentUser, currentUserEmail]);
 
@@ -80,6 +107,42 @@ export default function PlayerProfileModal({
     setCopiedAccountIndex(index);
     if (showToast) showToast(`Copied account username: ${text}`, 'success');
     setTimeout(() => setCopiedAccountIndex(null), 2000);
+  };
+
+  const handleClaimLevelReward = async () => {
+    if (!selectedRewardGame) {
+      if (showToast) showToast('Please select a game account to receive your Level Reward.', 'error');
+      else alert('Please select a game account to receive your Level Reward.');
+      return;
+    }
+
+    setClaimingReward(true);
+    try {
+      const res = await fetch('/api/user/level-rewards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: currentUserEmail,
+          gameTitle: selectedRewardGame
+        })
+      });
+
+      const data = await res.json();
+      if (data?.success) {
+        setClaimSuccessMessage(data.message || 'Level Reward claimed successfully! Coins loading is in progress.');
+        if (showToast) showToast(data.message || 'Level Reward claimed successfully!', 'success');
+        fetchLevelRewards(currentUserEmail);
+      } else {
+        if (showToast) showToast(data?.message || 'Failed to claim Level Reward.', 'error');
+        else alert(data?.message || 'Failed to claim Level Reward.');
+      }
+    } catch (err) {
+      console.error('Error claiming Level Reward:', err);
+      if (showToast) showToast('Network error while claiming reward.', 'error');
+      else alert('Network error while claiming reward.');
+    } finally {
+      setClaimingReward(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -253,48 +316,89 @@ export default function PlayerProfileModal({
             </div>
 
             {userGameAccounts.length > 0 ? (
-              <div style={{ display: 'grid', gap: '0.6rem' }}>
-                {userGameAccounts.map((acc, idx) => (
-                  <div
-                    key={acc.id || idx}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      background: 'rgba(15, 23, 42, 0.7)',
-                      border: '1px solid rgba(255,255,255,0.08)',
-                      borderRadius: '10px',
-                      padding: '0.65rem 0.85rem'
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#fff' }}>{acc.gameTitle}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#facc15', fontFamily: 'monospace', marginTop: '0.1rem' }}>
-                        ID: {acc.username}
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleCopyUsername(acc.username, idx)}
+              <div>
+                <div
+                  style={{
+                    display: 'grid',
+                    gap: '0.6rem',
+                    maxHeight: showAllAccounts ? '280px' : 'none',
+                    overflowY: showAllAccounts ? 'auto' : 'visible',
+                    paddingRight: showAllAccounts ? '4px' : '0'
+                  }}
+                >
+                  {(showAllAccounts ? userGameAccounts : userGameAccounts.slice(0, 3)).map((acc, idx) => (
+                    <div
+                      key={acc.id || idx}
                       style={{
-                        background: copiedAccountIndex === idx ? 'rgba(34, 197, 94, 0.2)' : 'rgba(255,255,255,0.06)',
-                        border: '1px solid rgba(255,255,255,0.15)',
-                        color: copiedAccountIndex === idx ? '#4ade80' : '#cbd5e1',
-                        borderRadius: '6px',
-                        padding: '0.3rem 0.6rem',
-                        fontSize: '0.725rem',
-                        cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '0.35rem'
+                        justifyContent: 'space-between',
+                        background: 'rgba(15, 23, 42, 0.7)',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: '10px',
+                        padding: '0.65rem 0.85rem'
                       }}
                     >
-                      <i className={`fa-solid ${copiedAccountIndex === idx ? 'fa-check' : 'fa-copy'}`}></i>
-                      <span>{copiedAccountIndex === idx ? 'Copied' : 'Copy'}</span>
-                    </button>
-                  </div>
-                ))}
+                      <div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#fff' }}>{acc.gameTitle}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#facc15', fontFamily: 'monospace', marginTop: '0.1rem' }}>
+                          ID: {acc.username}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleCopyUsername(acc.username, idx)}
+                        style={{
+                          background: copiedAccountIndex === idx ? 'rgba(34, 197, 94, 0.2)' : 'rgba(255,255,255,0.06)',
+                          border: '1px solid rgba(255,255,255,0.15)',
+                          color: copiedAccountIndex === idx ? '#4ade80' : '#cbd5e1',
+                          borderRadius: '6px',
+                          padding: '0.3rem 0.6rem',
+                          fontSize: '0.725rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.35rem'
+                        }}
+                      >
+                        <i className={`fa-solid ${copiedAccountIndex === idx ? 'fa-check' : 'fa-copy'}`}></i>
+                        <span>{copiedAccountIndex === idx ? 'Copied' : 'Copy'}</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {userGameAccounts.length > 3 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllAccounts(!showAllAccounts)}
+                    style={{
+                      width: '100%',
+                      marginTop: '0.6rem',
+                      padding: '0.45rem 0.75rem',
+                      background: 'rgba(250, 204, 21, 0.08)',
+                      border: '1px dashed rgba(250, 204, 21, 0.35)',
+                      borderRadius: '8px',
+                      color: '#facc15',
+                      fontSize: '0.75rem',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.4rem',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <i className={`fa-solid ${showAllAccounts ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i>
+                    <span>
+                      {showAllAccounts
+                        ? 'Show Less Accounts'
+                        : `View All (${userGameAccounts.length}) Game Accounts (+${userGameAccounts.length - 3} more)`}
+                    </span>
+                  </button>
+                )}
               </div>
             ) : (
               <div
@@ -450,6 +554,97 @@ export default function PlayerProfileModal({
                     }}
                   />
                 </div>
+              </div>
+            )}
+
+            {/* Level Milestone Reward Claim Card */}
+            {levelRewardsData?.milestoneRewards?.unclaimedAmount > 0 && (
+              <div
+                style={{
+                  marginBottom: '1.25rem',
+                  padding: '1rem',
+                  borderRadius: '12px',
+                  background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.15) 0%, rgba(202, 138, 4, 0.28) 100%)',
+                  border: '1px solid #facc15',
+                  boxShadow: '0 0 20px rgba(250, 204, 21, 0.25)'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.6rem' }}>
+                  <div>
+                    <div style={{ fontSize: '0.725rem', fontWeight: '800', color: '#fde047', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      🎉 UNCLAIMED LEVEL REWARD READY
+                    </div>
+                    <div style={{ fontSize: '1.3rem', fontWeight: '900', color: '#fff', marginTop: '0.1rem' }}>
+                      ${levelRewardsData.milestoneRewards.unclaimedAmount.toFixed(2)} Bonus Coins
+                    </div>
+                  </div>
+
+                  <span style={{ background: '#facc15', color: '#000', padding: '0.25rem 0.65rem', borderRadius: '20px', fontSize: '0.7rem', fontWeight: '900' }}>
+                    {levelInfo.levelName} Milestone
+                  </span>
+                </div>
+
+                {claimSuccessMessage ? (
+                  <div style={{ background: 'rgba(34, 197, 94, 0.2)', border: '1px solid #22c55e', color: '#4ade80', padding: '0.6rem 0.85rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '700', marginTop: '0.5rem' }}>
+                    <i className="fa-solid fa-circle-check" style={{ marginRight: '6px' }}></i> {claimSuccessMessage}
+                  </div>
+                ) : (
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.725rem', color: '#cbd5e1', fontWeight: '700', marginBottom: '0.35rem' }}>
+                      Select Game Account to Receive Coins:
+                    </label>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <select
+                        value={selectedRewardGame}
+                        onChange={(e) => setSelectedRewardGame(e.target.value)}
+                        style={{
+                          flex: 1,
+                          minWidth: '160px',
+                          background: '#07090f',
+                          border: '1px solid rgba(255, 215, 0, 0.4)',
+                          borderRadius: '8px',
+                          color: '#fff',
+                          fontSize: '0.8rem',
+                          padding: '0.5rem 0.75rem',
+                          outline: 'none'
+                        }}
+                      >
+                        {(levelRewardsData.gameAccounts?.length > 0 ? levelRewardsData.gameAccounts : userGameAccounts).map((ga) => (
+                          <option key={ga.gameTitle} value={ga.gameTitle}>
+                            {ga.gameTitle} (ID: {ga.username})
+                          </option>
+                        ))}
+                      </select>
+
+                      <button
+                        type="button"
+                        onClick={handleClaimLevelReward}
+                        disabled={claimingReward || (!selectedRewardGame && userGameAccounts.length === 0)}
+                        style={{
+                          background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                          color: '#000',
+                          border: 'none',
+                          borderRadius: '8px',
+                          padding: '0.5rem 1.25rem',
+                          fontSize: '0.8rem',
+                          fontWeight: '900',
+                          cursor: claimingReward ? 'wait' : 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.4rem',
+                          boxShadow: '0 4px 15px rgba(250, 204, 21, 0.4)',
+                          textTransform: 'uppercase'
+                        }}
+                      >
+                        {claimingReward ? (
+                          <><i className="fa-solid fa-spinner fa-spin"></i> Claiming...</>
+                        ) : (
+                          <><i className="fa-solid fa-gift"></i> Claim ${levelRewardsData.milestoneRewards.unclaimedAmount.toFixed(2)} Bonus</>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

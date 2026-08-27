@@ -319,10 +319,10 @@ export default function RequestsTab({ adminUser, onApproveRequest, completedActi
                   <td data-label="#">{(page - 1) * limit + idx + 1}</td>
                   <td data-label="Player">
                     <div className="requests-player-cell">
-                      {req.userName ? (
-                        <strong className="requests-player-name">{req.userName}</strong>
+                      <strong className="requests-player-name">{req.userName || req.userEmail}</strong>
+                      {req.userName && req.userEmail ? (
+                        <span className="requests-player-email">{req.userEmail}</span>
                       ) : null}
-                      <span className="requests-player-email">{req.userEmail}</span>
                     </div>
                   </td>
                   <td data-label="Requested Game">

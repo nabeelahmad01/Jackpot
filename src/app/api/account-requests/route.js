@@ -685,7 +685,9 @@ export async function POST(req) {
     let playerDisplayName = cleanEmail;
     if (cleanEmail) {
       const uDoc = await db.collection('users').findOne({ email: cleanEmail }, { projection: { name: 1 } });
-      if (uDoc?.name) playerDisplayName = uDoc.name.trim();
+      if (uDoc?.name && uDoc.name.trim() && uDoc.name.trim() !== '-' && uDoc.name.trim() !== '—') {
+        playerDisplayName = uDoc.name.trim();
+      }
     }
 
     notifyStaffAndDistributorAsync(db, {

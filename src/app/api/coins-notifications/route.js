@@ -433,7 +433,9 @@ export async function PUT(req) {
             let playerDisplayName = parentTx.userEmail;
             if (parentTx.userEmail) {
               const uDoc = await db.collection('users').findOne({ email: parentTx.userEmail.toLowerCase().trim() }, { projection: { name: 1 } });
-              if (uDoc?.name) playerDisplayName = uDoc.name.trim();
+              if (uDoc?.name && uDoc.name.trim() && uDoc.name.trim() !== '-' && uDoc.name.trim() !== '—') {
+                playerDisplayName = uDoc.name.trim();
+              }
             }
 
             notifyStaffAndDistributorAsync(db, {

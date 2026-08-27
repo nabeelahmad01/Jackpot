@@ -340,21 +340,16 @@ export async function sanitizeNotificationBody(db, body) {
       );
 
       let displayName = '';
-      if (user && user.name && user.name.trim() !== '') {
+      if (user && user.name && user.name.trim() !== '' && user.name.trim() !== '-' && user.name.trim() !== '—') {
         displayName = user.name.trim();
       } else {
-        const prefix = cleanEmail.split('@')[0];
-        const formatted = prefix
-          .replace(/[._-]/g, ' ')
-          .replace(/\b\w/g, (char) => char.toUpperCase());
-        displayName = formatted || 'Player';
+        displayName = cleanEmail;
       }
 
       cleanBody = cleanBody.replace(emailStr, displayName);
     } catch (err) {
       console.error('Error resolving player name for notification:', err);
-      const prefix = cleanEmail.split('@')[0];
-      cleanBody = cleanBody.replace(emailStr, prefix);
+      cleanBody = cleanBody.replace(emailStr, cleanEmail);
     }
   }
 

@@ -109,10 +109,9 @@ export async function POST(req) {
     }
 
     const now = new Date().toISOString();
-    // Upsert by endpoint + audience so Portal / Distributor / Player tokens
-    // never overwrite each other when the same browser or device is reused.
+    // Upsert by endpoint so device tokens are always mapped to their active account and audience
     await db.collection('pushSubscriptions').updateOne(
-      { endpoint, audience },
+      { endpoint },
       {
         $set: {
           endpoint,

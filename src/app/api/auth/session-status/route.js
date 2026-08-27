@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/mongodb';
 import { isSessionRevoked, isProtectedSuperAdminEmail } from '../../../../lib/sessionRevoke';
-import { isDeviceBlocked } from '../../../../lib/deviceBlock';
+import { isDeviceBlocked, trackDeviceSession } from '../../../../lib/deviceBlock';
 
 /**
  * Lightweight live-session check. Clients poll this while logged in;
@@ -60,6 +60,19 @@ export async function GET(req) {
       if (String(user.status || '').toUpperCase() === 'SUSPENDED') {
         return NextResponse.json({ success: true, valid: false, reason: 'suspended' });
       }
+
+      const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || '';
+      const userAgent = req.headers.get('user-agent') || '';
+      trackDeviceSession(db, {
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        deviceId,
+        deviceFingerprint,
+        userAgent,
+        ip
+      }).catch(() => {});
+
       return NextResponse.json({ success: true, valid: true, role: user.role || 'user' });
     }
 

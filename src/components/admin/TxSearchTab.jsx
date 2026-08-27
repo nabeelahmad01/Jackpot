@@ -37,6 +37,7 @@ export default function TxSearchTab({ onInspectProof, adminUser }) {
   const transactions = data?.transactions || [];
   const totalTransactions = data?.totalTransactions || 0;
   const totalPages = data?.totalPages || 1;
+  const searchSummary = data?.searchSummary || null;
 
   const handleHistoryPrevPage = () => {
     if (historyPage > 1) setHistoryPage(historyPage - 1);
@@ -183,6 +184,68 @@ export default function TxSearchTab({ onInspectProof, adminUser }) {
           </select>
         </div>
       </div>
+
+      {/* Search Summary Analytics Banner */}
+      {searchSummary && (
+        <div
+          style={{
+            background: 'linear-gradient(135deg, rgba(250, 204, 21, 0.08) 0%, rgba(15, 23, 42, 0.95) 100%)',
+            border: '1px solid rgba(250, 204, 21, 0.35)',
+            borderRadius: '10px',
+            padding: '1rem 1.25rem',
+            marginBottom: '1.25rem',
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1rem',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.35)'
+          }}
+        >
+          <div>
+            <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'bold' }}>
+              <i className={`fa-solid ${searchSummary.isUsernameSearch ? 'fa-gamepad' : 'fa-envelope'}`} style={{ color: 'var(--gold-primary)', marginRight: '6px' }}></i>
+              {searchSummary.isUsernameSearch ? 'Specific Game Account Audit' : 'Player Overall Account Audit'}
+            </div>
+            <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.2rem', flexWrap: 'wrap' }}>
+              <span style={{ color: '#facc15' }}>{searchSummary.query}</span>
+              {searchSummary.matchedGame && (
+                <span style={{ fontSize: '0.725rem', background: 'rgba(56, 189, 248, 0.15)', border: '1px solid rgba(56, 189, 248, 0.35)', padding: '0.15rem 0.55rem', borderRadius: '4px', color: '#38bdf8', fontWeight: 'bold' }}>
+                  {searchSummary.matchedGame}
+                </span>
+              )}
+              {searchSummary.userEmail && searchSummary.isUsernameSearch && (
+                <span style={{ fontSize: '0.725rem', color: '#94a3b8' }}>
+                  ({searchSummary.userEmail})
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ background: 'rgba(34, 197, 94, 0.08)', border: '1px solid rgba(34, 197, 94, 0.25)', padding: '0.4rem 0.8rem', borderRadius: '8px' }}>
+              <div style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 'bold' }}>Total Deposits</div>
+              <div style={{ fontSize: '1rem', fontWeight: '900', color: '#22c55e', marginTop: '0.1rem' }}>
+                ${(searchSummary.totalDeposits || 0).toFixed(2)}
+              </div>
+            </div>
+
+            <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', padding: '0.4rem 0.8rem', borderRadius: '8px' }}>
+              <div style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 'bold' }}>Total Redeems / Cashouts</div>
+              <div style={{ fontSize: '1rem', fontWeight: '900', color: '#ef4444', marginTop: '0.1rem' }}>
+                ${(searchSummary.totalRedeems || 0).toFixed(2)}
+              </div>
+            </div>
+
+            <div style={{ background: 'rgba(250, 204, 21, 0.08)', border: '1px solid rgba(250, 204, 21, 0.25)', padding: '0.4rem 0.8rem', borderRadius: '8px' }}>
+              <div style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 'bold' }}>Net Balance (P&L)</div>
+              <div style={{ fontSize: '1rem', fontWeight: '900', color: (searchSummary.netProfit || 0) >= 0 ? '#facc15' : '#ef4444', marginTop: '0.1rem' }}>
+                {(searchSummary.netProfit || 0) >= 0 ? '+' : ''}${(searchSummary.netProfit || 0).toFixed(2)}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="table-responsive">
         <table className="admin-table">

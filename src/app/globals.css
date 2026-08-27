@@ -4251,6 +4251,31 @@ dialog::backdrop {
     display: none !important;
   }
 
+  /* Compact Profile chip on mobile so players clearly see it is their Profile */
+  .profile-nav-btn {
+    width: auto !important;
+    min-width: 0 !important;
+    height: 36px;
+    padding: 0 0.6rem !important;
+    gap: 0.35rem !important;
+    border-radius: 8px !important;
+    background: linear-gradient(135deg, rgba(250, 204, 21, 0.18) 0%, rgba(202, 138, 4, 0.28) 100%) !important;
+    border: 1px solid rgba(250, 204, 21, 0.6) !important;
+    color: #fde047 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 0 10px rgba(250, 204, 21, 0.2) !important;
+  }
+
+  .profile-nav-btn span {
+    display: inline !important;
+    font-size: 0.68rem !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.03em !important;
+    white-space: nowrap !important;
+  }
+
   .get-app-btn i {
     font-size: 0.8rem;
     color: #ffe566;

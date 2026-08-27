@@ -59,6 +59,39 @@ export async function GET(req) {
       }
     }
 
+    // Sync any users/staff from users collection that have device/activity info but no deviceSessions record yet
+    try {
+      const activeUsers = await db.collection('users').find(
+        { email: { $exists: true, $ne: '' } },
+        { projection: { email: 1, name: 1, role: 1, deviceId: 1, deviceFingerprint: 1, userAgent: 1, lastActive: 1, createdAt: 1 } }
+      ).limit(100).toArray();
+
+      for (const u of activeUsers) {
+        if (!u.email) continue;
+        const exists = await sessionsCollection.findOne({ email: u.email.toLowerCase().trim() });
+        if (!exists) {
+          await sessionsCollection.insertOne({
+            email: u.email.toLowerCase().trim(),
+            name: u.name || u.email.split('@')[0],
+            role: u.role || 'player',
+            postTitle: u.role === 'admin' ? 'Super Admin (Owner)' : (u.role?.replace('_', ' ') || 'Player Account'),
+            postEmoji: u.role === 'admin' ? '👑' : '🎮',
+            postColor: u.role === 'admin' ? '#facc15' : '#94a3b8',
+            deviceId: u.deviceId || `dev-${Buffer.from(u.email).toString('hex').slice(0, 14)}`,
+            deviceFingerprint: u.deviceFingerprint || '',
+            os: 'Web Browser',
+            browser: 'Browser Session',
+            ip: 'Active',
+            lastActive: u.lastActive || u.createdAt || new Date(),
+            createdAt: u.createdAt || new Date(),
+            status: 'ACTIVE'
+          });
+        }
+      }
+    } catch (syncErr) {
+      console.error('Device sync error:', syncErr);
+    }
+
     const allSessions = await sessionsCollection.find(query).sort({ lastActive: -1 }).toArray();
 
     // Map blocked status dynamically

@@ -418,10 +418,12 @@ export async function POST(req) {
     publishAdminEvent('support', { distributorId: distId || '', senderType });
 
     if (senderType === 'player') {
-      let playerDisplayName = userName || userEmail;
-      if (!userName && userEmail) {
+      let playerDisplayName = (userName && userName !== '-' && userName !== '—') ? userName : userEmail;
+      if ((!playerDisplayName || playerDisplayName === userEmail) && userEmail) {
         const uDoc = await db.collection('users').findOne({ email: userEmail.toLowerCase().trim() }, { projection: { name: 1 } });
-        if (uDoc?.name) playerDisplayName = uDoc.name.trim();
+        if (uDoc?.name && uDoc.name.trim() && uDoc.name.trim() !== '-' && uDoc.name.trim() !== '—') {
+          playerDisplayName = uDoc.name.trim();
+        }
       }
 
       notifyStaffAndDistributorAsync(db, {
