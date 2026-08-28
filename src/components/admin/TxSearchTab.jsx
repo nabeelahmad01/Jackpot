@@ -295,6 +295,12 @@ export default function TxSearchTab({ onInspectProof, adminUser }) {
                       <span style={{ fontSize: '0.725rem', opacity: 0.9 }}>
                         {tx.gateway || '—'} {tx.code ? `(${tx.code})` : ''}
                       </span>
+                      {(tx.nameOnTag || tx.phoneOnTag) && (
+                        <div style={{ marginTop: '0.25rem', padding: '0.25rem 0.5rem', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', fontSize: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.1rem', border: '1px solid rgba(255,255,255,0.03)' }}>
+                          {tx.nameOnTag && <span style={{ color: '#ffd700' }}>Name: {tx.nameOnTag}</span>}
+                          {tx.phoneOnTag && <span style={{ color: '#38bdf8' }}>Phone: {tx.phoneOnTag}</span>}
+                        </div>
+                      )}
                       {tx.note && <p style={{ fontSize: '0.675rem', color: '#ffb703', margin: '0.2rem 0 0 0' }}>{tx.note}</p>}
                       
                       {/* Action Logger details */}
@@ -333,8 +339,8 @@ export default function TxSearchTab({ onInspectProof, adminUser }) {
                           </div>
                         </div>
                       ) : (
-                        <span className={`admin-badge-preview b-${(tx.status === 'PENDING_COINS' || tx.status === 'COINS_LOADING') ? 'new' : (tx.status.toLowerCase() === 'success' ? 'ready' : tx.status.toLowerCase())}`}>
-                          {tx.status === 'PENDING_COINS' ? 'VERIFYING COINS' : (tx.status === 'COINS_LOADING' ? 'COINS LOADING' : tx.status)}
+                        <span className={`admin-badge-preview b-${(tx.status === 'PENDING_COINS' || tx.status === 'COINS_LOADING') ? 'new' : (tx.status.toLowerCase() === 'success' ? 'ready' : (tx.status.toLowerCase() === 'cancelled' || tx.status.toLowerCase() === 'timed_out' || tx.status.toLowerCase() === 'failed' || tx.status.toLowerCase() === 'rejected') ? 'failed' : tx.status.toLowerCase())}`}>
+                          {tx.status === 'PENDING_COINS' ? 'VERIFYING COINS' : (tx.status === 'COINS_LOADING' ? 'COINS LOADING' : tx.status === 'TIMED_OUT' ? 'TIMED OUT' : tx.status)}
                         </span>
                       )}
                     </td>

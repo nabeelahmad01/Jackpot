@@ -23,6 +23,18 @@ export async function GET(req) {
       if (!tx) {
         return NextResponse.json({ success: false, message: 'Transaction not found.' }, { status: 404 });
       }
+      if (tx.parentTxId && (!tx.tagQrScreenshot || !tx.phoneOnTag || !tx.nameOnTag || !tx.screenshot)) {
+        const parentTx = await db.collection('transactions').findOne({ id: tx.parentTxId });
+        if (parentTx) {
+          if (!tx.tagQrScreenshot && parentTx.tagQrScreenshot) tx.tagQrScreenshot = parentTx.tagQrScreenshot;
+          if (!tx.phoneOnTag && parentTx.phoneOnTag) tx.phoneOnTag = parentTx.phoneOnTag;
+          if (!tx.nameOnTag && parentTx.nameOnTag) tx.nameOnTag = parentTx.nameOnTag;
+          if (!tx.emailOnTag && parentTx.emailOnTag) tx.emailOnTag = parentTx.emailOnTag;
+          if (!tx.screenshot && parentTx.screenshot) tx.screenshot = parentTx.screenshot;
+          if (!tx.payoutQr && parentTx.payoutQr) tx.payoutQr = parentTx.payoutQr;
+          if (!tx.gameUsername && parentTx.gameUsername) tx.gameUsername = parentTx.gameUsername;
+        }
+      }
       if (tx.type === 'WEBSITE_COMMISSION_PAYMENT') {
         const adminRole = searchParams.get('adminRole') || '';
         const userEmailParam = searchParams.get('email') || '';
@@ -248,6 +260,33 @@ export async function GET(req) {
       }
     }
 
+    // Remainder / child transactions fallback: inherit parent tag QR, phone, and name if missing
+    const remainderTxsNeedingParent = transactions.filter((t) => t.parentTxId && (!t.tagQrScreenshot || !t.phoneOnTag || !t.nameOnTag || !t.screenshot));
+    if (remainderTxsNeedingParent.length > 0) {
+      const parentIds = Array.from(new Set(remainderTxsNeedingParent.map((t) => String(t.parentTxId)).filter(Boolean)));
+      if (parentIds.length > 0) {
+        const parents = await transactionsCollection.find({ id: { $in: parentIds } }).project({
+          id: 1,
+          nameOnTag: 1,
+          phoneOnTag: 1,
+          emailOnTag: 1,
+          tagQrScreenshot: { $cond: { if: { $eq: [{ $ifNull: ["$tagQrScreenshot", ""] }, ""] }, then: false, else: true } },
+          screenshot: { $cond: { if: { $eq: [{ $ifNull: ["$screenshot", ""] }, ""] }, then: false, else: true } }
+        }).toArray();
+        const parentMap = new Map(parents.map((p) => [String(p.id), p]));
+        for (const tx of transactions) {
+          if (tx.parentTxId && parentMap.has(String(tx.parentTxId))) {
+            const parent = parentMap.get(String(tx.parentTxId));
+            if (!tx.phoneOnTag && parent.phoneOnTag) tx.phoneOnTag = parent.phoneOnTag;
+            if (!tx.nameOnTag && parent.nameOnTag) tx.nameOnTag = parent.nameOnTag;
+            if (!tx.emailOnTag && parent.emailOnTag) tx.emailOnTag = parent.emailOnTag;
+            if (!tx.tagQrScreenshot && parent.tagQrScreenshot) tx.tagQrScreenshot = parent.tagQrScreenshot;
+            if (!tx.screenshot && parent.screenshot) tx.screenshot = parent.screenshot;
+          }
+        }
+      }
+    }
+
     // Heal: proof already in DB but flag stuck on "uploading" (failed client ack / race)
     const healedIds = transactions
       .filter((t) => t.proofPending && t.screenshot)
@@ -458,6 +497,10 @@ export async function POST(req) {
       const parentType = parentTx ? parentTx.type : 'WITHDRAW';
 
       // Create remainder payout request
+      const tagQrImg = newTx.tagQrScreenshot || parentTx?.tagQrScreenshot || '';
+      const gameShot = newTx.screenshot || parentTx?.screenshot || '';
+      const payoutQrImg = newTx.payoutQr || parentTx?.payoutQr || '';
+
       const txObject = {
         id: (Date.now() + Math.floor(Math.random() * 100)).toString(),
         userEmail: newTx.userEmail.toLowerCase().trim(),
@@ -466,11 +509,21 @@ export async function POST(req) {
         status: 'PENDING', // Directly ready for payout ledger
         type: parentType,
         amount: parseFloat(newTx.amount),
-        gateway: newTx.gateway || 'Chime',
-        code: newTx.code || '—',
-        gameTitle: newTx.gameTitle || 'Lobby',
+        gateway: newTx.gateway || parentTx?.gateway || 'Chime',
+        code: newTx.code || parentTx?.code || '—',
+        gameTitle: newTx.gameTitle || parentTx?.gameTitle || 'Lobby',
+        gameUsername: newTx.gameUsername || parentTx?.gameUsername || '',
+        nameOnTag: newTx.nameOnTag || parentTx?.nameOnTag || '',
+        phoneOnTag: newTx.phoneOnTag || parentTx?.phoneOnTag || '',
+        emailOnTag: newTx.emailOnTag || parentTx?.emailOnTag || '',
+        tagQrScreenshot: tagQrImg,
+        hasTagQrScreenshot: Boolean(tagQrImg),
+        screenshot: gameShot,
+        hasScreenshot: Boolean(gameShot),
+        payoutQr: payoutQrImg,
         note: `Remaining payout request for Tx #${newTx.parentTxId}`,
         parentTxId: newTx.parentTxId,
+        isRemainderRequest: true,
         distributorId: distId,
         distributorType: distType,
         isFreeplayWithdraw: parentTx ? Boolean(parentTx.isFreeplayWithdraw) : false
@@ -880,22 +933,24 @@ export async function POST(req) {
       }
     }
 
+    const isCancelledOrTimedOut = newTx.status === 'CANCELLED' || newTx.status === 'TIMED_OUT' || newTx.status === 'FAILED';
+
     const txObject = {
       id: (Date.now() + Math.floor(Math.random() * 100)).toString(),
       userEmail,
       date: new Date().toISOString(),
       createdAt: new Date().toISOString(),
       // Freeplay goes directly to coins admin (COINS_LOADING), not finance (PENDING)
-      status: newTx.type === 'WITHDRAW' ? 'PENDING_COINS' : isFreeplayBonus ? 'COINS_LOADING' : newTx.type === 'BONUS' ? 'SUCCESS' : 'PENDING',
-      note: '',
+      status: isCancelledOrTimedOut ? newTx.status : newTx.type === 'WITHDRAW' ? 'PENDING_COINS' : isFreeplayBonus ? 'COINS_LOADING' : newTx.type === 'BONUS' ? 'SUCCESS' : 'PENDING',
+      note: newTx.note || (newTx.status === 'TIMED_OUT' ? 'Deposit session timed out' : newTx.status === 'CANCELLED' ? 'Deposit cancelled by player' : ''),
       distributorId: distId,
       distributorType: distType,
       ...newTx,
-      proofPending: Boolean(proofPending),
+      proofPending: isCancelledOrTimedOut ? false : Boolean(proofPending),
       hasScreenshot: Boolean(newTx.screenshot && String(newTx.screenshot).trim())
     };
 
-    if (txObject.type === 'WITHDRAW') {
+    if (!isCancelledOrTimedOut && txObject.type === 'WITHDRAW') {
       let frontendSettings = cache.get('frontend_settings_all');
       if (!frontendSettings) {
         frontendSettings = await db.collection('settings').findOne({ id: 'frontend_settings' }) || {};
@@ -992,7 +1047,7 @@ export async function POST(req) {
     const writeOps = [transactionsCollection.insertOne(txObject)];
 
     let coinGameUsername = '';
-    if (txObject.type === 'WITHDRAW' || isFreeplayBonus) {
+    if (!isCancelledOrTimedOut && (txObject.type === 'WITHDRAW' || isFreeplayBonus)) {
       try {
         const umap = await buildGameUsernameMap(db, [String(txObject.userEmail || '').toLowerCase().trim()], { dedupe: false });
         coinGameUsername = umap[accountLookupKey(txObject.userEmail, txObject.gameTitle || 'Lobby')] || '';
@@ -1001,7 +1056,7 @@ export async function POST(req) {
       }
     }
 
-    if (txObject.type === 'WITHDRAW') {
+    if (!isCancelledOrTimedOut && txObject.type === 'WITHDRAW') {
       writeOps.push(notificationsCollection.insertOne({
         id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
         userEmail: txObject.userEmail,
@@ -1020,7 +1075,7 @@ export async function POST(req) {
       }));
     }
 
-    if (isFreeplayBonus) {
+    if (!isCancelledOrTimedOut && isFreeplayBonus) {
       writeOps.push(notificationsCollection.insertOne({
         id: Date.now().toString() + Math.floor(Math.random() * 100).toString(),
         userEmail: txObject.userEmail,
@@ -1042,35 +1097,37 @@ export async function POST(req) {
     await Promise.all(writeOps);
 
     // Alert Jackpot Portal + owning Distributor APK — never touches player promo push.
-    const alertType = String(txObject.type || 'REQUEST').replace(/_/g, ' ');
-    const isLedgerTx = txObject.type === 'DEPOSIT' || txObject.type === 'WITHDRAW' || txObject.type === 'PAYOUT' || txObject.type === 'COMMISSION_WITHDRAW';
-    const targetAdminUrl = isLedgerTx ? '/admin/ledger' : '/admin/requests';
-    const targetDistributorUrl = isLedgerTx ? '/distributor/ledger' : '/distributor/requests';
+    if (!isCancelledOrTimedOut) {
+      const alertType = String(txObject.type || 'REQUEST').replace(/_/g, ' ');
+      const isLedgerTx = txObject.type === 'DEPOSIT' || txObject.type === 'WITHDRAW' || txObject.type === 'PAYOUT' || txObject.type === 'COMMISSION_WITHDRAW';
+      const targetAdminUrl = isLedgerTx ? '/admin/ledger' : '/admin/requests';
+      const targetDistributorUrl = isLedgerTx ? '/distributor/ledger' : '/distributor/requests';
 
-    let playerDisplayName = txObject.userEmail || 'Player';
-    if (txObject.userEmail) {
-      const uDoc = await db.collection('users').findOne({ email: txObject.userEmail.toLowerCase().trim() }, { projection: { name: 1 } });
-      if (uDoc?.name && uDoc.name.trim() && uDoc.name.trim() !== '-' && uDoc.name.trim() !== '—') {
-        playerDisplayName = uDoc.name.trim();
+      let playerDisplayName = txObject.userEmail || 'Player';
+      if (txObject.userEmail) {
+        const uDoc = await db.collection('users').findOne({ email: txObject.userEmail.toLowerCase().trim() }, { projection: { name: 1 } });
+        if (uDoc?.name && uDoc.name.trim() && uDoc.name.trim() !== '-' && uDoc.name.trim() !== '—') {
+          playerDisplayName = uDoc.name.trim();
+        }
       }
-    }
 
-    notifyStaffAndDistributorAsync(db, {
-      title: `New ${alertType}`,
-      body: `${playerDisplayName} · $${parseFloat(txObject.amount || 0).toFixed(2)}${txObject.gameTitle ? ` · ${txObject.gameTitle}` : ''}`,
-      adminUrl: targetAdminUrl,
-      distributorUrl: targetDistributorUrl,
-      url: targetAdminUrl,
-      tag: `tx-${txObject.id}`,
-      gameTitle: txObject.gameTitle || '',
-      alertKind: 'game'
-    }, txObject.distributorId);
+      notifyStaffAndDistributorAsync(db, {
+        title: `New ${alertType}`,
+        body: `${playerDisplayName} · $${parseFloat(txObject.amount || 0).toFixed(2)}${txObject.gameTitle ? ` · ${txObject.gameTitle}` : ''}`,
+        adminUrl: targetAdminUrl,
+        distributorUrl: targetDistributorUrl,
+        url: targetAdminUrl,
+        tag: `tx-${txObject.id}`,
+        gameTitle: txObject.gameTitle || '',
+        alertKind: 'game'
+      }, txObject.distributorId);
+    }
 
     // Invalidate stats cache + instant admin SSE
     cache.del('admin_stats');
     const distKey = txObject.distributorId || '';
     publishAdminEvent('transactions', { distributorId: distKey, txType: txObject.type });
-    if (txObject.type === 'WITHDRAW' || isFreeplayBonus) {
+    if (!isCancelledOrTimedOut && (txObject.type === 'WITHDRAW' || isFreeplayBonus)) {
       publishAdminEvent('coins', { distributorId: distKey, transactionId: txObject.id });
     }
 

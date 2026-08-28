@@ -485,6 +485,11 @@ function AffiliatePortal() {
           amount: parseFloat(tx.payoutHold),
           gateway: tx.gateway,
           code: tx.code || '—',
+          nameOnTag: tx.nameOnTag || '',
+          phoneOnTag: tx.phoneOnTag || '',
+          emailOnTag: tx.emailOnTag || '',
+          tagQrScreenshot: tx.tagQrScreenshot || '',
+          payoutQr: tx.payoutQr || '',
           isRemainderRequest: true,
           parentTxId: tx.id
         })

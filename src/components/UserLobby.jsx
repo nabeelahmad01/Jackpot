@@ -645,6 +645,14 @@ export default function UserLobby({
 
   const renderFailedStatusWithTooltip = (tx) => {
     const isTooltipActive = activeTooltipId === tx.id;
+    const st = String(tx.status || '').toUpperCase();
+    const isCancelled = st === 'CANCELLED';
+    const isTimedOut = st === 'TIMED_OUT';
+    const label = isCancelled ? 'CANCELLED' : isTimedOut ? 'TIMED OUT' : st === 'REJECTED' ? 'REJECTED' : 'FAILED';
+    const badgeColor = isCancelled ? '#94a3b8' : isTimedOut ? '#f97316' : '#f87171';
+    const badgeBg = isCancelled ? 'rgba(148, 163, 184, 0.1)' : isTimedOut ? 'rgba(249, 115, 22, 0.1)' : 'rgba(239, 68, 68, 0.1)';
+    const badgeBorder = isCancelled ? 'rgba(148, 163, 184, 0.25)' : isTimedOut ? 'rgba(249, 115, 22, 0.25)' : 'rgba(239, 68, 68, 0.25)';
+
     return (
       <div style={{ position: 'relative', display: 'inline-block' }}>
         <span
@@ -656,9 +664,9 @@ export default function UserLobby({
             gap: '0.25rem',
             padding: '0.2rem 0.5rem',
             borderRadius: '4px',
-            background: 'rgba(239, 68, 68, 0.1)',
-            border: '1px solid rgba(239, 68, 68, 0.25)',
-            color: '#f87171'
+            background: badgeBg,
+            border: `1px solid ${badgeBorder}`,
+            color: badgeColor
           }}
           onClick={(e) => {
             e.stopPropagation();
@@ -667,7 +675,7 @@ export default function UserLobby({
           onMouseEnter={() => setActiveTooltipId(tx.id)}
           onMouseLeave={() => setActiveTooltipId(null)}
         >
-          FAILED <i className="fa-solid fa-circle-info" style={{ fontSize: '0.65rem' }}></i>
+          {label} <i className="fa-solid fa-circle-info" style={{ fontSize: '0.65rem' }}></i>
         </span>
 
         {isTooltipActive && (
@@ -689,8 +697,12 @@ export default function UserLobby({
             animation: 'scale-up 0.15s cubic-bezier(0.34, 1.56, 0.64, 1)',
             pointerEvents: 'none'
           }}>
-            <strong style={{ color: '#000', display: 'block', marginBottom: '0.2rem' }}>Rejection Reason:</strong>
-            <span style={{ color: '#333', fontWeight: '500' }}>{tx.note || 'Declined by Administrator.'}</span>
+            <strong style={{ color: '#000', display: 'block', marginBottom: '0.2rem' }}>
+              {isCancelled ? 'Cancellation Note:' : isTimedOut ? 'Timeout Info:' : 'Rejection Reason:'}
+            </strong>
+            <span style={{ color: '#333', fontWeight: '500' }}>
+              {tx.note || (isCancelled ? 'Deposit cancelled by player' : isTimedOut ? 'Deposit session timed out' : 'Declined by Administrator.')}
+            </span>
             <div style={{
               position: 'absolute',
               top: '100%',
@@ -765,8 +777,25 @@ export default function UserLobby({
         if (!prev?.expiresAt) return null;
         const left = remainingSeconds(prev.expiresAt);
         if (left <= 0) {
+          const inv = prev;
           clearPendingDeposit();
           showToast('Deposit session expired.', 'error');
+          if (onSubmitTransaction && inv) {
+            const allottedAcc = (gameAccounts || []).find(
+              (acc) => acc.gameTitle === (activeGame?.title || '')
+            );
+            const gameUsername = allottedAcc ? allottedAcc.username : '';
+            onSubmitTransaction({
+              gameTitle: activeGame?.title || 'Lobby',
+              type: 'DEPOSIT',
+              status: 'TIMED_OUT',
+              amount: inv.amount,
+              gateway: inv.gateway?.name || 'Direct',
+              code: inv.noteCode || '—',
+              note: 'Deposit session timed out',
+              gameUsername: gameUsername || ''
+            });
+          }
           return null;
         }
         if (left === prev.timeRemaining) return prev;
@@ -1086,10 +1115,30 @@ export default function UserLobby({
   };
 
   const handleCancelInvoice = () => {
+    if (!activeInvoice) return;
+    const inv = activeInvoice;
     clearPendingDeposit();
     setActiveInvoice(null);
     setScreenshotBase64('');
     showToast('Deposit checkout cancelled.', 'info');
+
+    const allottedAcc = (gameAccounts || []).find(
+      (acc) => acc.gameTitle === (activeGame?.title || '')
+    );
+    const gameUsername = allottedAcc ? allottedAcc.username : '';
+
+    if (onSubmitTransaction) {
+      onSubmitTransaction({
+        gameTitle: activeGame?.title || 'Lobby',
+        type: 'DEPOSIT',
+        status: 'CANCELLED',
+        amount: inv.amount,
+        gateway: inv.gateway?.name || 'Direct',
+        code: inv.noteCode || '—',
+        note: 'Deposit cancelled by player',
+        gameUsername: gameUsername || ''
+      });
+    }
   };
 
   const handlePaidConfirm = () => {
@@ -1143,8 +1192,15 @@ export default function UserLobby({
         amount: parseFloat(tx.payoutHold),
         gateway: tx.gateway,
         code: tx.code || '—',
+        nameOnTag: tx.nameOnTag || '',
+        phoneOnTag: tx.phoneOnTag || '',
+        emailOnTag: tx.emailOnTag || '',
+        tagQrScreenshot: tx.tagQrScreenshot || '',
+        screenshot: tx.screenshot || '',
+        gameUsername: tx.gameUsername || '',
+        payoutQr: tx.payoutQr || '',
         gameTitle: tx.gameTitle || 'Lobby',
-        type: 'WITHDRAW'
+        type: tx.type || 'WITHDRAW'
       });
       // The parent onSubmitTransaction handler will hit API, trigger mutate, and show success toast!
     } catch (err) {
@@ -2998,7 +3054,7 @@ export default function UserLobby({
                               const isCoinsLoading = String(tx.status || '').toUpperCase() === 'COINS_LOADING';
                               const isVerifying = String(tx.status || '').toUpperCase() === 'PENDING_COINS';
                               const isHold = String(tx.status || '').toUpperCase() === 'HOLD' || parseFloat(tx.payoutHold || 0) > 0;
-                              const isFailed = String(tx.status || '').toUpperCase() === 'FAILED' || String(tx.status || '').toUpperCase() === 'CANCELLED' || String(tx.status || '').toUpperCase() === 'REJECTED';
+                              const isFailed = String(tx.status || '').toUpperCase() === 'FAILED' || String(tx.status || '').toUpperCase() === 'CANCELLED' || String(tx.status || '').toUpperCase() === 'TIMED_OUT' || String(tx.status || '').toUpperCase() === 'REJECTED';
 
                               const hasProofImg = Boolean(tx.screenshot || tx.hasScreenshot || tx.proofUrl);
 
@@ -3034,6 +3090,16 @@ export default function UserLobby({
                                       <span style={{ fontSize: '0.725rem', opacity: 0.8 }}>
                                         {tx.isDepositFromCashout ? 'Added deposit from remaining cashout' : tx.note && !isFailed ? tx.note : (tx.code === 'SIGNUP-FREE3' ? 'Freeplay (SIGNUP-FREE3)' : tx.code === 'FREEPLAY' ? 'Freeplay' : `${tx.gateway || 'Direct'} (${tx.code || tx.noteCode || tx.id})`)}
                                       </span>
+                                      {tx.nameOnTag && (
+                                        <span style={{ fontSize: '0.675rem', color: '#ffd700' }}>
+                                          Name: {tx.nameOnTag}
+                                        </span>
+                                      )}
+                                      {tx.phoneOnTag && (
+                                        <span style={{ fontSize: '0.675rem', color: '#38bdf8' }}>
+                                          Phone: {tx.phoneOnTag}
+                                        </span>
+                                      )}
                                       {tx.type === 'WITHDRAW' && (
                                         <RemainderClaimAction
                                           tx={tx}
@@ -3045,56 +3111,82 @@ export default function UserLobby({
                                     </div>
                                   </td>
                                   <td>
-                                    {hasProofImg ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => setLightboxImage(tx.screenshot || tx.proofUrl || `/api/transactions/proof?id=${tx.id}`)}
-                                        style={{
-                                          background: 'rgba(250, 204, 21, 0.12)',
-                                          border: '1px solid rgba(250, 204, 21, 0.4)',
-                                          color: '#facc15',
-                                          borderRadius: '6px',
-                                          padding: '0.25rem 0.55rem',
-                                          fontSize: '0.675rem',
-                                          cursor: 'pointer',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '0.35rem',
-                                          fontWeight: '700'
-                                        }}
-                                      >
-                                        <i className="fa-solid fa-receipt"></i> View Proof
-                                      </button>
-                                    ) : (tx.type === 'DEPOSIT' || isPending || isFailed || tx.proofPending) ? (
-                                      <label
-                                        style={{
-                                          background: 'rgba(56, 189, 248, 0.12)',
-                                          border: '1px dashed rgba(56, 189, 248, 0.5)',
-                                          color: '#38bdf8',
-                                          borderRadius: '6px',
-                                          padding: '0.25rem 0.55rem',
-                                          fontSize: '0.675rem',
-                                          cursor: 'pointer',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '0.35rem',
-                                          fontWeight: '700'
-                                        }}
-                                      >
-                                        <i className={`fa-solid ${uploadingProofTxId === tx.id ? 'fa-spinner fa-spin' : 'fa-camera'}`}></i>
-                                        <span>{uploadingProofTxId === tx.id ? 'Uploading...' : 'Attach Proof'}</span>
-                                        <input
-                                          type="file"
-                                          accept="image/*"
-                                          onChange={(e) => {
-                                            if (e.target.files?.[0]) handleUploadTxProof(tx, e.target.files[0]);
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}>
+                                      {hasProofImg ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => setLightboxImage(tx.screenshot || tx.proofUrl || `/api/transactions/proof?id=${tx.id}`)}
+                                          style={{
+                                            background: 'rgba(250, 204, 21, 0.12)',
+                                            border: '1px solid rgba(250, 204, 21, 0.4)',
+                                            color: '#facc15',
+                                            borderRadius: '6px',
+                                            padding: '0.25rem 0.55rem',
+                                            fontSize: '0.675rem',
+                                            cursor: 'pointer',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '0.35rem',
+                                            fontWeight: '700'
                                           }}
-                                          style={{ display: 'none' }}
-                                        />
-                                      </label>
-                                    ) : (
-                                      <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>—</span>
-                                    )}
+                                        >
+                                          <i className="fa-solid fa-receipt"></i> View Proof
+                                        </button>
+                                      ) : (tx.type === 'DEPOSIT' && (isPending || tx.proofPending)) ? (
+                                        <label
+                                          style={{
+                                            background: 'rgba(56, 189, 248, 0.12)',
+                                            border: '1px dashed rgba(56, 189, 248, 0.5)',
+                                            color: '#38bdf8',
+                                            borderRadius: '6px',
+                                            padding: '0.25rem 0.55rem',
+                                            fontSize: '0.675rem',
+                                            cursor: 'pointer',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '0.35rem',
+                                            fontWeight: '700'
+                                          }}
+                                        >
+                                          <i className={`fa-solid ${uploadingProofTxId === tx.id ? 'fa-spinner fa-spin' : 'fa-camera'}`}></i>
+                                          <span>{uploadingProofTxId === tx.id ? 'Uploading...' : 'Attach Proof'}</span>
+                                          <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={(e) => {
+                                              if (e.target.files?.[0]) handleUploadTxProof(tx, e.target.files[0]);
+                                            }}
+                                            style={{ display: 'none' }}
+                                          />
+                                        </label>
+                                      ) : null}
+
+                                      {tx.type === 'WITHDRAW' && Boolean(tx.tagQrScreenshot || tx.hasTagQrScreenshot) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setLightboxImage(typeof tx.tagQrScreenshot === 'string' && tx.tagQrScreenshot.startsWith('data:image') ? tx.tagQrScreenshot : `/api/transactions/proof?id=${tx.id}&field=tagQrScreenshot`)}
+                                          style={{
+                                            background: 'rgba(168, 85, 247, 0.12)',
+                                            border: '1px solid rgba(168, 85, 247, 0.4)',
+                                            color: '#c084fc',
+                                            borderRadius: '6px',
+                                            padding: '0.25rem 0.55rem',
+                                            fontSize: '0.675rem',
+                                            cursor: 'pointer',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '0.35rem',
+                                            fontWeight: '700'
+                                          }}
+                                        >
+                                          <i className="fa-solid fa-qrcode"></i> View Tag QR
+                                        </button>
+                                      )}
+
+                                      {!hasProofImg && !(tx.type === 'DEPOSIT' && (isPending || tx.proofPending)) && !(tx.type === 'WITHDRAW' && Boolean(tx.tagQrScreenshot || tx.hasTagQrScreenshot)) && (
+                                        <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>—</span>
+                                      )}
+                                    </div>
                                   </td>
                                   <td style={{ fontSize: '0.7rem', opacity: 0.7 }}>
                                     {formatDeviceDateTime(tx.createdAt, tx.date)}

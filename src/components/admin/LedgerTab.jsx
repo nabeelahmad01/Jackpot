@@ -324,10 +324,10 @@ export default function LedgerTab({
                         <span style={{ fontSize: '0.725rem', opacity: 0.9 }}>
                           {tx.gateway} ({tx.code})
                         </span>
-                        {tx.nameOnTag && (
+                        {(tx.nameOnTag || tx.phoneOnTag) && (
                           <div style={{ marginTop: '0.25rem', padding: '0.25rem 0.5rem', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', fontSize: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.1rem', border: '1px solid rgba(255,255,255,0.03)' }}>
-                            <span style={{ color: '#ffd700' }}>Name: {tx.nameOnTag}</span>
-                            {tx.phoneOnTag && <span style={{ color: 'var(--text-muted)' }}>Phone: {tx.phoneOnTag}</span>}
+                            {tx.nameOnTag && <span style={{ color: '#ffd700' }}>Name: {tx.nameOnTag}</span>}
+                            {tx.phoneOnTag && <span style={{ color: '#38bdf8' }}>Phone: {tx.phoneOnTag}</span>}
                           </div>
                         )}
                         {tx.note && <p style={{ fontSize: '0.65rem', color: '#ff8787', margin: '0.2rem 0 0 0' }}>{tx.note}</p>}
@@ -457,10 +457,10 @@ export default function LedgerTab({
                         <span style={{ fontSize: '0.725rem', opacity: 0.9 }}>
                           {tx.gateway} ({tx.code})
                         </span>
-                        {tx.nameOnTag && (
+                        {(tx.nameOnTag || tx.phoneOnTag) && (
                           <div style={{ marginTop: '0.25rem', padding: '0.25rem 0.5rem', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', fontSize: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.1rem', border: '1px solid rgba(255,255,255,0.03)' }}>
-                            <span style={{ color: '#ffd700' }}>Name: {tx.nameOnTag}</span>
-                            {tx.phoneOnTag && <span style={{ color: 'var(--text-muted)' }}>Phone: {tx.phoneOnTag}</span>}
+                            {tx.nameOnTag && <span style={{ color: '#ffd700' }}>Name: {tx.nameOnTag}</span>}
+                            {tx.phoneOnTag && <span style={{ color: '#38bdf8' }}>Phone: {tx.phoneOnTag}</span>}
                           </div>
                         )}
                         {tx.note && <p style={{ fontSize: '0.65rem', color: '#ff8787', margin: '0.2rem 0 0 0' }}>{tx.note}</p>}
@@ -596,7 +596,25 @@ export default function LedgerTab({
               <div style={{ marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                 <div>Player: <strong style={{ color: '#fff' }}>{selectedPayoutTx.userEmail}</strong></div>
                 <div style={{ marginTop: '0.25rem' }}>Platform: <strong>{selectedPayoutTx.gateway}</strong> • Tag: <strong>{selectedPayoutTx.code}</strong></div>
+                {selectedPayoutTx.nameOnTag && (
+                  <div style={{ marginTop: '0.25rem' }}>Name on Tag: <strong style={{ color: '#ffd700' }}>{selectedPayoutTx.nameOnTag}</strong></div>
+                )}
+                {selectedPayoutTx.phoneOnTag && (
+                  <div style={{ marginTop: '0.25rem' }}>Phone / Linked #: <strong style={{ color: '#38bdf8' }}>{selectedPayoutTx.phoneOnTag}</strong></div>
+                )}
                 <div style={{ marginTop: '0.25rem', fontSize: '0.95rem' }}>Total Requested: <strong style={{ color: 'var(--gold-primary)' }}>${parseFloat(selectedPayoutTx.amount).toFixed(2)}</strong></div>
+                {selectedPayoutTx.tagQrScreenshot && (
+                  <div style={{ marginTop: '0.5rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => onInspectProof(selectedPayoutTx.tagQrScreenshot, selectedPayoutTx.id, 'tagQrScreenshot')}
+                      className="submit-btn"
+                      style={{ background: '#a855f7', color: '#fff', margin: 0, padding: '0.35rem 0.65rem', width: 'auto', display: 'inline-flex', gap: '0.3rem', alignItems: 'center', fontSize: '0.75rem', fontWeight: 'bold' }}
+                    >
+                      <i className="fa-solid fa-qrcode"></i> View Tag QR Screenshot
+                    </button>
+                  </div>
+                )}
               </div>
 
               <form onSubmit={handleProcessPayoutSubmit} noValidate>

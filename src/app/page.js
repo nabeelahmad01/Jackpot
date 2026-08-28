@@ -483,6 +483,7 @@ export default function Home() {
 
   // Player Transactions Requests
   const handleSubmitTransaction = async (newTx) => {
+    const isCancelledOrTimedOut = newTx.status === 'CANCELLED' || newTx.status === 'TIMED_OUT';
     const isDeposit = newTx.type === 'DEPOSIT';
     const isWithdraw = newTx.type === 'WITHDRAW';
     const isFreeplay =
@@ -490,7 +491,7 @@ export default function Home() {
       (newTx.code === 'SIGNUP-FREE3' || newTx.code === 'FREEPLAY' || /promo freeplay/i.test(String(newTx.note || '')));
 
     // Paint toast before API — freeplay/deposit/withdraw must not wait on Mongo
-    if (isDeposit) {
+    if (isDeposit && !isCancelledOrTimedOut) {
       showToast(`Deposit request of $${parseFloat(newTx.amount).toFixed(2)} submitted with payment proof.`, 'success');
     } else if (isWithdraw) {
       showToast(`Withdrawal request of $${parseFloat(newTx.amount).toFixed(2)} submitted.`, 'success');
