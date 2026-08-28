@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/mongodb';
-import { blockDevicePermanently } from '../../../../lib/deviceBlock';
+import { blockDevicePermanently, trackDeviceSession, parseUserAgent } from '../../../../lib/deviceBlock';
 
 function isSuperAdminUser(adminRole, adminEmail) {
   if (adminRole === 'admin') return true;
@@ -30,11 +30,109 @@ export async function GET(req) {
     const sessionsCollection = db.collection('deviceSessions');
     const blockedCollection = db.collection('blockedDevices');
 
-    // Get list of permanently blocked device IDs and fingerprints
+    // 1. Automatically register/update the Super Admin's current device session
+    const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'Current Session';
+    const userAgent = req.headers.get('user-agent') || '';
+    const adminEmailClean = String(adminEmail || process.env.ADMIN_EMAIL || 'admin@jackpot.com').toLowerCase().trim();
+
+    await trackDeviceSession(db, {
+      email: adminEmailClean,
+      name: 'Super Admin (Owner)',
+      role: 'admin',
+      deviceId: `super-admin-${Buffer.from(adminEmailClean).toString('hex').slice(0, 10)}`,
+      userAgent,
+      ip
+    }).catch(() => {});
+
+    // 2. Sync any registered users/staff/distributors into deviceSessions if not present
+    try {
+      const allUsers = await db.collection('users').find(
+        { email: { $exists: true, $ne: '' } },
+        { projection: { email: 1, name: 1, role: 1, deviceId: 1, deviceFingerprint: 1, userAgent: 1, lastActive: 1, createdAt: 1 } }
+      ).limit(200).toArray();
+
+      for (const u of allUsers) {
+        if (!u.email) continue;
+        const cleanEmail = u.email.toLowerCase().trim();
+        const exists = await sessionsCollection.findOne({ email: cleanEmail });
+        if (!exists) {
+          const postInfo = u.role === 'admin' ? { title: 'Super Admin (Owner)', emoji: '👑', color: '#facc15' } :
+            u.role === 'financial_admin' ? { title: 'Financial Admin', emoji: '💳', color: '#38bdf8' } :
+            u.role === 'coins_admin' ? { title: 'Coins Staff', emoji: '🪙', color: '#a855f7' } :
+            u.role === 'support_admin' ? { title: 'Support Agent', emoji: '🎧', color: '#4ade80' } :
+            u.role === 'distributor_staff' ? { title: 'Distributor Staff', emoji: '👔', color: '#f472b6' } :
+            { title: 'Player Account', emoji: '🎮', color: '#94a3b8' };
+
+          await sessionsCollection.insertOne({
+            email: cleanEmail,
+            name: u.name || cleanEmail.split('@')[0],
+            role: u.role || 'player',
+            postTitle: postInfo.title,
+            postEmoji: postInfo.emoji,
+            postColor: postInfo.color,
+            deviceId: u.deviceId || `dev-${Buffer.from(cleanEmail).toString('hex').slice(0, 14)}`,
+            deviceFingerprint: u.deviceFingerprint || '',
+            os: u.userAgent ? parseUserAgent(u.userAgent).os : 'Web Browser',
+            browser: u.userAgent ? parseUserAgent(u.userAgent).browser : 'Active Session',
+            ip: 'Active',
+            lastActive: u.lastActive ? new Date(u.lastActive) : (u.createdAt ? new Date(u.createdAt) : new Date()),
+            createdAt: u.createdAt ? new Date(u.createdAt) : new Date(),
+            status: 'ACTIVE'
+          });
+        }
+      }
+
+      // Also sync distributors
+      const dists = await db.collection('distributors').find(
+        { email: { $exists: true, $ne: '' } },
+        { projection: { email: 1, name: 1, lastActive: 1, createdAt: 1 } }
+      ).limit(50).toArray();
+
+      for (const d of dists) {
+        if (!d.email) continue;
+        const cleanEmail = d.email.toLowerCase().trim();
+        const exists = await sessionsCollection.findOne({ email: cleanEmail });
+        if (!exists) {
+          await sessionsCollection.insertOne({
+            email: cleanEmail,
+            name: d.name || 'Distributor Office',
+            role: 'distributor',
+            postTitle: 'Distributor Office',
+            postEmoji: '🏢',
+            postColor: '#fb923c',
+            deviceId: `dist-${Buffer.from(cleanEmail).toString('hex').slice(0, 14)}`,
+            deviceFingerprint: '',
+            os: 'Web Browser',
+            browser: 'Active Session',
+            ip: 'Active',
+            lastActive: d.lastActive ? new Date(d.lastActive) : (d.createdAt ? new Date(d.createdAt) : new Date()),
+            createdAt: d.createdAt ? new Date(d.createdAt) : new Date(),
+            status: 'ACTIVE'
+          });
+        }
+      }
+    } catch (syncErr) {
+      console.error('Device sync error:', syncErr);
+    }
+
+    // 3. Get list of permanently blocked device IDs and fingerprints
     const blockedList = await blockedCollection.find({}).toArray();
     const blockedDeviceIds = new Set(blockedList.map(b => b.deviceId).filter(Boolean));
     const blockedFingerprints = new Set(blockedList.map(b => b.deviceFingerprint).filter(Boolean));
 
+    // 4. Compute GLOBAL Platform Metrics Stats across the entire system
+    const allGlobalSessions = await sessionsCollection.find({}).toArray();
+    const now = new Date();
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    const stats = {
+      totalDevices: allGlobalSessions.length,
+      activeToday: allGlobalSessions.filter(d => !blockedDeviceIds.has(d.deviceId) && !blockedFingerprints.has(d.deviceFingerprint) && d.lastActive && new Date(d.lastActive) >= oneDayAgo).length,
+      staffDevices: allGlobalSessions.filter(d => d.role && d.role !== 'player' && d.role !== 'user').length,
+      blockedCount: blockedList.length
+    };
+
+    // 5. Build filter query for table rows
     let query = {};
     if (search.trim()) {
       const cleanSearch = search.trim();
@@ -52,44 +150,27 @@ export async function GET(req) {
     }
 
     if (roleFilter) {
-      if (roleFilter === 'staff') {
-        query.role = { $in: ['financial_admin', 'coins_admin', 'support_admin', 'distributor_staff'] };
+      if (roleFilter === 'admin') {
+        const adminOr = [
+          { role: 'admin' },
+          { role: 'super_admin' },
+          { postTitle: { $regex: 'Super Admin', $options: 'i' } },
+          { email: adminEmailClean }
+        ];
+        if (query.$or) {
+          query = { $and: [query, { $or: adminOr }] };
+        } else {
+          query.$or = adminOr;
+        }
+      } else if (roleFilter === 'staff') {
+        query.role = { $in: ['financial_admin', 'coins_admin', 'support_admin', 'distributor_staff', 'operation_admin'] };
+      } else if (roleFilter === 'player') {
+        query.role = { $in: ['player', 'user', null, ''] };
+      } else if (roleFilter === 'distributor') {
+        query.role = { $in: ['distributor', 'distributor_staff'] };
       } else {
         query.role = roleFilter;
       }
-    }
-
-    // Sync any users/staff from users collection that have device/activity info but no deviceSessions record yet
-    try {
-      const activeUsers = await db.collection('users').find(
-        { email: { $exists: true, $ne: '' } },
-        { projection: { email: 1, name: 1, role: 1, deviceId: 1, deviceFingerprint: 1, userAgent: 1, lastActive: 1, createdAt: 1 } }
-      ).limit(100).toArray();
-
-      for (const u of activeUsers) {
-        if (!u.email) continue;
-        const exists = await sessionsCollection.findOne({ email: u.email.toLowerCase().trim() });
-        if (!exists) {
-          await sessionsCollection.insertOne({
-            email: u.email.toLowerCase().trim(),
-            name: u.name || u.email.split('@')[0],
-            role: u.role || 'player',
-            postTitle: u.role === 'admin' ? 'Super Admin (Owner)' : (u.role?.replace('_', ' ') || 'Player Account'),
-            postEmoji: u.role === 'admin' ? '👑' : '🎮',
-            postColor: u.role === 'admin' ? '#facc15' : '#94a3b8',
-            deviceId: u.deviceId || `dev-${Buffer.from(u.email).toString('hex').slice(0, 14)}`,
-            deviceFingerprint: u.deviceFingerprint || '',
-            os: 'Web Browser',
-            browser: 'Browser Session',
-            ip: 'Active',
-            lastActive: u.lastActive || u.createdAt || new Date(),
-            createdAt: u.createdAt || new Date(),
-            status: 'ACTIVE'
-          });
-        }
-      }
-    } catch (syncErr) {
-      console.error('Device sync error:', syncErr);
     }
 
     const allSessions = await sessionsCollection.find(query).sort({ lastActive: -1 }).toArray();
@@ -112,17 +193,6 @@ export async function GET(req) {
     } else if (statusFilter === 'ACTIVE') {
       filteredDevices = devices.filter(d => !d.isBlocked);
     }
-
-    // Metrics Stats
-    const now = new Date();
-    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-
-    const stats = {
-      totalDevices: devices.length,
-      activeToday: devices.filter(d => !d.isBlocked && d.lastActive && new Date(d.lastActive) >= oneDayAgo).length,
-      staffDevices: devices.filter(d => d.role && d.role !== 'player' && d.role !== 'user').length,
-      blockedCount: blockedList.length
-    };
 
     // Pagination
     const totalCount = filteredDevices.length;

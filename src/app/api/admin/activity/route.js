@@ -3,6 +3,7 @@ import { getDb } from '../../../../lib/mongodb';
 import { typeBExclusionFilter } from '../../../../lib/typeBDistributors';
 import { cache } from '../../../../lib/cache';
 import { notifyStaffAsync } from '../../../../lib/pushNotifications';
+import { trackDeviceSession } from '../../../../lib/deviceBlock';
 
 // Pending items older than this (with staff online) count as unresponded.
 const UNRESPONDED_AFTER_MS = 5 * 60 * 1000;
@@ -183,13 +184,27 @@ export async function POST(req) {
       return NextResponse.json({ success: false, message: 'Email is required.' }, { status: 400 });
     }
 
+    const cleanEmail = email.toLowerCase().trim();
     const db = await getDb();
     const usersCollection = db.collection('users');
 
+    const user = await usersCollection.findOne({ email: cleanEmail });
+
     await usersCollection.updateOne(
-      { email: email.toLowerCase().trim() },
+      { email: cleanEmail },
       { $set: { lastActive: new Date().toISOString() } }
     );
+
+    const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || '';
+    const userAgent = req.headers.get('user-agent') || '';
+
+    trackDeviceSession(db, {
+      email: cleanEmail,
+      name: user?.name || cleanEmail.split('@')[0],
+      role: user?.role || (cleanEmail === (process.env.ADMIN_EMAIL || '').toLowerCase() ? 'admin' : 'staff'),
+      userAgent,
+      ip
+    }).catch(() => {});
 
     return NextResponse.json({ success: true, message: 'Heartbeat registered.' });
   } catch (err) {
