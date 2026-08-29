@@ -41,7 +41,7 @@ export async function GET(req) {
       const escaped = cleanSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const searchRegex = { $regex: escaped, $options: 'i' };
 
-      // Look up matching accountRequests, gameAccounts, or transactions to catch player emails for that game username
+      // Look up matching accountRequests, gameAccounts, or transactions to catch specific { userEmail, gameTitle } pairs for that username
       const [matchingRequests, matchingAccounts, matchingTransactions] = await Promise.all([
         db.collection('accountRequests')
           .find({ gameAccountUsername: searchRegex })
@@ -60,26 +60,45 @@ export async function GET(req) {
           .toArray()
       ]);
 
-      const emailMatches = Array.from(new Set([
-        ...matchingRequests.map(r => String(r.userEmail || '').toLowerCase().trim()),
-        ...matchingAccounts.map(a => String(a.userEmail || '').toLowerCase().trim()),
-        ...matchingTransactions.map(t => String(t.userEmail || '').toLowerCase().trim())
-      ].filter(Boolean)));
+      const specificPairs = [];
+      const seenPairKeys = new Set();
+      const addPair = (e, g) => {
+        if (!e || !g) return;
+        const em = String(e).toLowerCase().trim();
+        const gt = String(g).trim();
+        const key = `${em}_${gt.toLowerCase()}`;
+        if (!seenPairKeys.has(key)) {
+          seenPairKeys.add(key);
+          specificPairs.push({
+            userEmail: em,
+            gameTitle: { $regex: `^${gt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' }
+          });
+        }
+      };
+
+      matchingRequests.forEach(r => addPair(r.userEmail, r.gameTitle));
+      matchingAccounts.forEach(a => addPair(a.userEmail, a.gameTitle));
+      matchingTransactions.forEach(t => addPair(t.userEmail, t.gameTitle));
 
       const orConditions = [
-        { userEmail: searchRegex },
-        { gameUsername: searchRegex },
-        { gameTitle: searchRegex },
-        { userName: searchRegex },
-        { transactionId: searchRegex }
+        { gameUsername: searchRegex }
       ];
+
+      if (cleanSearch.includes('@')) {
+        orConditions.push({ userEmail: searchRegex });
+      } else {
+        orConditions.push({ userEmail: searchRegex });
+        orConditions.push({ gameTitle: searchRegex });
+        orConditions.push({ userName: searchRegex });
+        orConditions.push({ transactionId: searchRegex });
+      }
 
       if (!isNaN(cleanSearch) && cleanSearch !== '') {
         orConditions.push({ id: Number(cleanSearch) }, { id: cleanSearch });
       }
 
-      if (emailMatches.length > 0) {
-        orConditions.push({ userEmail: { $in: emailMatches } });
+      if (specificPairs.length > 0) {
+        orConditions.push(...specificPairs);
       }
 
       const searchCriteria = { $or: orConditions };
@@ -88,18 +107,44 @@ export async function GET(req) {
 
       // Compute lifetime coins load summary for this searched game username / user
       try {
-        const allMatchingForSearch = await notificationsCollection.find(query).toArray();
-        const completedLoads = allMatchingForSearch.filter(n => String(n.status).toUpperCase() === 'COMPLETED').length;
-        const pendingLoads = allMatchingForSearch.filter(n => ['PENDING', 'CLAIM_REQUESTED', 'HOLD'].includes(String(n.status).toUpperCase())).length;
-        const totalCoinsAllotted = allMatchingForSearch
+        const allCandidates = await notificationsCollection.find(query).toArray();
+        const candMissing = allCandidates.filter(n => !String(n.gameUsername || '').trim() && n.userEmail && n.gameTitle);
+        let candMap = {};
+        if (candMissing.length > 0) {
+          const candEmails = Array.from(new Set(candMissing.map(n => n.userEmail.toLowerCase().trim())));
+          candMap = await buildGameUsernameMap(db, candEmails, { dedupe: false });
+        }
+
+        const sLower = cleanSearch.toLowerCase();
+        const filteredAll = allCandidates.filter(noti => {
+          const gu = (String(noti.gameUsername || '').trim() || candMap[accountLookupKey(noti.userEmail, noti.gameTitle)] || '').toLowerCase();
+          const ue = String(noti.userEmail || '').toLowerCase();
+          const gt = String(noti.gameTitle || '').toLowerCase();
+          const un = String(noti.userName || '').toLowerCase();
+          const tx = String(noti.transactionId || '').toLowerCase();
+          const idStr = String(noti.id || '');
+
+          return (
+            gu.includes(sLower) ||
+            ue.includes(sLower) ||
+            gt.includes(sLower) ||
+            un.includes(sLower) ||
+            tx.includes(sLower) ||
+            idStr === cleanSearch
+          );
+        });
+
+        const completedLoads = filteredAll.filter(n => String(n.status).toUpperCase() === 'COMPLETED').length;
+        const pendingLoads = filteredAll.filter(n => ['PENDING', 'CLAIM_REQUESTED', 'HOLD'].includes(String(n.status).toUpperCase())).length;
+        const totalCoinsAllotted = filteredAll
           .filter(n => String(n.status).toUpperCase() === 'COMPLETED')
           .reduce((sum, n) => sum + (parseFloat(n.totalCoins) || 0), 0);
-        const totalDepositCash = allMatchingForSearch
+        const totalDepositCash = filteredAll
           .reduce((sum, n) => sum + (parseFloat(n.depositAmount) || 0), 0);
 
         searchSummary = {
           searchTerm: cleanSearch,
-          totalRecords: allMatchingForSearch.length,
+          totalRecords: filteredAll.length,
           completedLoads,
           pendingLoads,
           totalCoinsAllotted,
@@ -281,11 +326,36 @@ export async function GET(req) {
       });
     }
     
+    let finalNotifications = notifications;
+    if (search) {
+      const cleanSearch = search.trim();
+      const sLower = cleanSearch.toLowerCase();
+      finalNotifications = notifications.filter((noti) => {
+        const gu = String(noti.gameUsername || '').toLowerCase();
+        const ue = String(noti.userEmail || '').toLowerCase();
+        const gt = String(noti.gameTitle || '').toLowerCase();
+        const un = String(noti.userName || '').toLowerCase();
+        const tx = String(noti.transactionId || '').toLowerCase();
+        const idStr = String(noti.id || '');
+
+        return (
+          gu.includes(sLower) ||
+          ue.includes(sLower) ||
+          gt.includes(sLower) ||
+          un.includes(sLower) ||
+          tx.includes(sLower) ||
+          idStr === cleanSearch
+        );
+      });
+    }
+
+    const totalCount = search && searchSummary ? searchSummary.totalRecords : totalNotifications;
+
     return NextResponse.json({
       success: true,
-      coinsNotifications: notifications,
-      totalNotifications,
-      totalPages: Math.ceil(totalNotifications / limit),
+      coinsNotifications: finalNotifications,
+      totalNotifications: totalCount,
+      totalPages: Math.ceil(totalCount / limit) || 1,
       currentPage: page,
       searchSummary
     });
