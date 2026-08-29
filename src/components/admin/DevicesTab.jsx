@@ -27,10 +27,13 @@ export default function DevicesTab({ adminUser }) {
   const isSuperAdmin = adminUser?.role === 'admin' || adminUser?.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL;
 
   const swrKey = isSuperAdmin
-    ? `/api/admin/devices?page=${page}&limit=25&search=${encodeURIComponent(debouncedSearch)}&role=${roleFilter}&status=${statusFilter}&adminRole=${adminUser?.role || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`
+    ? `/api/admin/devices?page=${page}&limit=25&search=${encodeURIComponent(debouncedSearch)}&role=${encodeURIComponent(roleFilter)}&status=${encodeURIComponent(statusFilter)}&adminRole=${encodeURIComponent(adminUser?.role || '')}&adminEmail=${encodeURIComponent(adminUser?.email || '')}`
     : null;
 
-  const { data, error, mutate } = usePollingSWR(swrKey, POLL.LISTS);
+  const { data, error, mutate, isValidating } = usePollingSWR(swrKey, POLL.LISTS);
+
+  const isInitialLoading = !data && !error;
+  const isUpdating = isValidating && Boolean(data);
 
   const devices = data?.devices || [];
   const stats = data?.stats || { totalDevices: 0, activeToday: 0, staffDevices: 0, blockedCount: 0 };
@@ -98,9 +101,16 @@ export default function DevicesTab({ adminUser }) {
             </p>
           </div>
 
-          <span style={{ background: 'rgba(250, 204, 21, 0.1)', border: '1px solid #facc15', color: '#facc15', padding: '0.3rem 0.75rem', borderRadius: '20px', fontSize: '0.725rem', fontWeight: 'bold' }}>
-            👑 Super Admin Access Granted
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {isUpdating && (
+              <span style={{ fontSize: '0.725rem', color: '#facc15', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                <i className="fa-solid fa-spinner fa-spin"></i> Updating...
+              </span>
+            )}
+            <span style={{ background: 'rgba(250, 204, 21, 0.1)', border: '1px solid #facc15', color: '#facc15', padding: '0.3rem 0.75rem', borderRadius: '20px', fontSize: '0.725rem', fontWeight: 'bold' }}>
+              👑 Super Admin Access Granted
+            </span>
+          </div>
         </div>
       </div>
 
@@ -108,27 +118,35 @@ export default function DevicesTab({ adminUser }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem', marginBottom: '1.25rem' }}>
         <div style={{ background: '#0b0d16', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', padding: '0.85rem 1rem' }}>
           <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Logged-in Devices</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#fff', marginTop: '0.2rem' }}>{stats.totalDevices}</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#fff', marginTop: '0.2rem' }}>
+            {isInitialLoading ? <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '1.1rem', color: 'var(--gold-primary)' }}></i> : stats.totalDevices}
+          </div>
         </div>
 
         <div style={{ background: '#0b0d16', border: '1px solid rgba(34, 197, 94, 0.2)', borderRadius: '10px', padding: '0.85rem 1rem' }}>
           <div style={{ fontSize: '0.7rem', color: '#4ade80', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Active Today</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#4ade80', marginTop: '0.2rem' }}>{stats.activeToday}</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#4ade80', marginTop: '0.2rem' }}>
+            {isInitialLoading ? <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '1.1rem', color: '#4ade80' }}></i> : stats.activeToday}
+          </div>
         </div>
 
         <div style={{ background: '#0b0d16', border: '1px solid rgba(56, 189, 248, 0.2)', borderRadius: '10px', padding: '0.85rem 1rem' }}>
           <div style={{ fontSize: '0.7rem', color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Staff & Admin Devices</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#38bdf8', marginTop: '0.2rem' }}>{stats.staffDevices}</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#38bdf8', marginTop: '0.2rem' }}>
+            {isInitialLoading ? <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '1.1rem', color: '#38bdf8' }}></i> : stats.staffDevices}
+          </div>
         </div>
 
         <div style={{ background: '#0b0d16', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '10px', padding: '0.85rem 1rem' }}>
           <div style={{ fontSize: '0.7rem', color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Permanently Blocked</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#ef4444', marginTop: '0.2rem' }}>{stats.blockedCount}</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#ef4444', marginTop: '0.2rem' }}>
+            {isInitialLoading ? <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '1.1rem', color: '#ef4444' }}></i> : stats.blockedCount}
+          </div>
         </div>
       </div>
 
       {/* Filters & Search Bar */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem', padding: '1rem', background: '#0b0d16', borderRadius: '10px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem', padding: '1rem', background: '#0b0d16', borderRadius: '10px', alignItems: 'center' }}>
         <div className="input-wrapper search-wrapper" style={{ flex: 1, minWidth: '240px', background: '#07090f', margin: 0 }}>
           <i className="fa-solid fa-magnifying-glass input-icon"></i>
           <input
@@ -142,7 +160,7 @@ export default function DevicesTab({ adminUser }) {
         <select
           value={roleFilter}
           onChange={(e) => { setRoleFilter(e.target.value); setPage(1); }}
-          style={{ background: '#07090f', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', padding: '0.5rem', borderRadius: '8px', fontSize: '0.75rem', outline: 'none' }}
+          style={{ background: '#07090f', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', padding: '0.55rem 0.75rem', borderRadius: '8px', fontSize: '0.75rem', outline: 'none', cursor: 'pointer' }}
         >
           <option value="">All Posts / Roles</option>
           <option value="admin">Super Admin (Owner)</option>
@@ -158,7 +176,7 @@ export default function DevicesTab({ adminUser }) {
         <select
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          style={{ background: '#07090f', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', padding: '0.5rem', borderRadius: '8px', fontSize: '0.75rem', outline: 'none' }}
+          style={{ background: '#07090f', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', padding: '0.55rem 0.75rem', borderRadius: '8px', fontSize: '0.75rem', outline: 'none', cursor: 'pointer' }}
         >
           <option value="">All Statuses</option>
           <option value="ACTIVE">Active Devices</option>
@@ -181,10 +199,38 @@ export default function DevicesTab({ adminUser }) {
             </tr>
           </thead>
           <tbody>
-            {devices.length === 0 ? (
+            {isInitialLoading ? (
               <tr>
-                <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', opacity: 0.6 }}>
-                  No logged-in devices found matching your criteria.
+                <td colSpan="7" style={{ textAlign: 'center', padding: '3.5rem 1rem', color: '#facc15' }}>
+                  <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '2.5rem', marginBottom: '1rem', display: 'block', color: 'var(--gold-primary)' }}></i>
+                  <strong style={{ fontSize: '1rem', color: '#fff', display: 'block' }}>Loading Connected Devices...</strong>
+                  <p style={{ fontSize: '0.775rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
+                    Fetching live sessions, fingerprints and security records
+                  </p>
+                </td>
+              </tr>
+            ) : error ? (
+              <tr>
+                <td colSpan="7" style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#ef4444' }}>
+                  <i className="fa-solid fa-circle-exclamation" style={{ fontSize: '2rem', marginBottom: '0.5rem', display: 'block' }}></i>
+                  <strong>Failed to load devices data.</strong>
+                  <button
+                    type="button"
+                    onClick={() => mutate()}
+                    style={{ display: 'block', margin: '0.75rem auto 0', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid #ef4444', color: '#ef4444', padding: '0.35rem 0.85rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem' }}
+                  >
+                    Retry
+                  </button>
+                </td>
+              </tr>
+            ) : devices.length === 0 ? (
+              <tr>
+                <td colSpan="7" style={{ textAlign: 'center', padding: '3rem 1rem', opacity: 0.8 }}>
+                  <i className="fa-solid fa-laptop-slash" style={{ fontSize: '2.2rem', marginBottom: '0.75rem', display: 'block', opacity: 0.35, color: '#facc15' }}></i>
+                  <strong style={{ color: '#fff', display: 'block', fontSize: '0.95rem' }}>No logged-in devices found</strong>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                    No devices match your selected search or role filter criteria.
+                  </p>
                 </td>
               </tr>
             ) : (

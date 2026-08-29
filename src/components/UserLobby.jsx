@@ -437,6 +437,8 @@ export default function UserLobby({
   const [actionLoading, setActionLoading] = useState(false);
   const [activeTooltipId, setActiveTooltipId] = useState(null);
   const [lightboxImage, setLightboxImage] = useState(null);
+  const [lightboxLoading, setLightboxLoading] = useState(false);
+  const [lightboxTitle, setLightboxTitle] = useState('Payment Receipt Proof');
 
   // Subscription Alert Prompt states
   const [showSubPrompt, setShowSubPrompt] = useState(false);
@@ -960,6 +962,83 @@ export default function UserLobby({
       showToast('Error uploading payment receipt.', 'error');
     } finally {
       setUploadingProofTxId(null);
+    }
+  };
+
+  const handleViewProof = async (tx, preferredField = null, title = 'Transaction Proof') => {
+    setLightboxTitle(title);
+
+    // Check if client object already has direct data: or http: or valid path string
+    let directImage = null;
+    if (preferredField === 'tagQrScreenshot') {
+      if (typeof tx.tagQrScreenshot === 'string' && (tx.tagQrScreenshot.startsWith('data:') || tx.tagQrScreenshot.startsWith('http') || tx.tagQrScreenshot.startsWith('/'))) {
+        directImage = tx.tagQrScreenshot;
+      }
+    } else if (preferredField === 'payoutProof') {
+      if (typeof tx.payoutProof === 'string' && (tx.payoutProof.startsWith('data:') || tx.payoutProof.startsWith('http') || tx.payoutProof.startsWith('/'))) {
+        directImage = tx.payoutProof;
+      }
+    } else if (preferredField === 'screenshot') {
+      if (typeof tx.screenshot === 'string' && (tx.screenshot.startsWith('data:') || tx.screenshot.startsWith('http') || tx.screenshot.startsWith('/'))) {
+        directImage = tx.screenshot;
+      } else if (typeof tx.proofUrl === 'string' && (tx.proofUrl.startsWith('data:') || tx.proofUrl.startsWith('http') || tx.proofUrl.startsWith('/'))) {
+        directImage = tx.proofUrl;
+      }
+    } else {
+      if (typeof tx.payoutProof === 'string' && (tx.payoutProof.startsWith('data:') || tx.payoutProof.startsWith('http') || tx.payoutProof.startsWith('/'))) {
+        directImage = tx.payoutProof;
+      } else if (typeof tx.screenshot === 'string' && (tx.screenshot.startsWith('data:') || tx.screenshot.startsWith('http') || tx.screenshot.startsWith('/'))) {
+        directImage = tx.screenshot;
+      } else if (typeof tx.proofUrl === 'string' && (tx.proofUrl.startsWith('data:') || tx.proofUrl.startsWith('http') || tx.proofUrl.startsWith('/'))) {
+        directImage = tx.proofUrl;
+      } else if (typeof tx.tagQrScreenshot === 'string' && (tx.tagQrScreenshot.startsWith('data:') || tx.tagQrScreenshot.startsWith('http') || tx.tagQrScreenshot.startsWith('/'))) {
+        directImage = tx.tagQrScreenshot;
+      }
+    }
+
+    if (directImage) {
+      setLightboxImage(directImage);
+      return;
+    }
+
+    if (!tx?.id) {
+      showToast('Transaction ID is missing.', 'error');
+      return;
+    }
+
+    setLightboxLoading(true);
+    setLightboxImage('LOADING');
+    try {
+      const fieldParam = preferredField ? `&field=${encodeURIComponent(preferredField)}` : '';
+      const res = await fetch(`/api/transactions?id=${tx.id}&email=${encodeURIComponent(currentUserEmail || '')}`);
+      const data = await res.json();
+      if (data?.success && data?.transaction) {
+        const fullTx = data.transaction;
+        let img = null;
+        if (preferredField === 'tagQrScreenshot') {
+          img = fullTx.tagQrScreenshot;
+        } else if (preferredField === 'payoutProof') {
+          img = fullTx.payoutProof;
+        } else if (preferredField === 'screenshot') {
+          img = fullTx.screenshot || fullTx.proofUrl;
+        } else {
+          img = fullTx.payoutProof || fullTx.screenshot || fullTx.proofUrl || fullTx.tagQrScreenshot || fullTx.payoutQr;
+        }
+
+        if (typeof img === 'string' && (img.startsWith('data:') || img.startsWith('http') || img.startsWith('/'))) {
+          setLightboxImage(img);
+        } else {
+          // Fallback to direct proof endpoint
+          setLightboxImage(`/api/transactions/proof?id=${tx.id}${fieldParam}`);
+        }
+      } else {
+        setLightboxImage(`/api/transactions/proof?id=${tx.id}${fieldParam}`);
+      }
+    } catch (err) {
+      console.error('Failed to load transaction image proof:', err);
+      setLightboxImage(`/api/transactions/proof?id=${tx.id}${preferredField ? `&field=${preferredField}` : ''}`);
+    } finally {
+      setLightboxLoading(false);
     }
   };
 
@@ -2242,7 +2321,10 @@ export default function UserLobby({
                       type="button"
                       key={`${proof.id || 'proof'}-${idx}`}
                       className="proof-slide"
-                      onClick={() => setLightboxImage(proof.imageUrl)}
+                      onClick={() => {
+                        setLightboxTitle(proof.title || 'Cashout Proof');
+                        setLightboxImage(proof.imageUrl);
+                      }}
                       aria-hidden={idx >= proofMarqueeSet.length ? 'true' : undefined}
                       tabIndex={idx >= proofMarqueeSet.length ? -1 : 0}
                     >
@@ -3056,7 +3138,22 @@ export default function UserLobby({
                               const isHold = String(tx.status || '').toUpperCase() === 'HOLD' || parseFloat(tx.payoutHold || 0) > 0;
                               const isFailed = String(tx.status || '').toUpperCase() === 'FAILED' || String(tx.status || '').toUpperCase() === 'CANCELLED' || String(tx.status || '').toUpperCase() === 'TIMED_OUT' || String(tx.status || '').toUpperCase() === 'REJECTED';
 
-                              const hasProofImg = Boolean(tx.screenshot || tx.hasScreenshot || tx.proofUrl);
+                              const hasProofImg = Boolean(
+                                (typeof tx.screenshot === 'string' && tx.screenshot.length > 0) ||
+                                tx.screenshot === true ||
+                                tx.hasScreenshot ||
+                                tx.proofUrl
+                              );
+                              const hasPayoutProof = Boolean(
+                                (typeof tx.payoutProof === 'string' && tx.payoutProof.length > 0) ||
+                                tx.payoutProof === true ||
+                                tx.hasPayoutProof
+                              );
+                              const hasTagQr = Boolean(
+                                (typeof tx.tagQrScreenshot === 'string' && tx.tagQrScreenshot.length > 0) ||
+                                tx.tagQrScreenshot === true ||
+                                tx.hasTagQrScreenshot
+                              );
 
                               return (
                                 <tr key={tx.id}>
@@ -3112,10 +3209,34 @@ export default function UserLobby({
                                   </td>
                                   <td>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}>
+                                      {/* Admin Payout Receipt */}
+                                      {hasPayoutProof && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleViewProof(tx, 'payoutProof', 'Payout Receipt Proof')}
+                                          style={{
+                                            background: 'rgba(34, 197, 94, 0.12)',
+                                            border: '1px solid rgba(34, 197, 94, 0.4)',
+                                            color: '#4ade80',
+                                            borderRadius: '6px',
+                                            padding: '0.25rem 0.55rem',
+                                            fontSize: '0.675rem',
+                                            cursor: 'pointer',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '0.35rem',
+                                            fontWeight: '700'
+                                          }}
+                                        >
+                                          <i className="fa-solid fa-receipt"></i> View Payout Receipt
+                                        </button>
+                                      )}
+
+                                      {/* User Payment/Deposit Proof or Game Screenshot */}
                                       {hasProofImg ? (
                                         <button
                                           type="button"
-                                          onClick={() => setLightboxImage(tx.screenshot || tx.proofUrl || `/api/transactions/proof?id=${tx.id}`)}
+                                          onClick={() => handleViewProof(tx, 'screenshot', tx.type === 'WITHDRAW' ? 'Game Balance Screenshot' : 'Payment Proof')}
                                           style={{
                                             background: 'rgba(250, 204, 21, 0.12)',
                                             border: '1px solid rgba(250, 204, 21, 0.4)',
@@ -3130,7 +3251,7 @@ export default function UserLobby({
                                             fontWeight: '700'
                                           }}
                                         >
-                                          <i className="fa-solid fa-receipt"></i> View Proof
+                                          <i className={`fa-solid ${tx.type === 'WITHDRAW' ? 'fa-gamepad' : 'fa-receipt'}`}></i> {tx.type === 'WITHDRAW' ? 'View Game Shot' : 'View Proof'}
                                         </button>
                                       ) : (tx.type === 'DEPOSIT' && (isPending || tx.proofPending)) ? (
                                         <label
@@ -3161,10 +3282,11 @@ export default function UserLobby({
                                         </label>
                                       ) : null}
 
-                                      {tx.type === 'WITHDRAW' && Boolean(tx.tagQrScreenshot || tx.hasTagQrScreenshot) && (
+                                      {/* Tag QR Screenshot */}
+                                      {tx.type === 'WITHDRAW' && hasTagQr && (
                                         <button
                                           type="button"
-                                          onClick={() => setLightboxImage(typeof tx.tagQrScreenshot === 'string' && tx.tagQrScreenshot.startsWith('data:image') ? tx.tagQrScreenshot : `/api/transactions/proof?id=${tx.id}&field=tagQrScreenshot`)}
+                                          onClick={() => handleViewProof(tx, 'tagQrScreenshot', 'Tag QR Code')}
                                           style={{
                                             background: 'rgba(168, 85, 247, 0.12)',
                                             border: '1px solid rgba(168, 85, 247, 0.4)',
@@ -3183,7 +3305,7 @@ export default function UserLobby({
                                         </button>
                                       )}
 
-                                      {!hasProofImg && !(tx.type === 'DEPOSIT' && (isPending || tx.proofPending)) && !(tx.type === 'WITHDRAW' && Boolean(tx.tagQrScreenshot || tx.hasTagQrScreenshot)) && (
+                                      {!hasProofImg && !hasPayoutProof && !(tx.type === 'DEPOSIT' && (isPending || tx.proofPending)) && !(tx.type === 'WITHDRAW' && hasTagQr) && (
                                         <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>—</span>
                                       )}
                                     </div>
@@ -3823,7 +3945,10 @@ export default function UserLobby({
       {/* Lightbox Modal */}
       {lightboxImage && (
         <div 
-          onClick={() => setLightboxImage(null)}
+          onClick={() => {
+            setLightboxImage(null);
+            setLightboxLoading(false);
+          }}
           style={{
             position: 'fixed',
             top: 0,
@@ -3835,36 +3960,83 @@ export default function UserLobby({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '2rem',
+            padding: '1.5rem',
             animation: 'fade-in 0.25s ease-out'
           }}
         >
-          <button 
-            onClick={() => setLightboxImage(null)}
+          <div
+            onClick={(e) => e.stopPropagation()}
             style={{
-              position: 'absolute',
-              top: '1.5rem',
-              right: '1.5rem',
-              background: 'none',
-              border: 'none',
-              color: '#fff',
-              fontSize: '2rem',
-              cursor: 'pointer'
+              position: 'relative',
+              maxWidth: '95vw',
+              maxHeight: '92vh',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center'
             }}
           >
-            &times;
-          </button>
-          <img 
-            src={lightboxImage} 
-            alt="Winnings Proof High Resolution" 
-            style={{
-              maxWidth: '95%',
-              maxHeight: '90vh',
-              borderRadius: '12px',
-              border: '2px solid var(--gold-primary)',
-              boxShadow: '0 0 35px rgba(255,215,0,0.2)'
-            }}
-          />
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                width: '100%',
+                marginBottom: '0.75rem',
+                padding: '0 0.5rem'
+              }}
+            >
+              <span style={{ color: '#ffd700', fontWeight: 600, fontSize: '0.9rem', letterSpacing: '0.5px' }}>
+                {lightboxTitle || 'Proof Preview'}
+              </span>
+              <button 
+                type="button"
+                onClick={() => {
+                  setLightboxImage(null);
+                  setLightboxLoading(false);
+                }}
+                style={{
+                  background: 'rgba(255,255,255,0.15)',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  color: '#fff',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.2rem',
+                  cursor: 'pointer',
+                  lineHeight: 1
+                }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {lightboxImage === 'LOADING' || lightboxLoading ? (
+              <div style={{ padding: '3rem 2rem', textAlign: 'center', color: '#facc15' }}>
+                <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '2.5rem', marginBottom: '1rem', display: 'block' }}></i>
+                <span style={{ fontSize: '0.9rem', color: '#e2e8f0' }}>Loading high resolution proof...</span>
+              </div>
+            ) : (
+              <img 
+                src={lightboxImage} 
+                alt={lightboxTitle || 'Proof Image'} 
+                onError={() => {
+                  showToast('Failed to display image proof.', 'error');
+                  setLightboxImage(null);
+                }}
+                style={{
+                  maxWidth: '95vw',
+                  maxHeight: '82vh',
+                  borderRadius: '12px',
+                  border: '2px solid var(--gold-primary)',
+                  boxShadow: '0 0 35px rgba(255,215,0,0.2)',
+                  objectFit: 'contain'
+                }}
+              />
+            )}
+          </div>
         </div>
       )}
 

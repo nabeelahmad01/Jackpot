@@ -1,12 +1,76 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/mongodb';
-import { blockDevicePermanently, trackDeviceSession, parseUserAgent } from '../../../../lib/deviceBlock';
+import { blockDevicePermanently, trackDeviceSession, parseUserAgent, getRolePostTitle } from '../../../../lib/deviceBlock';
 
 function isSuperAdminUser(adminRole, adminEmail) {
   if (adminRole === 'admin') return true;
   const envAdminEmail = (process.env.ADMIN_EMAIL || process.env.NEXT_PUBLIC_ADMIN_EMAIL || '').toLowerCase().trim();
   if (envAdminEmail && String(adminEmail || '').toLowerCase().trim() === envAdminEmail) return true;
   return false;
+}
+
+function getRoleFilterConditions(roleFilter, adminEmailClean) {
+  const rf = String(roleFilter || '').toLowerCase().trim();
+  switch (rf) {
+    case 'admin':
+    case 'super_admin':
+      return [
+        { role: { $in: ['admin', 'super_admin', 'owner', 'ADMIN', 'SUPER_ADMIN'] } },
+        { postTitle: { $regex: 'Super Admin|Owner', $options: 'i' } },
+        ...(adminEmailClean ? [{ email: adminEmailClean }] : [])
+      ];
+    case 'financial_admin':
+    case 'finance':
+      return [
+        { role: { $in: ['financial_admin', 'financial', 'FINANCIAL_ADMIN'] } },
+        { postTitle: { $regex: 'Financial', $options: 'i' } }
+      ];
+    case 'coins_admin':
+    case 'coins':
+      return [
+        { role: { $in: ['coins_admin', 'coins', 'COINS_ADMIN'] } },
+        { postTitle: { $regex: 'Coins', $options: 'i' } }
+      ];
+    case 'support_admin':
+    case 'support':
+      return [
+        { role: { $in: ['support_admin', 'support', 'SUPPORT_ADMIN'] } },
+        { postTitle: { $regex: 'Support', $options: 'i' } }
+      ];
+    case 'distributor':
+      return [
+        { role: { $in: ['distributor', 'DISTRIBUTOR'] } },
+        { postTitle: { $regex: 'Distributor Office', $options: 'i' } }
+      ];
+    case 'distributor_staff':
+      return [
+        { role: { $in: ['distributor_staff', 'DISTRIBUTOR_STAFF'] } },
+        { postTitle: { $regex: 'Distributor Staff', $options: 'i' } }
+      ];
+    case 'agent':
+    case 'affiliate':
+      return [
+        { role: { $in: ['agent', 'affiliate', 'affiliate_agent', 'AGENT', 'AFFILIATE'] } },
+        { postTitle: { $regex: 'Affiliate|Agent', $options: 'i' } }
+      ];
+    case 'player':
+    case 'user':
+      return [
+        { role: { $in: ['player', 'user', 'PLAYER', 'USER', null, ''] } },
+        { role: { $exists: false } },
+        { postTitle: { $regex: 'Player', $options: 'i' } }
+      ];
+    case 'staff':
+      return [
+        { role: { $in: ['financial_admin', 'coins_admin', 'support_admin', 'distributor_staff', 'operation_admin'] } },
+        { postTitle: { $regex: 'Admin|Staff|Agent', $options: 'i' } }
+      ];
+    default:
+      return [
+        { role: { $regex: `^${rf}$`, $options: 'i' } },
+        { postTitle: { $regex: rf, $options: 'i' } }
+      ];
+  }
 }
 
 // GET list of active & blocked devices (Super Admin Only)
@@ -44,25 +108,20 @@ export async function GET(req) {
       ip
     }).catch(() => {});
 
-    // 2. Sync any registered users/staff/distributors into deviceSessions if not present
+    // 2. Sync registered users/staff/distributors into deviceSessions if not present
     try {
       const allUsers = await db.collection('users').find(
         { email: { $exists: true, $ne: '' } },
         { projection: { email: 1, name: 1, role: 1, deviceId: 1, deviceFingerprint: 1, userAgent: 1, lastActive: 1, createdAt: 1 } }
-      ).limit(200).toArray();
+      ).limit(300).toArray();
 
       for (const u of allUsers) {
         if (!u.email) continue;
         const cleanEmail = u.email.toLowerCase().trim();
         const exists = await sessionsCollection.findOne({ email: cleanEmail });
-        if (!exists) {
-          const postInfo = u.role === 'admin' ? { title: 'Super Admin (Owner)', emoji: '👑', color: '#facc15' } :
-            u.role === 'financial_admin' ? { title: 'Financial Admin', emoji: '💳', color: '#38bdf8' } :
-            u.role === 'coins_admin' ? { title: 'Coins Staff', emoji: '🪙', color: '#a855f7' } :
-            u.role === 'support_admin' ? { title: 'Support Agent', emoji: '🎧', color: '#4ade80' } :
-            u.role === 'distributor_staff' ? { title: 'Distributor Staff', emoji: '👔', color: '#f472b6' } :
-            { title: 'Player Account', emoji: '🎮', color: '#94a3b8' };
+        const postInfo = getRolePostTitle(u.role || 'player');
 
+        if (!exists) {
           await sessionsCollection.insertOne({
             email: cleanEmail,
             name: u.name || cleanEmail.split('@')[0],
@@ -79,6 +138,11 @@ export async function GET(req) {
             createdAt: u.createdAt ? new Date(u.createdAt) : new Date(),
             status: 'ACTIVE'
           });
+        } else if (!exists.postTitle || !exists.role) {
+          await sessionsCollection.updateOne(
+            { _id: exists._id },
+            { $set: { role: u.role || exists.role || 'player', postTitle: postInfo.title, postEmoji: postInfo.emoji, postColor: postInfo.color } }
+          );
         }
       }
 
@@ -86,20 +150,22 @@ export async function GET(req) {
       const dists = await db.collection('distributors').find(
         { email: { $exists: true, $ne: '' } },
         { projection: { email: 1, name: 1, lastActive: 1, createdAt: 1 } }
-      ).limit(50).toArray();
+      ).limit(100).toArray();
 
       for (const d of dists) {
         if (!d.email) continue;
         const cleanEmail = d.email.toLowerCase().trim();
         const exists = await sessionsCollection.findOne({ email: cleanEmail });
+        const postInfo = getRolePostTitle('distributor');
+
         if (!exists) {
           await sessionsCollection.insertOne({
             email: cleanEmail,
             name: d.name || 'Distributor Office',
             role: 'distributor',
-            postTitle: 'Distributor Office',
-            postEmoji: '🏢',
-            postColor: '#fb923c',
+            postTitle: postInfo.title,
+            postEmoji: postInfo.emoji,
+            postColor: postInfo.color,
             deviceId: `dist-${Buffer.from(cleanEmail).toString('hex').slice(0, 14)}`,
             deviceFingerprint: '',
             os: 'Web Browser',
@@ -133,45 +199,31 @@ export async function GET(req) {
     };
 
     // 5. Build filter query for table rows
-    let query = {};
+    const andClauses = [];
+
     if (search.trim()) {
       const cleanSearch = search.trim();
       const escaped = cleanSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      query.$or = [
-        { email: { $regex: escaped, $options: 'i' } },
-        { name: { $regex: escaped, $options: 'i' } },
-        { role: { $regex: escaped, $options: 'i' } },
-        { postTitle: { $regex: escaped, $options: 'i' } },
-        { deviceId: { $regex: escaped, $options: 'i' } },
-        { ip: { $regex: escaped, $options: 'i' } },
-        { os: { $regex: escaped, $options: 'i' } },
-        { browser: { $regex: escaped, $options: 'i' } }
-      ];
+      andClauses.push({
+        $or: [
+          { email: { $regex: escaped, $options: 'i' } },
+          { name: { $regex: escaped, $options: 'i' } },
+          { role: { $regex: escaped, $options: 'i' } },
+          { postTitle: { $regex: escaped, $options: 'i' } },
+          { deviceId: { $regex: escaped, $options: 'i' } },
+          { ip: { $regex: escaped, $options: 'i' } },
+          { os: { $regex: escaped, $options: 'i' } },
+          { browser: { $regex: escaped, $options: 'i' } }
+        ]
+      });
     }
 
     if (roleFilter) {
-      if (roleFilter === 'admin') {
-        const adminOr = [
-          { role: 'admin' },
-          { role: 'super_admin' },
-          { postTitle: { $regex: 'Super Admin', $options: 'i' } },
-          { email: adminEmailClean }
-        ];
-        if (query.$or) {
-          query = { $and: [query, { $or: adminOr }] };
-        } else {
-          query.$or = adminOr;
-        }
-      } else if (roleFilter === 'staff') {
-        query.role = { $in: ['financial_admin', 'coins_admin', 'support_admin', 'distributor_staff', 'operation_admin'] };
-      } else if (roleFilter === 'player') {
-        query.role = { $in: ['player', 'user', null, ''] };
-      } else if (roleFilter === 'distributor') {
-        query.role = { $in: ['distributor', 'distributor_staff'] };
-      } else {
-        query.role = roleFilter;
-      }
+      const roleConditions = getRoleFilterConditions(roleFilter, adminEmailClean);
+      andClauses.push({ $or: roleConditions });
     }
+
+    const query = andClauses.length > 1 ? { $and: andClauses } : (andClauses[0] || {});
 
     const allSessions = await sessionsCollection.find(query).sort({ lastActive: -1 }).toArray();
 
