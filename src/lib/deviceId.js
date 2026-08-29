@@ -170,10 +170,24 @@ export function getDeviceFingerprint() {
  */
 export function getDevicePayload() {
   if (typeof window === 'undefined') {
-    return { deviceId: '', deviceFingerprint: '' };
+    return { deviceId: '', deviceFingerprint: '', isApp: false, appType: 'BROWSER', clientPlatform: '' };
   }
+
+  const isStandalone = Boolean(
+    window.matchMedia?.('(display-mode: standalone)').matches ||
+    window.navigator?.standalone === true ||
+    document.referrer?.includes('android-app://') ||
+    (typeof window.location !== 'undefined' && (
+      window.location.search?.includes('source=app') ||
+      window.location.search?.includes('pwa=1')
+    ))
+  );
+
   return {
     deviceId: getOrCreateDeviceId(),
-    deviceFingerprint: getDeviceFingerprint()
+    deviceFingerprint: getDeviceFingerprint(),
+    isApp: isStandalone,
+    appType: isStandalone ? 'PWA_APP' : 'BROWSER',
+    clientPlatform: typeof navigator !== 'undefined' ? (navigator.userAgentData?.platform || navigator.platform || '') : ''
   };
 }

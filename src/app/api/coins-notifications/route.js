@@ -34,16 +34,80 @@ export async function GET(req) {
       Object.assign(query, await typeBExclusionFilter(db));
     }
 
+    let searchSummary = null;
+
     if (search) {
       const cleanSearch = search.trim();
-      const searchCriteria = {
-        $or: [
-          { userEmail: { $regex: cleanSearch, $options: 'i' } },
-          { gameTitle: { $regex: cleanSearch, $options: 'i' } }
-        ]
-      };
+      const escaped = cleanSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const searchRegex = { $regex: escaped, $options: 'i' };
+
+      // Look up matching accountRequests, gameAccounts, or transactions to catch player emails for that game username
+      const [matchingRequests, matchingAccounts, matchingTransactions] = await Promise.all([
+        db.collection('accountRequests')
+          .find({ gameAccountUsername: searchRegex })
+          .project({ userEmail: 1, gameTitle: 1, gameAccountUsername: 1 })
+          .limit(100)
+          .toArray(),
+        db.collection('gameAccounts')
+          .find({ username: searchRegex })
+          .project({ userEmail: 1, gameTitle: 1, username: 1 })
+          .limit(100)
+          .toArray(),
+        db.collection('transactions')
+          .find({ gameUsername: searchRegex })
+          .project({ userEmail: 1, gameTitle: 1, gameUsername: 1 })
+          .limit(100)
+          .toArray()
+      ]);
+
+      const emailMatches = Array.from(new Set([
+        ...matchingRequests.map(r => String(r.userEmail || '').toLowerCase().trim()),
+        ...matchingAccounts.map(a => String(a.userEmail || '').toLowerCase().trim()),
+        ...matchingTransactions.map(t => String(t.userEmail || '').toLowerCase().trim())
+      ].filter(Boolean)));
+
+      const orConditions = [
+        { userEmail: searchRegex },
+        { gameUsername: searchRegex },
+        { gameTitle: searchRegex },
+        { userName: searchRegex },
+        { transactionId: searchRegex }
+      ];
+
+      if (!isNaN(cleanSearch) && cleanSearch !== '') {
+        orConditions.push({ id: Number(cleanSearch) }, { id: cleanSearch });
+      }
+
+      if (emailMatches.length > 0) {
+        orConditions.push({ userEmail: { $in: emailMatches } });
+      }
+
+      const searchCriteria = { $or: orConditions };
       // Always AND with existing filters (keeps Type B exclusion for HQ admin)
       query = Object.keys(query).length > 0 ? { $and: [query, searchCriteria] } : searchCriteria;
+
+      // Compute lifetime coins load summary for this searched game username / user
+      try {
+        const allMatchingForSearch = await notificationsCollection.find(query).toArray();
+        const completedLoads = allMatchingForSearch.filter(n => String(n.status).toUpperCase() === 'COMPLETED').length;
+        const pendingLoads = allMatchingForSearch.filter(n => ['PENDING', 'CLAIM_REQUESTED', 'HOLD'].includes(String(n.status).toUpperCase())).length;
+        const totalCoinsAllotted = allMatchingForSearch
+          .filter(n => String(n.status).toUpperCase() === 'COMPLETED')
+          .reduce((sum, n) => sum + (parseFloat(n.totalCoins) || 0), 0);
+        const totalDepositCash = allMatchingForSearch
+          .reduce((sum, n) => sum + (parseFloat(n.depositAmount) || 0), 0);
+
+        searchSummary = {
+          searchTerm: cleanSearch,
+          totalRecords: allMatchingForSearch.length,
+          completedLoads,
+          pendingLoads,
+          totalCoinsAllotted,
+          totalDepositCash
+        };
+      } catch (sumErr) {
+        console.error('Coins search summary error:', sumErr);
+      }
     }
 
     const statusParam = searchParams.get('status');
@@ -130,11 +194,11 @@ export async function GET(req) {
     ]);
 
     // Prefer username stored on the notification (set at approve time).
-    // Fill gaps only for active queue rows (or full join when slim is off).
+    // Fill gaps for active queue rows OR whenever search is active OR when slim is off.
     const missingUname = notifications.filter((n) => {
       if (!n.gameTitle || !n.userEmail || n.gameTitle === 'Referral Reward') return false;
       if (String(n.gameUsername || '').trim()) return false;
-      if (!slim) return true;
+      if (search || !slim) return true;
       const st = String(n.status || '').toUpperCase();
       return st === 'PENDING' || st === 'CLAIM_REQUESTED' || st === 'HOLD';
     });
@@ -222,7 +286,8 @@ export async function GET(req) {
       coinsNotifications: notifications,
       totalNotifications,
       totalPages: Math.ceil(totalNotifications / limit),
-      currentPage: page
+      currentPage: page,
+      searchSummary
     });
   } catch (err) {
     console.error('Fetch Coins Notifications Error:', err);

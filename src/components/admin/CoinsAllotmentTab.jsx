@@ -30,7 +30,7 @@ export default function CoinsAllotmentTab({
 
   // New work + history: PENDING/CLAIM/HOLD on top, COMPLETED below (API sorts).
   // Search covers both. Optimistic hide only for just-completed rows still in-flight.
-  const { data, error, mutate } = usePollingSWR(
+  const { data, error, mutate, isValidating } = usePollingSWR(
     `/api/coins-notifications?status=PENDING,CLAIM_REQUESTED,HOLD,COMPLETED&page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&adminRole=${adminUser?.role || ''}&adminDistributorId=${adminUser?.distributorId || ''}&adminEmail=${encodeURIComponent(adminUser?.email || '')}&slim=1`,
     POLL.LIVE,
     { refreshWhenHidden: true, keepPreviousData: false, dedupingInterval: 200 }
@@ -44,6 +44,7 @@ export default function CoinsAllotmentTab({
   });
   const totalNotifications = data?.totalNotifications || 0;
   const totalPages = data?.totalPages || 1;
+  const searchSummary = data?.searchSummary;
 
   const handleUpdate = async (id, status, read, holdNote) => {
     await onUpdateCoinsNotification(id, status, read, holdNote);
@@ -59,26 +60,120 @@ export default function CoinsAllotmentTab({
   };
 
   const isLoading = !data && !error;
+  const isUpdating = isValidating && Boolean(data);
 
   return (
     <section className="admin-section-card" style={{ animation: 'fade-in 0.2s ease-out' }}>
       <div className="section-card-header" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <h3><i className="fa-solid fa-coins gold-text"></i> Pending Game Coin Allotment Tasks</h3>
+          <h3 style={{ margin: 0, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <i className="fa-solid fa-coins gold-text"></i>
+            Game Coin Allotment Tasks & History
+          </h3>
           <span className="game-tap-tip" style={{ float: 'right' }}>
-            New requests on top · completed history below · search works on both
+            New requests on top · completed history below · search works across all records
           </span>
         </div>
         
-        <div className="input-wrapper search-wrapper" style={{ background: '#0b0d16', width: '100%' }}>
-          <i className="fa-solid fa-magnifying-glass input-icon"></i>
-          <input
-            type="text"
-            placeholder="Search tasks by player email or game..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', width: '100%' }}>
+          <div className="input-wrapper search-wrapper" style={{ background: '#0b0d16', flex: 1, margin: 0 }}>
+            <i className="fa-solid fa-magnifying-glass input-icon"></i>
+            <input
+              type="text"
+              placeholder="Search by game username (e.g. Wal321gv1), player email, game title..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '0 0.5rem' }}
+              >
+                &times;
+              </button>
+            )}
+          </div>
+          {isUpdating && (
+            <span style={{ fontSize: '0.725rem', color: '#facc15', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}>
+              <i className="fa-solid fa-spinner fa-spin"></i> Searching...
+            </span>
+          )}
         </div>
+
+        {/* Live Search Summary Box showing total times loaded for this specific username */}
+        {debouncedSearch && searchSummary && (
+          <div
+            style={{
+              background: 'linear-gradient(135deg, rgba(250, 204, 21, 0.12), rgba(168, 85, 247, 0.12))',
+              border: '1px solid rgba(250, 204, 21, 0.35)',
+              borderRadius: '12px',
+              padding: '0.85rem 1.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '1rem',
+              marginTop: '0.25rem',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.3)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div
+                style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '10px',
+                  background: 'rgba(250, 204, 21, 0.2)',
+                  border: '1px solid rgba(250, 204, 21, 0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#facc15',
+                  fontSize: '1.25rem'
+                }}
+              >
+                <i className="fa-solid fa-gamepad"></i>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  <span>Coins Records for:</span>
+                  <span style={{ color: '#facc15', background: 'rgba(250,204,21,0.15)', padding: '0.15rem 0.5rem', borderRadius: '6px', border: '1px solid rgba(250,204,21,0.3)' }}>
+                    {debouncedSearch}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#cbd5e1', marginTop: '0.2rem' }}>
+                  Total Loaded: <strong style={{ color: '#4ade80', fontSize: '0.85rem' }}>{searchSummary.completedLoads} time{searchSummary.completedLoads !== 1 ? 's' : ''}</strong>
+                  {searchSummary.pendingLoads > 0 && (
+                    <span style={{ color: '#facc15', marginLeft: '0.5rem', fontWeight: 'bold' }}>
+                      · {searchSummary.pendingLoads} Pending Task{searchSummary.pendingLoads !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '0.675rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Total Coins Loaded
+                </div>
+                <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#facc15' }}>
+                  🪙 {Math.round(searchSummary.totalCoinsAllotted || 0).toLocaleString()} Coins
+                </div>
+              </div>
+
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '0.675rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Total Cash Deposited
+                </div>
+                <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#4ade80' }}>
+                  ${(searchSummary.totalDepositCash || 0).toFixed(2)}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="table-responsive">
@@ -86,7 +181,7 @@ export default function CoinsAllotmentTab({
           <thead>
             <tr>
               <th>#</th>
-              <th>User Email</th>
+              <th>User & In-Game Username</th>
               <th>Target Game</th>
               <th>Deposit Cash</th>
               <th>Bonus Applied</th>
@@ -100,25 +195,35 @@ export default function CoinsAllotmentTab({
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan="10" className="text-center text-muted" style={{ padding: '2rem' }}>
-                  <i className="fa-solid fa-spinner fa-spin" style={{ color: 'var(--gold-primary)', marginRight: '6px' }}></i> Loading allotment queue...
+                <td colSpan="10" className="text-center text-muted" style={{ padding: '3rem 1rem' }}>
+                  <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '2rem', color: 'var(--gold-primary)', marginBottom: '0.75rem', display: 'block' }}></i>
+                  <span>Loading coin allotment tasks & history...</span>
                 </td>
               </tr>
             ) : notifications.length === 0 ? (
               <tr>
-                <td colSpan="10" className="text-center text-muted" style={{ padding: '2rem' }}>
-                  No coin allotment tasks found.
+                <td colSpan="10" className="text-center text-muted" style={{ padding: '3rem 1rem' }}>
+                  <i className="fa-solid fa-coins" style={{ fontSize: '2rem', marginBottom: '0.75rem', display: 'block', opacity: 0.3, color: '#facc15' }}></i>
+                  <strong style={{ color: '#fff', display: 'block', fontSize: '0.95rem' }}>No coin allotment tasks found.</strong>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                    {debouncedSearch ? `No coin records found for "${debouncedSearch}".` : 'There are no active or completed coins allotment tasks.'}
+                  </p>
                 </td>
               </tr>
             ) : (
               notifications.map((noti, idx) => (
-                <tr key={noti.id} style={{ opacity: noti.status === 'COMPLETED' ? 0.6 : 1 }}>
+                <tr key={noti.id} style={{ opacity: noti.status === 'COMPLETED' ? 0.7 : 1, background: noti.status === 'COMPLETED' ? 'rgba(0,0,0,0.15)' : 'transparent' }}>
                   <td>{(page - 1) * limit + idx + 1}</td>
                   <td>
-                    <strong>{noti.userEmail}</strong>
-                    {noti.gameUsername && (
-                      <div style={{ fontSize: '0.7rem', color: 'var(--gold-primary)', marginTop: '0.15rem' }}>
-                        <i className="fa-solid fa-gamepad" style={{ marginRight: '3px' }}></i> {noti.gameUsername}
+                    <strong style={{ display: 'block', fontSize: '0.8rem', color: '#fff' }}>{noti.userEmail}</strong>
+                    {noti.gameUsername ? (
+                      <div style={{ fontSize: '0.75rem', color: '#facc15', fontWeight: 'bold', marginTop: '0.25rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', background: 'rgba(250, 204, 21, 0.12)', padding: '0.15rem 0.5rem', borderRadius: '4px', border: '1px solid rgba(250, 204, 21, 0.3)' }}>
+                        <i className="fa-solid fa-gamepad"></i>
+                        <span>{noti.gameUsername}</span>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '0.675rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                        —
                       </div>
                     )}
                   </td>
@@ -194,9 +299,27 @@ export default function CoinsAllotmentTab({
                     </button>
                   </td>
                   <td>
-                    <span className={`admin-badge-preview b-${noti.status === 'PENDING' ? 'none' : noti.status === 'HOLD' ? 'new' : noti.status === 'CLAIM_REQUESTED' ? 'hot' : 'ready'}`}>
-                      {noti.status === 'HOLD' ? 'ON HOLD' : noti.status === 'CLAIM_REQUESTED' ? 'CLAIM REQUESTED' : noti.status}
-                    </span>
+                    {noti.status === 'COMPLETED' ? (
+                      <span className="admin-badge-preview b-ready" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <i className="fa-solid fa-check"></i> LOADED
+                      </span>
+                    ) : noti.status === 'PENDING' ? (
+                      <span className="admin-badge-preview b-new" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <i className="fa-solid fa-clock"></i> PENDING LOAD
+                      </span>
+                    ) : noti.status === 'CLAIM_REQUESTED' ? (
+                      <span className="admin-badge-preview b-hot" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <i className="fa-solid fa-bell"></i> CLAIM REQUESTED
+                      </span>
+                    ) : noti.status === 'HOLD' ? (
+                      <span className="admin-badge-preview" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', border: '1px solid #f59e0b', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <i className="fa-solid fa-pause"></i> ON HOLD
+                      </span>
+                    ) : (
+                      <span className="admin-badge-preview b-none">
+                        {noti.status}
+                      </span>
+                    )}
                   </td>
                   <td>
                     {noti.status === 'PENDING' || noti.status === 'CLAIM_REQUESTED' || noti.status === 'HOLD' ? (
@@ -282,7 +405,9 @@ export default function CoinsAllotmentTab({
                         )}
                       </div>
                     ) : (
-                      <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>Fulfilled</span>
+                      <span style={{ fontSize: '0.75rem', color: '#4ade80', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <i className="fa-solid fa-circle-check"></i> Fulfilled
+                      </span>
                     )}
                   </td>
                 </tr>

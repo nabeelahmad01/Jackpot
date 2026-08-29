@@ -273,14 +273,33 @@ export default function DevicesTab({ adminUser }) {
                     {/* Device & OS */}
                     <td>
                       <div>
-                        <div style={{ fontSize: '0.775rem', fontWeight: 'bold', color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        {/* Device Model / Name */}
+                        <div style={{ fontSize: '0.785rem', fontWeight: 'bold', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                           <i
                             className={`fa-solid ${device.os?.includes('Android') || device.os?.includes('iOS') || device.os?.includes('iPhone') ? 'fa-mobile-screen-button' : (device.os?.includes('iPad') || device.os?.includes('Tablet') ? 'fa-tablet-screen-button' : (device.os?.includes('Mac') || device.os?.includes('Windows') || device.os?.includes('Linux') ? 'fa-desktop' : 'fa-mobile-screen-button'))}`}
-                            style={{ color: device.os?.includes('Android') || device.os?.includes('iOS') ? '#38bdf8' : '#cbd5e1', fontSize: '0.85rem' }}
+                            style={{ color: device.os?.includes('Android') || device.os?.includes('iOS') ? '#38bdf8' : '#facc15', fontSize: '0.85rem' }}
                           ></i>
-                          <span>{device.os} ({device.browser})</span>
+                          <span>{device.deviceName || device.os || 'Android Smartphone'}</span>
+                          <span style={{ fontSize: '0.675rem', color: '#94a3b8', background: 'rgba(255,255,255,0.06)', padding: '0.1rem 0.35rem', borderRadius: '4px' }}>
+                            {device.os}
+                          </span>
                         </div>
-                        <div style={{ fontSize: '0.675rem', color: '#94a3b8', fontFamily: 'monospace', marginTop: '0.2rem' }} title={device.deviceId}>
+
+                        {/* App vs Browser Distinction Badge */}
+                        <div style={{ marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          {device.isApp || device.browser?.includes('App') ? (
+                            <span style={{ background: 'linear-gradient(135deg, rgba(250, 204, 21, 0.15), rgba(168, 85, 247, 0.15))', border: '1px solid rgba(250, 204, 21, 0.45)', color: '#facc15', padding: '0.15rem 0.45rem', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                              <i className="fa-solid fa-mobile-screen-button"></i> 📲 Jackpot Royals App (APK/PWA)
+                            </span>
+                          ) : (
+                            <span style={{ background: 'rgba(56, 189, 248, 0.12)', border: '1px solid rgba(56, 189, 248, 0.3)', color: '#38bdf8', padding: '0.15rem 0.45rem', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                              <i className={device.browser?.includes('Safari') ? 'fa-brands fa-safari' : (device.browser?.includes('Firefox') ? 'fa-brands fa-firefox-browser' : (device.browser?.includes('Edge') ? 'fa-brands fa-edge' : 'fa-brands fa-chrome'))}></i>
+                              <span>{device.browser || 'Chrome Browser'}</span>
+                            </span>
+                          )}
+                        </div>
+
+                        <div style={{ fontSize: '0.65rem', color: '#94a3b8', fontFamily: 'monospace', marginTop: '0.25rem' }} title={device.deviceId}>
                           ID: {device.deviceId ? `${device.deviceId.slice(0, 16)}...` : 'N/A'}
                         </div>
                       </div>

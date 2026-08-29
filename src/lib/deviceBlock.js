@@ -1,25 +1,120 @@
 import { getDb } from './mongodb';
 
 /**
- * Parses user agent string into human-friendly OS & Browser device details.
+ * Extracts specific hardware model, smartphone brand or desktop device type.
  */
-export function parseUserAgent(uaString = '') {
-  const ua = String(uaString);
-  let os = 'Unknown OS';
-  let browser = 'Browser';
+export function detectDeviceModel(uaString = '', clientModel = '') {
+  if (clientModel && clientModel !== 'K' && clientModel !== 'unknown' && clientModel !== 'undefined') {
+    return clientModel;
+  }
+  const ua = String(uaString || '');
 
+  // iOS check
+  if (/iPhone/i.test(ua)) return 'Apple iPhone';
+  if (/iPad/i.test(ua)) return 'Apple iPad';
+  if (/iPod/i.test(ua)) return 'Apple iPod';
+  if (/Macintosh|Mac OS X/i.test(ua)) return 'Apple Mac / MacBook';
+  if (/Windows NT 10\.0/i.test(ua)) return 'Windows 10/11 PC';
+  if (/Windows NT/i.test(ua)) return 'Windows PC';
+  if (/Linux/i.test(ua) && !/Android/i.test(ua)) return 'Linux PC';
+
+  // Android Model Extraction
+  // Look for: Linux; Android <version>; <model> (Build|;|)|AppleWebKit
+  const match = ua.match(/Android\s+[\d\.]+;\s*([^;)\/]+?)(?:\s+Build|\s*;|\s*\)|\s*AppleWebKit)/i);
+  let rawModel = match ? match[1].trim() : '';
+
+  // Clean raw model
+  rawModel = rawModel.replace(/Build\/.*$/i, '').replace(/[\r\n\t]/g, '').trim();
+
+  // If model is just "K" (Chrome Android 10+ user-agent reduction placeholder) or empty
+  if (!rawModel || rawModel === 'K' || rawModel === 'Mobile') {
+    if (/Mobile/i.test(ua)) return 'Android Smartphone';
+    if (/Tablet/i.test(ua)) return 'Android Tablet';
+    return 'Android Device';
+  }
+
+  // Model brand identification and formatting
+  if (/^SM-|^GT-|^SCH-|^SGH-|^SHV-|^Galaxy/i.test(rawModel)) {
+    return `Samsung Galaxy (${rawModel})`;
+  }
+  if (/^Pixel/i.test(rawModel)) {
+    return `Google ${rawModel}`;
+  }
+  if (/^Redmi|^POCO|^Mi\s|^220|^210|^230|^240|^M20|^M21|^2106|^2201/i.test(rawModel)) {
+    return `Xiaomi / Redmi (${rawModel})`;
+  }
+  if (/^CPH|^RMX|^OnePlus|^NE2|^KB2|^IN2/i.test(rawModel)) {
+    if (/^RMX/i.test(rawModel)) return `Realme (${rawModel})`;
+    if (/^CPH/i.test(rawModel)) return `Oppo / OnePlus (${rawModel})`;
+    return `OnePlus (${rawModel})`;
+  }
+  if (/^V2|^V1|^vivo/i.test(rawModel)) {
+    return `Vivo (${rawModel})`;
+  }
+  if (/^moto|^XT/i.test(rawModel)) {
+    return `Motorola (${rawModel})`;
+  }
+  if (/^Infinix|^X6/i.test(rawModel)) {
+    return `Infinix (${rawModel})`;
+  }
+  if (/^TECNO|^KG|^BD/i.test(rawModel)) {
+    return `Tecno (${rawModel})`;
+  }
+  if (/^HUAWEI|^HONOR|^VOG-|^ELE-/i.test(rawModel)) {
+    return `Huawei / Honor (${rawModel})`;
+  }
+  if (/^Xperia|^SO-/i.test(rawModel)) {
+    return `Sony Xperia (${rawModel})`;
+  }
+
+  return rawModel;
+}
+
+/**
+ * Parses user agent string into human-friendly OS, Device Model & Browser / App details.
+ */
+export function parseUserAgent(uaString = '', isApp = false, appType = '', clientModel = '') {
+  const ua = String(uaString || '');
+  let os = 'Unknown OS';
+  let browser = 'Web Browser';
+  let deviceName = detectDeviceModel(ua, clientModel);
+  let isInstalledApp = Boolean(isApp);
+
+  // Check if UA indicates WebView / APK / TWA / App
+  const isWebView = /;\s*wv\)|Version\/4\.0.*Chrome\/|JackpotRoyalsApp|JackpotApp|com\.jackpotroyals/i.test(ua);
+  if (isWebView || isApp || appType === 'PWA_APP' || appType === 'ANDROID_APK' || appType === 'APP') {
+    isInstalledApp = true;
+  }
+
+  // OS Detection
   if (/iPhone|iPad|iPod/i.test(ua)) os = 'iOS (iPhone/iPad)';
-  else if (/Android/i.test(ua)) os = 'Android Device';
+  else if (/Android/i.test(ua)) os = 'Android';
   else if (/Macintosh|Mac OS X/i.test(ua)) os = 'macOS';
   else if (/Windows/i.test(ua)) os = 'Windows';
   else if (/Linux/i.test(ua)) os = 'Linux';
 
-  if (/Chrome/i.test(ua) && !/Chromium|Edg/i.test(ua)) browser = 'Chrome';
-  else if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) browser = 'Safari';
-  else if (/Firefox/i.test(ua)) browser = 'Firefox';
-  else if (/Edg/i.test(ua)) browser = 'Edge';
+  // Browser vs App Detection
+  if (isInstalledApp) {
+    browser = isWebView ? 'Jackpot Royals App (APK)' : 'Jackpot Royals App (Installed)';
+  } else {
+    if (/Edg/i.test(ua)) browser = 'Edge Browser';
+    else if (/Brave/i.test(ua)) browser = 'Brave Browser';
+    else if (/OPR|Opera/i.test(ua)) browser = 'Opera Browser';
+    else if (/Firefox|FxiOS/i.test(ua)) browser = 'Firefox Browser';
+    else if (/CriOS/i.test(ua)) browser = 'Chrome (iOS)';
+    else if (/Chrome/i.test(ua) && !/Chromium|Edg/i.test(ua)) browser = 'Chrome Browser';
+    else if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) browser = 'Safari Browser';
+    else browser = 'Web Browser';
+  }
 
-  return { os, browser, raw: ua };
+  return {
+    os,
+    browser,
+    deviceName,
+    isApp: isInstalledApp,
+    appType: isInstalledApp ? 'APP' : 'BROWSER',
+    raw: ua
+  };
 }
 
 /**
@@ -112,7 +207,7 @@ export async function blockDevicePermanently(db, { deviceId, deviceFingerprint, 
 /**
  * Log or update an active device session in MongoDB.
  */
-export async function trackDeviceSession(db, { email, name, role, deviceId, deviceFingerprint, userAgent, ip }) {
+export async function trackDeviceSession(db, { email, name, role, deviceId, deviceFingerprint, userAgent, ip, isApp, appType, deviceModel }) {
   if (!email) return;
 
   const cleanEmail = email.toLowerCase().trim();
@@ -128,7 +223,7 @@ export async function trackDeviceSession(db, { email, name, role, deviceId, devi
     }
   }
 
-  const uaParsed = parseUserAgent(userAgent);
+  const uaParsed = parseUserAgent(userAgent, isApp, appType, deviceModel);
   const postInfo = getRolePostTitle(role);
 
   const sessionDoc = {
@@ -140,8 +235,11 @@ export async function trackDeviceSession(db, { email, name, role, deviceId, devi
     postColor: postInfo.color,
     deviceId: cleanId,
     deviceFingerprint: cleanFp,
+    deviceName: uaParsed.deviceName,
     os: uaParsed.os,
     browser: uaParsed.browser,
+    isApp: uaParsed.isApp,
+    appType: uaParsed.appType,
     userAgent: uaParsed.raw,
     ip: ip || 'Unknown',
     lastActive: new Date(),

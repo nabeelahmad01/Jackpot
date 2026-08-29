@@ -5,7 +5,7 @@ import { isDeviceBlocked, trackDeviceSession } from '../../../../lib/deviceBlock
 
 export async function POST(req) {
   try {
-    const { email, password, deviceId, deviceFingerprint } = await req.json();
+    const { email, password, deviceId, deviceFingerprint, isApp, appType, deviceModel } = await req.json();
 
     if (!email || !password) {
       return NextResponse.json(
@@ -16,6 +16,8 @@ export async function POST(req) {
 
     const inputEmail = email.toLowerCase().trim();
     const db = await getDb();
+    const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || '';
+    const userAgent = req.headers.get('user-agent') || '';
 
     // Device block check
     if (await isDeviceBlocked(db, deviceId, deviceFingerprint)) {
@@ -40,6 +42,19 @@ export async function POST(req) {
       // ONLY way to open the top-level admin account.
       if (inputEmail === envAdminEmail) {
         if (password === envAdminPassword) {
+          trackDeviceSession(db, {
+            email: envAdminEmail,
+            name: 'System Admin',
+            role: 'admin',
+            deviceId,
+            deviceFingerprint,
+            userAgent,
+            ip,
+            isApp,
+            appType,
+            deviceModel
+          }).catch(() => {});
+
           return NextResponse.json({
             success: true,
             message: 'Login successful!',
@@ -95,8 +110,6 @@ export async function POST(req) {
     // Deleted distributor → player stays, but game accounts reset so they can re-request.
     const user = await healOrphanedDistributorPlayer(db, matchedUser);
 
-    const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || '';
-    const userAgent = req.headers.get('user-agent') || '';
     trackDeviceSession(db, {
       email: user.email,
       name: user.name,
@@ -104,7 +117,10 @@ export async function POST(req) {
       deviceId,
       deviceFingerprint,
       userAgent,
-      ip
+      ip,
+      isApp,
+      appType,
+      deviceModel
     }).catch(() => {});
 
     return NextResponse.json({

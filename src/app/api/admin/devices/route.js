@@ -227,12 +227,23 @@ export async function GET(req) {
 
     const allSessions = await sessionsCollection.find(query).sort({ lastActive: -1 }).toArray();
 
-    // Map blocked status dynamically
+    // Map blocked status and enrich device details dynamically
     const devices = allSessions.map((session) => {
       const isBlocked = blockedDeviceIds.has(session.deviceId) || blockedFingerprints.has(session.deviceFingerprint);
+      const uaParsed = session.userAgent ? parseUserAgent(session.userAgent, session.isApp, session.appType, session.deviceModel) : null;
+
+      const deviceName = session.deviceName || uaParsed?.deviceName || (session.os?.includes('Windows') ? 'Windows PC' : (session.os?.includes('Mac') ? 'MacBook / Mac' : 'Android Smartphone'));
+      const os = uaParsed?.os || session.os || 'Android';
+      const isApp = session.isApp !== undefined ? Boolean(session.isApp) : (uaParsed?.isApp || false);
+      const browser = session.browser || uaParsed?.browser || (isApp ? 'Jackpot Royals App (Installed)' : 'Chrome Browser');
+
       return {
         ...session,
         id: session._id?.toString(),
+        deviceName,
+        os,
+        browser,
+        isApp,
         isBlocked,
         status: isBlocked ? 'PERMANENTLY_BLOCKED' : (session.status || 'ACTIVE')
       };
