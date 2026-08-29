@@ -993,7 +993,7 @@ export default function AdminDashboard({
                 transition: 'all 0.2s ease'
               }}
             >
-              <i className="fa-solid fa-laptop-mobile" style={{ width: '18px' }}></i>
+              <i className="fa-solid fa-mobile-screen-button" style={{ width: '18px' }}></i>
               <span>Device Management</span>
             </button>
           )}

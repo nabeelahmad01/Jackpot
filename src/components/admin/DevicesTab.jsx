@@ -93,7 +93,7 @@ export default function DevicesTab({ adminUser }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <h3 style={{ margin: 0, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <i className="fa-solid fa-laptop-mobile gold-text"></i>
+              <i className="fa-solid fa-mobile-screen-button gold-text"></i>
               Super Admin Device Management & Banning
             </h3>
             <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
@@ -274,7 +274,10 @@ export default function DevicesTab({ adminUser }) {
                     <td>
                       <div>
                         <div style={{ fontSize: '0.775rem', fontWeight: 'bold', color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <i className={`fa-solid ${device.os?.includes('Android') || device.os?.includes('iOS') ? 'fa-mobile-screen' : 'fa-desktop'}`}></i>
+                          <i
+                            className={`fa-solid ${device.os?.includes('Android') || device.os?.includes('iOS') || device.os?.includes('iPhone') ? 'fa-mobile-screen-button' : (device.os?.includes('iPad') || device.os?.includes('Tablet') ? 'fa-tablet-screen-button' : (device.os?.includes('Mac') || device.os?.includes('Windows') || device.os?.includes('Linux') ? 'fa-desktop' : 'fa-mobile-screen-button'))}`}
+                            style={{ color: device.os?.includes('Android') || device.os?.includes('iOS') ? '#38bdf8' : '#cbd5e1', fontSize: '0.85rem' }}
+                          ></i>
                           <span>{device.os} ({device.browser})</span>
                         </div>
                         <div style={{ fontSize: '0.675rem', color: '#94a3b8', fontFamily: 'monospace', marginTop: '0.2rem' }} title={device.deviceId}>
