@@ -248,24 +248,47 @@ export default function DevicesTab({ adminUser }) {
                         </strong>
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{device.email}</span>
 
-                        <div style={{ marginTop: '0.3rem' }}>
-                          <span
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.3rem',
-                              padding: '0.15rem 0.5rem',
-                              borderRadius: '6px',
-                              fontSize: '0.675rem',
-                              fontWeight: '700',
-                              background: 'rgba(255,255,255,0.06)',
-                              color: device.postColor || '#facc15',
-                              border: `1px solid ${device.postColor || 'rgba(255,255,255,0.1)'}`
-                            }}
-                          >
-                            <span>{device.postEmoji || '🎮'}</span>
-                            <span>{device.postTitle || device.role}</span>
-                          </span>
+                        <div style={{ marginTop: '0.35rem', display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                          {device.badges && device.badges.length > 0 ? (
+                            device.badges.map((b, bIdx) => (
+                              <span
+                                key={bIdx}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem',
+                                  padding: '0.15rem 0.5rem',
+                                  borderRadius: '6px',
+                                  fontSize: '0.675rem',
+                                  fontWeight: '700',
+                                  background: 'rgba(255,255,255,0.06)',
+                                  color: b.color || '#facc15',
+                                  border: `1px solid ${b.color || 'rgba(255,255,255,0.15)'}`
+                                }}
+                              >
+                                <span>{b.emoji}</span>
+                                <span>{b.title}</span>
+                              </span>
+                            ))
+                          ) : (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.3rem',
+                                padding: '0.15rem 0.5rem',
+                                borderRadius: '6px',
+                                fontSize: '0.675rem',
+                                fontWeight: '700',
+                                background: 'rgba(255,255,255,0.06)',
+                                color: device.postColor || '#94a3b8',
+                                border: `1px solid ${device.postColor || 'rgba(255,255,255,0.1)'}`
+                              }}
+                            >
+                              <span>{device.postEmoji || '🎮'}</span>
+                              <span>{device.postTitle || 'Player Account'}</span>
+                            </span>
+                          )}
                         </div>
                       </div>
                     </td>

@@ -118,29 +118,79 @@ export function parseUserAgent(uaString = '', isApp = false, appType = '', clien
 }
 
 /**
- * Returns human-friendly Post / Role title.
+ * Maps an individual role key to its badge metadata.
  */
-export function getRolePostTitle(role = '') {
+export function getSingleRoleInfo(role = '') {
   const r = String(role || '').toLowerCase().trim();
   switch (r) {
     case 'admin':
     case 'super_admin':
-      return { title: 'Super Admin (Owner)', emoji: '👑', color: '#facc15' };
+    case 'owner':
+      return { role: 'admin', title: 'Super Admin (Owner)', emoji: '👑', color: '#facc15' };
     case 'financial_admin':
-      return { title: 'Financial Admin', emoji: '💳', color: '#38bdf8' };
+    case 'financial':
+    case 'finance':
+      return { role: 'financial_admin', title: 'Financial Admin', emoji: '💳', color: '#38bdf8' };
     case 'coins_admin':
-      return { title: 'Coins Staff', emoji: '🪙', color: '#a855f7' };
+    case 'coins':
+      return { role: 'coins_admin', title: 'Coins Staff', emoji: '🪙', color: '#a855f7' };
     case 'support_admin':
-      return { title: 'Support Agent', emoji: '🎧', color: '#4ade80' };
+    case 'support':
+      return { role: 'support_admin', title: 'Support Agent', emoji: '🎧', color: '#4ade80' };
+    case 'operation_admin':
+    case 'operation':
+    case 'operations':
+      return { role: 'operation_admin', title: 'Operations Admin', emoji: '⚙️', color: '#fb923c' };
     case 'distributor':
-      return { title: 'Distributor Office', emoji: '🏢', color: '#fb923c' };
+      return { role: 'distributor', title: 'Distributor Office', emoji: '🏢', color: '#fb923c' };
     case 'distributor_staff':
-      return { title: 'Distributor Staff', emoji: '👔', color: '#f472b6' };
+      return { role: 'distributor_staff', title: 'Distributor Staff', emoji: '👔', color: '#f472b6' };
     case 'agent':
-      return { title: 'Affiliate Agent', emoji: '💼', color: '#818cf8' };
+    case 'affiliate':
+    case 'affiliate_agent':
+      return { role: 'agent', title: 'Affiliate Agent', emoji: '💼', color: '#818cf8' };
     default:
-      return { title: 'Player Account', emoji: '🎮', color: '#94a3b8' };
+      return null;
   }
+}
+
+/**
+ * Returns human-friendly Post / Role title and badges for single or multiple assigned roles.
+ */
+export function getRolePostTitle(role = '') {
+  const roleStr = Array.isArray(role) ? role.join(',') : String(role || '');
+  const rawParts = roleStr.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  
+  const matchedRoles = [];
+  for (const part of rawParts) {
+    const info = getSingleRoleInfo(part);
+    if (info && !matchedRoles.some(m => m.role === info.role)) {
+      matchedRoles.push(info);
+    }
+  }
+
+  // If no staff/admin roles matched, return Player Account
+  if (matchedRoles.length === 0) {
+    return {
+      title: 'Player Account',
+      emoji: '🎮',
+      color: '#94a3b8',
+      roles: ['player'],
+      badges: [{ role: 'player', title: 'Player Account', emoji: '🎮', color: '#94a3b8' }]
+    };
+  }
+
+  // If super admin is present, it takes top priority
+  const hasAdmin = matchedRoles.find(m => m.role === 'admin');
+  const primary = hasAdmin || matchedRoles[0];
+
+  return {
+    title: matchedRoles.map(m => m.title).join(' & '),
+    emoji: primary.emoji,
+    color: primary.color,
+    roles: matchedRoles.map(m => m.role),
+    badges: matchedRoles
+  };
 }
 
 /**
