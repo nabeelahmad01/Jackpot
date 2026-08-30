@@ -94,11 +94,6 @@ export default function CoinsAllotmentTab({
               </button>
             )}
           </div>
-          {isUpdating && (
-            <span style={{ fontSize: '0.725rem', color: '#facc15', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}>
-              <i className="fa-solid fa-spinner fa-spin"></i> Searching...
-            </span>
-          )}
         </div>
 
         {/* Live Search Summary Box showing total times loaded for this specific username */}

@@ -166,7 +166,7 @@ export async function GET(req) {
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
     // 6. Enrich devices with live role, badges, and device details
-    const devices = allSessions.map((session) => {
+    const rawDevices = allSessions.map((session) => {
       const emailKey = session.email?.toLowerCase().trim();
       const isBlocked = blockedDeviceIds.has(session.deviceId) || blockedFingerprints.has(session.deviceFingerprint);
       const uaParsed = session.userAgent ? parseUserAgent(session.userAgent, session.isApp, session.appType, session.deviceModel) : null;
@@ -202,7 +202,37 @@ export async function GET(req) {
       };
     });
 
-    // 7. Compute Global Stats
+    // 7. Deduplicate sessions per unique device per user
+    // (Prevents duplicate entries when user has both client did_ and server dev- fallback or repeated session docs)
+    const deduplicatedMap = new Map();
+    for (const dev of rawDevices) {
+      const emailKey = String(dev.email || '').toLowerCase().trim();
+      const devId = String(dev.deviceId || '').trim();
+      const devName = String(dev.deviceName || dev.os || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const appKey = dev.isApp ? 'app' : 'browser';
+
+      // Deduplication key: email + normalized device hardware + app/browser mode
+      const key = `${emailKey}__${devName}__${appKey}`;
+
+      const existing = deduplicatedMap.get(key);
+      if (!existing) {
+        deduplicatedMap.set(key, dev);
+      } else {
+        const isCurrentRealDid = devId.startsWith('did_') || devId.startsWith('fp_');
+        const isExistingRealDid = String(existing.deviceId || '').startsWith('did_') || String(existing.deviceId || '').startsWith('fp_');
+        
+        const devDate = dev.lastActive ? new Date(dev.lastActive).getTime() : 0;
+        const existingDate = existing.lastActive ? new Date(existing.lastActive).getTime() : 0;
+
+        if ((isCurrentRealDid && !isExistingRealDid) || (isCurrentRealDid === isExistingRealDid && devDate > existingDate)) {
+          deduplicatedMap.set(key, dev);
+        }
+      }
+    }
+
+    const devices = Array.from(deduplicatedMap.values());
+
+    // 8. Compute Global Stats
     const stats = {
       totalDevices: devices.length,
       activeToday: devices.filter((d) => !d.isBlocked && d.lastActive && new Date(d.lastActive) >= oneDayAgo).length,
@@ -210,7 +240,7 @@ export async function GET(req) {
       blockedCount: blockedList.length
     };
 
-    // 8. Apply Role Filter accurately
+    // 9. Apply Role Filter accurately
     let filteredDevices = devices;
     if (roleFilter) {
       const rf = roleFilter.toLowerCase().trim();
@@ -252,7 +282,7 @@ export async function GET(req) {
       });
     }
 
-    // 9. Apply Search Filter
+    // 10. Apply Search Filter
     if (search.trim()) {
       const sLower = search.trim().toLowerCase();
       filteredDevices = filteredDevices.filter((d) => {
@@ -280,14 +310,14 @@ export async function GET(req) {
       });
     }
 
-    // 10. Apply Status Filter
+    // 11. Apply Status Filter
     if (statusFilter === 'BLOCKED') {
       filteredDevices = filteredDevices.filter((d) => d.isBlocked);
     } else if (statusFilter === 'ACTIVE') {
       filteredDevices = filteredDevices.filter((d) => !d.isBlocked);
     }
 
-    // 11. Pagination
+    // 12. Pagination
     const totalCount = filteredDevices.length;
     const skip = (page - 1) * limit;
     const paginatedDevices = filteredDevices.slice(skip, skip + limit);

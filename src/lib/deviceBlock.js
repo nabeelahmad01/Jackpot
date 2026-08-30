@@ -306,4 +306,12 @@ export async function trackDeviceSession(db, { email, name, role, deviceId, devi
     },
     { upsert: true }
   );
+
+  // If real client fingerprint ID is present, remove old server fallback session records
+  if (cleanId.startsWith('did_') || cleanId.startsWith('fp_')) {
+    db.collection('deviceSessions').deleteMany({
+      email: cleanEmail,
+      deviceId: { $regex: '^dev-' }
+    }).catch(() => {});
+  }
 }
