@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import usePollingSWR from '../../hooks/usePollingSWR';
 import { POLL } from '../../lib/pollingConfig';
 import { registerNativeBackHandler } from '../../lib/nativeBack';
@@ -73,14 +73,16 @@ export default function SupportTab({ adminUser }) {
   useEffect(() => {
     const q = chatSearch.trim();
     if (q.length < 2) {
-      setPlayerHits([]);
-      setPlayerSearchLoading(false);
-      return undefined;
+      const resetTimer = setTimeout(() => {
+        setPlayerHits([]);
+        setPlayerSearchLoading(false);
+      }, 0);
+      return () => clearTimeout(resetTimer);
     }
 
     const controller = new AbortController();
-    setPlayerSearchLoading(true);
     const timer = setTimeout(async () => {
+      setPlayerSearchLoading(true);
       try {
         const distParam = adminUser?.distributorId
           ? `&adminDistributorId=${encodeURIComponent(adminUser.distributorId)}`
@@ -283,31 +285,32 @@ export default function SupportTab({ adminUser }) {
   };
 
   // Translate incoming player message (English -> Roman Urdu)
-  const handleTranslateIncoming = async (msg) => {
+  const handleTranslateIncoming = useCallback(async (msg) => {
     if (!msg || !msg.message) return;
-    const existing = incomingTranslations[msg.id];
-    if (existing && !existing.loading) {
-      setIncomingTranslations((prev) => ({
-        ...prev,
-        [msg.id]: { ...existing, expanded: !existing.expanded }
-      }));
-      return;
-    }
 
-    setIncomingTranslations((prev) => ({
-      ...prev,
-      [msg.id]: { loading: true, expanded: true, romanUrdu: '', urdu: '' }
-    }));
+    setIncomingTranslations((prev) => {
+      const existing = prev[msg.id];
+      if (existing && !existing.loading) {
+        return {
+          ...prev,
+          [msg.id]: { ...existing, expanded: !existing.expanded }
+        };
+      }
+      return {
+        ...prev,
+        [msg.id]: { loading: true, expanded: true, romanUrdu: '', urdu: '' }
+      };
+    });
 
     try {
       const data = await translateText(msg.message, 'to_roman_urdu');
-      if (data && data.success) {
+      if (data && data.success && (data.romanUrdu || data.urdu)) {
         setIncomingTranslations((prev) => ({
           ...prev,
           [msg.id]: {
             loading: false,
             expanded: true,
-            romanUrdu: data.romanUrdu || data.translation || msg.message,
+            romanUrdu: data.romanUrdu || data.urdu,
             urdu: data.urdu || ''
           }
         }));
@@ -334,17 +337,22 @@ export default function SupportTab({ adminUser }) {
         }
       }));
     }
-  };
+  }, []);
 
   // Auto-translate incoming player messages when toggle is ON
   useEffect(() => {
     if (!autoTranslateIncoming || !activeChatMessages.length) return;
     activeChatMessages.forEach((msg) => {
-      if (msg.senderType !== 'admin' && !msg.isDeleted && msg.message && !incomingTranslations[msg.id]) {
-        handleTranslateIncoming(msg);
+      if (msg.senderType !== 'admin' && !msg.isDeleted && msg.message) {
+        setIncomingTranslations((prev) => {
+          if (!prev[msg.id]) {
+            handleTranslateIncoming(msg);
+          }
+          return prev;
+        });
       }
     });
-  }, [autoTranslateIncoming, activeChatMessages]);
+  }, [autoTranslateIncoming, activeChatMessages, handleTranslateIncoming]);
 
   const handleToggleReaction = async (messageId, emoji) => {
     if (!adminUser) return;
