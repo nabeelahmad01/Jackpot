@@ -43,8 +43,10 @@ const backupDir = path.resolve(process.cwd(), 'db-backups', `backup_${Date.now()
 async function backupDatabase() {
   console.log('🚀 Connecting to MongoDB Atlas...');
   const client = new MongoClient(sourceUri, {
-    connectTimeoutMS: 30000,
-    socketTimeoutMS: 60000
+    connectTimeoutMS: 120000,
+    socketTimeoutMS: 300000,
+    serverSelectionTimeoutMS: 120000,
+    maxPoolSize: 10
   });
 
   try {
@@ -80,20 +82,33 @@ async function backupDatabase() {
 
       const totalInCol = await collection.countDocuments().catch(() => 0);
       const docs = [];
-      const PAGE_SIZE = 25;
+      const PAGE_SIZE = 15;
 
-      if (totalInCol === 0) {
-        // empty collection
-      } else {
-        for (let skip = 0; skip < totalInCol; skip += PAGE_SIZE) {
-          const chunk = await collection
-            .find({})
-            .sort({ _id: 1 })
-            .skip(skip)
-            .limit(PAGE_SIZE)
-            .toArray();
+      if (totalInCol > 0) {
+        let lastId = null;
+        while (docs.length < totalInCol) {
+          const query = lastId !== null ? { _id: { $gt: lastId } } : {};
+          let chunk = [];
+          let retries = 0;
 
+          while (retries < 3) {
+            try {
+              chunk = await collection
+                .find(query)
+                .sort({ _id: 1 })
+                .limit(PAGE_SIZE)
+                .toArray();
+              break;
+            } catch (err) {
+              retries++;
+              await new Promise((r) => setTimeout(r, 1000));
+            }
+          }
+
+          if (chunk.length === 0) break;
           docs.push(...chunk);
+          lastId = chunk[chunk.length - 1]._id;
+
           const percent = Math.min(100, Math.round((docs.length / totalInCol) * 100));
           process.stdout.write(`\r  ⏳ ${colName.padEnd(26)} : ${docs.length} / ${totalInCol} docs (${percent}%)... `);
         }
