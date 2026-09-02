@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "db:backup": "node scripts/backup-atlas.mjs",
+    "db:restore": "node scripts/restore-local-db.mjs",
     "android:sync": "cap sync android",
     "android:debug": "JAVA_HOME=/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home PATH=/usr/local/opt/openjdk@21/bin:$PATH ./android/gradlew -p android assembleDebug",
     "android:release": "npm run android:sync && JAVA_HOME=/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home PATH=/usr/local/opt/openjdk@21/bin:$PATH ./android/gradlew -p android assembleRelease && cp android/app/build/outputs/apk/release/app-release.apk public/downloads/jackpot-royals.apk",
