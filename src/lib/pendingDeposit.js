@@ -1,4 +1,4 @@
-import { CODE_WORDS, generateCandidateCode } from './depositCodeGenerator';
+import { CODE_WORDS, generateCandidateCode } from './depositWords';
 
 const STORAGE_KEY = 'jackpot_pending_deposit';
 export const DEPOSIT_CODE_TTL_MS = 10 * 60 * 1000;
