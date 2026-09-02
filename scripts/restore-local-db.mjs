@@ -31,7 +31,8 @@ function loadEnv() {
 
 loadEnv();
 
-const targetUri = process.env.LOCAL_MONGODB_URI || process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/jackpot';
+// Target is strictly the local VPS MongoDB: 127.0.0.1:27017
+const targetUri = process.argv[2] || process.env.TARGET_MONGODB_URI || process.env.LOCAL_MONGODB_URI || 'mongodb://127.0.0.1:27017/jackpot';
 
 async function restoreDatabase() {
   const backupsRoot = path.resolve(process.cwd(), 'db-backups');
@@ -53,13 +54,16 @@ async function restoreDatabase() {
 
   const latestBackupFolder = path.join(backupsRoot, subdirs[0]);
   console.log(`📂 Selected Backup: ${latestBackupFolder}`);
-  console.log(`🚀 Connecting to Target MongoDB: ${targetUri}...`);
+  console.log(`🚀 Connecting to Free Local MongoDB: ${targetUri}...`);
 
-  const client = new MongoClient(targetUri);
+  const client = new MongoClient(targetUri, {
+    connectTimeoutMS: 10000,
+    socketTimeoutMS: 30000
+  });
 
   try {
     await client.connect();
-    console.log('✅ Connected successfully to Target MongoDB.');
+    console.log('✅ Connected successfully to Local MongoDB (127.0.0.1:27017).');
 
     const db = client.db();
 
@@ -67,7 +71,7 @@ async function restoreDatabase() {
     const allFiles = fs.readdirSync(latestBackupFolder);
     const dataFiles = allFiles.filter(f => f.endsWith('.ejson') || (f.endsWith('.json') && !f.endsWith('.indexes.json') && f !== '_metadata.json'));
 
-    console.log(`📦 Found ${dataFiles.length} collections to restore.\n`);
+    console.log(`📦 Found ${dataFiles.length} collections to restore into Local MongoDB.\n`);
 
     let totalRestored = 0;
 
@@ -86,17 +90,19 @@ async function restoreDatabase() {
       await collection.deleteMany({});
 
       if (Array.isArray(docs) && docs.length > 0) {
-        // Chunk inserts to avoid 16MB MongoDB packet limit for heavy documents (e.g. screenshots)
-        const CHUNK_SIZE = 30;
+        const CHUNK_SIZE = 100;
         let insertedInCol = 0;
 
         for (let i = 0; i < docs.length; i += CHUNK_SIZE) {
           const chunk = docs.slice(i, i + CHUNK_SIZE);
           const insertResult = await collection.insertMany(chunk, { ordered: false });
           insertedInCol += insertResult.insertedCount;
+          if (docs.length > 100) {
+            process.stdout.write(`\r  ⏳ Restoring ${colName.padEnd(26)} : ${insertedInCol} / ${docs.length} docs... `);
+          }
         }
 
-        console.log(`  ✓ Restored ${colName.padEnd(26)} : ${String(insertedInCol).padStart(6)} documents`);
+        process.stdout.write(`\r  ✓ Restored ${colName.padEnd(26)} : ${String(insertedInCol).padStart(6)} documents\n`);
         totalRestored += insertedInCol;
       } else {
         console.log(`  ✓ Initialized empty collection : ${colName}`);
@@ -123,7 +129,7 @@ async function restoreDatabase() {
     }
 
     console.log('\n🎉 ================================================');
-    console.log(`✅ 100% COMPLETE DATABASE RESTORE SUCCESSFUL!`);
+    console.log(`✅ 100% COMPLETE LOCAL DATABASE RESTORE SUCCESSFUL!`);
     console.log(`📚 Total Collections Restored: ${dataFiles.length}`);
     console.log(`📊 Total Documents Restored: ${totalRestored}`);
     console.log('🎉 ================================================\n');
