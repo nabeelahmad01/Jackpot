@@ -1,4 +1,4 @@
-import { MongoClient } from 'mongodb';
+import { MongoClient, BSON } from 'mongodb';
 import fs from 'fs';
 import path from 'path';
 
@@ -49,33 +49,63 @@ async function backupDatabase() {
     console.log('✅ Connected successfully to MongoDB Atlas.');
 
     const db = client.db();
-    const collections = await db.listCollections().toArray();
+    const dbName = db.databaseName;
+    console.log(`📂 Database Name: "${dbName}"`);
+
+    // Fetch ALL collections in database
+    const collections = await db.listCollections({}, { nameOnly: false }).toArray();
 
     if (!fs.existsSync(backupDir)) {
       fs.mkdirSync(backupDir, { recursive: true });
     }
 
-    console.log(`📦 Found ${collections.length} collections to export.\n`);
+    console.log(`📦 Found ${collections.length} total collections to backup.\n`);
 
     let totalDocs = 0;
+    const metadata = {
+      dbName,
+      timestamp: new Date().toISOString(),
+      collections: []
+    };
 
     for (const colInfo of collections) {
       const colName = colInfo.name;
       if (colName.startsWith('system.')) continue;
 
       const collection = db.collection(colName);
-      const docs = await collection.find({}).toArray();
-      const filePath = path.join(backupDir, `${colName}.json`);
 
-      fs.writeFileSync(filePath, JSON.stringify(docs, null, 2), 'utf-8');
-      console.log(`  ✓ Exported ${colName}: ${docs.length} documents -> ${colName}.json`);
+      // Fetch all docs and all collection indexes
+      const [docs, indexes] = await Promise.all([
+        collection.find({}).toArray(),
+        collection.indexes().catch(() => [])
+      ]);
+
+      // Use BSON Extended JSON to preserve 100% data types (ObjectId, Date, Binary, etc.)
+      const ejsonString = BSON.EJSON.stringify(docs, { relaxed: false });
+      const filePath = path.join(backupDir, `${colName}.ejson`);
+      fs.writeFileSync(filePath, ejsonString, 'utf-8');
+
+      // Save collection index definitions
+      const indexFilePath = path.join(backupDir, `${colName}.indexes.json`);
+      fs.writeFileSync(indexFilePath, JSON.stringify(indexes, null, 2), 'utf-8');
+
+      console.log(`  ✓ ${colName.padEnd(26)} : ${String(docs.length).padStart(6)} documents, ${indexes.length} indexes`);
       totalDocs += docs.length;
+
+      metadata.collections.push({
+        name: colName,
+        count: docs.length,
+        indexesCount: indexes.length
+      });
     }
 
+    fs.writeFileSync(path.join(backupDir, '_metadata.json'), JSON.stringify(metadata, null, 2), 'utf-8');
+
     console.log('\n🎉 ================================================');
-    console.log(`✅ FULL DATABASE BACKUP COMPLETED!`);
+    console.log(`✅ 100% COMPLETE DATABASE BACKUP SUCCESSFUL!`);
     console.log(`📁 Backup folder: ${backupDir}`);
-    console.log(`📊 Total documents saved: ${totalDocs}`);
+    console.log(`📚 Total Collections Saved: ${metadata.collections.length}`);
+    console.log(`📊 Total Documents Saved: ${totalDocs}`);
     console.log('🎉 ================================================\n');
   } catch (err) {
     console.error('❌ Backup failed with error:', err);

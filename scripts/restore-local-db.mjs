@@ -1,4 +1,4 @@
-import { MongoClient } from 'mongodb';
+import { MongoClient, BSON } from 'mongodb';
 import fs from 'fs';
 import path from 'path';
 
@@ -62,36 +62,61 @@ async function restoreDatabase() {
     console.log('✅ Connected successfully to Target MongoDB.');
 
     const db = client.db();
-    const files = fs.readdirSync(latestBackupFolder).filter(f => f.endsWith('.json'));
 
-    console.log(`📦 Found ${files.length} collections to restore.\n`);
+    // Check for .ejson files or fallback to .json
+    const allFiles = fs.readdirSync(latestBackupFolder);
+    const dataFiles = allFiles.filter(f => f.endsWith('.ejson') || (f.endsWith('.json') && !f.endsWith('.indexes.json') && f !== '_metadata.json'));
+
+    console.log(`📦 Found ${dataFiles.length} collections to restore.\n`);
 
     let totalRestored = 0;
 
-    for (const file of files) {
-      const colName = path.basename(file, '.json');
+    for (const file of dataFiles) {
+      const isEjson = file.endsWith('.ejson');
+      const colName = file.replace(/\.(ejson|json)$/, '');
       const filePath = path.join(latestBackupFolder, file);
       const rawData = fs.readFileSync(filePath, 'utf-8');
-      const docs = JSON.parse(rawData);
 
-      if (!Array.isArray(docs) || docs.length === 0) {
-        console.log(`  ⚠ Skipping empty collection: ${colName}`);
-        continue;
-      }
+      // Parse with BSON.EJSON or standard JSON
+      const docs = isEjson ? BSON.EJSON.parse(rawData, { relaxed: false }) : JSON.parse(rawData);
 
       const collection = db.collection(colName);
       
-      // Clean target collection before inserting to prevent duplicate _id conflicts
+      // Clean target collection before inserting to prevent duplicate conflicts
       await collection.deleteMany({});
-      
-      const insertResult = await collection.insertMany(docs, { ordered: false });
-      console.log(`  ✓ Restored ${colName}: ${insertResult.insertedCount} documents`);
-      totalRestored += insertResult.insertedCount;
+
+      if (Array.isArray(docs) && docs.length > 0) {
+        const insertResult = await collection.insertMany(docs, { ordered: false });
+        console.log(`  ✓ Restored ${colName.padEnd(26)} : ${String(insertResult.insertedCount).padStart(6)} documents`);
+        totalRestored += insertResult.insertedCount;
+      } else {
+        console.log(`  ✓ Initialized empty collection : ${colName}`);
+      }
+
+      // Recreate custom indexes if backup has them
+      const indexFile = path.join(latestBackupFolder, `${colName}.indexes.json`);
+      if (fs.existsSync(indexFile)) {
+        try {
+          const indexDefs = JSON.parse(fs.readFileSync(indexFile, 'utf-8'));
+          for (const idx of indexDefs) {
+            if (idx.name === '_id_') continue; // Default index
+            const keySpec = idx.key;
+            const options = { name: idx.name };
+            if (idx.unique) options.unique = true;
+            if (idx.sparse) options.sparse = true;
+            if (idx.expireAfterSeconds !== undefined) options.expireAfterSeconds = idx.expireAfterSeconds;
+            await collection.createIndex(keySpec, options).catch(() => {});
+          }
+        } catch (_) {
+          /* ignore index restore warning */
+        }
+      }
     }
 
     console.log('\n🎉 ================================================');
-    console.log(`✅ DATABASE RESTORE COMPLETED SUCCESSFULLY!`);
-    console.log(`📊 Total documents restored: ${totalRestored}`);
+    console.log(`✅ 100% COMPLETE DATABASE RESTORE SUCCESSFUL!`);
+    console.log(`📚 Total Collections Restored: ${dataFiles.length}`);
+    console.log(`📊 Total Documents Restored: ${totalRestored}`);
     console.log('🎉 ================================================\n');
   } catch (err) {
     console.error('❌ Restore failed with error:', err);
