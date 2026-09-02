@@ -25,6 +25,7 @@ import PlayerProfileModal from './PlayerProfileModal';
 import {
   clearPendingDeposit,
   DEPOSIT_CODE_TTL_MS,
+  fetchUniqueDepositNoteCode,
   generateDepositNoteCode,
   pendingMatchesGame,
   readPendingDeposit,
@@ -1127,17 +1128,12 @@ export default function UserLobby({
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  const handleSelectGateway = (gatewayObj) => {
+  const handleSelectGateway = async (gatewayObj) => {
     setPaymentModalOpen(false);
 
     const amountVal = parseFloat(depositAmount);
-    const pending = readPendingDeposit(currentUserEmail);
-    const reuse =
-      pendingMatchesGame(pending, activeGame?.title) &&
-      remainingSeconds(pending.expiresAt) > 0;
-
-    const noteCode = reuse ? pending.noteCode : generateDepositNoteCode();
-    const expiresAt = reuse ? pending.expiresAt : Date.now() + DEPOSIT_CODE_TTL_MS;
+    const clientCode = generateDepositNoteCode();
+    const expiresAt = Date.now() + DEPOSIT_CODE_TTL_MS;
     const timeRemaining = remainingSeconds(expiresAt);
 
     setScreenshotBase64('');
@@ -1145,7 +1141,7 @@ export default function UserLobby({
     const invoice = {
       amount: amountVal,
       gateway: gatewayObj,
-      noteCode,
+      noteCode: clientCode,
       timeRemaining,
       expiresAt
     };
@@ -1155,12 +1151,34 @@ export default function UserLobby({
       gameTitle: activeGame?.title || '',
       amount: amountVal,
       gateway: gatewayObj,
-      noteCode,
+      noteCode: clientCode,
       expiresAt
     });
     trackInitiateCheckout({ value: amountVal, currency: 'USD' });
 
     setDepositAmount('');
+
+    // Fetch server-verified unique note code to guarantee 0 database collisions
+    try {
+      const serverCode = await fetchUniqueDepositNoteCode();
+      if (serverCode && serverCode !== clientCode) {
+        setActiveInvoice((prev) => {
+          if (!prev || prev.amount !== amountVal) return prev;
+          const updated = { ...prev, noteCode: serverCode };
+          writePendingDeposit({
+            userEmail: currentUserEmail,
+            gameTitle: activeGame?.title || '',
+            amount: amountVal,
+            gateway: gatewayObj,
+            noteCode: serverCode,
+            expiresAt
+          });
+          return updated;
+        });
+      }
+    } catch (_) {
+      /* Keep clientCode fallback */
+    }
   };
 
   const isLinkPayGateway = (gatewayObj) => {

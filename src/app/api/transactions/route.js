@@ -10,6 +10,7 @@ import { accountLookupKey, buildGameUsernameMap } from '../../../lib/resolveGame
 import { compressDataUrlIfNeeded } from '../../../lib/serverImageCompress';
 import { applyStaffGameFilter } from '../../../lib/staffGameAccess';
 import { getDepositBasedMinWithdraw } from '../../../lib/withdrawRules';
+import { generateUniqueDepositCode } from '../../../lib/depositCodeGenerator';
 
 // GET transactions (supports filtering by email for users, or returning all for admins)
 export async function GET(req) {
@@ -949,6 +950,27 @@ export async function POST(req) {
       proofPending: isCancelledOrTimedOut ? false : Boolean(proofPending),
       hasScreenshot: Boolean(newTx.screenshot && String(newTx.screenshot).trim())
     };
+
+    // Guarantee deposit note code is unique across all transactions (never repeats)
+    if (txObject.type === 'DEPOSIT') {
+      const specialDepositCodes = ['CASHOUT-DEP', 'FREEPLAY', 'SIGNUP-FREE3', 'REFERRAL'];
+      const rawCode = String(txObject.code || '').trim();
+      const isSpecial = specialDepositCodes.includes(rawCode);
+
+      if (!isSpecial) {
+        if (!rawCode || rawCode === '—' || rawCode === '-') {
+          txObject.code = await generateUniqueDepositCode(db);
+        } else {
+          const duplicateTx = await transactionsCollection.findOne(
+            { code: rawCode, id: { $ne: txObject.id } },
+            { projection: { _id: 1, id: 1 } }
+          );
+          if (duplicateTx) {
+            txObject.code = await generateUniqueDepositCode(db);
+          }
+        }
+      }
+    }
 
     if (!isCancelledOrTimedOut && txObject.type === 'WITHDRAW') {
       let frontendSettings = cache.get('frontend_settings_all');

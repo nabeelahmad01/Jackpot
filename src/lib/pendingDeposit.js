@@ -1,5 +1,9 @@
+import { CODE_WORDS, generateCandidateCode } from './depositCodeGenerator';
+
 const STORAGE_KEY = 'jackpot_pending_deposit';
 export const DEPOSIT_CODE_TTL_MS = 10 * 60 * 1000;
+
+export { CODE_WORDS };
 
 function normEmail(email) {
   return String(email || '').trim().toLowerCase();
@@ -66,17 +70,27 @@ export function pendingMatchesGame(pending, gameTitle) {
   return normTitle(pending.gameTitle) === normTitle(gameTitle);
 }
 
-const CODE_WORDS = [
-  'Book', 'Car', 'Rocky', 'Apple', 'Tiger', 'Lion', 'Sky', 'Tree', 'Star',
-  'Moon', 'Sun', 'River', 'Bird', 'Fish', 'Ring', 'King', 'Queen', 'Royal',
-  'Club', 'Jack', 'Gold', 'Card', 'Play', 'Game', 'Win', 'Luck', 'Cash',
-  'Ace', 'Diamond', 'Heart', 'Spade', 'Crown', 'Ruby', 'Pearl', 'Coin'
-];
-
+/**
+ * Generate high-entropy deposit note code
+ */
 export function generateDepositNoteCode() {
-  const randWord = CODE_WORDS[Math.floor(Math.random() * CODE_WORDS.length)];
-  const randNum = Math.floor(100 + Math.random() * 900);
-  return `${randWord}${randNum}`;
+  return generateCandidateCode();
+}
+
+/**
+ * Fetch a guaranteed unique deposit note code from server, with high-entropy fallback
+ */
+export async function fetchUniqueDepositNoteCode() {
+  try {
+    const res = await fetch('/api/deposit-code', { cache: 'no-store' });
+    const data = await res.json();
+    if (data?.success && data?.noteCode) {
+      return data.noteCode;
+    }
+  } catch (err) {
+    console.warn('Could not fetch deposit code from server, falling back to local generator:', err);
+  }
+  return generateDepositNoteCode();
 }
 
 export function remainingSeconds(expiresAt) {
