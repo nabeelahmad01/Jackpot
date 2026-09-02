@@ -42,7 +42,10 @@ const backupDir = path.resolve(process.cwd(), 'db-backups', `backup_${Date.now()
 
 async function backupDatabase() {
   console.log('🚀 Connecting to MongoDB Atlas...');
-  const client = new MongoClient(sourceUri);
+  const client = new MongoClient(sourceUri, {
+    connectTimeoutMS: 30000,
+    socketTimeoutMS: 60000
+  });
 
   try {
     await client.connect();
@@ -73,14 +76,31 @@ async function backupDatabase() {
       if (colName.startsWith('system.')) continue;
 
       const collection = db.collection(colName);
+      process.stdout.write(`  ⏳ ${colName.padEnd(26)} : Connecting... `);
 
-      // Fetch all docs and all collection indexes
-      const [docs, indexes] = await Promise.all([
-        collection.find({}).toArray(),
-        collection.indexes().catch(() => [])
-      ]);
+      const docs = [];
+      let count = 0;
 
-      // Use BSON Extended JSON to preserve 100% data types (ObjectId, Date, Binary, etc.)
+      try {
+        const cursor = collection.find({}).batchSize(50);
+        for await (const doc of cursor) {
+          docs.push(doc);
+          count++;
+          if (count % 25 === 0) {
+            process.stdout.write(`\r  ⏳ ${colName.padEnd(26)} : Downloading ${count} docs... `);
+          }
+        }
+      } catch (err) {
+        process.stdout.write(`\n  ⚠ Warning: Streaming error on ${colName}, retrying with direct fetch... `);
+        const fallbackDocs = await collection.find({}).toArray();
+        docs.length = 0;
+        docs.push(...fallbackDocs);
+        count = fallbackDocs.length;
+      }
+
+      const indexes = await collection.indexes().catch(() => []);
+
+      // Use BSON Extended JSON to preserve 100% data types
       const ejsonString = BSON.EJSON.stringify(docs, { relaxed: false });
       const filePath = path.join(backupDir, `${colName}.ejson`);
       fs.writeFileSync(filePath, ejsonString, 'utf-8');
@@ -89,12 +109,12 @@ async function backupDatabase() {
       const indexFilePath = path.join(backupDir, `${colName}.indexes.json`);
       fs.writeFileSync(indexFilePath, JSON.stringify(indexes, null, 2), 'utf-8');
 
-      console.log(`  ✓ ${colName.padEnd(26)} : ${String(docs.length).padStart(6)} documents, ${indexes.length} indexes`);
-      totalDocs += docs.length;
+      process.stdout.write(`\r  ✓ ${colName.padEnd(26)} : ${String(count).padStart(6)} documents, ${indexes.length} indexes\n`);
+      totalDocs += count;
 
       metadata.collections.push({
         name: colName,
-        count: docs.length,
+        count,
         indexesCount: indexes.length
       });
     }

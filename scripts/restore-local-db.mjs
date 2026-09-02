@@ -86,9 +86,18 @@ async function restoreDatabase() {
       await collection.deleteMany({});
 
       if (Array.isArray(docs) && docs.length > 0) {
-        const insertResult = await collection.insertMany(docs, { ordered: false });
-        console.log(`  ✓ Restored ${colName.padEnd(26)} : ${String(insertResult.insertedCount).padStart(6)} documents`);
-        totalRestored += insertResult.insertedCount;
+        // Chunk inserts to avoid 16MB MongoDB packet limit for heavy documents (e.g. screenshots)
+        const CHUNK_SIZE = 30;
+        let insertedInCol = 0;
+
+        for (let i = 0; i < docs.length; i += CHUNK_SIZE) {
+          const chunk = docs.slice(i, i + CHUNK_SIZE);
+          const insertResult = await collection.insertMany(chunk, { ordered: false });
+          insertedInCol += insertResult.insertedCount;
+        }
+
+        console.log(`  ✓ Restored ${colName.padEnd(26)} : ${String(insertedInCol).padStart(6)} documents`);
+        totalRestored += insertedInCol;
       } else {
         console.log(`  ✓ Initialized empty collection : ${colName}`);
       }
