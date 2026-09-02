@@ -76,26 +76,27 @@ async function backupDatabase() {
       if (colName.startsWith('system.')) continue;
 
       const collection = db.collection(colName);
-      process.stdout.write(`  ⏳ ${colName.padEnd(26)} : Connecting... `);
+      process.stdout.write(`  ⏳ ${colName.padEnd(26)} : Checking... `);
 
+      const totalInCol = await collection.countDocuments().catch(() => 0);
       const docs = [];
-      let count = 0;
+      const PAGE_SIZE = 25;
 
-      try {
-        const cursor = collection.find({}).batchSize(50);
-        for await (const doc of cursor) {
-          docs.push(doc);
-          count++;
-          if (count % 25 === 0) {
-            process.stdout.write(`\r  ⏳ ${colName.padEnd(26)} : Downloading ${count} docs... `);
-          }
+      if (totalInCol === 0) {
+        // empty collection
+      } else {
+        for (let skip = 0; skip < totalInCol; skip += PAGE_SIZE) {
+          const chunk = await collection
+            .find({})
+            .sort({ _id: 1 })
+            .skip(skip)
+            .limit(PAGE_SIZE)
+            .toArray();
+
+          docs.push(...chunk);
+          const percent = Math.min(100, Math.round((docs.length / totalInCol) * 100));
+          process.stdout.write(`\r  ⏳ ${colName.padEnd(26)} : ${docs.length} / ${totalInCol} docs (${percent}%)... `);
         }
-      } catch (err) {
-        process.stdout.write(`\n  ⚠ Warning: Streaming error on ${colName}, retrying with direct fetch... `);
-        const fallbackDocs = await collection.find({}).toArray();
-        docs.length = 0;
-        docs.push(...fallbackDocs);
-        count = fallbackDocs.length;
       }
 
       const indexes = await collection.indexes().catch(() => []);
@@ -109,12 +110,12 @@ async function backupDatabase() {
       const indexFilePath = path.join(backupDir, `${colName}.indexes.json`);
       fs.writeFileSync(indexFilePath, JSON.stringify(indexes, null, 2), 'utf-8');
 
-      process.stdout.write(`\r  ✓ ${colName.padEnd(26)} : ${String(count).padStart(6)} documents, ${indexes.length} indexes\n`);
-      totalDocs += count;
+      process.stdout.write(`\r  ✓ ${colName.padEnd(26)} : ${String(docs.length).padStart(6)} documents, ${indexes.length} indexes\n`);
+      totalDocs += docs.length;
 
       metadata.collections.push({
         name: colName,
-        count,
+        count: docs.length,
         indexesCount: indexes.length
       });
     }
