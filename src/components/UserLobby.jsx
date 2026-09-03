@@ -3185,7 +3185,85 @@ export default function UserLobby({
                                     <strong>${parseFloat(tx.amount).toFixed(2)}</strong>
                                   </td>
                                   <td>
-                                    {isSuccess ? `$${parseFloat(tx.amount).toFixed(2)}` : '—'}
+                                    {(() => {
+                                      const baseAmount = parseFloat(tx.amount || 0);
+                                      const totalCoins = tx.totalCoins !== undefined && tx.totalCoins !== null
+                                        ? parseFloat(tx.totalCoins)
+                                        : (tx.gameAmount !== undefined && tx.gameAmount !== null ? parseFloat(tx.gameAmount) : null);
+                                      const bonusApplied = tx.bonusApplied !== undefined && tx.bonusApplied !== null ? Number(tx.bonusApplied) : null;
+                                      const isDepositType = tx.type === 'DEPOSIT' || tx.isDepositFromCashout;
+                                      const isBonusType = tx.type === 'BONUS';
+                                      const isWithdrawType = tx.type === 'WITHDRAW';
+
+                                      if (isFailed) {
+                                        return <span style={{ color: 'var(--text-muted)' }}>—</span>;
+                                      }
+
+                                      if (isWithdrawType) {
+                                        const deductAmount = totalCoins !== null ? Math.abs(totalCoins) : baseAmount;
+                                        return (
+                                          <div>
+                                            <strong style={{ color: '#ff4d6d', fontSize: '0.85rem' }}>
+                                              <i className="fa-solid fa-coins" style={{ marginRight: '3px', fontSize: '0.75rem' }}></i>
+                                              -{deductAmount.toFixed(2)}
+                                            </strong>
+                                            <span style={{ display: 'block', fontSize: '0.62rem', color: 'rgba(255,255,255,0.45)' }}>
+                                              Deducted
+                                            </span>
+                                          </div>
+                                        );
+                                      }
+
+                                      if (isBonusType) {
+                                        const bonusCoins = totalCoins !== null ? Math.abs(totalCoins) : baseAmount;
+                                        return (
+                                          <div>
+                                            <strong style={{ color: '#a855f7', fontSize: '0.85rem' }}>
+                                              <i className="fa-solid fa-gift" style={{ marginRight: '3px', fontSize: '0.75rem' }}></i>
+                                              +{bonusCoins.toFixed(2)}
+                                            </strong>
+                                            <span style={{ display: 'block', fontSize: '0.62rem', color: '#c084fc', fontWeight: 'bold' }}>
+                                              Freeplay Bonus
+                                            </span>
+                                          </div>
+                                        );
+                                      }
+
+                                      if (isDepositType) {
+                                        let displayCoins = totalCoins !== null ? totalCoins : baseAmount;
+                                        let bonusPercent = bonusApplied !== null && bonusApplied > 0 ? bonusApplied : 0;
+                                        let bonusDollars = displayCoins > baseAmount ? (displayCoins - baseAmount) : 0;
+
+                                        if (bonusDollars === 0 && bonusPercent > 0) {
+                                          bonusDollars = baseAmount * (bonusPercent / 100);
+                                          displayCoins = baseAmount + bonusDollars;
+                                        }
+
+                                        return (
+                                          <div>
+                                            <strong style={{ color: '#00ff66', fontSize: '0.88rem' }}>
+                                              <i className="fa-solid fa-coins" style={{ color: '#ffd700', marginRight: '3px', fontSize: '0.75rem' }}></i>
+                                              ${displayCoins.toFixed(2)}
+                                            </strong>
+                                            {bonusDollars > 0 ? (
+                                              <div style={{ fontSize: '0.65rem', color: '#ffd700', fontWeight: '700', marginTop: '0.1rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                                <span style={{ background: 'rgba(250, 204, 21, 0.15)', border: '1px solid rgba(250, 204, 21, 0.35)', padding: '0.05rem 0.35rem', borderRadius: '4px' }}>
+                                                  +${bonusDollars.toFixed(2)} ({bonusPercent ? `${bonusPercent}%` : 'Bonus'})
+                                                </span>
+                                              </div>
+                                            ) : (
+                                              <span style={{ display: 'block', fontSize: '0.62rem', color: 'rgba(255,255,255,0.45)' }}>
+                                                100% Loaded
+                                              </span>
+                                            )}
+                                          </div>
+                                        );
+                                      }
+
+                                      return (
+                                        <strong>${(totalCoins !== null ? totalCoins : baseAmount).toFixed(2)}</strong>
+                                      );
+                                    })()}
                                   </td>
                                   <td>
                                     {isFailed ? (

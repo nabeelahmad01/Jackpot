@@ -585,6 +585,9 @@ export async function PUT(req) {
             }, parentTx.distributorId);
           } else if (parentTx.type === 'DEPOSIT' || parentTx.type === 'BONUS') {
             txUpdate.status = 'SUCCESS';
+            if (originalNoti.totalCoins !== undefined) txUpdate.totalCoins = originalNoti.totalCoins;
+            if (originalNoti.bonusApplied !== undefined) txUpdate.bonusApplied = originalNoti.bonusApplied;
+            if (originalNoti.totalCoins !== undefined) txUpdate.gameAmount = originalNoti.totalCoins;
             if (originalNoti.isDepositFromCashout || parentTx.isDepositFromCashout) {
               txUpdate.note = 'Added deposit from remaining cashout';
             }

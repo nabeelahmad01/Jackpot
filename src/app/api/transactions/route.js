@@ -234,6 +234,8 @@ export async function GET(req) {
         allottedBy: 1,
         isFreeplayWithdraw: 1,
         gameAmount: 1,
+        totalCoins: 1,
+        bonusApplied: 1,
         proofPending: 1,
         coinsHoldNote: 1,
         coinsHoldAt: 1,
@@ -244,6 +246,40 @@ export async function GET(req) {
       .skip(skip)
       .limit(limit)
       .toArray();
+
+    // Enrich transactions with coinsNotifications (totalCoins, bonusApplied, gameAmount)
+    const txIdList = transactions.map((t) => String(t.id)).filter(Boolean);
+    if (txIdList.length > 0) {
+      try {
+        const notis = await db.collection('coinsNotifications').find({
+          transactionId: { $in: txIdList }
+        }).project({ transactionId: 1, totalCoins: 1, bonusApplied: 1, depositAmount: 1, isFreeplay: 1 }).toArray();
+
+        const notiMap = new Map();
+        for (const n of notis) {
+          if (n.transactionId) {
+            notiMap.set(String(n.transactionId), n);
+          }
+        }
+
+        for (const tx of transactions) {
+          const n = notiMap.get(String(tx.id));
+          if (n) {
+            if (tx.totalCoins === undefined || tx.totalCoins === null) {
+              tx.totalCoins = n.totalCoins;
+            }
+            if (tx.bonusApplied === undefined || tx.bonusApplied === null) {
+              tx.bonusApplied = n.bonusApplied;
+            }
+            if (tx.gameAmount === undefined || tx.gameAmount === null) {
+              tx.gameAmount = n.totalCoins;
+            }
+          }
+        }
+      } catch (coinErr) {
+        console.warn('Error enriching transactions with coinsNotifications:', coinErr?.message || coinErr);
+      }
+    }
 
     // Live username from Requests credentials / gameAccounts (fixes VEGAS X vs Vegas x duplicates)
     const txPairs = transactions.filter((t) => t.gameTitle && t.userEmail);
@@ -1514,6 +1550,10 @@ export async function PUT(req) {
           createdCoinTask = coinTaskResult.upsertedCount === 1;
           shouldNotifyCoins = createdCoinTask || coinTaskResult.matchedCount > 0;
         }
+
+        updateFields.totalCoins = totalCoins;
+        updateFields.bonusApplied = bonusPercentage;
+        updateFields.gameAmount = totalCoins;
 
         // If this deposit was already Loaded, force SUCCESS (even if stuck on COINS_LOADING)
         if (existingStatus === 'COMPLETED') {
