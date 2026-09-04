@@ -248,16 +248,25 @@ export async function GET(req) {
       .toArray();
 
     // Enrich transactions with coinsNotifications (totalCoins, bonusApplied, gameAmount)
-    const txIdList = transactions.map((t) => String(t.id)).filter(Boolean);
-    if (txIdList.length > 0) {
+    const allIdVariants = [];
+    for (const t of transactions) {
+      if (t.id !== undefined && t.id !== null) {
+        allIdVariants.push(t.id);
+        allIdVariants.push(String(t.id));
+        const num = Number(t.id);
+        if (!Number.isNaN(num)) allIdVariants.push(num);
+      }
+    }
+
+    if (allIdVariants.length > 0) {
       try {
         const notis = await db.collection('coinsNotifications').find({
-          transactionId: { $in: txIdList }
+          transactionId: { $in: allIdVariants }
         }).project({ transactionId: 1, totalCoins: 1, bonusApplied: 1, depositAmount: 1, isFreeplay: 1 }).toArray();
 
         const notiMap = new Map();
         for (const n of notis) {
-          if (n.transactionId) {
+          if (n.transactionId !== undefined && n.transactionId !== null) {
             notiMap.set(String(n.transactionId), n);
           }
         }
@@ -265,14 +274,14 @@ export async function GET(req) {
         for (const tx of transactions) {
           const n = notiMap.get(String(tx.id));
           if (n) {
-            if (tx.totalCoins === undefined || tx.totalCoins === null) {
-              tx.totalCoins = n.totalCoins;
+            if (tx.totalCoins === undefined || tx.totalCoins === null || Number(tx.totalCoins) === Number(tx.amount)) {
+              if (n.totalCoins !== undefined && n.totalCoins !== null) tx.totalCoins = n.totalCoins;
             }
             if (tx.bonusApplied === undefined || tx.bonusApplied === null) {
-              tx.bonusApplied = n.bonusApplied;
+              if (n.bonusApplied !== undefined && n.bonusApplied !== null) tx.bonusApplied = n.bonusApplied;
             }
             if (tx.gameAmount === undefined || tx.gameAmount === null) {
-              tx.gameAmount = n.totalCoins;
+              if (n.totalCoins !== undefined && n.totalCoins !== null) tx.gameAmount = n.totalCoins;
             }
           }
         }

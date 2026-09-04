@@ -3133,7 +3133,7 @@ export default function UserLobby({
                             <th>#</th>
                             <th>Type</th>
                             <th>Amount</th>
-                            <th>Amount in Game</th>
+                            <th>Amount in Game (Coins)</th>
                             <th>Status</th>
                             <th>Note / Gateway</th>
                             <th>Proof / Receipt</th>
@@ -3187,10 +3187,10 @@ export default function UserLobby({
                                   <td>
                                     {(() => {
                                       const baseAmount = parseFloat(tx.amount || 0);
-                                      const totalCoins = tx.totalCoins !== undefined && tx.totalCoins !== null
+                                      const rawTotalCoins = tx.totalCoins !== undefined && tx.totalCoins !== null
                                         ? parseFloat(tx.totalCoins)
                                         : (tx.gameAmount !== undefined && tx.gameAmount !== null ? parseFloat(tx.gameAmount) : null);
-                                      const bonusApplied = tx.bonusApplied !== undefined && tx.bonusApplied !== null ? Number(tx.bonusApplied) : null;
+                                      const rawBonusApplied = tx.bonusApplied !== undefined && tx.bonusApplied !== null ? Number(tx.bonusApplied) : null;
                                       const isDepositType = tx.type === 'DEPOSIT' || tx.isDepositFromCashout;
                                       const isBonusType = tx.type === 'BONUS';
                                       const isWithdrawType = tx.type === 'WITHDRAW';
@@ -3200,55 +3200,80 @@ export default function UserLobby({
                                       }
 
                                       if (isWithdrawType) {
-                                        const deductAmount = totalCoins !== null ? Math.abs(totalCoins) : baseAmount;
+                                        const deductAmount = rawTotalCoins !== null ? Math.abs(rawTotalCoins) : baseAmount;
                                         return (
                                           <div>
                                             <strong style={{ color: '#ff4d6d', fontSize: '0.85rem' }}>
                                               <i className="fa-solid fa-coins" style={{ marginRight: '3px', fontSize: '0.75rem' }}></i>
-                                              -{deductAmount.toFixed(2)}
+                                              -{deductAmount.toFixed(2)} Coins
                                             </strong>
                                             <span style={{ display: 'block', fontSize: '0.62rem', color: 'rgba(255,255,255,0.45)' }}>
-                                              Deducted
+                                              Deducted from Game
                                             </span>
                                           </div>
                                         );
                                       }
 
                                       if (isBonusType) {
-                                        const bonusCoins = totalCoins !== null ? Math.abs(totalCoins) : baseAmount;
+                                        const bonusCoins = rawTotalCoins !== null ? Math.abs(rawTotalCoins) : baseAmount;
                                         return (
                                           <div>
-                                            <strong style={{ color: '#a855f7', fontSize: '0.85rem' }}>
+                                            <strong style={{ color: '#a855f7', fontSize: '0.88rem' }}>
                                               <i className="fa-solid fa-gift" style={{ marginRight: '3px', fontSize: '0.75rem' }}></i>
-                                              +{bonusCoins.toFixed(2)}
+                                              +{bonusCoins.toFixed(2)} Coins
                                             </strong>
                                             <span style={{ display: 'block', fontSize: '0.62rem', color: '#c084fc', fontWeight: 'bold' }}>
-                                              Freeplay Bonus
+                                              🎁 Freeplay Bonus
                                             </span>
                                           </div>
                                         );
                                       }
 
                                       if (isDepositType) {
-                                        let displayCoins = totalCoins !== null ? totalCoins : baseAmount;
-                                        let bonusPercent = bonusApplied !== null && bonusApplied > 0 ? bonusApplied : 0;
-                                        let bonusDollars = displayCoins > baseAmount ? (displayCoins - baseAmount) : 0;
+                                        let displayCoins = rawTotalCoins;
+                                        let bonusPercent = rawBonusApplied;
 
-                                        if (bonusDollars === 0 && bonusPercent > 0) {
-                                          bonusDollars = baseAmount * (bonusPercent / 100);
-                                          displayCoins = baseAmount + bonusDollars;
+                                        if (displayCoins !== null && displayCoins > baseAmount) {
+                                          if (!bonusPercent || bonusPercent <= 0) {
+                                            bonusPercent = Math.round(((displayCoins - baseAmount) / baseAmount) * 100);
+                                          }
+                                        } else if (bonusPercent !== null && bonusPercent > 0) {
+                                          displayCoins = Math.floor(baseAmount * (1 + bonusPercent / 100));
+                                        } else {
+                                          // Dynamically calculate from player's deposit order
+                                          const allSuccessDeposits = (transactions || [])
+                                            .filter(t => (t.type === 'DEPOSIT' || t.isDepositFromCashout) && String(t.status || '').toUpperCase() === 'SUCCESS')
+                                            .sort((a, b) => new Date(a.date || a.createdAt || 0) - new Date(b.date || b.createdAt || 0));
+
+                                          const isFirst = allSuccessDeposits.length > 0 && String(allSuccessDeposits[0].id) === String(tx.id);
+                                          const defaultFirst = Number(frontendSettings?.firstDepositBonus !== undefined ? frontendSettings.firstDepositBonus : 300);
+                                          const defaultReg = Number(frontendSettings?.regularDepositBonus !== undefined ? frontendSettings.regularDepositBonus : 20);
+                                          bonusPercent = isFirst ? defaultFirst : defaultReg;
+                                          displayCoins = Math.floor(baseAmount * (1 + bonusPercent / 100));
                                         }
+
+                                        const bonusDollars = Math.max(0, (displayCoins || baseAmount) - baseAmount);
 
                                         return (
                                           <div>
-                                            <strong style={{ color: '#00ff66', fontSize: '0.88rem' }}>
-                                              <i className="fa-solid fa-coins" style={{ color: '#ffd700', marginRight: '3px', fontSize: '0.75rem' }}></i>
-                                              ${displayCoins.toFixed(2)}
+                                            <strong style={{ color: '#00ff66', fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                              <i className="fa-solid fa-coins" style={{ color: '#ffd700', fontSize: '0.8rem' }}></i>
+                                              {parseFloat(displayCoins || baseAmount).toFixed(2)} Coins
                                             </strong>
                                             {bonusDollars > 0 ? (
-                                              <div style={{ fontSize: '0.65rem', color: '#ffd700', fontWeight: '700', marginTop: '0.1rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                                <span style={{ background: 'rgba(250, 204, 21, 0.15)', border: '1px solid rgba(250, 204, 21, 0.35)', padding: '0.05rem 0.35rem', borderRadius: '4px' }}>
-                                                  +${bonusDollars.toFixed(2)} ({bonusPercent ? `${bonusPercent}%` : 'Bonus'})
+                                              <div style={{ marginTop: '0.15rem' }}>
+                                                <span style={{
+                                                  background: 'linear-gradient(135deg, rgba(250, 204, 21, 0.2) 0%, rgba(234, 179, 8, 0.3) 100%)',
+                                                  border: '1px solid rgba(250, 204, 21, 0.5)',
+                                                  color: '#fde047',
+                                                  padding: '0.1rem 0.4rem',
+                                                  borderRadius: '4px',
+                                                  fontSize: '0.65rem',
+                                                  fontWeight: '800',
+                                                  display: 'inline-block',
+                                                  boxShadow: '0 0 8px rgba(250, 204, 21, 0.2)'
+                                                }}>
+                                                  +${bonusDollars.toFixed(2)} ({bonusPercent}% Bonus)
                                                 </span>
                                               </div>
                                             ) : (
@@ -3261,7 +3286,7 @@ export default function UserLobby({
                                       }
 
                                       return (
-                                        <strong>${(totalCoins !== null ? totalCoins : baseAmount).toFixed(2)}</strong>
+                                        <strong>${(rawTotalCoins !== null ? rawTotalCoins : baseAmount).toFixed(2)}</strong>
                                       );
                                     })()}
                                   </td>
