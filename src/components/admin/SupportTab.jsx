@@ -19,17 +19,6 @@ export default function SupportTab({ adminUser }) {
   const [deleteModalMsg, setDeleteModalMsg] = useState(null);
   const chatEndRef = useRef(null);
 
-  // Translation States
-  const [translatingOutgoing, setTranslatingOutgoing] = useState(false);
-  const [outboundPreview, setOutboundPreview] = useState(null); // { original, translated, isEditing }
-  const [autoTranslateOnSend, setAutoTranslateOnSend] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('jackpot_admin_auto_translate_send') === 'true';
-    }
-    return false;
-  });
-  const [autoTranslateIncoming, setAutoTranslateIncoming] = useState(false);
-  const [incomingTranslations, setIncomingTranslations] = useState({}); // { [msgId]: { loading, romanUrdu, urdu, expanded } }
   const [isSendingReply, setIsSendingReply] = useState(false);
 
   const quickEmojis = ['🎰', '🔥', '💰', '👍', '👑', '💎', '🚀', '❤️', '😂'];
@@ -241,118 +230,6 @@ export default function SupportTab({ adminUser }) {
     markAsRead();
   }, [activeChatEmail, activeChatMessages.length, mutateConversations]);
 
-  // Translate API Helper
-  const translateText = async (text, direction = 'to_english') => {
-    if (!text || !text.trim()) return null;
-    try {
-      const res = await fetch('/api/translate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text.trim(), direction })
-      });
-      const data = await res.json();
-      if (data.success) {
-        return data;
-      }
-      return null;
-    } catch (err) {
-      console.error('Translation helper error:', err);
-      return null;
-    }
-  };
-
-  // Translate Admin typed message (Roman Urdu -> English)
-  const handleTranslateOutbound = async () => {
-    const text = adminReplyText.trim();
-    if (!text) return;
-    setTranslatingOutgoing(true);
-    try {
-      const data = await translateText(text, 'to_english');
-      if (data && data.translation) {
-        setOutboundPreview({
-          original: text,
-          translated: data.translation,
-          isEditing: Boolean(editingMsg)
-        });
-      } else {
-        alert('Translation failed. Please try again.');
-      }
-    } catch (err) {
-      console.error('Outbound translate error:', err);
-    } finally {
-      setTranslatingOutgoing(false);
-    }
-  };
-
-  // Translate incoming player message (English -> Roman Urdu)
-  const handleTranslateIncoming = useCallback(async (msg) => {
-    if (!msg || !msg.message) return;
-
-    setIncomingTranslations((prev) => {
-      const existing = prev[msg.id];
-      if (existing && !existing.loading) {
-        return {
-          ...prev,
-          [msg.id]: { ...existing, expanded: !existing.expanded }
-        };
-      }
-      return {
-        ...prev,
-        [msg.id]: { loading: true, expanded: true, romanUrdu: '', urdu: '' }
-      };
-    });
-
-    try {
-      const data = await translateText(msg.message, 'to_roman_urdu');
-      if (data && data.success && (data.romanUrdu || data.urdu)) {
-        setIncomingTranslations((prev) => ({
-          ...prev,
-          [msg.id]: {
-            loading: false,
-            expanded: true,
-            romanUrdu: data.romanUrdu || data.urdu,
-            urdu: data.urdu || ''
-          }
-        }));
-      } else {
-        setIncomingTranslations((prev) => ({
-          ...prev,
-          [msg.id]: {
-            loading: false,
-            expanded: true,
-            romanUrdu: 'Translation unavailable',
-            urdu: ''
-          }
-        }));
-      }
-    } catch (err) {
-      console.error('Incoming translate error:', err);
-      setIncomingTranslations((prev) => ({
-        ...prev,
-        [msg.id]: {
-          loading: false,
-          expanded: true,
-          romanUrdu: 'Translation error',
-          urdu: ''
-        }
-      }));
-    }
-  }, []);
-
-  // Auto-translate incoming player messages when toggle is ON
-  useEffect(() => {
-    if (!autoTranslateIncoming || !activeChatMessages.length) return;
-    activeChatMessages.forEach((msg) => {
-      if (msg.senderType !== 'admin' && !msg.isDeleted && msg.message) {
-        setIncomingTranslations((prev) => {
-          if (!prev[msg.id]) {
-            handleTranslateIncoming(msg);
-          }
-          return prev;
-        });
-      }
-    });
-  }, [autoTranslateIncoming, activeChatMessages, handleTranslateIncoming]);
 
   const handleToggleReaction = async (messageId, emoji) => {
     if (!adminUser) return;
@@ -535,19 +412,7 @@ export default function SupportTab({ adminUser }) {
     let finalMessage = textToSend;
 
     // If autoTranslateOnSend is checked and text was not already translated via customText
-    if (autoTranslateOnSend && !customText && finalMessage && !adminAttachment) {
-      try {
-        const tr = await translateText(finalMessage, 'to_english');
-        if (tr && tr.translation) {
-          finalMessage = tr.translation;
-        }
-      } catch (e) {
-        console.warn('Auto-translate on send failed, sending original:', e);
-      }
-    }
-
     setAdminReplyText('');
-    setOutboundPreview(null);
     const replyAttachment = adminAttachment;
     setAdminAttachment('');
     const currentReply = replyTo;
@@ -806,34 +671,6 @@ export default function SupportTab({ adminUser }) {
                 </div>
               </div>
 
-              {/* Auto Translate Toggle for Player Messages */}
-              <label
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  background: autoTranslateIncoming ? 'rgba(59, 130, 246, 0.18)' : 'rgba(255,255,255,0.04)',
-                  border: '1px solid ' + (autoTranslateIncoming ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255,255,255,0.08)'),
-                  padding: '0.25rem 0.6rem',
-                  borderRadius: '16px',
-                  fontSize: '0.65rem',
-                  color: autoTranslateIncoming ? '#93c5fd' : '#94a3b8',
-                  cursor: 'pointer',
-                  flexShrink: 0,
-                  marginRight: '0.5rem',
-                  userSelect: 'none'
-                }}
-                title="Automatically translate player messages to Roman Urdu"
-              >
-                <input
-                  type="checkbox"
-                  checked={autoTranslateIncoming}
-                  onChange={(e) => setAutoTranslateIncoming(e.target.checked)}
-                  style={{ accentColor: '#3b82f6', width: '12px', height: '12px', cursor: 'pointer' }}
-                />
-                <span style={{ fontWeight: 600 }}>🌐 Roman Urdu</span>
-              </label>
-
               <button
                 type="button"
                 onClick={() => { setActiveChatEmail(null); }}
@@ -860,7 +697,6 @@ export default function SupportTab({ adminUser }) {
                 activeChatMessages.map((msg) => {
                   const isMe = msg.senderType === 'admin';
                   const isDeleted = Boolean(msg.isDeleted);
-                  const translation = incomingTranslations[msg.id];
 
                   return (
                     <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
@@ -887,60 +723,6 @@ export default function SupportTab({ adminUser }) {
                         )}
 
                         {msg.message}
-
-                        {/* Incoming Translated Card for Player Messages */}
-                        {!isMe && !isDeleted && translation?.expanded && (
-                          <div
-                            style={{
-                              marginTop: '0.5rem',
-                              padding: '0.45rem 0.65rem',
-                              background: 'rgba(15, 23, 42, 0.95)',
-                              border: '1px solid rgba(96, 165, 250, 0.35)',
-                              borderRadius: '8px',
-                              fontSize: '0.72rem',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '0.25rem',
-                              color: '#f1f5f9'
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.25rem' }}>
-                              <span style={{ fontSize: '0.62rem', color: '#93c5fd', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <i className="fa-solid fa-language"></i> ROMAN URDU TRANSLATION
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setIncomingTranslations((prev) => ({
-                                    ...prev,
-                                    [msg.id]: { ...prev[msg.id], expanded: false }
-                                  }));
-                                }}
-                                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '0.85rem', padding: 0, lineHeight: 1 }}
-                                title="Close translation"
-                              >
-                                &times;
-                              </button>
-                            </div>
-
-                            {translation.loading ? (
-                              <div style={{ padding: '0.35rem 0', opacity: 0.85, display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.68rem', color: '#93c5fd' }}>
-                                <i className="fa-solid fa-spinner fa-spin"></i> Translating to Roman Urdu...
-                              </div>
-                            ) : (
-                              <>
-                                <div style={{ lineHeight: 1.4, color: '#f8fafc', fontWeight: '600' }}>
-                                  🗣️ <span style={{ color: '#fed7aa' }}>{translation.romanUrdu}</span>
-                                </div>
-                                {translation.urdu && translation.urdu !== translation.romanUrdu && (
-                                  <div style={{ fontSize: '0.72rem', color: '#cbd5e1', direction: 'rtl', textAlign: 'right', opacity: 0.9, marginTop: '2px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-                                    🇵🇰 {translation.urdu}
-                                  </div>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        )}
 
                         {msg.attachment && !isDeleted && (
                           <div style={{ marginTop: '0.5rem' }}>
@@ -1021,29 +803,6 @@ export default function SupportTab({ adminUser }) {
                               >
                                 <i className="fa-solid fa-reply"></i> Reply
                               </button>
-
-                              {!isMe && msg.message && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleTranslateIncoming(msg)}
-                                  style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: translation?.expanded ? '#fde047' : '#60a5fa',
-                                    fontWeight: '600',
-                                    cursor: 'pointer',
-                                    padding: 0,
-                                    fontSize: '0.675rem',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '3px'
-                                  }}
-                                  title="Translate to Roman Urdu"
-                                >
-                                  <i className={`fa-solid ${translation?.loading ? 'fa-spinner fa-spin' : 'fa-language'}`}></i>
-                                  {translation?.expanded ? 'Hide RU' : 'Roman Urdu'}
-                                </button>
-                              )}
 
                               {isMe && (
                                 <button
@@ -1126,113 +885,7 @@ export default function SupportTab({ adminUser }) {
                   <div style={{ flex: 1 }}>
                     <span style={{ fontSize: '0.65rem', color: '#a855f7', fontWeight: 'bold' }}>Editing Message</span>
                   </div>
-                  <button type="button" onClick={() => { setEditingMsg(null); setAdminReplyText(''); setOutboundPreview(null); }} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.9rem', cursor: 'pointer' }}>&times;</button>
-                </div>
-              )}
-
-              {/* Outbound Translation Preview Card */}
-              {outboundPreview && (
-                <div
-                  style={{
-                    background: 'linear-gradient(135deg, rgba(16, 24, 39, 0.98) 0%, rgba(11, 13, 22, 0.98) 100%)',
-                    border: '1px solid rgba(255, 215, 0, 0.35)',
-                    borderRadius: '10px',
-                    padding: '0.65rem 0.85rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.45rem',
-                    boxShadow: '0 4px 15px rgba(0,0,0,0.5)',
-                    position: 'relative'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.3rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '0.68rem', color: 'var(--gold-primary)', fontWeight: 'bold', letterSpacing: '0.5px' }}>
-                        <i className="fa-solid fa-wand-magic-sparkles"></i> TRANSLATION PREVIEW (ENGLISH)
-                      </span>
-                      <span style={{ fontSize: '0.55rem', background: 'rgba(34, 197, 94, 0.15)', color: '#4ade80', border: '1px solid rgba(34, 197, 94, 0.3)', padding: '0.05rem 0.3rem', borderRadius: '4px', fontWeight: 'bold' }}>
-                        User receives this
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setOutboundPreview(null)}
-                      style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '1rem', cursor: 'pointer', lineHeight: 1 }}
-                      title="Discard preview"
-                    >
-                      &times;
-                    </button>
-                  </div>
-
-                  <div style={{ fontSize: '0.675rem', color: '#94a3b8' }}>
-                    <span style={{ color: '#cbd5e1', fontWeight: '600' }}>Your Roman Urdu:</span> &quot;{outboundPreview.original}&quot;
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.65rem', color: 'var(--gold-primary)', fontWeight: '600', marginBottom: '0.2rem' }}>
-                      English Message (Review or edit before sending):
-                    </label>
-                    <input
-                      type="text"
-                      value={outboundPreview.translated}
-                      onChange={(e) => setOutboundPreview({ ...outboundPreview, translated: e.target.value })}
-                      style={{
-                        width: '100%',
-                        background: '#070913',
-                        border: '1px solid rgba(255, 215, 0, 0.25)',
-                        borderRadius: '6px',
-                        padding: '0.45rem 0.65rem',
-                        color: '#fff',
-                        fontSize: '0.8rem',
-                        outline: 'none',
-                        boxSizing: 'border-box'
-                      }}
-                    />
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.2rem' }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAdminReplyText(outboundPreview.translated);
-                        setOutboundPreview(null);
-                      }}
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.08)',
-                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                        color: '#e2e8f0',
-                        padding: '0.35rem 0.65rem',
-                        borderRadius: '6px',
-                        fontSize: '0.675rem',
-                        fontWeight: '600',
-                        cursor: 'pointer'
-                      }}
-                      title="Copy English text into the main message box"
-                    >
-                      <i className="fa-solid fa-pen-to-square"></i> Put in Box
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => executeSend(outboundPreview.translated)}
-                      disabled={isSendingReply}
-                      style={{
-                        background: 'linear-gradient(135deg, #ffd700 0%, #cca000 100%)',
-                        border: 'none',
-                        color: '#000',
-                        padding: '0.35rem 0.85rem',
-                        borderRadius: '6px',
-                        fontSize: '0.72rem',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                    >
-                      <i className={`fa-solid ${isSendingReply ? 'fa-spinner fa-spin' : 'fa-paper-plane'}`}></i> Send English
-                    </button>
-                  </div>
+                  <button type="button" onClick={() => { setEditingMsg(null); setAdminReplyText(''); }} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.9rem', cursor: 'pointer' }}>&times;</button>
                 </div>
               )}
 
@@ -1266,7 +919,7 @@ export default function SupportTab({ adminUser }) {
                 </div>
               )}
 
-              {/* Quick Emoji Bar & Auto Translate Toggle */}
+              {/* Quick Emoji Bar */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: 'rgba(255,255,255,0.03)', padding: '0.25rem 0.5rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflowX: 'auto' }}>
                   <span style={{ fontSize: '0.6rem', color: '#888', fontWeight: 'bold', letterSpacing: '0.5px' }}>QUICK:</span>
@@ -1281,21 +934,6 @@ export default function SupportTab({ adminUser }) {
                     </button>
                   ))}
                 </div>
-
-                <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', margin: 0, fontSize: '0.65rem', color: autoTranslateOnSend ? 'var(--gold-primary)' : 'var(--text-muted)', fontWeight: '600', userSelect: 'none' }}>
-                  <input
-                    type="checkbox"
-                    checked={autoTranslateOnSend}
-                    onChange={(e) => {
-                      setAutoTranslateOnSend(e.target.checked);
-                      try {
-                        localStorage.setItem('jackpot_admin_auto_translate_send', e.target.checked ? 'true' : 'false');
-                      } catch {}
-                    }}
-                    style={{ accentColor: 'var(--gold-primary)', cursor: 'pointer', width: '12px', height: '12px' }}
-                  />
-                  <span>⚡ Auto-translate on Send (RU → EN)</span>
-                </label>
               </div>
 
               {(() => {
@@ -1341,7 +979,7 @@ export default function SupportTab({ adminUser }) {
 
                     <input
                       type="text"
-                      placeholder={editingMsg ? 'Edit message...' : (activeChatMessages.length === 0 ? 'Write in Roman Urdu or English...' : 'Type reply in Roman Urdu or English...')}
+                      placeholder={editingMsg ? 'Edit message...' : (activeChatMessages.length === 0 ? 'Type a message...' : 'Type reply...')}
                       value={adminReplyText}
                       onChange={(e) => setAdminReplyText(e.target.value)}
                       style={{
@@ -1357,33 +995,6 @@ export default function SupportTab({ adminUser }) {
                       }}
                       required={!adminAttachment}
                     />
-
-                    {/* Translate Button for Outbound Text */}
-                    <button
-                      type="button"
-                      onClick={handleTranslateOutbound}
-                      disabled={translatingOutgoing || !adminReplyText.trim()}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '4px',
-                        background: adminReplyText.trim() ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255,255,255,0.03)',
-                        border: '1px solid ' + (adminReplyText.trim() ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255,255,255,0.08)'),
-                        borderRadius: '8px',
-                        padding: '0.65rem 0.8rem',
-                        color: adminReplyText.trim() ? '#60a5fa' : '#64748b',
-                        cursor: adminReplyText.trim() ? 'pointer' : 'not-allowed',
-                        fontSize: '0.75rem',
-                        fontWeight: 'bold',
-                        transition: 'all 0.2s',
-                        flexShrink: 0
-                      }}
-                      title="Translate Roman Urdu to English before sending"
-                    >
-                      <i className={`fa-solid ${translatingOutgoing ? 'fa-spinner fa-spin' : 'fa-language'}`}></i>
-                      <span style={{ fontSize: '0.7rem' }}>{translatingOutgoing ? 'Translating...' : 'Translate'}</span>
-                    </button>
 
                     <button
                       type="submit"
