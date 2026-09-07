@@ -68,15 +68,31 @@ export default function AdminDashboard({
 
   const handleSyncNotifications = async () => {
     const email = adminUser?.email;
-    if (!email) return;
+    if (!email) {
+      showToast('Please log in first to sync notifications.', 'error');
+      return;
+    }
+
+    if (typeof window !== 'undefined' && window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      const msg = 'Push notifications require HTTPS. Please open https://jackpotroyals.com/admin';
+      setPushSyncState({ loading: false, success: false, message: 'Requires HTTPS' });
+      showToast(msg, 'error');
+      return;
+    }
+
     setPushSyncState({ loading: true, success: false, message: '' });
     try {
-      await subscribeToStaffPush(email);
-      setPushSyncState({ loading: false, success: true, message: 'Device registered successfully!' });
-      setTimeout(() => setPushSyncState((prev) => ({ ...prev, message: '' })), 4000);
-    } catch (err) {
-      setPushSyncState({ loading: false, success: false, message: err?.message || 'Registration failed' });
+      const res = await subscribeToStaffPush(email);
+      const isNative = Boolean(res?.nativeToken) || Boolean(window.Capacitor?.isNativePlatform?.());
+      const successMsg = isNative ? 'APK Native Token registered!' : 'Browser notifications connected!';
+      setPushSyncState({ loading: false, success: true, message: successMsg });
+      showToast(`✅ ${successMsg} (${email})`, 'success');
       setTimeout(() => setPushSyncState((prev) => ({ ...prev, message: '' })), 5000);
+    } catch (err) {
+      const errMsg = err?.message || 'Registration failed';
+      setPushSyncState({ loading: false, success: false, message: errMsg });
+      showToast(errMsg, 'error');
+      setTimeout(() => setPushSyncState((prev) => ({ ...prev, message: '' })), 6000);
     }
   };
 
