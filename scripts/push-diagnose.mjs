@@ -58,9 +58,14 @@ async function main() {
   const nativeSubs = allSubs.filter((s) => s.type === 'native' && s.nativeToken);
   const webSubs = allSubs.filter((s) => s.type !== 'native' && s.subscription);
 
-  const staffSubs = allSubs.filter((s) => s.audience === 'staff');
+  const envAdminEmail = (process.env.ADMIN_EMAIL || process.env.NEXT_PUBLIC_ADMIN_EMAIL || '')
+    .toLowerCase()
+    .trim();
+  const adminEmails = new Set([envAdminEmail, 'admin@jackpot.com'].filter(Boolean));
+
+  const staffSubs = allSubs.filter((s) => s.audience === 'staff' || adminEmails.has(String(s.userEmail || '').toLowerCase().trim()));
   const distributorSubs = allSubs.filter((s) => s.audience === 'distributor');
-  const playerSubs = allSubs.filter((s) => !s.audience || s.audience === 'player');
+  const playerSubs = allSubs.filter((s) => !staffSubs.includes(s) && !distributorSubs.includes(s));
 
   console.log('====================================================');
   console.log('       📱 PUSH NOTIFICATION DEVICES SUMMARY         ');

@@ -367,8 +367,18 @@ export async function sendStaffPush(
   { title, body, url = '/admin', tag = 'staff-alert', gameTitle = '', alertKind = '' } = {}
 ) {
   try {
+    const envAdminEmail = (process.env.ADMIN_EMAIL || process.env.NEXT_PUBLIC_ADMIN_EMAIL || '')
+      .toLowerCase()
+      .trim();
+    const adminEmails = [envAdminEmail, 'admin@jackpot.com'].filter(Boolean);
+
     const allSubscriptions = await db.collection('pushSubscriptions')
-      .find({ audience: 'staff' })
+      .find({
+        $or: [
+          { audience: 'staff' },
+          { userEmail: { $in: adminEmails } }
+        ]
+      })
       .toArray();
 
     const subscriptions = await filterStaffSubscriptionsForAlert(db, allSubscriptions, {

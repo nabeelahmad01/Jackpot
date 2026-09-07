@@ -184,24 +184,32 @@ export default function AdminDashboard({
     };
   }, []);
 
-  // Register this device for Jackpot Portal lock-screen request alerts
-  // (native Portal APK + optional browser staff push). Player APK tokens are separate.
-  useEffect(() => {
+  const [pushStatus, setPushStatus] = useState('checking');
+  const [pushLoading, setPushLoading] = useState(false);
+
+  const checkAndRegisterPush = async (interactive = false) => {
     const email = adminUser?.email;
     if (!email) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        await subscribeToStaffPush(email);
-      } catch (err) {
-        if (!cancelled) {
-          console.warn('Staff push registration:', err?.message || err);
-        }
+    try {
+      if (interactive) setPushLoading(true);
+      await subscribeToStaffPush(email);
+      setPushStatus('enabled');
+    } catch (err) {
+      const msg = String(err?.message || '');
+      if (/denied|not allowed/i.test(msg)) {
+        setPushStatus('denied');
+        if (interactive) alert('Notification permission is blocked. Please allow notifications in your browser settings.');
+      } else {
+        setPushStatus('prompt');
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    } finally {
+      if (interactive) setPushLoading(false);
+    }
+  };
+
+  // Register this device for Jackpot Portal lock-screen request alerts
+  useEffect(() => {
+    checkAndRegisterPush(false);
   }, [adminUser?.email]);
 
   useEffect(() => {
@@ -424,9 +432,33 @@ export default function AdminDashboard({
             JACKPOT<span style={{ color: 'var(--gold-primary)' }}>ROYALS</span>
           </span>
         </div>
-        <button className="lobby-nav-btn logout-btn" onClick={onLogout} style={{ padding: '0.4rem 0.8rem', fontSize: '0.7rem', margin: 0, width: 'auto', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-          <i className="fa-solid fa-right-from-bracket"></i> <span>LOGOUT</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <button
+            onClick={() => checkAndRegisterPush(true)}
+            disabled={pushLoading}
+            title={pushStatus === 'enabled' ? 'Lock-screen alerts ACTIVE' : 'Click to enable Lock-screen alerts'}
+            style={{
+              background: pushStatus === 'enabled' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(234, 179, 8, 0.2)',
+              border: `1px solid ${pushStatus === 'enabled' ? 'rgba(34, 197, 94, 0.4)' : 'rgba(234, 179, 8, 0.5)'}`,
+              color: pushStatus === 'enabled' ? '#4ade80' : '#facc15',
+              padding: '0.4rem 0.65rem',
+              borderRadius: '6px',
+              fontSize: '0.7rem',
+              fontWeight: '700',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              cursor: 'pointer'
+            }}
+          >
+            <i className={`fa-solid ${pushStatus === 'enabled' ? 'fa-bell' : 'fa-bell-slash'}`}></i>
+            <span>{pushStatus === 'enabled' ? 'ALERTS ON' : 'ENABLE ALERTS'}</span>
+          </button>
+
+          <button className="lobby-nav-btn logout-btn" onClick={onLogout} style={{ padding: '0.4rem 0.8rem', fontSize: '0.7rem', margin: 0, width: 'auto', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <i className="fa-solid fa-right-from-bracket"></i> <span>LOGOUT</span>
+          </button>
+        </div>
       </div>
 
       {sidebarOpen && (

