@@ -1,6 +1,55 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../../lib/mongodb';
 
+function isSameCalendarDay(raw, targetYear, targetMonth, targetDay, dateParam) {
+  if (!raw) return false;
+
+  if (raw instanceof Date) {
+    if (isNaN(raw.getTime())) return false;
+    if (raw.getUTCFullYear() === targetYear && (raw.getUTCMonth() + 1) === targetMonth && raw.getUTCDate() === targetDay) return true;
+    if (raw.getFullYear() === targetYear && (raw.getMonth() + 1) === targetMonth && raw.getDate() === targetDay) return true;
+    const pkt = new Date(raw.getTime() + 5 * 3600000);
+    if (pkt.getUTCFullYear() === targetYear && (pkt.getUTCMonth() + 1) === targetMonth && pkt.getUTCDate() === targetDay) return true;
+    return false;
+  }
+
+  const str = String(raw).trim();
+  if (!str) return false;
+
+  if (str.startsWith(dateParam)) return true;
+
+  const y = String(targetYear);
+  const m = String(targetMonth);
+  const mPad = String(targetMonth).padStart(2, '0');
+  const d = String(targetDay);
+  const dPad = String(targetDay).padStart(2, '0');
+
+  const prefixes = [
+    `${m}/${d}/${y}`,
+    `${mPad}/${dPad}/${y}`,
+    `${m}/${dPad}/${y}`,
+    `${mPad}/${d}/${y}`,
+    `${y}-${mPad}-${dPad}`,
+    `${y}-${m}-${d}`,
+    `${y}/${mPad}/${dPad}`,
+    `${y}/${m}/${d}`
+  ];
+
+  for (const prefix of prefixes) {
+    if (str.startsWith(prefix)) return true;
+  }
+
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    if (parsed.getUTCFullYear() === targetYear && (parsed.getUTCMonth() + 1) === targetMonth && parsed.getUTCDate() === targetDay) return true;
+    if (parsed.getFullYear() === targetYear && (parsed.getMonth() + 1) === targetMonth && parsed.getDate() === targetDay) return true;
+    const pkt = new Date(parsed.getTime() + 5 * 3600000);
+    if (pkt.getUTCFullYear() === targetYear && (pkt.getUTCMonth() + 1) === targetMonth && pkt.getUTCDate() === targetDay) return true;
+  }
+
+  return false;
+}
+
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
@@ -16,10 +65,6 @@ export async function GET(req) {
     }
     const [targetYear, targetMonth, targetDay] = parts;
 
-    // Buffer range for MongoDB query
-    const startWindow = new Date(Date.UTC(targetYear, targetMonth - 1, targetDay - 2, 0, 0, 0, 0));
-    const endWindow = new Date(Date.UTC(targetYear, targetMonth - 1, targetDay + 2, 23, 59, 59, 999));
-
     const db = await getDb();
 
     const transactions = await db.collection('transactions')
@@ -27,14 +72,7 @@ export async function GET(req) {
         {
           status: 'SUCCESS',
           type: { $in: ['DEPOSIT', 'WITHDRAW'] },
-          isDepositFromCashout: { $ne: true },
-          $or: [
-            { date: { $regex: `^${dateParam}` } },
-            { date: { $gte: startWindow.toISOString(), $lte: endWindow.toISOString() } },
-            { date: { $gte: startWindow, $lte: endWindow } },
-            { createdAt: { $gte: startWindow.toISOString(), $lte: endWindow.toISOString() } },
-            { createdAt: { $gte: startWindow, $lte: endWindow } }
-          ]
+          isDepositFromCashout: { $ne: true }
         },
         { projection: { amount: 1, payoutSent: 1, type: 1, date: 1, createdAt: 1, isDepositFromCashout: 1 } }
       )
@@ -43,32 +81,9 @@ export async function GET(req) {
     let totalIn = 0;
     let totalOut = 0;
 
-    const matchesTargetDate = (rawDate) => {
-      if (!rawDate) return false;
-      const str = String(rawDate).trim();
-      if (str.startsWith(dateParam)) return true;
-
-      const d = new Date(rawDate);
-      if (isNaN(d.getTime())) return false;
-
-      // 1. UTC match
-      if (d.getUTCFullYear() === targetYear && (d.getUTCMonth() + 1) === targetMonth && d.getUTCDate() === targetDay) {
-        return true;
-      }
-      // 2. Local match
-      if (d.getFullYear() === targetYear && (d.getMonth() + 1) === targetMonth && d.getDate() === targetDay) {
-        return true;
-      }
-      // 3. PKT / Asian timezone (UTC+5) match
-      const pkt = new Date(d.getTime() + 5 * 60 * 60 * 1000);
-      if (pkt.getUTCFullYear() === targetYear && (pkt.getUTCMonth() + 1) === targetMonth && pkt.getUTCDate() === targetDay) {
-        return true;
-      }
-      return false;
-    };
-
     transactions.forEach((tx) => {
-      const isMatch = matchesTargetDate(tx.date) || matchesTargetDate(tx.createdAt);
+      const isMatch = isSameCalendarDay(tx.date, targetYear, targetMonth, targetDay, dateParam) ||
+                      isSameCalendarDay(tx.createdAt, targetYear, targetMonth, targetDay, dateParam);
       if (!isMatch) return;
 
       const amount = parseFloat(tx.amount) || 0;
