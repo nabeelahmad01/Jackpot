@@ -77,19 +77,22 @@ function getServiceAccount() {
   return candidates.find(keyIsValid) || candidates[0] || null;
 }
 
+const customTitle = process.argv[3];
+const customBody = process.argv[4];
+
 async function main() {
   const client = new MongoClient(process.env.MONGODB_URI);
   await client.connect();
   const db = client.db();
 
-  const query = emailFilter ? { userEmail: emailFilter } : {};
+  const query = emailFilter ? { userEmail: { $regex: new RegExp(`^${emailFilter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } } : {};
   const subs = await db.collection('pushSubscriptions').find(query).toArray();
   const native = subs.filter((s) => s.type === 'native' && s.nativeToken);
   const web = subs.filter((s) => s.type !== 'native' && s.subscription);
 
-  console.log(`Found ${subs.length} subscription(s): ${native.length} native (APK), ${web.length} web.`);
+  console.log(`\nFound ${subs.length} subscription(s) for query [${emailFilter || 'ALL'}]: ${native.length} native (APK), ${web.length} web.`);
   if (subs.length === 0) {
-    console.log('No devices registered. Open the app, allow notifications, then retry.');
+    console.log('No devices registered for this email. Open the app on the phone, tap "Sync / Enable Device Push", then retry.');
     await client.close();
     return;
   }
@@ -99,19 +102,32 @@ async function main() {
   if (native.length > 0 && serviceAccount) {
     const app = getApps().length ? getApps()[0] : initializeApp({ credential: cert(serviceAccount) });
     const messaging = getMessaging(app);
-    const res = await messaging.sendEachForMulticast({
-      tokens: native.map((s) => s.nativeToken),
-      notification: { title: TITLE, body: BODY },
-      data: { url: '/lobby' },
-      android: {
-        priority: 'high',
-        notification: { channelId: 'jackpot_promotions', sound: 'default' }
+
+    for (const sub of native) {
+      const isStaff = sub.audience === 'staff' || sub.userEmail?.toLowerCase().includes('rocky') || sub.userEmail?.toLowerCase().includes('admin');
+      const channelId = isStaff ? 'jackpot_portal_alerts' : (sub.audience === 'distributor' ? 'jackpot_distributor_alerts' : 'jackpot_promotions');
+      const title = customTitle || (isStaff ? '🚨 Jackpot Portal Super Admin Alert' : 'Jackpot Royals');
+      const body = customBody || (isStaff ? 'Demo test notification — Super Admin lock-screen push is working!' : 'Test notification — reply and tell us if this reached your lock screen!');
+      const url = isStaff ? '/admin' : (sub.audience === 'distributor' ? '/distributor' : '/lobby');
+
+      try {
+        const res = await messaging.send({
+          token: sub.nativeToken,
+          notification: { title, body },
+          data: { url, tag: 'demo-test' },
+          android: {
+            priority: 'high',
+            notification: {
+              channelId,
+              sound: 'default'
+            }
+          }
+        });
+        console.log(`✅ Native APK Push Sent to [${sub.userEmail}] (${sub.platform || 'android'}) → MessageID: ${res}`);
+      } catch (err) {
+        console.log(`❌ Native APK Push Failed for [${sub.userEmail}]:`, err?.code || err?.message);
       }
-    });
-    console.log(`Native push → success: ${res.successCount}, failed: ${res.failureCount}`);
-    res.responses.forEach((r, i) => {
-      if (!r.success) console.log(`  token#${i} error: ${r.error?.code} ${r.error?.message}`);
-    });
+    }
   } else if (native.length > 0) {
     console.log('Native devices exist but no Firebase service account found in .env.local.');
   }
@@ -123,23 +139,24 @@ async function main() {
       process.env.VAPID_PUBLIC_KEY,
       process.env.VAPID_PRIVATE_KEY
     );
-    const payload = JSON.stringify({ title: TITLE, body: BODY, url: '/lobby', tag: 'test-push' });
-    let ok = 0;
-    let bad = 0;
     for (const record of web) {
+      const isStaff = record.audience === 'staff' || record.userEmail?.toLowerCase().includes('rocky') || record.userEmail?.toLowerCase().includes('admin');
+      const title = customTitle || (isStaff ? '🚨 Jackpot Portal Alert' : 'Jackpot Royals');
+      const body = customBody || (isStaff ? 'Demo test notification — Staff push is working!' : 'Test notification — reply and tell us if this reached your lock screen!');
+      const url = isStaff ? '/admin' : '/lobby';
+      const payload = JSON.stringify({ title, body, url, tag: 'test-push' });
+
       try {
         await webpush.sendNotification(record.subscription, payload);
-        ok += 1;
+        console.log(`✅ Web Push Sent to [${record.userEmail}]`);
       } catch (e) {
-        bad += 1;
-        console.log(`  web error: ${e.statusCode || e.message}`);
+        console.log(`❌ Web push error for [${record.userEmail}]: ${e.statusCode || e.message}`);
       }
     }
-    console.log(`Web push → success: ${ok}, failed: ${bad}`);
   }
 
   await client.close();
-  console.log('\nDone. Check your device now.');
+  console.log('\nDone. Check your mobile lock screen now!');
 }
 
 main().catch((err) => {
