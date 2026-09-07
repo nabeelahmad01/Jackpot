@@ -54,33 +54,76 @@ async function main() {
   await client.connect();
   const db = client.db();
 
-  const subs = await db.collection('pushSubscriptions').find({ type: 'native' }).sort({ createdAt: -1 }).toArray();
-  console.log(`\nNative (APK) subscriptions: ${subs.length}\n`);
+  const allSubs = await db.collection('pushSubscriptions').find({}).sort({ updatedAt: -1, createdAt: -1 }).toArray();
+  const nativeSubs = allSubs.filter((s) => s.type === 'native' && s.nativeToken);
+  const webSubs = allSubs.filter((s) => s.type !== 'native' && s.subscription);
 
-  const sa = getServiceAccount();
-  const app = getApps().length ? getApps()[0] : initializeApp({ credential: cert(sa) });
-  const messaging = getMessaging(app);
+  const staffSubs = allSubs.filter((s) => s.audience === 'staff');
+  const distributorSubs = allSubs.filter((s) => s.audience === 'distributor');
+  const playerSubs = allSubs.filter((s) => !s.audience || s.audience === 'player');
 
-  let validCount = 0;
-  for (const s of subs) {
-    let state = 'unknown';
-    try {
-      await messaging.send(
-        { token: s.nativeToken, notification: { title: 't', body: 'b' }, android: { notification: { channelId: 'jackpot_promotions' } } },
-        true // dryRun — validates only, delivers nothing
-      );
-      state = 'VALID';
-      validCount += 1;
-    } catch (e) {
-      state = e.code || e.message;
-    }
-    console.log(
-      `${state.padEnd(42)} ${String(s.userEmail || '—').padEnd(30)} created:${fmt(s.createdAt)}  updated:${fmt(s.updatedAt)}  …${String(s.nativeToken || '').slice(-10)}`
-    );
+  console.log('====================================================');
+  console.log('       📱 PUSH NOTIFICATION DEVICES SUMMARY         ');
+  console.log('====================================================');
+  console.log(`Total Registered Devices:  ${allSubs.length}`);
+  console.log(`  - Android/iOS Native APK: ${nativeSubs.length}`);
+  console.log(`  - Web Push (Browsers):    ${webSubs.length}`);
+  console.log('----------------------------------------------------');
+  console.log(`Breakdown by Audience:`);
+  console.log(`  - 👔 Staff / Admin:       ${staffSubs.length} device(s)`);
+  console.log(`  - 🏢 Distributors:        ${distributorSubs.length} device(s)`);
+  console.log(`  - 🎮 Players:             ${playerSubs.length} device(s)`);
+  console.log('====================================================\n');
+
+  console.log('--- 👔 STAFF / ADMIN REGISTERED DEVICES ---');
+  if (staffSubs.length === 0) {
+    console.log('No staff devices registered yet.');
+  } else {
+    staffSubs.forEach((s, idx) => {
+      const type = s.type === 'native' ? 'APK' : 'WEB';
+      console.log(` ${idx + 1}. [${type}] ${String(s.userEmail || '—').padEnd(30)} updated:${fmt(s.updatedAt || s.createdAt)}`);
+    });
   }
 
-  console.log(`\nValid tokens: ${validCount} / ${subs.length}`);
+  console.log('\n--- 🏢 DISTRIBUTOR REGISTERED DEVICES ---');
+  if (distributorSubs.length === 0) {
+    console.log('No distributor devices registered yet.');
+  } else {
+    distributorSubs.forEach((s, idx) => {
+      const type = s.type === 'native' ? 'APK' : 'WEB';
+      console.log(` ${idx + 1}. [${type}] Dist:${String(s.distributorId || '—').padEnd(10)} ${String(s.userEmail || '—').padEnd(25)} updated:${fmt(s.updatedAt || s.createdAt)}`);
+    });
+  }
+
+  // Verify Native APK Tokens with Firebase dryRun
+  const sa = getServiceAccount();
+  if (sa && nativeSubs.length > 0) {
+    console.log('\n--- 🔍 FIREBASE APK TOKEN HEALTH CHECK (dryRun) ---');
+    const app = getApps().length ? getApps()[0] : initializeApp({ credential: cert(sa) });
+    const messaging = getMessaging(app);
+
+    let validCount = 0;
+    for (const s of nativeSubs) {
+      let state = 'unknown';
+      try {
+        await messaging.send(
+          { token: s.nativeToken, notification: { title: 't', body: 'b' }, android: { notification: { channelId: 'jackpot_promotions' } } },
+          true // dryRun — validates only, delivers nothing
+        );
+        state = 'VALID';
+        validCount += 1;
+      } catch (e) {
+        state = e.code || e.message;
+      }
+      console.log(
+        `${state.padEnd(42)} [${(s.audience || 'player').toUpperCase().padEnd(11)}] ${String(s.userEmail || '—').padEnd(28)} …${String(s.nativeToken || '').slice(-10)}`
+      );
+    }
+    console.log(`\nActive/Valid APK Tokens: ${validCount} / ${nativeSubs.length}`);
+  }
+
   await client.close();
+  console.log('\nDone.');
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
