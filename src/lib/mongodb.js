@@ -2,7 +2,19 @@ import { MongoClient } from 'mongodb';
 
 // MongoDB Atlas is the only database source; no local-data fallback.
 
-const MONGODB_URI = process.env.MONGODB_URI;
+function getMongoUri() {
+  let uri = process.env.MONGODB_URI || '';
+  uri = uri.trim();
+  if (
+    (uri.startsWith('"') && uri.endsWith('"')) ||
+    (uri.startsWith("'") && uri.endsWith("'"))
+  ) {
+    uri = uri.slice(1, -1).trim();
+  }
+  return uri;
+}
+
+const MONGODB_URI = getMongoUri();
 
 // Default initial data for seeding
 const DEFAULT_SEEDS = {

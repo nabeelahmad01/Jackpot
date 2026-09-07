@@ -23,7 +23,16 @@ function loadEnv() {
     const raw = readFileSync(envPath, 'utf8');
     for (const line of raw.split('\n')) {
       const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
-      if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^'(.*)'$/, '$1');
+      if (m && !process.env[m[1]]) {
+        let val = m[2].trim();
+        if (
+          (val.startsWith('"') && val.endsWith('"')) ||
+          (val.startsWith("'") && val.endsWith("'"))
+        ) {
+          val = val.slice(1, -1).trim();
+        }
+        process.env[m[1]] = val;
+      }
     }
   } catch {
     /* ignore */
