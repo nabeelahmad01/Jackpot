@@ -195,14 +195,20 @@ if (typeof window !== 'undefined') {
     const Push = Cap?.Plugins?.PushNotifications;
     if (!Push) return;
     try {
-      Push.addListener('registration', (result) => {
-        if (result?.value) {
-          autoSyncNativeToken(result.value);
-        }
-      }).catch(() => {});
-      Push.addListener('registrationError', (err) => {
-        console.warn('Native push registration error:', err);
-      }).catch(() => {});
+      try {
+        Push.addListener('registration', (result) => {
+          if (result?.value) {
+            autoSyncNativeToken(result.value);
+          }
+        });
+      } catch {}
+
+      try {
+        Push.addListener('registrationError', (err) => {
+          console.warn('Native push registration error:', err);
+        });
+      } catch {}
+
       const perm = await Push.checkPermissions().catch(() => null);
       if (perm?.receive === 'granted') {
         await Push.register().catch(() => {});
@@ -289,30 +295,40 @@ async function subscribeToNativePush(userEmail, { audience = 'player', distribut
     rejectToken = reject;
   });
 
-  const registrationHandle = await PushNotifications.addListener('registration', (result) => {
-    if (result?.value) {
-      latestNativeToken = result.value;
-      try {
-        localStorage.setItem('jackpot_cached_native_token', result.value);
-      } catch {}
-      resolveToken(result.value);
-    }
-  }).catch(() => null);
+  let registrationHandle = null;
+  try {
+    registrationHandle = await PushNotifications.addListener('registration', (result) => {
+      if (result?.value) {
+        latestNativeToken = result.value;
+        try {
+          localStorage.setItem('jackpot_cached_native_token', result.value);
+        } catch {}
+        resolveToken(result.value);
+      }
+    });
+  } catch {}
 
-  const errorHandle = await PushNotifications.addListener('registrationError', (err) => {
-    if (token) {
-      resolveToken(token);
-    } else {
-      rejectToken(new Error(err?.error || 'This native build is not connected to Firebase/APNs yet.'));
-    }
-  }).catch(() => null);
+  let errorHandle = null;
+  try {
+    errorHandle = await PushNotifications.addListener('registrationError', (err) => {
+      if (token) {
+        resolveToken(token);
+      } else {
+        rejectToken(new Error(err?.error || 'This native build is not connected to Firebase/APNs yet.'));
+      }
+    });
+  } catch {}
 
   try {
     await PushNotifications.register();
   } catch (regErr) {
     if (!token) {
-      try { await registrationHandle?.remove(); } catch {}
-      try { await errorHandle?.remove(); } catch {}
+      try {
+        if (typeof registrationHandle?.remove === 'function') await registrationHandle.remove();
+      } catch {}
+      try {
+        if (typeof errorHandle?.remove === 'function') await errorHandle.remove();
+      } catch {}
       throw regErr;
     }
   }
@@ -338,8 +354,12 @@ async function subscribeToNativePush(userEmail, { audience = 'player', distribut
     }
   } finally {
     window.clearTimeout(timeout);
-    try { await registrationHandle?.remove(); } catch {}
-    try { await errorHandle?.remove(); } catch {}
+    try {
+      if (typeof registrationHandle?.remove === 'function') await registrationHandle.remove();
+    } catch {}
+    try {
+      if (typeof errorHandle?.remove === 'function') await errorHandle.remove();
+    } catch {}
   }
 
   const response = await fetch('/api/push-subscriptions', {
@@ -363,27 +383,29 @@ async function subscribeToNativePush(userEmail, { audience = 'player', distribut
 
   if (!nativeActionListenerReady) {
     nativeActionListenerReady = true;
-    PushNotifications.addListener('pushNotificationActionPerformed', ({ notification }) => {
-      const isDist = isDistributorNative();
-      const isPort = isPortalNative();
-      const fallback =
-        resolvedAudience === 'distributor' || isDist
-          ? '/distributor'
-          : resolvedAudience === 'staff' || isPort
-            ? '/admin'
-            : '/lobby';
-      let targetUrl =
-        notification?.data?.url ||
-        notification?.data?.adminUrl ||
-        notification?.data?.distributorUrl ||
-        fallback;
+    try {
+      PushNotifications.addListener('pushNotificationActionPerformed', ({ notification }) => {
+        const isDist = isDistributorNative();
+        const isPort = isPortalNative();
+        const fallback =
+          resolvedAudience === 'distributor' || isDist
+            ? '/distributor'
+            : resolvedAudience === 'staff' || isPort
+              ? '/admin'
+              : '/lobby';
+        let targetUrl =
+          notification?.data?.url ||
+          notification?.data?.adminUrl ||
+          notification?.data?.distributorUrl ||
+          fallback;
 
-      if (/\/ledger|\/payout|\/deposit|\/withdraw/i.test(targetUrl)) {
-        targetUrl = (resolvedAudience === 'distributor' || isDist) ? '/distributor/ledger' : '/admin/ledger';
-      }
+        if (/\/ledger|\/payout|\/deposit|\/withdraw/i.test(targetUrl)) {
+          targetUrl = (resolvedAudience === 'distributor' || isDist) ? '/distributor/ledger' : '/admin/ledger';
+        }
 
-      window.location.assign(targetUrl);
-    }).catch(() => {});
+        window.location.assign(targetUrl);
+      });
+    } catch {}
   }
 
   return { nativeToken: token, success: true };
