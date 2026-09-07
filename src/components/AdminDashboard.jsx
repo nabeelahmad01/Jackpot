@@ -45,6 +45,7 @@ export default function AdminDashboard({
   adminUser,
   completedActionIds = {},
   onLogout,
+  showToast,
   onAddGameClick,
   onEditGameClick,
   onDeleteGame,
@@ -84,12 +85,16 @@ export default function AdminDashboard({
       const isNative = Boolean(res?.nativeToken) || Boolean(window.Capacitor?.isNativePlatform?.());
       const successMsg = isNative ? 'APK Native Device Registered!' : 'Browser notifications connected!';
       setPushSyncState({ loading: false, success: true, message: successMsg });
-      showToast(`✅ ${successMsg} (${email})`, 'success');
+      if (typeof showToast === 'function') {
+        showToast(`✅ ${successMsg} (${email})`, 'success');
+      }
       setTimeout(() => setPushSyncState((prev) => ({ ...prev, message: '' })), 5000);
     } catch (err) {
       const errMsg = err?.message || 'Registration failed';
       setPushSyncState({ loading: false, success: false, message: errMsg });
-      showToast(errMsg, 'error');
+      if (typeof showToast === 'function') {
+        showToast(errMsg, 'error');
+      }
       setTimeout(() => setPushSyncState((prev) => ({ ...prev, message: '' })), 6000);
     }
   };

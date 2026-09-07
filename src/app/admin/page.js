@@ -705,6 +705,7 @@ export default function AdminPage({ portalName, forcedRole }) {
           adminUser={adminUser}
           completedActionIds={completedActionIds}
           onLogout={handleAdminLogout}
+          showToast={showToast}
           onAddGameClick={() => { setEditGameData(null); setGameModalOpen(true); }}
           onEditGameClick={(game) => { setEditGameData(game); setGameModalOpen(true); }}
           onDeleteGame={handleDeleteGame}
