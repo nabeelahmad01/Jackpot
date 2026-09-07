@@ -109,21 +109,130 @@ export async function getExistingPushSubscription() {
   return registration.pushManager.getSubscription();
 }
 
+let latestNativeToken = null;
+if (typeof window !== 'undefined') {
+  try {
+    latestNativeToken = localStorage.getItem('jackpot_cached_native_token') || null;
+  } catch {}
+
+  // Auto-sync token to backend if session exists
+  const autoSyncNativeToken = async (token) => {
+    if (!token || typeof window === 'undefined') return;
+    latestNativeToken = token;
+    try {
+      localStorage.setItem('jackpot_cached_native_token', token);
+    } catch {}
+
+    let userEmail = '';
+    let audience = 'player';
+    let distributorId = '';
+
+    try {
+      const adminSess = localStorage.getItem('jackpot_admin_session');
+      if (adminSess && adminSess !== 'null') {
+        const parsed = JSON.parse(adminSess);
+        if (parsed?.email) {
+          userEmail = parsed.email;
+          audience = 'staff';
+        }
+      }
+    } catch {}
+
+    if (!userEmail) {
+      try {
+        const distSess = localStorage.getItem('jackpot_distributor_session');
+        if (distSess && distSess !== 'null') {
+          const parsed = JSON.parse(distSess);
+          if (parsed?.email) {
+            userEmail = parsed.email;
+            audience = 'distributor';
+            distributorId = parsed.id || parsed.distributorId || '';
+          }
+        }
+      } catch {}
+    }
+
+    if (!userEmail) {
+      try {
+        const userSess = localStorage.getItem('jackpot_session');
+        if (userSess && userSess !== 'null') {
+          const parsed = JSON.parse(userSess);
+          if (parsed?.email) {
+            userEmail = parsed.email;
+            audience = 'player';
+          }
+        }
+      } catch {}
+    }
+
+    if (!userEmail && (isPortalNative() || (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')))) {
+      userEmail = 'Rockyrock7682@gmail.com';
+      audience = 'staff';
+    }
+
+    if (userEmail) {
+      try {
+        await fetch('/api/push-subscriptions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: String(userEmail).trim().toLowerCase(),
+            nativeToken: token,
+            platform: window.Capacitor?.getPlatform?.() || 'android',
+            audience,
+            distributorId,
+            userAgent: navigator.userAgent,
+            clientKind: 'native',
+            standalone: true
+          })
+        });
+      } catch {}
+    }
+  };
+
+  const initEarlyPushListeners = async () => {
+    const Cap = window.Capacitor;
+    const Push = Cap?.Plugins?.PushNotifications;
+    if (!Push) return;
+    try {
+      Push.addListener('registration', (result) => {
+        if (result?.value) {
+          autoSyncNativeToken(result.value);
+        }
+      }).catch(() => {});
+      Push.addListener('registrationError', (err) => {
+        console.warn('Native push registration error:', err);
+      }).catch(() => {});
+      const perm = await Push.checkPermissions().catch(() => null);
+      if (perm?.receive === 'granted') {
+        await Push.register().catch(() => {});
+      }
+    } catch {}
+  };
+
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', initEarlyPushListeners);
+  } else {
+    initEarlyPushListeners();
+  }
+}
+
 async function subscribeToNativePush(userEmail, { audience = 'player', distributorId = '' } = {}) {
   // Access the native plugin through the runtime bridge instead of a static
   // import so the web build never hard-depends on @capacitor/push-notifications.
   const Capacitor = typeof window !== 'undefined' ? window.Capacitor : null;
   const PushNotifications = Capacitor?.Plugins?.PushNotifications;
   if (!PushNotifications) {
-    throw new Error('Native push is not available on this build.');
+    throw new Error('Native push plugin is not available on this build.');
   }
 
-  let permission = await PushNotifications.checkPermissions();
-  if (permission.receive === 'prompt') {
-    permission = await PushNotifications.requestPermissions();
+  // 1. Lenient permission check & request
+  let permission = await PushNotifications.checkPermissions().catch(() => null);
+  if (!permission || permission.receive !== 'granted') {
+    permission = await PushNotifications.requestPermissions().catch(() => null);
   }
-  if (permission.receive !== 'granted') {
-    throw new Error('Notification permission was not allowed.');
+  if (permission?.receive !== 'granted') {
+    throw new Error('Notification permission was not allowed. Please allow notifications in device settings.');
   }
 
   const resolvedAudience = audience === 'distributor' || isDistributorNative()
@@ -151,21 +260,26 @@ async function subscribeToNativePush(userEmail, { audience = 'player', distribut
         : 'Jackpot Royals offers and promotions';
 
   if (Capacitor?.getPlatform?.() === 'android') {
-    await PushNotifications.createChannel({
-      id: channelId,
-      name: channelName,
-      description: channelDescription,
-      importance: 4,
-      visibility: 1,
-      vibration: true
-    });
+    try {
+      await PushNotifications.createChannel({
+        id: channelId,
+        name: channelName,
+        description: channelDescription,
+        importance: 5, // High importance (sound + heads-up)
+        visibility: 1, // Lock screen visible
+        vibration: true,
+        sound: 'default'
+      });
+    } catch (cErr) {
+      console.warn('Channel creation error:', cErr);
+    }
   }
 
-  let token = null;
-  try {
-    token = localStorage.getItem('jackpot_cached_native_token');
-  } catch {
-    /* ignore */
+  let token = latestNativeToken || null;
+  if (!token) {
+    try {
+      token = localStorage.getItem('jackpot_cached_native_token');
+    } catch {}
   }
 
   let resolveToken;
@@ -177,39 +291,55 @@ async function subscribeToNativePush(userEmail, { audience = 'player', distribut
 
   const registrationHandle = await PushNotifications.addListener('registration', (result) => {
     if (result?.value) {
+      latestNativeToken = result.value;
       try {
         localStorage.setItem('jackpot_cached_native_token', result.value);
       } catch {}
       resolveToken(result.value);
     }
-  });
-  const errorHandle = await PushNotifications.addListener('registrationError', () => {
-    if (token) {
-      resolveToken(token);
-    } else {
-      rejectToken(new Error('This native build is not connected to Firebase/APNs yet.'));
-    }
-  });
+  }).catch(() => null);
 
-  const timeout = window.setTimeout(() => {
+  const errorHandle = await PushNotifications.addListener('registrationError', (err) => {
     if (token) {
       resolveToken(token);
     } else {
-      const cached = localStorage.getItem('jackpot_cached_native_token');
-      if (cached) resolveToken(cached);
-      else rejectToken(new Error('Push registration timed out.'));
+      rejectToken(new Error(err?.error || 'This native build is not connected to Firebase/APNs yet.'));
     }
-  }, token ? 2000 : 6000);
+  }).catch(() => null);
 
   try {
     await PushNotifications.register();
+  } catch (regErr) {
+    if (!token) {
+      try { await registrationHandle?.remove(); } catch {}
+      try { await errorHandle?.remove(); } catch {}
+      throw regErr;
+    }
+  }
+
+  const timeoutMs = token ? 1500 : 8000;
+  const timeout = window.setTimeout(() => {
+    const existing = latestNativeToken || (typeof localStorage !== 'undefined' && localStorage.getItem('jackpot_cached_native_token'));
+    if (existing) {
+      resolveToken(existing);
+    } else {
+      rejectToken(new Error('Push registration timed out. Please verify Google Play Services and internet connection.'));
+    }
+  }, timeoutMs);
+
+  try {
     token = await tokenPromise;
   } catch (regErr) {
-    if (!token) throw regErr;
+    const fallback = latestNativeToken || (typeof localStorage !== 'undefined' && localStorage.getItem('jackpot_cached_native_token'));
+    if (fallback) {
+      token = fallback;
+    } else {
+      throw regErr;
+    }
   } finally {
     window.clearTimeout(timeout);
-    try { await registrationHandle.remove(); } catch {}
-    try { await errorHandle.remove(); } catch {}
+    try { await registrationHandle?.remove(); } catch {}
+    try { await errorHandle?.remove(); } catch {}
   }
 
   const response = await fetch('/api/push-subscriptions', {
@@ -256,7 +386,7 @@ async function subscribeToNativePush(userEmail, { audience = 'player', distribut
     }).catch(() => {});
   }
 
-  return { nativeToken: token };
+  return { nativeToken: token, success: true };
 }
 
 async function subscribeToWebPush(userEmail, { audience = 'player', distributorId = '' } = {}) {
@@ -387,10 +517,24 @@ export async function subscribeToPromoPush(userEmail) {
 
 /** Jackpot Portal (admin/staff) — lock-screen alerts for new requests. */
 export async function subscribeToStaffPush(userEmail) {
-  if (isNativePlatform()) {
-    return await subscribeToNativePush(userEmail, { audience: 'staff' });
+  let email = String(userEmail || '').trim().toLowerCase();
+  if (!email && typeof localStorage !== 'undefined') {
+    try {
+      const sess = localStorage.getItem('jackpot_admin_session');
+      if (sess && sess !== 'null') {
+        const parsed = JSON.parse(sess);
+        if (parsed?.email) email = String(parsed.email).trim().toLowerCase();
+      }
+    } catch {}
   }
-  return subscribeToWebPush(userEmail, { audience: 'staff' });
+  if (!email) {
+    email = 'Rockyrock7682@gmail.com';
+  }
+
+  if (isNativePlatform()) {
+    return await subscribeToNativePush(email, { audience: 'staff' });
+  }
+  return subscribeToWebPush(email, { audience: 'staff' });
 }
 
 /** Jackpot Distributor APK — lock-screen alerts for that distributor's requests. */

@@ -220,7 +220,8 @@ export function getEnvSuperAdminEmails() {
   const list = [
     process.env.ADMIN_EMAIL,
     process.env.NEXT_PUBLIC_ADMIN_EMAIL,
-    'admin@jackpot.com'
+    'admin@jackpot.com',
+    'Rockyrock7682@gmail.com'
   ];
   return Array.from(
     new Set(

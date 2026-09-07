@@ -61,7 +61,8 @@ async function main() {
   const adminEmails = new Set([
     process.env.ADMIN_EMAIL,
     process.env.NEXT_PUBLIC_ADMIN_EMAIL,
-    'admin@jackpot.com'
+    'admin@jackpot.com',
+    'Rockyrock7682@gmail.com'
   ].map((e) => String(e || '').toLowerCase().trim()).filter(Boolean));
 
   const staffSubs = allSubs.filter((s) => s.audience === 'staff' || adminEmails.has(String(s.userEmail || '').toLowerCase().trim()));

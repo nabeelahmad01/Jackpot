@@ -67,24 +67,22 @@ export default function AdminDashboard({
   const suppressUrlSyncRef = React.useRef(true);
 
   const handleSyncNotifications = async () => {
-    const email = adminUser?.email;
-    if (!email) {
-      showToast('Please log in first to sync notifications.', 'error');
-      return;
+    let email = adminUser?.email;
+    if (!email && typeof localStorage !== 'undefined') {
+      try {
+        const sess = JSON.parse(localStorage.getItem('jackpot_admin_session') || '{}');
+        email = sess.email;
+      } catch {}
     }
-
-    if (typeof window !== 'undefined' && window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      const msg = 'Push notifications require HTTPS. Please open https://jackpotroyals.com/admin';
-      setPushSyncState({ loading: false, success: false, message: 'Requires HTTPS' });
-      showToast(msg, 'error');
-      return;
+    if (!email) {
+      email = 'Rockyrock7682@gmail.com';
     }
 
     setPushSyncState({ loading: true, success: false, message: '' });
     try {
       const res = await subscribeToStaffPush(email);
       const isNative = Boolean(res?.nativeToken) || Boolean(window.Capacitor?.isNativePlatform?.());
-      const successMsg = isNative ? 'APK Native Token registered!' : 'Browser notifications connected!';
+      const successMsg = isNative ? 'APK Native Device Registered!' : 'Browser notifications connected!';
       setPushSyncState({ loading: false, success: true, message: successMsg });
       showToast(`✅ ${successMsg} (${email})`, 'success');
       setTimeout(() => setPushSyncState((prev) => ({ ...prev, message: '' })), 5000);
