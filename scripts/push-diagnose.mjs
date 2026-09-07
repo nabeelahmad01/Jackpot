@@ -58,10 +58,11 @@ async function main() {
   const nativeSubs = allSubs.filter((s) => s.type === 'native' && s.nativeToken);
   const webSubs = allSubs.filter((s) => s.type !== 'native' && s.subscription);
 
-  const envAdminEmail = (process.env.ADMIN_EMAIL || process.env.NEXT_PUBLIC_ADMIN_EMAIL || '')
-    .toLowerCase()
-    .trim();
-  const adminEmails = new Set([envAdminEmail, 'admin@jackpot.com'].filter(Boolean));
+  const adminEmails = new Set([
+    process.env.ADMIN_EMAIL,
+    process.env.NEXT_PUBLIC_ADMIN_EMAIL,
+    'admin@jackpot.com'
+  ].map((e) => String(e || '').toLowerCase().trim()).filter(Boolean));
 
   const staffSubs = allSubs.filter((s) => s.audience === 'staff' || adminEmails.has(String(s.userEmail || '').toLowerCase().trim()));
   const distributorSubs = allSubs.filter((s) => s.audience === 'distributor');

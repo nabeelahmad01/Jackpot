@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/mongodb';
-import { getVapidPublicKey, isStaffRole } from '../../../lib/pushNotifications';
+import { getVapidPublicKey, isStaffRole, isEnvSuperAdminEmail } from '../../../lib/pushNotifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,12 +57,7 @@ export async function POST(req) {
 
     const db = await getDb();
 
-    const envAdminEmail = (process.env.ADMIN_EMAIL || process.env.NEXT_PUBLIC_ADMIN_EMAIL || '')
-      .toLowerCase()
-      .trim();
-    const isEnvAdmin =
-      (Boolean(envAdminEmail) && userEmail === envAdminEmail) ||
-      userEmail === 'admin@jackpot.com';
+    const isEnvAdmin = isEnvSuperAdminEmail(userEmail);
 
     const user = await db.collection('users').findOne(
       { email: userEmail },

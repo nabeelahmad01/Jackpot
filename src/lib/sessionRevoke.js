@@ -2,20 +2,30 @@ import { cache } from './cache';
 
 const revokeKey = (email) => `session_revoked_${String(email || '').toLowerCase().trim()}`;
 
-/** Env-configured super admin email (not stored in the users collection). */
+/** Env-configured super admin emails (not stored in the users collection). */
+export function getEnvSuperAdminEmails() {
+  const list = [
+    process.env.ADMIN_EMAIL,
+    process.env.NEXT_PUBLIC_ADMIN_EMAIL,
+    'admin@jackpot.com'
+  ];
+  return Array.from(
+    new Set(
+      list.map((e) => String(e || '').toLowerCase().trim()).filter(Boolean)
+    )
+  );
+}
+
 export function getEnvSuperAdminEmail() {
-  return String(process.env.ADMIN_EMAIL || process.env.NEXT_PUBLIC_ADMIN_EMAIL || '')
-    .toLowerCase()
-    .trim();
+  const emails = getEnvSuperAdminEmails();
+  return emails[0] || 'admin@jackpot.com';
 }
 
 /** True for the env super admin or the legacy hard-coded admin identity. */
 export function isProtectedSuperAdminEmail(email) {
   const clean = String(email || '').toLowerCase().trim();
   if (!clean) return false;
-  if (clean === 'admin@jackpot.com') return true;
-  const envEmail = getEnvSuperAdminEmail();
-  return Boolean(envEmail && clean === envEmail);
+  return getEnvSuperAdminEmails().includes(clean);
 }
 
 /** Mark an email so active localStorage sessions are forced to log out. */

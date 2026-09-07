@@ -216,14 +216,23 @@ function parseStaffRoles(role) {
     .filter(Boolean);
 }
 
-function isEnvSuperAdminEmail(email) {
+export function getEnvSuperAdminEmails() {
+  const list = [
+    process.env.ADMIN_EMAIL,
+    process.env.NEXT_PUBLIC_ADMIN_EMAIL,
+    'admin@jackpot.com'
+  ];
+  return Array.from(
+    new Set(
+      list.map((e) => String(e || '').toLowerCase().trim()).filter(Boolean)
+    )
+  );
+}
+
+export function isEnvSuperAdminEmail(email) {
   const clean = String(email || '').toLowerCase().trim();
   if (!clean) return false;
-  if (clean === 'admin@jackpot.com') return true;
-  const envEmail = String(process.env.ADMIN_EMAIL || process.env.NEXT_PUBLIC_ADMIN_EMAIL || '')
-    .toLowerCase()
-    .trim();
-  return Boolean(envEmail && clean === envEmail);
+  return getEnvSuperAdminEmails().includes(clean);
 }
 
 function staffCanReceiveAlert(roles, kind, { gameTitle, gameTitleLower, skipGameTitles, gamesById, allowedGameIds } = {}) {
@@ -367,10 +376,7 @@ export async function sendStaffPush(
   { title, body, url = '/admin', tag = 'staff-alert', gameTitle = '', alertKind = '' } = {}
 ) {
   try {
-    const envAdminEmail = (process.env.ADMIN_EMAIL || process.env.NEXT_PUBLIC_ADMIN_EMAIL || '')
-      .toLowerCase()
-      .trim();
-    const adminEmails = [envAdminEmail, 'admin@jackpot.com'].filter(Boolean);
+    const adminEmails = getEnvSuperAdminEmails();
 
     const allSubscriptions = await db.collection('pushSubscriptions')
       .find({

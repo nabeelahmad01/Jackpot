@@ -29,61 +29,54 @@ export async function POST(req) {
 
     // -------------------------------------------------------------
     // Env-driven super admin (single source of truth).
-    // Prefer server-only vars; fall back to the NEXT_PUBLIC_ ones that
-    // may already be set on the hosting panel.
+    // Support ADMIN_* and NEXT_PUBLIC_ADMIN_* seamlessly.
     // -------------------------------------------------------------
-    const envAdminEmail = (process.env.ADMIN_EMAIL || process.env.NEXT_PUBLIC_ADMIN_EMAIL || '')
-      .toLowerCase()
-      .trim();
-    const envAdminPassword = process.env.ADMIN_PASSWORD || process.env.NEXT_PUBLIC_ADMIN_PASSWORD || '';
+    const envAdminEmail = (process.env.ADMIN_EMAIL || '').toLowerCase().trim();
+    const envAdminPassword = process.env.ADMIN_PASSWORD || '';
+    const nextPublicAdminEmail = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || '').toLowerCase().trim();
+    const nextPublicAdminPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || '';
 
-    if (envAdminEmail && envAdminPassword) {
-      // When super admin credentials are configured via env, they are the
-      // ONLY way to open the top-level admin account.
-      if (inputEmail === envAdminEmail) {
-        if (password === envAdminPassword) {
-          trackDeviceSession(db, {
-            email: envAdminEmail,
-            name: 'System Admin',
-            role: 'admin',
-            deviceId,
-            deviceFingerprint,
-            userAgent,
-            ip,
-            isApp,
-            appType,
-            deviceModel
-          }).catch(() => {});
+    const isAdminMatch =
+      (envAdminEmail && envAdminPassword && inputEmail === envAdminEmail && password === envAdminPassword) ||
+      (nextPublicAdminEmail && nextPublicAdminPassword && inputEmail === nextPublicAdminEmail && password === nextPublicAdminPassword);
 
-          return NextResponse.json({
-            success: true,
-            message: 'Login successful!',
-            user: {
-              name: 'System Admin',
-              email: envAdminEmail,
-              role: 'admin',
-              coins: 0,
-              referralCode: '',
-              isSubscribed: false,
-              distributorId: '',
-              allowedGameIds: []
-            }
-          });
+    const configuredAdminEmail = envAdminEmail || nextPublicAdminEmail;
+
+    if (isAdminMatch) {
+      trackDeviceSession(db, {
+        email: inputEmail,
+        name: 'System Admin',
+        role: 'admin',
+        deviceId,
+        deviceFingerprint,
+        userAgent,
+        ip,
+        isApp,
+        appType,
+        deviceModel
+      }).catch(() => {});
+
+      return NextResponse.json({
+        success: true,
+        message: 'Login successful!',
+        user: {
+          name: 'System Admin',
+          email: inputEmail,
+          role: 'admin',
+          coins: 0,
+          referralCode: '',
+          isSubscribed: false,
+          distributorId: '',
+          allowedGameIds: []
         }
-        return NextResponse.json(
-          { success: false, message: 'Incorrect email or password.' },
-          { status: 401 }
-        );
-      }
+      });
+    }
 
-      // Neutralise the legacy hard-coded default admin that was seeded into
-      // the database, so only the env credentials can grant super-admin access.
-      if (inputEmail === 'admin@jackpot.com') {
-        return NextResponse.json(
-          { success: false, message: 'Incorrect email or password.' },
-          { status: 401 }
-        );
-      }
+    if (configuredAdminEmail && (inputEmail === envAdminEmail || inputEmail === nextPublicAdminEmail || inputEmail === 'admin@jackpot.com')) {
+      return NextResponse.json(
+        { success: false, message: 'Incorrect email or password.' },
+        { status: 401 }
+      );
     }
 
     const usersCollection = db.collection('users');
