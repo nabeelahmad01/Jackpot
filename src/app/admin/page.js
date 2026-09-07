@@ -66,11 +66,11 @@ export default function AdminPage({ portalName, forcedRole }) {
         }
       } catch (e) {
         setAuthenticated(true);
-        setAdminUser({ name: 'System Admin', email: 'admin@jackpot.com', role: 'admin' });
+        setAdminUser({ name: 'System Admin', email: process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'Rockyrock7682@gmail.com', role: 'admin' });
       }
     } else if (adminSession === 'active') {
       setAuthenticated(true);
-      setAdminUser({ name: 'System Admin', email: 'admin@jackpot.com', role: 'admin' });
+      setAdminUser({ name: 'System Admin', email: process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'Rockyrock7682@gmail.com', role: 'admin' });
     }
 
     // Multi-tab Real-Time Synchronization Listener
@@ -82,7 +82,7 @@ export default function AdminPage({ portalName, forcedRole }) {
           try {
             setAdminUser(JSON.parse(sess));
           } catch (err) {
-            setAdminUser({ name: 'System Admin', email: 'admin@jackpot.com', role: 'admin' });
+            setAdminUser({ name: 'System Admin', email: process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'Rockyrock7682@gmail.com', role: 'admin' });
           }
         } else {
           setAuthenticated(false);

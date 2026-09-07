@@ -60,11 +60,11 @@ export async function POST(req) {
     const isEnvAdmin = isEnvSuperAdminEmail(userEmail);
 
     const user = await db.collection('users').findOne(
-      { email: userEmail },
+      { email: { $regex: new RegExp(`^${userEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
       { projection: { _id: 1, role: 1, distributorId: 1 } }
     );
     const distributorDoc = await db.collection('distributors').findOne(
-      { email: userEmail },
+      { email: { $regex: new RegExp(`^${userEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
       { projection: { id: 1, email: 1 } }
     );
 
@@ -75,9 +75,9 @@ export async function POST(req) {
     let distributorId = '';
 
     if (audience === 'staff') {
-      const roleOk = isEnvAdmin || isStaffRole(user?.role);
-      const isDistributorStaff = Boolean(user?.distributorId);
-      if (!roleOk || isDistributorStaff) {
+      const isStaff = isEnvAdmin || isStaffRole(user?.role);
+      const isDistributorStaff = !isEnvAdmin && Boolean(user?.distributorId);
+      if (!isStaff || isDistributorStaff) {
         return NextResponse.json(
           { success: false, message: 'Only Jackpot Portal admin/staff can register for staff alerts.' },
           { status: 403 }
