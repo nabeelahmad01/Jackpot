@@ -12,18 +12,14 @@ export async function GET(req) {
       return NextResponse.json({ success: false, message: 'Missing distributorId or date.' }, { status: 400 });
     }
 
-    const targetDate = new Date(dateParam);
-    if (isNaN(targetDate.getTime())) {
+    const parts = dateParam.split('-').map(Number);
+    if (parts.length !== 3 || parts.some(isNaN)) {
       return NextResponse.json({ success: false, message: 'Invalid date format.' }, { status: 400 });
     }
-    const targetDateStr = targetDate.toDateString();
+    const [targetYear, targetMonth, targetDay] = parts;
 
-    const looseStart = new Date(targetDate);
-    looseStart.setDate(looseStart.getDate() - 1);
-    looseStart.setHours(0, 0, 0, 0);
-    const looseEnd = new Date(targetDate);
-    looseEnd.setDate(looseEnd.getDate() + 1);
-    looseEnd.setHours(23, 59, 59, 999);
+    const startWindow = new Date(Date.UTC(targetYear, targetMonth - 1, targetDay - 2, 0, 0, 0, 0));
+    const endWindow = new Date(Date.UTC(targetYear, targetMonth - 1, targetDay + 2, 23, 59, 59, 999));
 
     const db = await getDb();
     const distributorsCollection = db.collection('distributors');
@@ -48,33 +44,57 @@ export async function GET(req) {
     let totalDeposits = 0;
     let totalWithdrawals = 0;
 
+    const matchesTargetDate = (rawDate) => {
+      if (!rawDate) return false;
+      const str = String(rawDate).trim();
+      if (str.startsWith(dateParam)) return true;
+
+      const d = new Date(rawDate);
+      if (isNaN(d.getTime())) return false;
+
+      if (d.getUTCFullYear() === targetYear && (d.getUTCMonth() + 1) === targetMonth && d.getUTCDate() === targetDay) {
+        return true;
+      }
+      if (d.getFullYear() === targetYear && (d.getMonth() + 1) === targetMonth && d.getDate() === targetDay) {
+        return true;
+      }
+      const pkt = new Date(d.getTime() + 5 * 60 * 60 * 1000);
+      if (pkt.getUTCFullYear() === targetYear && (pkt.getUTCMonth() + 1) === targetMonth && pkt.getUTCDate() === targetDay) {
+        return true;
+      }
+      return false;
+    };
+
     if (playerEmails.length > 0) {
       const txs = await transactionsCollection.find(
         {
           userEmail: { $in: playerEmails },
           status: 'SUCCESS',
+          type: { $in: ['DEPOSIT', 'WITHDRAW'] },
+          isDepositFromCashout: { $ne: true },
           $or: [
-            { createdAt: { $gte: looseStart.toISOString(), $lte: looseEnd.toISOString() } },
-            { createdAt: { $gte: looseStart, $lte: looseEnd } },
-            { createdAt: { $exists: false } },
-            { createdAt: null },
-            { createdAt: '' }
+            { date: { $regex: `^${dateParam}` } },
+            { date: { $gte: startWindow.toISOString(), $lte: endWindow.toISOString() } },
+            { date: { $gte: startWindow, $lte: endWindow } },
+            { createdAt: { $gte: startWindow.toISOString(), $lte: endWindow.toISOString() } },
+            { createdAt: { $gte: startWindow, $lte: endWindow } }
           ]
         },
-        { projection: { amount: 1, payoutSent: 1, type: 1, date: 1, isDepositFromCashout: 1 } }
+        { projection: { amount: 1, payoutSent: 1, type: 1, date: 1, createdAt: 1, isDepositFromCashout: 1 } }
       ).toArray();
 
       txs.forEach(tx => {
-        if (!tx.date) return;
-        const txDate = new Date(tx.date);
-        if (txDate.toDateString() === targetDateStr) {
-          const amt = parseFloat(tx.amount || 0);
-          if (tx.type === 'DEPOSIT' && !tx.isDepositFromCashout) {
-            totalDeposits += amt;
-          } else if (tx.type === 'WITHDRAW') {
-            const val = (tx.payoutSent !== undefined && tx.payoutSent !== null) ? parseFloat(tx.payoutSent) : amt;
-            totalWithdrawals += val;
-          }
+        const isMatch = matchesTargetDate(tx.date) || matchesTargetDate(tx.createdAt);
+        if (!isMatch) return;
+
+        const amt = parseFloat(tx.amount || 0);
+        if (tx.type === 'DEPOSIT') {
+          totalDeposits += amt;
+        } else if (tx.type === 'WITHDRAW') {
+          const val = (tx.payoutSent !== undefined && tx.payoutSent !== null && tx.payoutSent !== '') 
+            ? parseFloat(tx.payoutSent) 
+            : amt;
+          totalWithdrawals += val;
         }
       });
     }
