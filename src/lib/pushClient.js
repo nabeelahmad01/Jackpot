@@ -260,9 +260,13 @@ async function subscribeToNativePush(userEmail, { audience = 'player', distribut
 }
 
 async function subscribeToWebPush(userEmail, { audience = 'player', distributorId = '' } = {}) {
+  if (typeof window !== 'undefined' && window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    throw new Error('Push notifications require HTTPS (SSL secure URL). Please open the site using https://');
+  }
+
   if (isIosDevice() && !isStandaloneDisplay()) {
     throw new Error(
-      'On iPhone, tap Share → Add to Home Screen, open Jackpot from that icon, then enable notifications.'
+      'On iPhone, tap Share (⬆) → Add to Home Screen, open Jackpot from that icon, then enable notifications.'
     );
   }
   if (
@@ -271,7 +275,7 @@ async function subscribeToWebPush(userEmail, { audience = 'player', distributorI
     !('PushManager' in window) ||
     !('Notification' in window)
   ) {
-    throw new Error('Push notifications are not supported on this device.');
+    throw new Error('Push notifications are not supported in this browser. Please open in Chrome / Edge or install the Jackpot Portal APK.');
   }
 
   // Ensure SW is controlling this page before PushManager.subscribe (required on iOS PWA).
@@ -370,19 +374,12 @@ async function subscribeToWebPush(userEmail, { audience = 'player', distributorI
 
 export async function subscribeToPromoPush(userEmail) {
   if (isNativePlatform()) {
-    try {
-      const audience = isDistributorNative()
-        ? 'distributor'
-        : isPortalNative()
-          ? 'staff'
-          : 'player';
-      return await subscribeToNativePush(userEmail, { audience });
-    } catch (error) {
-      const message = String(error?.message || '');
-      // Permission denied should not silently fall back.
-      if (/permission was not allowed/i.test(message)) throw error;
-      // Until Firebase is on the APK, use Web Push inside the WebView.
-    }
+    const audience = isDistributorNative()
+      ? 'distributor'
+      : isPortalNative()
+        ? 'staff'
+        : 'player';
+    return await subscribeToNativePush(userEmail, { audience });
   }
 
   return subscribeToWebPush(userEmail, { audience: 'player' });
@@ -391,12 +388,7 @@ export async function subscribeToPromoPush(userEmail) {
 /** Jackpot Portal (admin/staff) — lock-screen alerts for new requests. */
 export async function subscribeToStaffPush(userEmail) {
   if (isNativePlatform()) {
-    try {
-      return await subscribeToNativePush(userEmail, { audience: 'staff' });
-    } catch (error) {
-      const message = String(error?.message || '');
-      if (/permission was not allowed/i.test(message)) throw error;
-    }
+    return await subscribeToNativePush(userEmail, { audience: 'staff' });
   }
   return subscribeToWebPush(userEmail, { audience: 'staff' });
 }
@@ -404,15 +396,10 @@ export async function subscribeToStaffPush(userEmail) {
 /** Jackpot Distributor APK — lock-screen alerts for that distributor's requests. */
 export async function subscribeToDistributorPush(userEmail, distributorId) {
   if (isNativePlatform()) {
-    try {
-      return await subscribeToNativePush(userEmail, {
-        audience: 'distributor',
-        distributorId
-      });
-    } catch (error) {
-      const message = String(error?.message || '');
-      if (/permission was not allowed/i.test(message)) throw error;
-    }
+    return await subscribeToNativePush(userEmail, {
+      audience: 'distributor',
+      distributorId
+    });
   }
   return subscribeToWebPush(userEmail, {
     audience: 'distributor',
