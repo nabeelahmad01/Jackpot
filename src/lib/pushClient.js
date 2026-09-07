@@ -161,31 +161,55 @@ async function subscribeToNativePush(userEmail, { audience = 'player', distribut
     });
   }
 
+  let token = null;
+  try {
+    token = localStorage.getItem('jackpot_cached_native_token');
+  } catch {
+    /* ignore */
+  }
+
   let resolveToken;
   let rejectToken;
   const tokenPromise = new Promise((resolve, reject) => {
     resolveToken = resolve;
     rejectToken = reject;
   });
+
   const registrationHandle = await PushNotifications.addListener('registration', (result) => {
-    resolveToken(result.value);
+    if (result?.value) {
+      try {
+        localStorage.setItem('jackpot_cached_native_token', result.value);
+      } catch {}
+      resolveToken(result.value);
+    }
   });
   const errorHandle = await PushNotifications.addListener('registrationError', () => {
-    rejectToken(new Error('This native build is not connected to Firebase/APNs yet.'));
+    if (token) {
+      resolveToken(token);
+    } else {
+      rejectToken(new Error('This native build is not connected to Firebase/APNs yet.'));
+    }
   });
-  const timeout = window.setTimeout(
-    () => rejectToken(new Error('Push registration timed out.')),
-    15000
-  );
 
-  let token;
+  const timeout = window.setTimeout(() => {
+    if (token) {
+      resolveToken(token);
+    } else {
+      const cached = localStorage.getItem('jackpot_cached_native_token');
+      if (cached) resolveToken(cached);
+      else rejectToken(new Error('Push registration timed out.'));
+    }
+  }, token ? 2000 : 6000);
+
   try {
     await PushNotifications.register();
     token = await tokenPromise;
+  } catch (regErr) {
+    if (!token) throw regErr;
   } finally {
     window.clearTimeout(timeout);
-    await registrationHandle.remove();
-    await errorHandle.remove();
+    try { await registrationHandle.remove(); } catch {}
+    try { await errorHandle.remove(); } catch {}
   }
 
   const response = await fetch('/api/push-subscriptions', {

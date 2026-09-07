@@ -63,7 +63,22 @@ export default function AdminDashboard({
 }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [pushSyncState, setPushSyncState] = useState({ loading: false, success: false, message: '' });
   const suppressUrlSyncRef = React.useRef(true);
+
+  const handleSyncNotifications = async () => {
+    const email = adminUser?.email;
+    if (!email) return;
+    setPushSyncState({ loading: true, success: false, message: '' });
+    try {
+      await subscribeToStaffPush(email);
+      setPushSyncState({ loading: false, success: true, message: 'Device registered successfully!' });
+      setTimeout(() => setPushSyncState((prev) => ({ ...prev, message: '' })), 4000);
+    } catch (err) {
+      setPushSyncState({ loading: false, success: false, message: err?.message || 'Registration failed' });
+      setTimeout(() => setPushSyncState((prev) => ({ ...prev, message: '' })), 5000);
+    }
+  };
 
   // Sync tab from URL on mount and browser back/forward
   useEffect(() => {
@@ -1057,6 +1072,40 @@ export default function AdminDashboard({
               <i className="fa-solid fa-shield-halved"></i> {adminUser?.role?.replace('_', ' ') || 'Super Admin'}
             </span>
           </div>
+          <button
+            type="button"
+            onClick={handleSyncNotifications}
+            disabled={pushSyncState.loading}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.45rem',
+              padding: '0.55rem 0.6rem',
+              borderRadius: '8px',
+              border: pushSyncState.success
+                ? '1px solid rgba(74, 222, 128, 0.6)'
+                : '1px solid rgba(255, 215, 0, 0.35)',
+              background: pushSyncState.success
+                ? 'rgba(74, 222, 128, 0.15)'
+                : 'rgba(255, 215, 0, 0.08)',
+              color: pushSyncState.success ? '#4ade80' : '#ffe566',
+              fontSize: '0.7rem',
+              fontWeight: 800,
+              cursor: pushSyncState.loading ? 'wait' : 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <i className={`fa-solid ${pushSyncState.loading ? 'fa-spinner fa-spin' : pushSyncState.success ? 'fa-circle-check' : 'fa-bell'}`} />
+            <span>
+              {pushSyncState.loading
+                ? 'Connecting Device...'
+                : pushSyncState.message
+                ? pushSyncState.message
+                : '🔔 Sync / Enable Device Push'}
+            </span>
+          </button>
           <a
             href="/downloads/jackpot-portal.apk"
             download
